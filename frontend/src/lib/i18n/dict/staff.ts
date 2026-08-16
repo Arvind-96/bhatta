@@ -56,7 +56,7 @@ export const staffDict: Record<string, Record<Locale, string>> = {
     hi: "कोई चेहरा नहीं मिला — कैमरे की ओर देखें और फिर कोशिश करें",
   },
   "kiosk.markedPresent": { en: "Marked present: {name}", hi: "उपस्थित दर्ज: {name}" },
-  "kiosk.title": { en: "Attendance Kiosk", hi: "हाज़िरी कियोस्क" },
+  "kiosk.title": { en: "Attendance", hi: "हाज़िरी" },
   "kiosk.loadingFaceModel": { en: "Loading face model…", hi: "फेस मॉडल लोड हो रहा है…" },
   "kiosk.checkingLocation": { en: "Checking location…", hi: "स्थान जांचा जा रहा है…" },
   "kiosk.scanningFace": { en: "Scanning face…", hi: "चेहरा स्कैन हो रहा है…" },
