@@ -65,82 +65,6 @@ function KilnProfileSettings() {
   );
 }
 
-function AccountSettings() {
-  const { t } = useTranslation();
-  const user = useAuthStore((s) => s.user);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (newPassword !== confirmPassword) {
-      setError(t("settings.passwordMismatch"));
-      return;
-    }
-    setSaving(true);
-    try {
-      await api.changePassword(currentPassword, newPassword);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Card className="max-w-md">
-      <CardHeader>
-        <CardTitle>{t("settings.account")}</CardTitle>
-      </CardHeader>
-      <p className="mb-1 text-sm text-ink-primary">{user?.name}</p>
-      <p className="mb-4 text-sm text-ink-muted">{user?.email}</p>
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <input
-          required
-          type="password"
-          placeholder={t("settings.currentPassword")}
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          className={inputClass}
-        />
-        <input
-          required
-          type="password"
-          minLength={6}
-          placeholder={t("settings.newPassword")}
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          className={inputClass}
-        />
-        <input
-          required
-          type="password"
-          minLength={6}
-          placeholder={t("settings.confirmNewPassword")}
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className={inputClass}
-        />
-        {error && <p className="text-xs text-status-critical">{error}</p>}
-        <Button type="submit" disabled={saving}>
-          {saved ? t("settings.passwordUpdated") : saving ? t("settings.savingEllipsis") : t("settings.savePassword")}
-        </Button>
-      </form>
-    </Card>
-  );
-}
-
 function GeofenceSettings() {
   const { t } = useTranslation();
   const [latitude, setLatitude] = useState("");
@@ -535,7 +459,6 @@ export function Settings() {
   return (
     <div className="flex flex-wrap gap-4">
       <KilnProfileSettings />
-      <AccountSettings />
       <GeofenceSettings />
       <ChamberSettings />
       <YardCapacitySettings />

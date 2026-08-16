@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { eq, inArray, count } from "drizzle-orm";
+import { asc, eq, inArray, count } from "drizzle-orm";
 import { db } from "../db/client";
 import { kilns, users, kilnMemberships, people, ghers } from "../db/schema";
 import { env } from "../config/env";
@@ -122,6 +122,24 @@ export async function createAdditionalKiln(userId: string, name: string, locatio
 
 export async function listUserKilns(userId: string) {
   return listMemberships(userId);
+}
+
+// The app has no login screen, so the frontend has no session to derive a
+// kiln from on boot. This is the unauthenticated equivalent of a
+// login response's `kilns[0]` — the earliest-created kiln, which is this
+// deployment's one real bhatta (resolveKiln falls back to the same kiln
+// for every request that doesn't send an X-Kiln-Id).
+export async function defaultKilnPublicInfo() {
+  const kiln = db.select().from(kilns).orderBy(asc(kilns.createdAt)).get();
+  if (!kiln) throw new Error("No kiln configured yet");
+  return {
+    kilnId: kiln._id,
+    role: "OWNER" as const,
+    name: kiln.name,
+    location: kiln.location ?? undefined,
+    phone: kiln.phone ?? undefined,
+    needsSetup: await needsSetup(kiln._id, kiln.onboardedAt),
+  };
 }
 
 export async function setKilnGeofence(

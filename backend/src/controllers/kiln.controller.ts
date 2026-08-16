@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   completeOnboarding,
   createAdditionalKiln,
+  defaultKilnPublicInfo,
   listUserKilns,
   setKilnGeofence,
   setYardCapacity,
@@ -34,6 +35,14 @@ const profileSchema = z.object({
 export async function listKilns(req: AuthedRequest, res: Response) {
   const kilns = await listUserKilns(req.user!.id);
   res.json(kilns);
+}
+
+// Unauthenticated — this is how the frontend finds its kiln with no login
+// flow to hand it one. Mirrors a login response's `kilns[0]` shape so it
+// can be dropped straight into the auth store.
+export async function publicKiln(_req: AuthedRequest, res: Response) {
+  const kiln = await defaultKilnPublicInfo();
+  res.json(kiln);
 }
 
 export async function createKiln(req: AuthedRequest, res: Response) {

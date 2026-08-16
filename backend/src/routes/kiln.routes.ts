@@ -3,6 +3,7 @@ import {
   createKiln,
   finishOnboarding,
   listKilns,
+  publicKiln,
   updateGeofence,
   updateProfile,
   updateYardCapacity,
@@ -11,6 +12,8 @@ import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const kilnRouter = Router();
+
+kilnRouter.get("/public", asyncHandler(publicKiln));
 
 kilnRouter.use(requireAuth);
 kilnRouter.get("/", asyncHandler(listKilns));

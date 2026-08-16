@@ -1,42 +1,31 @@
 import { Server as HttpServer } from "http";
 import { Server as SocketServer } from "socket.io";
-import jwt from "jsonwebtoken";
-import { and, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { env } from "./env";
 import { db } from "../db/client";
-import { kilnMemberships } from "../db/schema";
+import { kilns } from "../db/schema";
 
 let io: SocketServer | null = null;
-
-interface SocketAuthPayload {
-  id: string;
-}
 
 export function initSocket(httpServer: HttpServer) {
   io = new SocketServer(httpServer, {
     cors: { origin: env.corsOrigin, credentials: true },
   });
 
-  // The client picks which of its kilns is "active" and sends it in the
-  // handshake; we verify membership here rather than trusting it, so a
-  // socket can never join a room for a kiln the user doesn't belong to.
-  io.use(async (socket, next) => {
+  // No login, so no membership to verify — a kilnId is honored if it names
+  // a real kiln, otherwise the socket joins the default (earliest-created)
+  // kiln's room, mirroring resolveKiln's HTTP-side fallback.
+  io.use((socket, next) => {
     try {
-      const { token, kilnId } = socket.handshake.auth as { token?: string; kilnId?: string };
-      if (!token || !kilnId) throw new Error("Missing auth token or kilnId");
+      const { kilnId } = socket.handshake.auth as { kilnId?: string };
+      const requested = kilnId ? db.select({ _id: kilns._id }).from(kilns).where(eq(kilns._id, kilnId)).get() : undefined;
+      const resolvedKilnId = requested?._id ?? db.select({ _id: kilns._id }).from(kilns).orderBy(asc(kilns.createdAt)).get()?._id;
+      if (!resolvedKilnId) throw new Error("No kiln configured yet");
 
-      const payload = jwt.verify(token, env.jwtSecret) as SocketAuthPayload;
-      const membership = db
-        .select()
-        .from(kilnMemberships)
-        .where(and(eq(kilnMemberships.userId, payload.id), eq(kilnMemberships.kilnId, kilnId)))
-        .get();
-      if (!membership) throw new Error("Not a member of this kiln");
-
-      socket.data.kilnId = kilnId;
+      socket.data.kilnId = resolvedKilnId;
       next();
-    } catch {
-      next(new Error("Unauthorized"));
+    } catch (err) {
+      next(err instanceof Error ? err : new Error("Unauthorized"));
     }
   });
 

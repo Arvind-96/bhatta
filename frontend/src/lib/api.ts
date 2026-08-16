@@ -185,6 +185,7 @@ export const api = {
     patch<{ ok: true }>("/auth/password", { currentPassword, newPassword }),
 
   kilns: {
+    public: () => get<UserKiln>("/kilns/public"),
     list: () => get<UserKiln[]>("/kilns"),
     create: (name: string, location?: string) => post<UserKiln>("/kilns", { name, location }),
     updateGeofence: (latitude: number, longitude: number, radiusMeters?: number) =>

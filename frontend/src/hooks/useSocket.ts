@@ -3,7 +3,7 @@ import { getSocket, reconnectSocket } from "@/lib/socket";
 import { useDashboardStore } from "@/store/dashboard.store";
 import { useAuthStore } from "@/store/auth.store";
 
-// Room membership is derived from (JWT, activeKilnId) on the server
+// Room membership is derived from activeKilnId on the server
 // (config/socket.ts) — switching the active kiln forces a fresh handshake
 // on the *same* client instance (reconnectSocket), not a new one, so every
 // useKilnEvent listener already attached elsewhere in the app stays live.

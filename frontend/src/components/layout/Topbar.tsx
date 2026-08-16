@@ -1,22 +1,17 @@
 import { useMemo, useRef, useState } from "react";
-import { Hammer, LogOut, Menu, Plus, Search } from "lucide-react";
+import { Hammer, Menu, Plus, Search } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboard.store";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
-import { destroySocket } from "@/lib/socket";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/hooks/useTranslation";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { navItems } from "./Sidebar";
-import { avatarToneSolidClass, initialsOf } from "@/lib/avatarTone";
-import { cn } from "@/lib/utils";
 
 export function Topbar() {
   const status = useDashboardStore((s) => s.connectionStatus);
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
   const kiln = kilns.find((k) => k.kilnId === activeKilnId);
   const view = useUiStore((s) => s.view);
   const setView = useUiStore((s) => s.setView);
@@ -46,11 +41,6 @@ export function Topbar() {
     setView(itemView);
     setQuery("");
     setSearchFocused(false);
-  }
-
-  function handleLogout() {
-    destroySocket();
-    logout();
   }
 
   return (
@@ -124,24 +114,6 @@ export function Topbar() {
           <span className={`h-1.5 w-1.5 rounded-full ${badge.dot} ${status === "online" ? "animate-pulse-ring" : ""}`} />
           <span className="hidden sm:inline">{badge.label}</span>
         </Badge>
-
-        <div
-          title={user?.email}
-          className={cn(
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-sm",
-            avatarToneSolidClass(user?.email ?? "u")
-          )}
-        >
-          {initialsOf(user?.name ?? user?.email ?? "U")}
-        </div>
-        <button
-          onClick={handleLogout}
-          title={t("topbar.logout")}
-          aria-label={t("topbar.logout")}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-status-critical/10 hover:text-status-critical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-        >
-          <LogOut className="h-4 w-4" />
-        </button>
       </div>
     </header>
   );
