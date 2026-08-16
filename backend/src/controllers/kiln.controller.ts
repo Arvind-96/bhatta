@@ -27,10 +27,21 @@ const yardCapacitySchema = z.object({
   yardCapacityBricks: z.number().positive(),
 });
 
-const seasonSchema = z.object({
-  seasonStartMonth: z.number().int().min(1).max(12),
-  seasonStartDay: z.number().int().min(1).max(31),
-});
+// A fixed non-leap reference year — this is a recurring annual anchor day,
+// not a specific calendar date, so Feb always caps at 28.
+function daysInMonth(month: number) {
+  return new Date(2023, month, 0).getDate();
+}
+
+const seasonSchema = z
+  .object({
+    seasonStartMonth: z.number().int().min(1).max(12),
+    seasonStartDay: z.number().int().min(1).max(31),
+  })
+  .refine((data) => data.seasonStartDay <= daysInMonth(data.seasonStartMonth), {
+    message: "seasonStartDay is not valid for the selected seasonStartMonth",
+    path: ["seasonStartDay"],
+  });
 
 const profileSchema = z.object({
   name: z.string().min(1).optional(),

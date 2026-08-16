@@ -242,6 +242,13 @@ const MONTH_OPTIONS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+// A fixed non-leap reference year (2023) — this is a recurring annual
+// anchor day, not tied to any specific year, so Feb is always capped at
+// 28 rather than sometimes allowing a Feb 29 that won't exist most years.
+function daysInMonth(month: number) {
+  return new Date(2023, month, 0).getDate();
+}
+
 function SeasonSettings() {
   const { t } = useTranslation();
   const kilns = useAuthStore((s) => s.kilns);
@@ -258,6 +265,13 @@ function SeasonSettings() {
     setStartMonth(activeKiln?.seasonStartMonth ?? 8);
     setStartDay(activeKiln?.seasonStartDay ?? 1);
   }, [activeKilnId]);
+
+  // Clamp the day whenever the month changes so e.g. picking February never
+  // leaves a previously-selected "31" sitting there as an invalid value.
+  function changeMonth(month: number) {
+    setStartMonth(month);
+    setStartDay((day) => Math.min(day, daysInMonth(month)));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -281,7 +295,7 @@ function SeasonSettings() {
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex gap-2">
-          <select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className={inputClass + " flex-1"}>
+          <select value={startMonth} onChange={(e) => changeMonth(Number(e.target.value))} className={inputClass + " flex-1"}>
             {MONTH_OPTIONS.map((name, i) => (
               <option key={name} value={i + 1}>
                 {name}
@@ -291,9 +305,9 @@ function SeasonSettings() {
           <input
             type="number"
             min={1}
-            max={31}
+            max={daysInMonth(startMonth)}
             value={startDay}
-            onChange={(e) => setStartDay(Number(e.target.value))}
+            onChange={(e) => setStartDay(Math.max(1, Math.min(Number(e.target.value), daysInMonth(startMonth))))}
             className={inputClass + " w-20"}
           />
         </div>

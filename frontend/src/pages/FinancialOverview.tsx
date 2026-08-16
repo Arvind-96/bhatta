@@ -236,7 +236,7 @@ export function FinancialOverview() {
                   <td className="py-2.5 text-ink-secondary">{row.label}</td>
                   {PERIOD_COLUMNS.map((c) => (
                     <td key={c.key} className={cn("py-2.5 text-right font-semibold tabular-nums", row.splitKey === "total" ? row.tone : "text-ink-primary")}>
-                      ₹{formatINR(overview[c.key][row.flowKey][row.splitKey])}
+                      ₹{formatINR(overview[c.key][row.flowKey]?.[row.splitKey] ?? 0)}
                     </td>
                   ))}
                 </tr>

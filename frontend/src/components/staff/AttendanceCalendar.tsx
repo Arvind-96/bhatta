@@ -85,9 +85,14 @@ export function AttendanceCalendar({ personId }: { personId: string }) {
         {leadingBlanks.map((_, i) => (
           <div key={`blank-${i}`} />
         ))}
-        {days.map((day) => {
-          const dateObj = new Date(day.date);
-          const dateKey = dateObj.toISOString().slice(0, 10);
+        {days.map((day, index) => {
+          // Derived from the array position (days[0] is always the 1st of
+          // the month, in order — see attendanceForPersonMonth) rather than
+          // parsing day.date with the Date object's local-timezone getters,
+          // which would show the wrong day number in any browser whose
+          // timezone sits behind UTC relative to the server's calendar day.
+          const dayOfMonth = index + 1;
+          const dateKey = `${cursor.year}-${String(cursor.month).padStart(2, "0")}-${String(dayOfMonth).padStart(2, "0")}`;
           return (
             <button
               key={dateKey}
@@ -98,7 +103,7 @@ export function AttendanceCalendar({ personId }: { personId: string }) {
               )}
               title={t(`calendar.${day.status === "HALF_DAY" ? "halfDay" : day.status.toLowerCase()}`)}
             >
-              {dateObj.getDate()}
+              {dayOfMonth}
             </button>
           );
         })}
