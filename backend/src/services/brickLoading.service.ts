@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
@@ -52,32 +52,47 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
     });
   }
 
-  // Auto-create a matching Dispatch so this trip shows up on the Dispatch
-  // page without a manual step — only when the admin hasn't already linked
-  // an existing dispatch, a category was chosen, and that category has a
-  // real price set (dispatches require a positive amount, so an unpriced
-  // category can't produce a valid one yet). Never lets a dispatch failure
-  // undo the already-saved loading entry — worst case is just no
-  // auto-linked dispatch, not a lost trip.
-  if (!input.dispatchId && input.categoryId) {
-    try {
-      const category = db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))).get();
-      if (category && category.pricePerBrick && category.pricePerBrick > 0) {
-        const amount = Math.round(input.bricksCount * category.pricePerBrick * 100) / 100;
-        const dispatch = await createDispatch({
-          kilnId: input.kilnId,
-          customerName: `Brick Loading — ${input.vehicleNumber}, ${(input.date ?? new Date()).toLocaleDateString("en-IN")}`,
-          bricksCount: input.bricksCount,
-          amount,
-          driverId: input.driverId,
-          categoryId: input.categoryId,
-          dispatchedOn: input.date,
-        });
-        db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, _id)).run();
-        entry = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)).get()!;
+  if (input.categoryId) {
+    const category = db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))).get();
+
+    if (category) {
+      // The bricks physically left the yard on this trip — deduct from
+      // that category's stock the same way the Stock page's manual
+      // "loading out" flow does (createStockLoadingEntry), just without a
+      // separate stockLoadingEntries row, since this brickLoadingEntries
+      // row is already the audit trail for the same physical movement.
+      db.update(brickCategories)
+        .set({ quantity: sql`${brickCategories.quantity} - ${input.bricksCount}` })
+        .where(eq(brickCategories._id, input.categoryId))
+        .run();
+      emitToKiln(input.kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)).get());
+
+      // Auto-create a matching Dispatch so this trip shows up on the
+      // Dispatch page without a manual step — only when the admin hasn't
+      // already linked an existing dispatch and this category has a real
+      // price set (dispatches require a positive amount, so an unpriced
+      // category can't produce a valid one yet). Never lets a dispatch
+      // failure undo the already-saved loading entry or the stock
+      // deduction above — worst case is just no auto-linked dispatch, not
+      // a lost trip.
+      if (!input.dispatchId && category.pricePerBrick && category.pricePerBrick > 0) {
+        try {
+          const amount = Math.round(input.bricksCount * category.pricePerBrick * 100) / 100;
+          const dispatch = await createDispatch({
+            kilnId: input.kilnId,
+            customerName: `Brick Loading — ${input.vehicleNumber}, ${(input.date ?? new Date()).toLocaleDateString("en-IN")}`,
+            bricksCount: input.bricksCount,
+            amount,
+            driverId: input.driverId,
+            categoryId: input.categoryId,
+            dispatchedOn: input.date,
+          });
+          db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, _id)).run();
+          entry = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)).get()!;
+        } catch (err) {
+          console.error("[brickLoading] auto-dispatch creation failed, loading entry still saved:", err);
+        }
       }
-    } catch (err) {
-      console.error("[brickLoading] auto-dispatch creation failed, loading entry still saved:", err);
     }
   }
 
@@ -107,6 +122,21 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
 
   db.update(brickLoadingEntries).set(input).where(eq(brickLoadingEntries._id, entryId)).run();
   const updated = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId)).get()!;
+
+  // A changed bricksCount means the original stock deduction (see
+  // createBrickLoadingEntry) is now off by the difference — correct the
+  // category's quantity by exactly that delta rather than re-deducting the
+  // new total, which would double-count the portion already applied.
+  if (input.bricksCount !== undefined && existing.categoryId) {
+    const delta = input.bricksCount - existing.bricksCount;
+    if (delta !== 0) {
+      db.update(brickCategories)
+        .set({ quantity: sql`${brickCategories.quantity} - ${delta}` })
+        .where(eq(brickCategories._id, existing.categoryId))
+        .run();
+      emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)).get());
+    }
+  }
 
   if (input.tipAmount !== undefined) {
     const delta = Math.round((input.tipAmount - oldTip) * 100) / 100;

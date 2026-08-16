@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "../db/client";
 import { people, ledgerEntries, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
@@ -166,7 +166,7 @@ export async function listOutstandingAdvances(kilnId: string) {
       .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, person._id)))
       .orderBy(asc(ledgerEntries.date))
       .all();
-    const balance = entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0);
+    const balance = Math.round(entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0) * 100) / 100;
     if (balance < 0) {
       const oldestAdvance = entries.find((e) => e.direction === "PAID");
       const daysPending = oldestAdvance
@@ -181,18 +181,17 @@ export async function listOutstandingAdvances(kilnId: string) {
 // "Whose payment is due" — the Overview dashboard's flip side of
 // listOutstandingAdvances: every person the kiln itself still owes money
 // to (wages/commission/salary earned but not yet paid out, purchases not
-// yet settled), across every person type that can carry a ledger balance
-// on this side of the relationship. Positive balance = kiln owes them.
+// yet settled, soil/contract dues not yet settled). Every non-CUSTOMER
+// type is included — not a hand-maintained allow-list, since a forgotten
+// type here (this previously missed LANDOWNER, THEKEDAR, and PARTNER —
+// real money, no other aggregate view surfaces it) silently hides real
+// dues from the owner rather than just failing loudly. Positive balance =
+// kiln owes them.
 export async function listPaymentsDue(kilnId: string) {
   const rows = await db
     .select()
     .from(people)
-    .where(
-      and(
-        eq(people.kilnId, kilnId),
-        inArray(people.type, ["WORKER", "HELPER", "LABOUR_CONTRACTOR", "MUNIM", "CHOWKIDAR", "DRIVER", "FITTER", "SUPPLIER"])
-      )
-    )
+    .where(and(eq(people.kilnId, kilnId), ne(people.type, "CUSTOMER")))
     .all();
 
   const results = [];
