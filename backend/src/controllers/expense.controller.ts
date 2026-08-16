@@ -2,13 +2,14 @@ import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { createExpense, expenseTotalsByCategory, listExpenses } from "../services/expense.service";
-import { EXPENSE_CATEGORIES } from "../db/schema";
+import { EXPENSE_CATEGORIES, LEDGER_PAYMENT_MODES } from "../db/schema";
 
 const categorySchema = z.enum(EXPENSE_CATEGORIES);
 
 const createSchema = z.object({
   category: categorySchema,
   amount: z.number().positive(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
   hours: z.number().positive().optional(),
   date: z.string().optional(),
   notes: z.string().optional(),

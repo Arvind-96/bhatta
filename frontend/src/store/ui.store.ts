@@ -19,6 +19,7 @@ export type AppView =
   | "stock"
   | "fleet"
   | "staff"
+  | "salary"
   | "kiosk"
   | "settings";
 

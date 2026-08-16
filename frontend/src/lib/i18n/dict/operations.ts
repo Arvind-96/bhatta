@@ -131,6 +131,7 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
     hi: "केवल यहाँ जोड़ी गई श्रेणियाँ ट्रैक होती हैं — जो इस भट्टे में उपयोग नहीं होतीं उन्हें हटा दें।",
   },
   "stock.addCategory": { en: "Add category", hi: "श्रेणी जोड़ें" },
+  "stock.allCategoriesAdded": { en: "All categories added", hi: "सभी श्रेणियां जोड़ी जा चुकी हैं" },
   "stock.category": { en: "Category", hi: "श्रेणी" },
   "stock.selectCategoryPlaceholder": { en: "Select category…", hi: "श्रेणी चुनें…" },
   "stock.noCategoriesYet": {

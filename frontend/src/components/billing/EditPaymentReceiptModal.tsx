@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
+import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import type { LedgerPaymentMode, PaymentReceipt } from "@/types";
 
 const inputClass =
@@ -27,6 +28,8 @@ export function EditPaymentReceiptModal({ receipt, personName, onClose, onSaved 
   const [amountPaid, setAmountPaid] = useState(String(receipt.amountPaid));
   const [totalAgreedAmount, setTotalAgreedAmount] = useState(receipt.totalAgreedAmount != null ? String(receipt.totalAgreedAmount) : "");
   const [paymentMode, setPaymentMode] = useState<LedgerPaymentMode | "">(receipt.paymentMode ?? "");
+  const [cashAmount, setCashAmount] = useState(receipt.cashAmount != null ? String(receipt.cashAmount) : "");
+  const [onlineAmount, setOnlineAmount] = useState(receipt.onlineAmount != null ? String(receipt.onlineAmount) : "");
   const [date, setDate] = useState(receipt.date.slice(0, 10));
   const [notes, setNotes] = useState(receipt.notes ?? "");
   const [saving, setSaving] = useState(false);
@@ -36,10 +39,13 @@ export function EditPaymentReceiptModal({ receipt, personName, onClose, onSaved 
     if (!amountPaid) return;
     setSaving(true);
     try {
+      const usingSplit = paymentMode === "CASH_AND_ONLINE";
       await api.paymentReceipts.update(receipt._id, {
         amountPaid: Number(amountPaid),
         totalAgreedAmount: totalAgreedAmount ? Number(totalAgreedAmount) : undefined,
         paymentMode: paymentMode || undefined,
+        cashAmount: usingSplit ? Number(cashAmount) : undefined,
+        onlineAmount: usingSplit ? Number(onlineAmount) : undefined,
         notes: notes || undefined,
         date,
       });
@@ -91,6 +97,7 @@ export function EditPaymentReceiptModal({ receipt, personName, onClose, onSaved 
               <option value="CASH">{t("billing.paymentCash")}</option>
               <option value="BANK">{t("billing.paymentBank")}</option>
               <option value="UPI">{t("billing.paymentUpi")}</option>
+              <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
             </select>
             <input
               required
@@ -100,6 +107,16 @@ export function EditPaymentReceiptModal({ receipt, personName, onClose, onSaved 
               className={inputClass}
             />
           </div>
+          {paymentMode === "CASH_AND_ONLINE" && (
+            <PaymentSplitFields
+              totalAmount={Number(amountPaid) || 0}
+              cashAmount={cashAmount}
+              onlineAmount={onlineAmount}
+              onCashAmountChange={setCashAmount}
+              onOnlineAmountChange={setOnlineAmount}
+              inputClassName={cn(inputClass, "w-full")}
+            />
+          )}
           <input
             placeholder={t("common.notesOptional")}
             value={notes}

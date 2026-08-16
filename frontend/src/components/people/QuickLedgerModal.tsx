@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { LedgerCategory, LedgerPaymentMode, Person } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
+import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 
 export type QuickLedgerCategory = "ADVANCE" | "KHARCHI" | "MEDICAL" | "FESTIVAL";
 
@@ -52,6 +53,8 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
   const title = t(meta.titleKey);
   const [amount, setAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState<LedgerPaymentMode>("CASH");
+  const [cashAmount, setCashAmount] = useState("");
+  const [onlineAmount, setOnlineAmount] = useState("");
   const [reason, setReason] = useState(t(meta.defaultReasonKey(isContractor)));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -70,6 +73,8 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
         amount: Number(amount),
         reason: reason.trim() || title,
         paymentMode,
+        cashAmount: paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
+        onlineAmount: paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
         category: category as LedgerCategory,
       });
       onSaved();
@@ -108,7 +113,18 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
             <option value="CASH">{t("people.cash")}</option>
             <option value="BANK">{t("people.bank")}</option>
             <option value="UPI">{t("people.upi")}</option>
+            <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
           </select>
+          {paymentMode === "CASH_AND_ONLINE" && (
+            <PaymentSplitFields
+              totalAmount={Number(amount) || 0}
+              cashAmount={cashAmount}
+              onlineAmount={onlineAmount}
+              onCashAmountChange={setCashAmount}
+              onOnlineAmountChange={setOnlineAmount}
+              inputClassName={inputClass}
+            />
+          )}
           <input placeholder={t("people.reason")} value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} />
           {error && <p className="text-xs font-medium text-status-critical">{error}</p>}
           <Button type="submit" disabled={loading} className="w-full">

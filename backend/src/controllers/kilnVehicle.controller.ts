@@ -10,6 +10,7 @@ import {
   listDieselEntries,
   listVehicles,
 } from "../services/kilnVehicle.service";
+import { LEDGER_PAYMENT_MODES } from "../db/schema";
 
 const createVehicleSchema = z.object({
   name: z.string().min(1),
@@ -36,6 +37,7 @@ const createDieselSchema = z.object({
   vehicleId: z.string(),
   quantityLiters: z.number().positive(),
   costAmount: z.number().nonnegative().optional(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
   date: z.string().optional(),
   notes: z.string().optional(),
 });

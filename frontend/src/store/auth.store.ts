@@ -12,6 +12,8 @@ export interface UserKiln {
   name: string;
   location?: string;
   phone?: string;
+  seasonStartMonth?: number;
+  seasonStartDay?: number;
   needsSetup?: boolean;
 }
 

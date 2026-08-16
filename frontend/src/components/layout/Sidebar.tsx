@@ -1,4 +1,4 @@
-import { Flame, LayoutGrid, Layers, ScanFace, Settings as SettingsIcon, Thermometer, Truck, Users, Hammer, PackageCheck, Wrench, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, Receipt, Wallet, Fuel as FuelIcon, Boxes, Warehouse, PieChart, X } from "lucide-react";
+import { Flame, LayoutGrid, Layers, ScanFace, Settings as SettingsIcon, Thermometer, Truck, Users, Hammer, PackageCheck, Wrench, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, Receipt, Wallet, Fuel as FuelIcon, Boxes, Warehouse, PieChart, Banknote, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KilnSwitcher } from "./KilnSwitcher";
 import { useUiStore, type AppView } from "@/store/ui.store";
@@ -41,6 +41,7 @@ export const navItems: { key: string; icon: typeof LayoutGrid; view: AppView; gr
   { key: "nav.fleet", icon: Wrench, view: "fleet", group: "nav.group.resources" },
 
   { key: "nav.staff", icon: UserCog, view: "staff", group: "nav.group.admin" },
+  { key: "nav.salary", icon: Banknote, view: "salary", group: "nav.group.admin" },
   { key: "nav.kiosk", icon: ScanFace, view: "kiosk", group: "nav.group.admin" },
   { key: "nav.settings", icon: SettingsIcon, view: "settings", group: "nav.group.admin" },
 ];

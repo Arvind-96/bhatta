@@ -8,6 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import type { LedgerCategory, LedgerEntry, LedgerPaymentMode, Person } from "@/types";
 import { formatINR } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
+import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 
 interface LedgerModalProps {
   person: Person;
@@ -31,6 +32,8 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
     amount: "",
     reason: "",
     paymentMode: "CASH" as LedgerPaymentMode,
+    cashAmount: "",
+    onlineAmount: "",
     category: undefined as LedgerCategory | undefined,
   });
   const [loading, setLoading] = useState(false);
@@ -73,14 +76,17 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
     setFormError("");
     setLoading(true);
     try {
+      const usingSplit = form.direction === "PAID" && form.paymentMode === "CASH_AND_ONLINE";
       await api.people.addLedger(person._id, {
         direction: form.direction,
         amount: Number(form.amount),
         reason: form.reason,
         paymentMode: form.direction === "PAID" ? form.paymentMode : undefined,
+        cashAmount: usingSplit ? Number(form.cashAmount) : undefined,
+        onlineAmount: usingSplit ? Number(form.onlineAmount) : undefined,
         category: form.category,
       });
-      setForm({ direction: "DUE", amount: "", reason: "", paymentMode: "CASH", category: undefined });
+      setForm({ direction: "DUE", amount: "", reason: "", paymentMode: "CASH", cashAmount: "", onlineAmount: "", category: undefined });
       await refresh();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : t("people.failedToAddLedgerEntry"));
@@ -247,6 +253,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                     <option value="CASH">{t("people.cash")}</option>
                     <option value="BANK">{t("people.bank")}</option>
                     <option value="UPI">{t("people.upi")}</option>
+                    <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
                   </select>
                 )}
               </div>
@@ -259,6 +266,16 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                 className="h-11 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
               />
+              {form.direction === "PAID" && !isCustomer && form.paymentMode === "CASH_AND_ONLINE" && (
+                <PaymentSplitFields
+                  totalAmount={Number(form.amount) || 0}
+                  cashAmount={form.cashAmount}
+                  onlineAmount={form.onlineAmount}
+                  onCashAmountChange={(v) => setForm((f) => ({ ...f, cashAmount: v }))}
+                  onOnlineAmountChange={(v) => setForm((f) => ({ ...f, onlineAmount: v }))}
+                  inputClassName="h-11 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+                />
+              )}
               {!isCustomer && !isPartner && (
                 <select
                   value={form.category ?? ""}

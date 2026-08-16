@@ -26,6 +26,7 @@ import { logisticsDict } from "./dict/logistics";
 import { operationsDict } from "./dict/operations";
 import { staffDict } from "./dict/staff";
 import { overviewDict } from "./dict/overview";
+import { salaryDict } from "./dict/salary";
 
 const coreDict: Record<string, Record<Locale, string>> = {
   "app.name": { en: "Bhatta Cloud", hi: "भट्टा क्लाउड" },
@@ -48,7 +49,8 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "nav.stock": { en: "Stock", hi: "स्टॉक" },
   "nav.fleet": { en: "Fleet & Machines", hi: "वाहन व मशीन" },
   "nav.staff": { en: "Staff", hi: "स्टाफ" },
-  "nav.kiosk": { en: "Attendance Kiosk", hi: "हाज़िरी कियोस्क" },
+  "nav.salary": { en: "Salary", hi: "वेतन" },
+  "nav.kiosk": { en: "Attendance", hi: "हाज़िरी" },
   "nav.settings": { en: "Settings", hi: "सेटिंग्स" },
 
   "topbar.kilnOverview": { en: "Kiln Overview", hi: "भट्टा अवलोकन" },
@@ -144,6 +146,10 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.vehicle": { en: "Vehicle", hi: "वाहन" },
   "common.driver": { en: "Driver", hi: "ड्राइवर" },
   "common.paymentMode": { en: "Payment mode", hi: "भुगतान का तरीका" },
+  "common.paymentModeCashAndOnline": { en: "Cash + Online", hi: "नकद + ऑनलाइन" },
+  "payment.cashAmount": { en: "Cash amount", hi: "नकद राशि" },
+  "payment.onlineAmount": { en: "Online amount", hi: "ऑनलाइन राशि" },
+  "payment.splitMismatch": { en: "Cash + Online must add up to ₹{total}", hi: "नकद + ऑनलाइन का योग ₹{total} होना चाहिए" },
   "common.new": { en: "New", hi: "नया" },
   "common.noneAddedYet": { en: "None added yet.", hi: "अभी तक कुछ नहीं जोड़ा गया।" },
   "common.paginationRange": { en: "{start}–{end} of {total}", hi: "{total} में से {start}–{end}" },
@@ -187,6 +193,7 @@ export const translations: Record<string, Record<Locale, string>> = {
   ...operationsDict,
   ...staffDict,
   ...overviewDict,
+  ...salaryDict,
 };
 
 // params supports simple {name}-style interpolation for strings that embed

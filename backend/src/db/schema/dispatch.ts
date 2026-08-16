@@ -1,8 +1,9 @@
 import { integer, real, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
+import { LEDGER_PAYMENT_MODES } from "./people";
 
 export const BRICK_GRADES = ["A1", "JHAMA", "PELA"] as const;
-export const DISPATCH_PAYMENT_MODES = ["CASH", "BANK", "UPI", "GST_INVOICE"] as const;
+export const DISPATCH_PAYMENT_MODES = ["CASH", "BANK", "UPI", "GST_INVOICE", "CASH_AND_ONLINE"] as const;
 
 export const dispatches = sqliteTable("dispatches", {
   _id: idColumn(),
@@ -21,6 +22,9 @@ export const dispatches = sqliteTable("dispatches", {
   returnedCount: integer("returnedCount").default(0),
   returnReason: text("returnReason"),
   paymentMode: text("paymentMode", { enum: DISPATCH_PAYMENT_MODES }),
+  // Only set when paymentMode is CASH_AND_ONLINE — must sum to `amount`.
+  cashAmount: real("cashAmount"),
+  onlineAmount: real("onlineAmount"),
   dispatchedOn: dateColumn("dispatchedOn"),
   localId: text("localId"),
   createdAt: createdAtColumn(),
@@ -80,6 +84,10 @@ export const expenses = sqliteTable("expenses", {
   kilnId: kilnIdColumn(),
   category: text("category", { enum: EXPENSE_CATEGORIES }).notNull(),
   amount: real("amount").notNull(),
+  // A single mode label is enough here (unlike dispatches/ledger entries) —
+  // expenses aren't customer-facing bills that get split payments, this
+  // just powers the Financial Overview's cash/online breakdown.
+  paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
   hours: real("hours"),
   date: dateColumn(),
   notes: text("notes"),

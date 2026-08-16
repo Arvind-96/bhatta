@@ -1,15 +1,17 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "../db/client";
-import { expenses, soilTrips, dispatches, EXPENSE_CATEGORIES } from "../db/schema";
+import { expenses, soilTrips, dispatches, EXPENSE_CATEGORIES, LEDGER_PAYMENT_MODES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+export type ExpensePaymentMode = Exclude<(typeof LEDGER_PAYMENT_MODES)[number], "CASH_AND_ONLINE">;
 
 export interface CreateExpenseInput {
   kilnId: string;
   category: ExpenseCategory;
   amount: number;
+  paymentMode?: ExpensePaymentMode;
   hours?: number;
   date?: Date;
   notes?: string;

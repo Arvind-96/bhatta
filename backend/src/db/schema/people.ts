@@ -87,7 +87,7 @@ export const LEDGER_CATEGORIES = [
   "WAGE", "COMMISSION", "SALARY", "TIP", "ADVANCE", "KHARCHI", "MEDICAL",
   "FESTIVAL", "SALE", "SOIL", "FUEL", "OTHER",
 ] as const;
-export const LEDGER_PAYMENT_MODES = ["CASH", "BANK", "UPI"] as const;
+export const LEDGER_PAYMENT_MODES = ["CASH", "BANK", "UPI", "CASH_AND_ONLINE"] as const;
 
 export const ledgerEntries = sqliteTable("ledger_entries", {
   _id: idColumn(),
@@ -98,6 +98,12 @@ export const ledgerEntries = sqliteTable("ledger_entries", {
   reason: text("reason").notNull(),
   category: text("category", { enum: LEDGER_CATEGORIES }),
   paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
+  // Only set when paymentMode is CASH_AND_ONLINE — the two must sum to
+  // `amount` (validated at the controller), so a split payment's cash vs.
+  // online portions can still be reported on accurately elsewhere (e.g.
+  // Financial Overview) instead of collapsing into one opaque label.
+  cashAmount: real("cashAmount"),
+  onlineAmount: real("onlineAmount"),
   contractId: text("contractId"),
   date: dateColumn(),
   createdAt: createdAtColumn(),
@@ -115,6 +121,8 @@ export const paymentReceipts = sqliteTable("payment_receipts", {
   balanceBefore: real("balanceBefore").notNull(),
   balanceAfter: real("balanceAfter").notNull(),
   paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
+  cashAmount: real("cashAmount"),
+  onlineAmount: real("onlineAmount"),
   notes: text("notes"),
   date: dateColumn(),
   createdAt: createdAtColumn(),
@@ -137,12 +145,16 @@ export const workEntries = sqliteTable("work_entries", {
   kilnDateIdx: index("workentry_kiln_date_idx").on(t.kilnId, t.date),
 }));
 
+// A row here is always an *exception* — everyone is implicitly PRESENT on
+// any date with no row (see attendance.service.ts's computeStatusForRange).
+// Only Absent/Half-day/Late overrides, or a kiosk-verified PRESENT check-in,
+// ever get written.
 export const attendances = sqliteTable("attendances", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
   personId: text("personId").notNull(),
   date: dateColumn().notNull(),
-  status: text("status", { enum: ["PRESENT", "ABSENT", "HALF_DAY"] }).notNull(),
+  status: text("status", { enum: ["PRESENT", "ABSENT", "HALF_DAY", "LATE"] }).notNull(),
   wageAmount: real("wageAmount"),
   createdAt: createdAtColumn(),
 }, (t) => ({

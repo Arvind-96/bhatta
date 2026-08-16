@@ -11,6 +11,10 @@ export const kilns = sqliteTable("kilns", {
   longitude: real("longitude"),
   radiusMeters: integer("radiusMeters").default(200),
   yardCapacityBricks: integer("yardCapacityBricks"),
+  // The bhatta season, e.g. Aug 1 – Jul 31 by default — used for
+  // season-scoped reporting. Month is 1-12, day is 1-31.
+  seasonStartMonth: integer("seasonStartMonth").default(8),
+  seasonStartDay: integer("seasonStartDay").default(1),
   createdAt: createdAtColumn(),
 });
 

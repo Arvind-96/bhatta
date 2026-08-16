@@ -1,4 +1,9 @@
 import type {
+  AttendanceStatus,
+  DayAttendance,
+  SalarySlip,
+  SalaryStatusEntry,
+  SimplePaymentMode,
   BrickCategory,
   BrickCategoryName,
   BrickGrade,
@@ -164,6 +169,8 @@ export const api = {
       transportCost?: number;
       transportPaidBy?: "OWNER" | "CUSTOMER";
       paymentMode?: PaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
     }) => post<Dispatch>("/dispatch", input, true),
     totals: (days = 7) => get<DispatchTotals>(`/dispatch/totals?days=${days}`, true),
     adjustment: (id: string, input: { breakageCount?: number; returnedCount?: number; returnReason?: string }) =>
@@ -192,6 +199,8 @@ export const api = {
       patch("/kilns/geofence", { latitude, longitude, radiusMeters }, true),
     updateYardCapacity: (yardCapacityBricks: number) =>
       patch("/kilns/yard-capacity", { yardCapacityBricks }, true),
+    updateSeason: (seasonStartMonth: number, seasonStartDay: number) =>
+      patch("/kilns/season", { seasonStartMonth, seasonStartDay }, true),
     updateProfile: (input: { name?: string; location?: string; phone?: string }) =>
       patch("/kilns/profile", input, true),
     completeOnboarding: () => post("/kilns/onboarding/complete", {}, true),
@@ -210,6 +219,8 @@ export const api = {
         amount: number;
         reason: string;
         paymentMode?: LedgerPaymentMode;
+        cashAmount?: number;
+        onlineAmount?: number;
         category?: LedgerCategory;
       }
     ) => post<LedgerEntry>(`/people/${id}/ledger`, input, true),
@@ -230,6 +241,8 @@ export const api = {
       amountPaid: number;
       totalAgreedAmount?: number;
       paymentMode?: LedgerPaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
       notes?: string;
       date?: string;
     }) => post<PaymentReceipt>("/payment-receipts", input, true),
@@ -239,6 +252,8 @@ export const api = {
         amountPaid?: number;
         totalAgreedAmount?: number;
         paymentMode?: LedgerPaymentMode;
+        cashAmount?: number;
+        onlineAmount?: number;
         notes?: string;
         date?: string;
       }
@@ -247,15 +262,24 @@ export const api = {
   },
 
   attendance: {
-    mark: (input: { personId: string; date: string; status: "PRESENT" | "ABSENT" | "HALF_DAY" }) =>
+    mark: (input: { personId: string; date: string; status: AttendanceStatus }) =>
       post("/attendance", input, true),
     listForDay: (date: string) => get(`/attendance?date=${date}`, true),
+    forPerson: (personId: string, month: string) =>
+      get<DayAttendance[]>(`/attendance/for-person/${personId}?month=${month}`, true),
     faceCheckIn: (input: { descriptor: number[]; latitude: number; longitude: number }) =>
       post<{ person: { id: string; name: string }; matchDistance: number }>(
         "/attendance/face-checkin",
         input,
         true
       ),
+  },
+
+  salary: {
+    status: (month: string) => get<SalaryStatusEntry[]>(`/salary?month=${month}`, true),
+    generate: (month?: string) => post<{ month: string; generated: number; failed: unknown[] }>("/salary/generate", { month }, true),
+    forPerson: (personId: string) => get<SalarySlip[]>(`/salary/for-person/${personId}`, true),
+    pdfUrl: (slipId: string, lang: "en" | "hi") => `${API_URL}/api/salary/${slipId}/pdf?lang=${lang}`,
   },
 
   soilTrips: {
@@ -384,6 +408,7 @@ export const api = {
     create: (input: {
       category: ExpenseCategory;
       amount: number;
+      paymentMode?: SimplePaymentMode;
       hours?: number;
       notes?: string;
       soilTripId?: string;
@@ -630,7 +655,7 @@ export const api = {
     create: (input: { name: string; type: string }) => post<KilnVehicle>("/kiln-vehicles", input, true),
     remove: (id: string) => del(`/kiln-vehicles/${id}`, true),
     listDiesel: (days = 60) => get<VehicleDieselEntry[]>(`/kiln-vehicles/diesel?days=${days}`, true),
-    logDiesel: (input: { vehicleId: string; quantityLiters: number; costAmount?: number; date?: string; notes?: string }) =>
+    logDiesel: (input: { vehicleId: string; quantityLiters: number; costAmount?: number; paymentMode?: SimplePaymentMode; date?: string; notes?: string }) =>
       post<VehicleDieselEntry>("/kiln-vehicles/diesel", input, true),
     removeDiesel: (id: string) => del(`/kiln-vehicles/diesel/${id}`, true),
     dieselPeriodTotals: () => get<DieselPeriodTotals>("/kiln-vehicles/diesel/period-totals", true),
@@ -670,6 +695,7 @@ export const api = {
       actualWeightKg: number;
       amount: number;
       paidAmount?: number;
+      paymentMode?: SimplePaymentMode;
       notes?: string;
     }) => post<FuelPurchase>("/fuel-purchases", input, true),
     stockBalance: () => get<Record<string, number>>("/fuel-purchases/stock-balance", true),

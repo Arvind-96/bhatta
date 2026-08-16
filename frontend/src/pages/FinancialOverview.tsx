@@ -23,7 +23,7 @@ function usePeriodColumns(): { key: keyof Pick<FinancialOverviewData, "today" | 
   ];
 }
 
-type FlowNumberKey = Exclude<keyof FinancialFlow, "breakdown">;
+type FlowNumberKey = Exclude<keyof FinancialFlow, "breakdown" | "moneyIn" | "moneyOut">;
 
 function useFlowRows(): { key: FlowNumberKey; label: string; unit?: string; tone?: string }[] {
   const { t } = useTranslation();
@@ -193,6 +193,52 @@ export function FinancialOverview() {
                       </td>
                     );
                   })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-series-3/10">
+              <Wallet className="h-4 w-4 text-series-3" />
+            </div>
+            <CardTitle>{t("financialOverview.paymentMethodBreakdown")}</CardTitle>
+          </div>
+        </CardHeader>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-sm text-ink-muted">
+                <th className="pb-2 font-medium">{t("financialOverview.metric")}</th>
+                {PERIOD_COLUMNS.map((c) => (
+                  <th key={c.key} className="pb-2 font-medium text-right">
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(
+                [
+                  { flowKey: "moneyIn", splitKey: "cash", label: t("financialOverview.moneyInCash"), tone: "text-status-good" },
+                  { flowKey: "moneyIn", splitKey: "online", label: t("financialOverview.moneyInOnline"), tone: "text-status-good" },
+                  { flowKey: "moneyIn", splitKey: "total", label: t("financialOverview.moneyInTotal"), tone: "text-status-good" },
+                  { flowKey: "moneyOut", splitKey: "cash", label: t("financialOverview.moneyOutCash"), tone: "text-status-critical" },
+                  { flowKey: "moneyOut", splitKey: "online", label: t("financialOverview.moneyOutOnline"), tone: "text-status-critical" },
+                  { flowKey: "moneyOut", splitKey: "total", label: t("financialOverview.moneyOutTotal"), tone: "text-status-critical" },
+                ] as const
+              ).map((row) => (
+                <tr key={`${row.flowKey}-${row.splitKey}`} className="border-b border-border/60 last:border-0">
+                  <td className="py-2.5 text-ink-secondary">{row.label}</td>
+                  {PERIOD_COLUMNS.map((c) => (
+                    <td key={c.key} className={cn("py-2.5 text-right font-semibold tabular-nums", row.splitKey === "total" ? row.tone : "text-ink-primary")}>
+                      ₹{formatINR(overview[c.key][row.flowKey][row.splitKey])}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>

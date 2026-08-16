@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { FuelEfficiency, FuelLog, FuelPurchase, FuelType, Gher, Person, SupplierFuelBalance } from "@/types";
+import type { FuelEfficiency, FuelLog, FuelPurchase, FuelType, Gher, Person, SimplePaymentMode, SupplierFuelBalance } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -232,6 +232,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
     actualWeightKg: "",
     amount: "",
     paidAmount: "",
+    paymentMode: "" as "" | SimplePaymentMode,
   });
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -279,6 +280,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
         actualWeightKg: Number(form.actualWeightKg),
         amount: Number(form.amount),
         paidAmount: form.paidAmount ? Number(form.paidAmount) : undefined,
+        paymentMode: form.paymentMode || undefined,
       });
       setForm((f) => ({
         ...f,
@@ -288,6 +290,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
         actualWeightKg: "",
         amount: "",
         paidAmount: "",
+        paymentMode: "",
       }));
       setShowForm(false);
       await refresh();
@@ -369,6 +372,16 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
               onChange={(e) => setForm((f) => ({ ...f, paidAmount: e.target.value }))}
               className={inputClass}
             />
+            <select
+              value={form.paymentMode}
+              onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value as "" | SimplePaymentMode }))}
+              className={inputClass}
+            >
+              <option value="">{t("common.paymentMode")}</option>
+              <option value="CASH">{t("billing.paymentCash")}</option>
+              <option value="BANK">{t("billing.paymentBank")}</option>
+              <option value="UPI">{t("billing.paymentUpi")}</option>
+            </select>
             {shortfall > 0 && (
               <p
                 className={cn(

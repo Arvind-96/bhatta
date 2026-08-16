@@ -1,5 +1,6 @@
 import { integer, real, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
+import { LEDGER_PAYMENT_MODES } from "./people";
 
 export const MACHINE_TYPES = [
   "TRACTOR", "TRUCK", "JCB", "PUG_MILL", "MOLDING_MACHINE", "WEIGHBRIDGE",
@@ -81,6 +82,7 @@ export const fuelPurchases = sqliteTable("fuel_purchases", {
   actualWeightKg: real("actualWeightKg").notNull(),
   amount: real("amount").notNull(),
   paidAmount: real("paidAmount").default(0),
+  paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
@@ -111,6 +113,7 @@ export const vehicleDieselEntries = sqliteTable("vehicle_diesel_entries", {
   vehicleId: text("vehicleId").notNull(),
   quantityLiters: real("quantityLiters").notNull(),
   costAmount: real("costAmount"),
+  paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),

@@ -6,6 +6,7 @@ import {
   defaultKilnPublicInfo,
   listUserKilns,
   setKilnGeofence,
+  setSeason,
   setYardCapacity,
   updateKilnProfile,
 } from "../services/auth.service";
@@ -24,6 +25,11 @@ const geofenceSchema = z.object({
 
 const yardCapacitySchema = z.object({
   yardCapacityBricks: z.number().positive(),
+});
+
+const seasonSchema = z.object({
+  seasonStartMonth: z.number().int().min(1).max(12),
+  seasonStartDay: z.number().int().min(1).max(31),
 });
 
 const profileSchema = z.object({
@@ -62,6 +68,12 @@ export async function updateGeofence(req: AuthedRequest, res: Response) {
 export async function updateYardCapacity(req: AuthedRequest, res: Response) {
   const input = yardCapacitySchema.parse(req.body);
   const kiln = await setYardCapacity(req.kiln!.id, input.yardCapacityBricks);
+  res.json(kiln);
+}
+
+export async function updateSeason(req: AuthedRequest, res: Response) {
+  const input = seasonSchema.parse(req.body);
+  const kiln = await setSeason(req.kiln!.id, input.seasonStartMonth, input.seasonStartDay);
   res.json(kiln);
 }
 

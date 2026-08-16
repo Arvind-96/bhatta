@@ -6,6 +6,7 @@ import {
   publicKiln,
   updateGeofence,
   updateProfile,
+  updateSeason,
   updateYardCapacity,
 } from "../controllers/kiln.controller";
 import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
@@ -20,5 +21,6 @@ kilnRouter.get("/", asyncHandler(listKilns));
 kilnRouter.post("/", asyncHandler(createKiln));
 kilnRouter.patch("/geofence", resolveKiln, asyncHandler(updateGeofence));
 kilnRouter.patch("/yard-capacity", resolveKiln, asyncHandler(updateYardCapacity));
+kilnRouter.patch("/season", resolveKiln, asyncHandler(updateSeason));
 kilnRouter.patch("/profile", resolveKiln, asyncHandler(updateProfile));
 kilnRouter.post("/onboarding/complete", resolveKiln, asyncHandler(finishOnboarding));

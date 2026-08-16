@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
+import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import type { BrickGrade, Dispatch as DispatchEntry, FinishedGoodsReconciliation, LoadingEntry, PaymentMode, Person } from "@/types";
 
 const inputClass =
@@ -33,6 +34,8 @@ function DispatchesTab() {
     transportCost: "",
     transportPaidBy: "OWNER" as "OWNER" | "CUSTOMER",
     paymentMode: "CASH" as PaymentMode,
+    cashAmount: "",
+    onlineAmount: "",
   });
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -80,6 +83,8 @@ function DispatchesTab() {
         transportCost: form.transportCost ? Number(form.transportCost) : undefined,
         transportPaidBy: form.transportCost ? form.transportPaidBy : undefined,
         paymentMode: form.paymentMode,
+        cashAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.cashAmount) : undefined,
+        onlineAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.onlineAmount) : undefined,
       });
       setForm({
         customerId: "",
@@ -91,6 +96,8 @@ function DispatchesTab() {
         transportCost: "",
         transportPaidBy: "OWNER",
         paymentMode: "CASH",
+        cashAmount: "",
+        onlineAmount: "",
       });
       setShowForm(false);
       await refresh();
@@ -169,7 +176,18 @@ function DispatchesTab() {
               <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
               <option value="UPI">{t("dispatch.paymentUpi")}</option>
               <option value="GST_INVOICE">{t("dispatch.paymentGstInvoice")}</option>
+              <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
             </select>
+            {form.paymentMode === "CASH_AND_ONLINE" && (
+              <PaymentSplitFields
+                totalAmount={Number(form.amount) || 0}
+                cashAmount={form.cashAmount}
+                onlineAmount={form.onlineAmount}
+                onCashAmountChange={(v) => setForm((f) => ({ ...f, cashAmount: v }))}
+                onOnlineAmountChange={(v) => setForm((f) => ({ ...f, onlineAmount: v }))}
+                inputClassName={inputClass}
+              />
+            )}
             <input
               required
               type="number"

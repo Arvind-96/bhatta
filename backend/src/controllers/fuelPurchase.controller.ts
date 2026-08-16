@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { createFuelPurchase, fuelStockBalance, listFuelPurchases, supplierFuelBalances } from "../services/fuelPurchase.service";
+import { LEDGER_PAYMENT_MODES } from "../db/schema";
 
 const createSchema = z.object({
   fuelType: z.string().min(1),
@@ -11,6 +12,7 @@ const createSchema = z.object({
   actualWeightKg: z.number().positive(),
   amount: z.number().positive(),
   paidAmount: z.number().nonnegative().optional(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
   date: z.string().optional(),
   notes: z.string().optional(),
 });

@@ -94,6 +94,12 @@ export const staffDict: Record<string, Record<Locale, string>> = {
   },
   "settings.yardCapacityPlaceholder": { en: "Yard capacity (bricks)", hi: "यार्ड क्षमता (ईंटें)" },
   "settings.saveCapacity": { en: "Save capacity", hi: "क्षमता सहेजें" },
+  "settings.bhattaSeason": { en: "Bhatta Season", hi: "भट्टा सीज़न" },
+  "settings.bhattaSeasonDescription": {
+    en: "The bhatta season generally runs Aug 1 – Jul 31. Change this if this kiln's season starts differently.",
+    hi: "भट्टा सीज़न आमतौर पर 1 अगस्त से 31 जुलाई तक चलता है। अगर इस भट्टे का सीज़न अलग से शुरू होता है तो यहाँ बदलें।",
+  },
+  "settings.saveSeason": { en: "Save season", hi: "सीज़न सहेजें" },
   "settings.pcbConsent": { en: "PCB Consent to Operate", hi: "PCB संचालन सहमति" },
   "settings.miningRoyaltyLicense": { en: "Mining Royalty License", hi: "खनन रॉयल्टी लाइसेंस" },
   "settings.zigZagCertificate": { en: "Zig-Zag Conversion Certificate", hi: "ज़िग-ज़ैग परिवर्तन प्रमाणपत्र" },

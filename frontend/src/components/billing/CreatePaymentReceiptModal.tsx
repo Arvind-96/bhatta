@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { printPaymentReceipt } from "@/lib/printDocument";
 import { useTranslation } from "@/hooks/useTranslation";
 import { usePersonTypeMeta, PERSON_TYPES } from "@/components/people/personTypes";
+import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import type { LedgerPaymentMode, Person, PersonType } from "@/types";
 
 const inputClass =
@@ -39,6 +40,8 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
   const [amountPaid, setAmountPaid] = useState("");
   const [totalAgreedAmount, setTotalAgreedAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState<LedgerPaymentMode | "">("");
+  const [cashAmount, setCashAmount] = useState("");
+  const [onlineAmount, setOnlineAmount] = useState("");
   const [date, setDate] = useState(todayIso());
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -82,11 +85,14 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
     if (!selectedPerson || !amountPaid) return;
     setSaving(true);
     try {
+      const usingSplit = paymentMode === "CASH_AND_ONLINE";
       const receipt = await api.paymentReceipts.create({
         personId: selectedPerson._id,
         amountPaid: Number(amountPaid),
         totalAgreedAmount: totalAgreedAmount ? Number(totalAgreedAmount) : undefined,
         paymentMode: paymentMode || undefined,
+        cashAmount: usingSplit ? Number(cashAmount) : undefined,
+        onlineAmount: usingSplit ? Number(onlineAmount) : undefined,
         notes: notes || undefined,
         date,
       });
@@ -220,6 +226,7 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
               <option value="CASH">{t("billing.paymentCash")}</option>
               <option value="BANK">{t("billing.paymentBank")}</option>
               <option value="UPI">{t("billing.paymentUpi")}</option>
+              <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
             </select>
             <input
               required
@@ -229,6 +236,16 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
               className={inputClass}
             />
           </div>
+          {paymentMode === "CASH_AND_ONLINE" && (
+            <PaymentSplitFields
+              totalAmount={Number(amountPaid) || 0}
+              cashAmount={cashAmount}
+              onlineAmount={onlineAmount}
+              onCashAmountChange={setCashAmount}
+              onOnlineAmountChange={setOnlineAmount}
+              inputClassName={cn(inputClass, "w-full")}
+            />
+          )}
           <input
             placeholder={t("common.notesOptional")}
             value={notes}

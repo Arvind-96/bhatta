@@ -21,6 +21,7 @@ import {
   LEDGER_PAYMENT_MODES,
   STACKING_STAGES,
 } from "../db/schema";
+import { validateCashOnlineSplit } from "../utils/paymentSplit";
 
 const personTypeSchema = z.enum(PERSON_TYPES);
 
@@ -66,14 +67,18 @@ const createSchema = z.object({
 
 const updateSchema = createSchema.partial().extend({ active: z.boolean().optional() });
 
-const ledgerSchema = z.object({
-  direction: z.enum(["DUE", "PAID"]),
-  amount: z.number().positive(),
-  reason: z.string(),
-  date: z.string().optional(),
-  paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
-  category: z.enum(LEDGER_CATEGORIES).optional(),
-});
+const ledgerSchema = z
+  .object({
+    direction: z.enum(["DUE", "PAID"]),
+    amount: z.number().positive(),
+    reason: z.string(),
+    date: z.string().optional(),
+    paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
+    cashAmount: z.number().min(0).optional(),
+    onlineAmount: z.number().min(0).optional(),
+    category: z.enum(LEDGER_CATEGORIES).optional(),
+  })
+  .superRefine((data, ctx) => validateCashOnlineSplit(data, data.amount, ctx));
 
 export async function create(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);
@@ -130,6 +135,8 @@ export async function addLedger(req: AuthedRequest, res: Response) {
     reason: input.reason,
     date: input.date ? new Date(input.date) : undefined,
     paymentMode: input.paymentMode,
+    cashAmount: input.cashAmount,
+    onlineAmount: input.onlineAmount,
     category: input.category,
   });
   res.status(201).json(entry);

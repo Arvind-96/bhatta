@@ -59,6 +59,8 @@ async function listMemberships(userId: string) {
         name: kiln?.name ?? "Unknown",
         location: kiln?.location,
         phone: kiln?.phone,
+        seasonStartMonth: kiln?.seasonStartMonth ?? 8,
+        seasonStartDay: kiln?.seasonStartDay ?? 1,
         needsSetup: await needsSetup(m.kilnId, kiln?.onboardedAt),
       };
     })
@@ -138,6 +140,8 @@ export async function defaultKilnPublicInfo() {
     name: kiln.name,
     location: kiln.location ?? undefined,
     phone: kiln.phone ?? undefined,
+    seasonStartMonth: kiln.seasonStartMonth ?? 8,
+    seasonStartDay: kiln.seasonStartDay ?? 1,
     needsSetup: await needsSetup(kiln._id, kiln.onboardedAt),
   };
 }
@@ -157,6 +161,13 @@ export async function setKilnGeofence(
 
 export async function setYardCapacity(kilnId: string, yardCapacityBricks: number) {
   db.update(kilns).set({ yardCapacityBricks }).where(eq(kilns._id, kilnId)).run();
+  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+  if (!kiln) throw new Error("Kiln not found");
+  return kiln;
+}
+
+export async function setSeason(kilnId: string, seasonStartMonth: number, seasonStartDay: number) {
+  db.update(kilns).set({ seasonStartMonth, seasonStartDay }).where(eq(kilns._id, kilnId)).run();
   const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
   if (!kiln) throw new Error("Kiln not found");
   return kiln;

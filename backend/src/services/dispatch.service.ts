@@ -35,6 +35,8 @@ export interface CreateDispatchInput {
   transportCost?: number;
   transportPaidBy?: "OWNER" | "CUSTOMER";
   paymentMode?: PaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   dispatchedOn?: Date;
 }
 

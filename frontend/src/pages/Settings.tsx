@@ -237,6 +237,74 @@ function YardCapacitySettings() {
   );
 }
 
+const MONTH_OPTIONS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function SeasonSettings() {
+  const { t } = useTranslation();
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const setKilns = useAuthStore((s) => s.setKilns);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+
+  const [startMonth, setStartMonth] = useState(activeKiln?.seasonStartMonth ?? 8);
+  const [startDay, setStartDay] = useState(activeKiln?.seasonStartDay ?? 1);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setStartMonth(activeKiln?.seasonStartMonth ?? 8);
+    setStartDay(activeKiln?.seasonStartDay ?? 1);
+  }, [activeKilnId]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.kilns.updateSeason(startMonth, startDay);
+      setKilns(kilns.map((k) => (k.kilnId === activeKilnId ? { ...k, seasonStartMonth: startMonth, seasonStartDay: startDay } : k)));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle>{t("settings.bhattaSeason")}</CardTitle>
+      </CardHeader>
+      <p className="mb-4 text-sm text-ink-muted">{t("settings.bhattaSeasonDescription")}</p>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <select value={startMonth} onChange={(e) => setStartMonth(Number(e.target.value))} className={inputClass + " flex-1"}>
+            {MONTH_OPTIONS.map((name, i) => (
+              <option key={name} value={i + 1}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={1}
+            max={31}
+            value={startDay}
+            onChange={(e) => setStartDay(Number(e.target.value))}
+            className={inputClass + " w-20"}
+          />
+        </div>
+        <Button type="submit" disabled={saving}>
+          {saved ? t("settings.saved") : saving ? t("settings.savingEllipsis") : t("settings.saveSeason")}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
 const COMPLIANCE_LABEL_KEYS: Record<ComplianceDocumentType, string> = {
   PCB_CONSENT_TO_OPERATE: "settings.pcbConsent",
   MINING_ROYALTY_LICENSE: "settings.miningRoyaltyLicense",
@@ -462,6 +530,7 @@ export function Settings() {
       <GeofenceSettings />
       <ChamberSettings />
       <YardCapacitySettings />
+      <SeasonSettings />
       <ComplianceSettings />
       <StockAuditSettings />
     </div>

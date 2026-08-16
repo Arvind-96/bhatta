@@ -16,6 +16,8 @@ export interface AddLedgerEntryInput {
   date?: Date;
   contractId?: string;
   paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   category?: LedgerCategory;
 }
 

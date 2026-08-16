@@ -164,10 +164,12 @@ function BrickStockSection() {
           <h3 className="text-sm font-semibold text-ink-primary">{t("stock.brickCategoriesHeading")}</h3>
           <p className="text-sm text-ink-muted">{t("stock.categoriesSubtitle")}</p>
         </div>
-        {availableCategories.length > 0 && (
+        {availableCategories.length > 0 ? (
           <Button size="sm" onClick={() => setShowAddCategory((s) => !s)}>
             <Plus className="h-4 w-4" /> {t("stock.addCategory")}
           </Button>
+        ) : (
+          <span className="rounded-full bg-ink-primary/5 px-2.5 py-1 text-sm text-ink-muted">{t("stock.allCategoriesAdded")}</span>
         )}
       </div>
 

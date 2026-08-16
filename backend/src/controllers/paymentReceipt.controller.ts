@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { LEDGER_PAYMENT_MODES } from "../db/schema";
+import { validateCashOnlineSplit } from "../utils/paymentSplit";
 import {
   createPaymentReceipt,
   deletePaymentReceipt,
@@ -10,22 +11,32 @@ import {
   updatePaymentReceipt,
 } from "../services/paymentReceipt.service";
 
-const createSchema = z.object({
-  personId: z.string(),
-  amountPaid: z.number().positive(),
-  totalAgreedAmount: z.number().nonnegative().optional(),
-  paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
-  notes: z.string().optional(),
-  date: z.string().optional(),
-});
+const createSchema = z
+  .object({
+    personId: z.string(),
+    amountPaid: z.number().positive(),
+    totalAgreedAmount: z.number().nonnegative().optional(),
+    paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
+    cashAmount: z.number().min(0).optional(),
+    onlineAmount: z.number().min(0).optional(),
+    notes: z.string().optional(),
+    date: z.string().optional(),
+  })
+  .superRefine((data, ctx) => validateCashOnlineSplit(data, data.amountPaid, ctx));
 
-const updateSchema = z.object({
-  amountPaid: z.number().positive().optional(),
-  totalAgreedAmount: z.number().nonnegative().optional(),
-  paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
-  notes: z.string().optional(),
-  date: z.string().optional(),
-});
+const updateSchema = z
+  .object({
+    amountPaid: z.number().positive().optional(),
+    totalAgreedAmount: z.number().nonnegative().optional(),
+    paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
+    cashAmount: z.number().min(0).optional(),
+    onlineAmount: z.number().min(0).optional(),
+    notes: z.string().optional(),
+    date: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.amountPaid != null) validateCashOnlineSplit(data, data.amountPaid, ctx);
+  });
 
 export async function create(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);

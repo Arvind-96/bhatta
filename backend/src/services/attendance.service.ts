@@ -1,8 +1,7 @@
 import { randomUUID } from "crypto";
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { attendances, people, kilns } from "../db/schema";
-import { assertPersonOfType } from "./person.service";
 import { emitToKiln } from "../config/socket";
 import { euclideanDistance, haversineDistanceMeters } from "../utils/geo";
 
@@ -11,12 +10,28 @@ import { euclideanDistance, haversineDistanceMeters } from "../utils/geo";
 // scans again) for near-zero false accepts (wrong person credited).
 const FACE_MATCH_THRESHOLD = 0.5;
 
+export type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "LATE";
+
 export interface MarkAttendanceInput {
   kilnId: string;
   personId: string;
   date: Date;
-  status: "PRESENT" | "ABSENT" | "HALF_DAY";
+  status: AttendanceStatus;
   wageAmount?: number;
+}
+
+// Eligible for attendance marking: WORKER/HELPER (piece-rate, kiosk
+// check-in) plus anyone with a monthlySalary set — not a fixed type list,
+// since which types actually carry a monthly salary varies by kiln (this
+// deployment's real data includes salaried FITTERs, for instance) and the
+// Salary module needs attendance for exactly that same "has monthlySalary"
+// population.
+async function assertAttendanceEligible(kilnId: string, personId: string) {
+  const person = db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))).get();
+  if (!person) throw new Error("Person not found in this kiln");
+  const eligible = person.type === "WORKER" || person.type === "HELPER" || person.monthlySalary != null;
+  if (!eligible) throw new Error("This person isn't eligible for attendance tracking (no monthly salary, not a worker/helper)");
+  return person;
 }
 
 function startOfDay(date: Date) {
@@ -26,7 +41,7 @@ function startOfDay(date: Date) {
 }
 
 export async function markAttendance(input: MarkAttendanceInput) {
-  await assertPersonOfType(input.kilnId, input.personId, ["WORKER", "HELPER"]);
+  await assertAttendanceEligible(input.kilnId, input.personId);
   const day = startOfDay(input.date);
 
   const existing = db
@@ -70,6 +85,77 @@ export async function listAttendanceForDay(kilnId: string, date: Date) {
   const peopleRows = await db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, personIds)).all();
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
   return rows.map((r) => ({ ...r, personId: personById.get(r.personId) ?? r.personId }));
+}
+
+export interface DayAttendance {
+  date: Date;
+  status: AttendanceStatus;
+  wageAmount: number | null;
+  recorded: boolean; // false = no row exists, implicitly PRESENT
+}
+
+// Every day of the given month for one person, defaulting to PRESENT
+// wherever no explicit row exists (see attendances table's schema comment
+// for why rows are exceptions-only). Backs both the staff-profile calendar
+// and salary-slip generation.
+export async function attendanceForPersonMonth(
+  kilnId: string,
+  personId: string,
+  year: number,
+  month: number // 1-12
+): Promise<DayAttendance[]> {
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0); // last day of the month
+  const daysInMonth = end.getDate();
+
+  const rows = await db
+    .select()
+    .from(attendances)
+    .where(and(eq(attendances.kilnId, kilnId), eq(attendances.personId, personId), gte(attendances.date, start), lte(attendances.date, end)))
+    .all();
+  const rowByDay = new Map(rows.map((r) => [startOfDay(r.date).getTime(), r]));
+
+  const days: DayAttendance[] = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month - 1, d);
+    const row = rowByDay.get(date.getTime());
+    days.push({
+      date,
+      status: (row?.status as AttendanceStatus) ?? "PRESENT",
+      wageAmount: row?.wageAmount ?? null,
+      recorded: !!row,
+    });
+  }
+  return days;
+}
+
+export interface MonthAttendanceSummary {
+  daysInMonth: number;
+  daysPresent: number;
+  daysAbsent: number;
+  daysHalfDay: number;
+  daysLate: number;
+}
+
+// Present/Absent/Half-day/Late day-counts for a month — Late counts as
+// fully worked for pay purposes (see salary.service.ts's deduction
+// formula) but is tallied separately since it's still worth surfacing on
+// the slip.
+export async function attendanceSummaryForMonth(
+  kilnId: string,
+  personId: string,
+  year: number,
+  month: number
+): Promise<MonthAttendanceSummary> {
+  const days = await attendanceForPersonMonth(kilnId, personId, year, month);
+  const summary: MonthAttendanceSummary = { daysInMonth: days.length, daysPresent: 0, daysAbsent: 0, daysHalfDay: 0, daysLate: 0 };
+  for (const d of days) {
+    if (d.status === "ABSENT") summary.daysAbsent++;
+    else if (d.status === "HALF_DAY") summary.daysHalfDay++;
+    else if (d.status === "LATE") { summary.daysLate++; summary.daysPresent++; }
+    else summary.daysPresent++;
+  }
+  return summary;
 }
 
 export interface FaceCheckInInput {

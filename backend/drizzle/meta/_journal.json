@@ -8,6 +8,13 @@
       "when": 1786860754671,
       "tag": "0000_conscious_rocket_raccoon",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786882296387,
+      "tag": "0001_fuzzy_pixie",
+      "breakpoints": true
     }
   ]
 }

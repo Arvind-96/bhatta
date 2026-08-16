@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { db } from "../db/client";
-import { fuelPurchases, fuelLogs, people } from "../db/schema";
+import { fuelPurchases, fuelLogs, people, LEDGER_PAYMENT_MODES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { assertFuelTypeExists } from "./fuelType.service";
 import { addLedgerEntry, listLedgerForPerson } from "./ledger.service";
@@ -18,6 +18,7 @@ export interface CreateFuelPurchaseInput {
   actualWeightKg: number;
   amount: number;
   paidAmount?: number;
+  paymentMode?: Exclude<(typeof LEDGER_PAYMENT_MODES)[number], "CASH_AND_ONLINE">;
   date?: Date;
   notes?: string;
 }

@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { DieselPeriodTotals, KilnVehicle, VehicleDieselEntry } from "@/types";
+import type { DieselPeriodTotals, KilnVehicle, SimplePaymentMode, VehicleDieselEntry } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -36,7 +36,7 @@ export function DieselSection() {
   const [savingVehicle, setSavingVehicle] = useState(false);
 
   const [showLogForm, setShowLogForm] = useState(false);
-  const [logForm, setLogForm] = useState({ vehicleId: "", quantityLiters: "", costAmount: "", notes: "" });
+  const [logForm, setLogForm] = useState({ vehicleId: "", quantityLiters: "", costAmount: "", paymentMode: "" as "" | SimplePaymentMode, notes: "" });
   const [savingLog, setSavingLog] = useState(false);
 
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -95,9 +95,10 @@ export function DieselSection() {
         vehicleId: logForm.vehicleId,
         quantityLiters: Number(logForm.quantityLiters),
         costAmount: logForm.costAmount ? Number(logForm.costAmount) : undefined,
+        paymentMode: logForm.paymentMode || undefined,
         notes: logForm.notes || undefined,
       });
-      setLogForm((f) => ({ ...f, quantityLiters: "", costAmount: "", notes: "" }));
+      setLogForm((f) => ({ ...f, quantityLiters: "", costAmount: "", paymentMode: "", notes: "" }));
       setShowLogForm(false);
       await refresh();
     } finally {
@@ -247,6 +248,16 @@ export function DieselSection() {
               onChange={(e) => setLogForm((f) => ({ ...f, costAmount: e.target.value }))}
               className={inputClass}
             />
+            <select
+              value={logForm.paymentMode}
+              onChange={(e) => setLogForm((f) => ({ ...f, paymentMode: e.target.value as "" | SimplePaymentMode }))}
+              className={inputClass}
+            >
+              <option value="">{t("common.paymentMode")}</option>
+              <option value="CASH">{t("billing.paymentCash")}</option>
+              <option value="BANK">{t("billing.paymentBank")}</option>
+              <option value="UPI">{t("billing.paymentUpi")}</option>
+            </select>
             <input
               placeholder={t("common.notesOptional")}
               value={logForm.notes}

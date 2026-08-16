@@ -9,6 +9,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 import type { LedgerEntry, Person } from "@/types";
 import { formatINR } from "@/lib/utils";
 import { usePersonTypeMeta } from "@/components/people/personTypes";
+import { AttendanceCalendar } from "./AttendanceCalendar";
+import { SalarySlipHistory } from "./SalarySlipHistory";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -233,6 +235,11 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
             </div>
           )}
         </Card>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <AttendanceCalendar personId={staffId} />
+        <SalarySlipHistory personId={staffId} />
       </div>
 
       {ledgerOpen && <LedgerModal person={staff} onClose={() => setLedgerOpen(false)} />}

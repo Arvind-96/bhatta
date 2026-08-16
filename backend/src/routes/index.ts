@@ -40,6 +40,7 @@ import { fuelTypeRouter } from "./fuelType.routes";
 import { kilnVehicleRouter } from "./kilnVehicle.routes";
 import { paymentReceiptRouter } from "./paymentReceipt.routes";
 import { financialOverviewRouter } from "./financialOverview.routes";
+import { salaryRouter } from "./salary.routes";
 
 export const apiRouter = Router();
 
@@ -84,3 +85,4 @@ apiRouter.use("/fuel-types", fuelTypeRouter);
 apiRouter.use("/kiln-vehicles", kilnVehicleRouter);
 apiRouter.use("/payment-receipts", paymentReceiptRouter);
 apiRouter.use("/financial-overview", financialOverviewRouter);
+apiRouter.use("/salary", salaryRouter);

@@ -19,7 +19,7 @@ export interface ProductionSeriesPoint {
 }
 
 export type BrickGrade = "A1" | "JHAMA" | "PELA";
-export type PaymentMode = "CASH" | "BANK" | "UPI" | "GST_INVOICE";
+export type PaymentMode = "CASH" | "BANK" | "UPI" | "GST_INVOICE" | "CASH_AND_ONLINE";
 
 export interface Dispatch {
   _id: string;
@@ -37,6 +37,8 @@ export interface Dispatch {
   returnedCount: number;
   returnReason?: string;
   paymentMode?: PaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   dispatchedOn: string;
 }
 
@@ -196,6 +198,7 @@ export interface VehicleDieselEntry {
   vehicleId: { _id: string; name: string; type: string } | string;
   quantityLiters: number;
   costAmount?: number;
+  paymentMode?: SimplePaymentMode;
   date: string;
   notes?: string;
 }
@@ -212,7 +215,10 @@ export interface DieselPeriodTotals {
   year: DieselPeriodBucket;
 }
 
-export type LedgerPaymentMode = "CASH" | "BANK" | "UPI";
+export type LedgerPaymentMode = "CASH" | "BANK" | "UPI" | "CASH_AND_ONLINE";
+// Expenses/fuel purchases/diesel entries aren't customer-facing bills, so
+// they only ever carry one mode label — no split-amount support.
+export type SimplePaymentMode = "CASH" | "BANK" | "UPI";
 export type LedgerCategory =
   | "WAGE"
   | "COMMISSION"
@@ -235,6 +241,8 @@ export interface LedgerEntry {
   reason: string;
   category?: LedgerCategory;
   paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   date: string;
 }
 
@@ -258,6 +266,8 @@ export interface PaymentReceipt {
   balanceBefore: number;
   balanceAfter: number;
   paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   notes?: string;
   date: string;
 }
@@ -467,6 +477,7 @@ export interface Expense {
   _id: string;
   category: ExpenseCategory;
   amount: number;
+  paymentMode?: SimplePaymentMode;
   hours?: number;
   date: string;
   notes?: string;
@@ -850,6 +861,7 @@ export interface FuelPurchase {
   actualWeightKg: number;
   amount: number;
   paidAmount?: number;
+  paymentMode?: SimplePaymentMode;
   date: string;
   notes?: string;
   shortfallKg?: number;
@@ -1058,6 +1070,12 @@ export interface SeasonFinancialSummary {
   netProfit: number;
 }
 
+export interface PaymentMethodSplit {
+  cash: number;
+  online: number;
+  total: number;
+}
+
 export interface FinancialFlow {
   moneyReceived: number;
   moneySpent: number;
@@ -1071,6 +1089,8 @@ export interface FinancialFlow {
     diesel: number;
     otherPayments: number;
   };
+  moneyIn: PaymentMethodSplit;
+  moneyOut: PaymentMethodSplit;
 }
 
 export interface FinancialOverview {
@@ -1087,4 +1107,32 @@ export interface ChamberCostReport {
   fuelCost: number;
   stackingCost: number;
   totalCost: number;
+}
+
+export type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "LATE";
+
+export interface DayAttendance {
+  date: string;
+  status: AttendanceStatus;
+  wageAmount: number | null;
+  recorded: boolean;
+}
+
+export interface SalarySlip {
+  _id: string;
+  personId: string;
+  month: string; // "YYYY-MM"
+  daysPresent: number;
+  daysAbsent: number;
+  daysHalfDay: number;
+  daysLate: number;
+  grossSalary: number;
+  deductions: number;
+  netSalary: number;
+  generatedAt: string;
+}
+
+export interface SalaryStatusEntry {
+  person: { _id: string; name: string; designation: string; monthlySalary: number };
+  slip: SalarySlip | null;
 }

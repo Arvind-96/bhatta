@@ -21,6 +21,16 @@ function personName(ref: { _id: string; name: string } | string | undefined) {
   return typeof ref === "string" ? "" : ref.name;
 }
 
+// A CASH_AND_ONLINE mode is meaningless on paper as just the label — the
+// point of a split payment is which portion was which, so print both
+// amounts instead of the bare mode name whenever it applies.
+function paymentModeLabel(entry: { paymentMode?: string | null; cashAmount?: number | null; onlineAmount?: number | null }) {
+  if (entry.paymentMode === "CASH_AND_ONLINE") {
+    return `Cash ₹${formatINR(entry.cashAmount ?? 0)} + Online ₹${formatINR(entry.onlineAmount ?? 0)}`;
+  }
+  return entry.paymentMode ?? "—";
+}
+
 const GRADE_LABELS: Record<string, string> = {
   A1: "A-1 Grade",
   JHAMA: "Jhama",
@@ -108,7 +118,7 @@ export function printInvoice(dispatch: Dispatch, kilnName: string) {
     </div>
     <table>
       <tr><td class="label">Billed to</td><td class="value">${escapeHtml(dispatch.customerName)}</td></tr>
-      <tr><td class="label">Payment mode</td><td class="value">${escapeHtml(dispatch.paymentMode ?? "—")}</td></tr>
+      <tr><td class="label">Payment mode</td><td class="value">${escapeHtml(paymentModeLabel(dispatch))}</td></tr>
     </table>
     <table>
       <thead>
@@ -155,7 +165,7 @@ export function printPaymentReceipt(receipt: PaymentReceipt, recipientName: stri
     </div>
     <table>
       <tr><td class="label">Received from / issued to</td><td class="value">${escapeHtml(recipientName)}</td></tr>
-      ${receipt.paymentMode ? `<tr><td class="label">Payment mode</td><td class="value">${escapeHtml(receipt.paymentMode)}</td></tr>` : ""}
+      ${receipt.paymentMode ? `<tr><td class="label">Payment mode</td><td class="value">${escapeHtml(paymentModeLabel(receipt))}</td></tr>` : ""}
       ${
         receipt.totalAgreedAmount != null
           ? `<tr><td class="label">Total agreed amount</td><td class="value">₹${formatINR(receipt.totalAgreedAmount)}</td></tr>`

@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { Expense as ExpenseEntry, ExpenseCategory } from "@/types";
+import type { Expense as ExpenseEntry, ExpenseCategory, SimplePaymentMode } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -96,7 +96,7 @@ export function Expense() {
   const PETTY_CASH_REASONS = buildPettyCashReasons(t);
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ category: "JCB_RENTAL" as ExpenseCategory, amount: "", hours: "", notes: "" });
+  const [form, setForm] = useState({ category: "JCB_RENTAL" as ExpenseCategory, amount: "", paymentMode: "" as "" | SimplePaymentMode, hours: "", notes: "" });
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -121,10 +121,11 @@ export function Expense() {
       await api.expenses.create({
         category: form.category,
         amount: Number(form.amount),
+        paymentMode: form.paymentMode || undefined,
         hours: form.hours ? Number(form.hours) : undefined,
         notes: form.notes || undefined,
       });
-      setForm({ category: "JCB_RENTAL", amount: "", hours: "", notes: "" });
+      setForm({ category: "JCB_RENTAL", amount: "", paymentMode: "", hours: "", notes: "" });
       setShowForm(false);
       await refresh();
     } finally {
@@ -155,6 +156,16 @@ export function Expense() {
                   {label}
                 </option>
               ))}
+            </select>
+            <select
+              value={form.paymentMode}
+              onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value as "" | SimplePaymentMode }))}
+              className={inputClass}
+            >
+              <option value="">{t("common.paymentMode")}</option>
+              <option value="CASH">{t("billing.paymentCash")}</option>
+              <option value="BANK">{t("billing.paymentBank")}</option>
+              <option value="UPI">{t("billing.paymentUpi")}</option>
             </select>
             <input
               required

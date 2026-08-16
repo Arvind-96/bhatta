@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "../db/client";
-import { kilnVehicles, vehicleDieselEntries } from "../db/schema";
+import { kilnVehicles, vehicleDieselEntries, LEDGER_PAYMENT_MODES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
 export interface CreateVehicleInput {
@@ -41,6 +41,7 @@ export interface CreateDieselEntryInput {
   vehicleId: string;
   quantityLiters: number;
   costAmount?: number;
+  paymentMode?: Exclude<(typeof LEDGER_PAYMENT_MODES)[number], "CASH_AND_ONLINE">;
   date?: Date;
   notes?: string;
 }

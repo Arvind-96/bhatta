@@ -27,6 +27,8 @@ export interface CreatePaymentReceiptInput {
   amountPaid: number;
   totalAgreedAmount?: number;
   paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   notes?: string;
   date?: Date;
 }
@@ -50,6 +52,8 @@ export async function createPaymentReceipt(input: CreatePaymentReceiptInput) {
     amount: input.amountPaid,
     reason: `Payment receipt ${receiptNumber}`,
     paymentMode: input.paymentMode,
+    cashAmount: input.cashAmount,
+    onlineAmount: input.onlineAmount,
     date: input.date,
   });
 
@@ -67,6 +71,8 @@ export async function createPaymentReceipt(input: CreatePaymentReceiptInput) {
       balanceBefore,
       balanceAfter,
       paymentMode: input.paymentMode,
+      cashAmount: input.cashAmount,
+      onlineAmount: input.onlineAmount,
       notes: input.notes,
       date: input.date,
     })
@@ -95,6 +101,8 @@ export interface UpdatePaymentReceiptInput {
   amountPaid?: number;
   totalAgreedAmount?: number;
   paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   notes?: string;
   date?: Date;
 }
@@ -138,6 +146,8 @@ export async function updatePaymentReceipt(kilnId: string, receiptId: string, in
 
   if (input.totalAgreedAmount !== undefined) patch.totalAgreedAmount = input.totalAgreedAmount;
   if (input.paymentMode !== undefined) patch.paymentMode = input.paymentMode;
+  if (input.cashAmount !== undefined) patch.cashAmount = input.cashAmount;
+  if (input.onlineAmount !== undefined) patch.onlineAmount = input.onlineAmount;
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.date !== undefined) patch.date = input.date;
 
