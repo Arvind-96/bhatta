@@ -1,0 +1,54 @@
+import { randomUUID } from "crypto";
+import { and, eq, desc } from "drizzle-orm";
+import { db } from "../db/client";
+import { ledgerEntries, people, LEDGER_PAYMENT_MODES, LEDGER_CATEGORIES } from "../db/schema";
+import { emitToKiln } from "../config/socket";
+
+export type LedgerPaymentMode = (typeof LEDGER_PAYMENT_MODES)[number];
+export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number];
+
+export interface AddLedgerEntryInput {
+  kilnId: string;
+  personId: string;
+  direction: "DUE" | "PAID";
+  amount: number;
+  reason: string;
+  date?: Date;
+  contractId?: string;
+  paymentMode?: LedgerPaymentMode;
+  category?: LedgerCategory;
+}
+
+// Every ledger write funnels through here, so this is the one place that
+// has to check the person actually exists *in this kiln* — without it, a
+// stale/cross-kiln/typo'd personId would silently create a balance for the
+// wrong record (or one that isn't there), and nobody would notice until
+// the money didn't add up.
+export async function addLedgerEntry(input: AddLedgerEntryInput) {
+  const person = db.select({ _id: people._id }).from(people).where(and(eq(people._id, input.personId), eq(people.kilnId, input.kilnId))).get();
+  if (!person) throw new Error("Referenced person not found in this kiln");
+
+  const _id = randomUUID();
+  db.insert(ledgerEntries).values({ ...input, _id }).run();
+  const entry = db.select().from(ledgerEntries).where(eq(ledgerEntries._id, _id)).get()!;
+  emitToKiln(input.kilnId, "ledger:update", entry);
+  return entry;
+}
+
+export async function listLedgerForPerson(kilnId: string, personId: string) {
+  return db
+    .select()
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, personId)))
+    .orderBy(desc(ledgerEntries.date))
+    .all();
+}
+
+export async function contractLedgerBalance(kilnId: string, contractId: string) {
+  const entries = await db
+    .select()
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.contractId, contractId)))
+    .all();
+  return entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0);
+}

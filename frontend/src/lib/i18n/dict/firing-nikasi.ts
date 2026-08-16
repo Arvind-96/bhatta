@@ -1,0 +1,256 @@
+import type { Locale } from "../translations";
+
+// Translation keys for: pages/Firing.tsx, pages/Nikasi.tsx +
+// components/firing/FitterDetailPage + components/nikasi/EditNikasiEntryModal,
+// NikasiContractorDetailPage, NikasiOperatorDetailPage. Merged into the main
+// dictionary by translations.ts.
+export const firingNikasiDict: Record<string, Record<Locale, string>> = {
+  // ---- Firing.tsx: incident type labels ----
+  "firing.incidentCrackLeakage": { en: "Chamber crack / air leakage", hi: "घेर में दरार / हवा का रिसाव" },
+  "firing.incidentWeatherFlooding": { en: "Rain / chamber flooding", hi: "बारिश / घेर में पानी भरना" },
+  "firing.incidentElectricalFailure": { en: "Transformer / motor failure", hi: "ट्रांसफार्मर / मोटर खराबी" },
+  "firing.incidentOther": { en: "Other", hi: "अन्य" },
+
+  // ---- Firing.tsx: fuel usage summary ----
+  "firing.fuelUsedForFiring": { en: "Fuel used for firing", hi: "पकाई में इस्तेमाल हुआ ईंधन" },
+  "firing.fuelColumnHeader": { en: "Fuel", hi: "ईंधन" },
+  "firing.kg": { en: "kg", hi: "किलो" },
+
+  // ---- Firing.tsx: fuel usage tab ----
+  "firing.logFuelUsedToday": { en: "Log fuel used today", hi: "आज का ईंधन दर्ज करें" },
+  "firing.noFuelTypesYet": {
+    en: "No fuel types added yet — add coal/tudi/wood etc. on the Fuel page first.",
+    hi: "अभी तक कोई ईंधन प्रकार नहीं जोड़ा गया — पहले ईंधन पेज पर कोयला/तूड़ी/लकड़ी आदि जोड़ें।",
+  },
+  "firing.chamberPlaceholder": { en: "Chamber…", hi: "घेर चुनें…" },
+  "firing.gherNumber": { en: "Gher #{number}", hi: "घेर #{number}" },
+  "firing.quantityFedKg": { en: "Quantity fed (kg)", hi: "डाली गई मात्रा (किलो)" },
+  "firing.noFuelUsageLoggedYet": { en: "No fuel usage logged yet.", hi: "अभी तक कोई ईंधन उपयोग दर्ज नहीं हुआ।" },
+  "firing.gherFuelLine": { en: "Gher #{number} · {fuelType}", hi: "घेर #{number} · {fuelType}" },
+
+  // ---- Firing.tsx: roster section ----
+  "firing.firingTeamRoster": { en: "Firing team roster", hi: "पकाई टीम रोस्टर" },
+  "firing.teamSizeLaborers": { en: "{count} / {target} laborers", hi: "{count} / {target} मज़दूर" },
+  "firing.newFitter": { en: "New fitter", hi: "नया फिटर" },
+  "firing.dayShift": { en: "Day shift", hi: "दिन की पारी" },
+  "firing.nightShift": { en: "Night shift", hi: "रात की पारी" },
+  "firing.noOneScheduled": { en: "No one scheduled.", hi: "किसी की पारी तय नहीं है।" },
+  "firing.perMonthSuffix": { en: "/mo", hi: "/माह" },
+  "firing.notOnRotation": {
+    en: "Not yet on a rotation: {names} — set their shift start from their profile.",
+    hi: "अभी पारी में शामिल नहीं: {names} — उनकी प्रोफ़ाइल से पारी शुरू करने की तारीख सेट करें।",
+  },
+
+  // ---- Firing.tsx: shifts tab ----
+  "firing.logShiftHandover": { en: "Log shift / handover", hi: "पारी / हैंडओवर दर्ज करें" },
+  "firing.fitterOstadPlaceholder": { en: "Fitter / Ostad…", hi: "फिटर / उस्ताद चुनें…" },
+  "firing.chamberBeingTendedOptional": { en: "Chamber being tended (optional)", hi: "जिस घेर पर काम हो रहा है (वैकल्पिक)" },
+  "firing.handoverNotesPlaceholder": {
+    en: "Handover notes (fire position, coal fed)",
+    hi: "हैंडओवर टिप्पणी (आग की स्थिति, डाला गया कोयला)",
+  },
+  "firing.otHoursPlaceholder": { en: "OT hours", hi: "ओवरटाइम घंटे" },
+  "firing.otRatePlaceholder": { en: "OT rate (₹/hr)", hi: "ओवरटाइम दर (₹/घंटा)" },
+  "firing.performanceBonusPlaceholder": { en: "Performance bonus (₹, optional)", hi: "प्रदर्शन बोनस (₹, वैकल्पिक)" },
+  "firing.saveShift": { en: "Save shift", hi: "पारी सहेजें" },
+  "firing.noShiftsLoggedYet": { en: "No shifts logged yet.", hi: "अभी तक कोई पारी दर्ज नहीं हुई।" },
+  "firing.hoursOT": { en: "{hours}h OT", hi: "{hours} घंटे ओवरटाइम" },
+  "firing.bonusAmount": { en: "₹{amount} bonus", hi: "₹{amount} बोनस" },
+
+  // ---- Firing.tsx: grading tab ----
+  "firing.fireRoundSpeed": { en: "Fire round speed (last {days} days)", hi: "आग की चाल की गति (पिछले {days} दिन)" },
+  "firing.chambersPerDay": { en: "{count} chambers/day", hi: "{count} घेर/दिन" },
+  "firing.fireCurrentlyAtGher": { en: "Fire currently at Gher #{number}", hi: "आग अभी घेर #{number} में है" },
+  "firing.logGrading": { en: "Log grading", hi: "ग्रेडिंग दर्ज करें" },
+  "firing.chamberReadyPlaceholder": { en: "Chamber (should be READY)…", hi: "घेर (तैयार होना चाहिए)…" },
+  "firing.gherNumberStatus": { en: "Gher #{number} ({status})", hi: "घेर #{number} ({status})" },
+  "firing.a1GradeCountPlaceholder": { en: "A-1 grade count", hi: "A-1 ग्रेड संख्या" },
+  "firing.jhamaPlaceholder": { en: "Jhama (over-baked)", hi: "झामा (अधिक पकी हुई)" },
+  "firing.pelaPlaceholder": { en: "Pela/Seem (under-baked)", hi: "पेला/सीम (कम पकी हुई)" },
+  "firing.rodaPlaceholder": { en: "Roda (broken)", hi: "रोड़ा (टूटी हुई)" },
+  "firing.saveGrading": { en: "Save grading", hi: "ग्रेडिंग सहेजें" },
+  "firing.noGradingsLoggedYet": { en: "No gradings logged yet.", hi: "अभी तक कोई ग्रेडिंग दर्ज नहीं हुई।" },
+  "firing.chamberHeader": { en: "Chamber", hi: "घेर" },
+  "firing.a1Header": { en: "A-1", hi: "A-1" },
+  "firing.jhamaHeader": { en: "Jhama", hi: "झामा" },
+  "firing.pelaHeader": { en: "Pela", hi: "पेला" },
+  "firing.rodaHeader": { en: "Roda", hi: "रोड़ा" },
+  "firing.recoveryHeader": { en: "Recovery", hi: "रिकवरी" },
+
+  // ---- Firing.tsx: incidents tab ----
+  "firing.logIncidentEmergency": { en: "Log incident / emergency", hi: "घटना / आपातकाल दर्ज करें" },
+  "firing.chamberOptionalPlaceholder": { en: "Chamber (optional)", hi: "घेर (वैकल्पिक)" },
+  "firing.whatHappenedPlaceholder": { en: "What happened", hi: "क्या हुआ" },
+  "firing.repairEmergencyCostPlaceholder": { en: "Repair/emergency cost (₹)", hi: "मरम्मत/आपातकालीन खर्च (₹)" },
+  "firing.bricksLostOptionalPlaceholder": { en: "Bricks lost (optional)", hi: "नुकसान हुई ईंटें (वैकल्पिक)" },
+  "firing.saveIncident": { en: "Save incident", hi: "घटना सहेजें" },
+  "firing.noIncidentsLogged": { en: "No incidents logged.", hi: "अभी तक कोई घटना दर्ज नहीं हुई।" },
+  "firing.repairCostSuffix": { en: "₹{amount} repair cost", hi: "₹{amount} मरम्मत खर्च" },
+  "firing.bricksLostSuffix": { en: "{count} bricks lost", hi: "{count} ईंटें नुकसान हुईं" },
+
+  // ---- Firing.tsx: tabs ----
+  "firing.tabGrading": { en: "Grading & Yield", hi: "ग्रेडिंग व उपज" },
+  "firing.tabShifts": { en: "Fitter Shifts", hi: "फिटर पारी" },
+  "firing.tabIncidents": { en: "Incidents", hi: "घटनाएं" },
+  "firing.tabFuel": { en: "Fuel Usage", hi: "ईंधन उपयोग" },
+
+  // ---- FitterDetailPage.tsx: advance category labels ----
+  "firing.advanceCategoryAdvance": { en: "Advance (Peshgi)", hi: "पेशगी (एडवांस)" },
+  "firing.advanceCategoryKharchi": { en: "Kharchi", hi: "खर्ची" },
+  "firing.advanceCategoryMedical": { en: "Medical", hi: "चिकित्सा" },
+  "firing.advanceCategoryFestival": { en: "Festival (Tyohar)", hi: "त्योहार" },
+  "firing.advanceCategoryOther": { en: "Other", hi: "अन्य" },
+
+  // ---- FitterDetailPage.tsx ----
+  "firing.confirmRemoveFromTeam": {
+    en: "Remove {name} from the firing team? Their records and ledger stay intact.",
+    hi: "{name} को पकाई टीम से हटाएं? उनके रिकॉर्ड और खाता-बही सुरक्षित रहेंगे।",
+  },
+  "firing.backToFiring": { en: "Back to Firing", hi: "पकाई पर वापस जाएं" },
+  "firing.fitterRoleLabel": { en: "Firing team fitter (Ostad/Jalayee)", hi: "पकाई टीम फिटर (उस्ताद/जलाई)" },
+  "firing.todayShift": { en: "Today: {shift}", hi: "आज: {shift}" },
+  "firing.advanceSalary": { en: "Advance / Salary", hi: "पेशगी / वेतन" },
+  "firing.removeFromTeam": { en: "Remove from team", hi: "टीम से हटाएं" },
+  "firing.fitterProfile": { en: "Fitter profile", hi: "फिटर प्रोफ़ाइल" },
+  "firing.address": { en: "Address", hi: "पता" },
+  "firing.aadharId": { en: "Aadhar / ID", hi: "आधार / पहचान पत्र" },
+  "firing.salaryShiftRotation": { en: "Salary & shift rotation", hi: "वेतन व पारी रोटेशन" },
+  "firing.monthlySalaryPlaceholder": { en: "Monthly salary (₹)", hi: "मासिक वेतन (₹)" },
+  "firing.startsOnPlaceholder": { en: "Starts on…", hi: "शुरुआत…" },
+  "firing.dayBlock": { en: "Day block", hi: "दिन ब्लॉक" },
+  "firing.nightBlock": { en: "Night block", hi: "रात ब्लॉक" },
+  "firing.rotationExplanation": {
+    en: "3 days on that shift type, then 3 nights on the other, repeating every 6 days from this start date — change it here to switch the fitter's cycle.",
+    hi: "उस पारी में 3 दिन, फिर दूसरी पारी में 3 रातें, इस शुरुआत की तारीख से हर 6 दिन में यही दोहराता है — फिटर का चक्र बदलने के लिए यहां बदलें।",
+  },
+  "firing.earningsLedger": { en: "Earnings ledger", hi: "कमाई खाता-बही" },
+  "firing.totalEarnings": { en: "total earnings", hi: "कुल कमाई" },
+  "firing.advancesKharchiExpenses": { en: "advances/kharchi/expenses", hi: "पेशगी/खर्ची/खर्च" },
+  "firing.netDue": { en: "net due", hi: "कुल बकाया" },
+  "firing.advanceOutstanding": { en: "advance outstanding", hi: "पेशगी बकाया" },
+  "firing.shiftAttendanceHistory": { en: "Shift / attendance history", hi: "पारी / हाज़िरी इतिहास" },
+  "firing.shiftHeader": { en: "Shift", hi: "पारी" },
+  "firing.otBonusHeader": { en: "OT/Bonus", hi: "ओवरटाइम/बोनस" },
+  "firing.handoverNotesHeader": { en: "Handover notes", hi: "हैंडओवर टिप्पणी" },
+  "firing.day": { en: "Day", hi: "दिन" },
+  "firing.night": { en: "Night", hi: "रात" },
+
+  // ---- Nikasi.tsx: contractor summary section ----
+  "nikasi.thekedarWise": { en: "Thekedar-wise (contractor)", hi: "ठेकेदार अनुसार" },
+  "nikasi.thekedarWiseSubtitle": {
+    en: "Only thekedars and labour whose profile's work type is set to Nikasi",
+    hi: "केवल वे ठेकेदार और मज़दूर जिनकी प्रोफ़ाइल में काम का प्रकार निकासी सेट है",
+  },
+  "nikasi.totalLabel": { en: "Total:", hi: "कुल:" },
+  "nikasi.bricksUnit": { en: "bricks", hi: "ईंटें" },
+  "nikasi.newThekedar": { en: "New thekedar", hi: "नया ठेकेदार" },
+  "nikasi.noThekedarsYet": {
+    en: 'No thekedars tagged for Nikasi yet — add one above, or open an existing thekedar\'s/labour\'s profile and set "Work type" to Nikasi so they show up here.',
+    hi: 'अभी तक निकासी के लिए कोई ठेकेदार टैग नहीं है — ऊपर एक जोड़ें, या किसी मौजूदा ठेकेदार/मज़दूर की प्रोफ़ाइल खोलकर "काम का प्रकार" निकासी सेट करें ताकि वे यहां दिखें।',
+  },
+  "nikasi.laborerCount": { en: "{count} laborer{suffix}", hi: "{count} मज़दूर" },
+  "nikasi.perMonthSuffix": { en: "/month", hi: "/महीना" },
+  "nikasi.ledgerAdvance": { en: "Ledger / advance", hi: "खाता-बही / पेशगी" },
+  "nikasi.damagedLabel": { en: "damaged", hi: "नुकसान" },
+  "nikasi.paidLabel": { en: "paid", hi: "भुगतान" },
+  "nikasi.dueLabel": { en: "due", hi: "बकाया" },
+  "nikasi.advanceLabel": { en: "advance", hi: "पेशगी" },
+  "nikasi.unloadedSuffix": { en: "{count} unloaded", hi: "{count} उतारी गईं" },
+  "nikasi.damagedSuffix": { en: "{count} damaged", hi: "{count} नुकसान" },
+
+  // ---- Nikasi.tsx: operator summary section ----
+  "nikasi.independentOperators": { en: "Independent operators (no thekedar)", hi: "स्वतंत्र ऑपरेटर (बिना ठेकेदार)" },
+  "nikasi.independentOperatorsSubtitle": {
+    en: "Only operators whose profile's work type is set to Nikasi",
+    hi: "केवल वे ऑपरेटर जिनकी प्रोफ़ाइल में काम का प्रकार निकासी सेट है",
+  },
+  "nikasi.newOperator": { en: "New operator", hi: "नया ऑपरेटर" },
+  "nikasi.noOperatorsYet": {
+    en: 'No operators tagged for Nikasi yet — add one above, or open an existing labour\'s profile and set "Work type" to Nikasi so they show up here.',
+    hi: 'अभी तक निकासी के लिए कोई ऑपरेटर टैग नहीं है — ऊपर एक जोड़ें, या किसी मौजूदा मज़दूर की प्रोफ़ाइल खोलकर "काम का प्रकार" निकासी सेट करें ताकि वे यहां दिखें।',
+  },
+  "nikasi.tripCount": { en: "{count} trip{suffix}", hi: "{count} ट्रिप" },
+
+  // ---- Nikasi.tsx: period stat cards ----
+  "nikasi.todayUnloading": { en: "Today's Unloading (Nikasi)", hi: "आज की निकासी" },
+  "nikasi.firedBricksUnloadedToday": { en: "fired bricks unloaded today", hi: "आज उतारी गई पकी ईंटें" },
+  "nikasi.weeklyUnloading": { en: "Weekly Unloading (Nikasi)", hi: "साप्ताहिक निकासी" },
+  "nikasi.last7Days": { en: "last 7 days", hi: "पिछले 7 दिन" },
+  "nikasi.monthlyUnloading": { en: "Monthly Unloading (Nikasi)", hi: "मासिक निकासी" },
+  "nikasi.last30Days": { en: "last 30 days", hi: "पिछले 30 दिन" },
+  "nikasi.todayDamage": { en: "Today's Nikasi Damage", hi: "आज का निकासी नुकसान" },
+  "nikasi.bricksDamagedToday": { en: "bricks damaged today", hi: "आज नुकसान हुई ईंटें" },
+  "nikasi.weeklyDamage": { en: "Weekly Nikasi Damage", hi: "साप्ताहिक निकासी नुकसान" },
+  "nikasi.monthlyDamage": { en: "Monthly Nikasi Damage", hi: "मासिक निकासी नुकसान" },
+
+  // ---- Nikasi.tsx: entry form + table ----
+  "nikasi.logEntry": { en: "Log nikasi entry", hi: "निकासी एंट्री दर्ज करें" },
+  "nikasi.chamberPlaceholder": { en: "Chamber…", hi: "घेर चुनें…" },
+  "nikasi.gherNumberStatus": { en: "Gher #{number} ({status})", hi: "घेर #{number} ({status})" },
+  "nikasi.gangJamadaarPlaceholder": { en: "Gang / jamadaar…", hi: "गैंग / जमादार चुनें…" },
+  "nikasi.bricksUnloadedPlaceholder": { en: "Bricks unloaded", hi: "उतारी गई ईंटें" },
+  "nikasi.damagedBricksOptionalPlaceholder": { en: "Damaged bricks (optional)", hi: "नुकसान हुई ईंटें (वैकल्पिक)" },
+  "nikasi.saveEntry": { en: "Save entry", hi: "एंट्री सहेजें" },
+  "nikasi.noEntriesYet": { en: "No nikasi entries yet.", hi: "अभी तक कोई निकासी एंट्री नहीं है।" },
+  "nikasi.chamberHeader": { en: "Chamber", hi: "घेर" },
+  "nikasi.gangHeader": { en: "Gang", hi: "गैंग" },
+  "nikasi.bricksHeader": { en: "Bricks", hi: "ईंटें" },
+  "nikasi.damagedHeader": { en: "Damaged", hi: "नुकसान" },
+
+  // ---- EditNikasiEntryModal.tsx ----
+  "nikasi.editEntry": { en: "Edit nikasi entry", hi: "निकासी एंट्री संपादित करें" },
+  "nikasi.damagedBricksPlaceholder": { en: "Damaged bricks", hi: "नुकसान हुई ईंटें" },
+
+  // ---- NikasiContractorDetailPage.tsx / NikasiOperatorDetailPage.tsx (shared) ----
+  "nikasi.backToNikasi": { en: "Back to Nikasi", hi: "निकासी पर वापस जाएं" },
+  "nikasi.address": { en: "Address", hi: "पता" },
+  "nikasi.aadharId": { en: "Aadhar / ID", hi: "आधार / पहचान पत्र" },
+  "nikasi.monthlySalary": { en: "Monthly salary", hi: "मासिक वेतन" },
+  "nikasi.bricksUnloadedLabel": { en: "bricks unloaded", hi: "उतारी गई ईंटें" },
+  "nikasi.bricksUnloaded": { en: "Bricks unloaded", hi: "उतारी गई ईंटें" },
+  "nikasi.advanceOutstanding": { en: "advance outstanding", hi: "पेशगी बकाया" },
+  "nikasi.totalEarnings": { en: "total earnings", hi: "कुल कमाई" },
+  "nikasi.advancesKharchiExpenses": { en: "advances/kharchi/expenses", hi: "पेशगी/खर्ची/खर्च" },
+  "nikasi.netDue": { en: "net due", hi: "कुल बकाया" },
+
+  // ---- NikasiContractorDetailPage.tsx ----
+  "nikasi.contractorProfile": { en: "Contractor profile", hi: "ठेकेदार प्रोफ़ाइल" },
+  "nikasi.contractorOwnSalaryLabel": { en: "Contractor's own monthly salary (₹)", hi: "ठेकेदार का अपना मासिक वेतन (₹)" },
+  "nikasi.eg17000": { en: "e.g. 17000", hi: "उदा. 17000" },
+  "nikasi.laborerSalaryNote": {
+    en: "Each laborer under this thekedar has their own monthly salary too, set from their profile.",
+    hi: "इस ठेकेदार के अंतर्गत हर मज़दूर का अपना मासिक वेतन भी होता है, जो उनकी प्रोफ़ाइल से सेट होता है।",
+  },
+  "nikasi.thekedarRoleLabel": { en: "Nikasi thekedar (Labour Contractor)", hi: "निकासी ठेकेदार (लेबर कॉन्ट्रैक्टर)" },
+  "nikasi.bricksDamagedGangTotal": { en: "{count} bricks damaged (gang total)", hi: "{count} ईंटें नुकसान (गैंग कुल)" },
+  "nikasi.gangSummary": { en: "Gang summary", hi: "गैंग सारांश" },
+  "nikasi.totalDueLabel": { en: "total due", hi: "कुल बकाया" },
+  "nikasi.totalPaidAdvance": { en: "total paid (advance)", hi: "कुल भुगतान (पेशगी)" },
+  "nikasi.remainingDue": { en: "remaining due", hi: "शेष बकाया" },
+  "nikasi.laborUnderThekedar": { en: "Labor under this thekedar ({count})", hi: "इस ठेकेदार के अंतर्गत मज़दूर ({count})" },
+  "nikasi.addLabor": { en: "Add labor", hi: "मज़दूर जोड़ें" },
+  "nikasi.noLaborersAssignedYet": {
+    en: "No laborers assigned to this thekedar for nikasi yet.",
+    hi: "अभी तक इस ठेकेदार के अंतर्गत निकासी के लिए कोई मज़दूर नहीं जोड़ा गया।",
+  },
+  "nikasi.unloadingOutputHistory": { en: "Unloading output history", hi: "निकासी उत्पादन इतिहास" },
+  "nikasi.noEntriesLoggedByGangYet": {
+    en: "No nikasi entries logged by this gang yet.",
+    hi: "अभी तक इस गैंग द्वारा कोई निकासी एंट्री दर्ज नहीं हुई।",
+  },
+  "nikasi.loggedByHeader": { en: "Logged by", hi: "किसके द्वारा दर्ज" },
+
+  // ---- NikasiOperatorDetailPage.tsx ----
+  "nikasi.operatorRoleLabel": { en: "Nikasi operator ({type})", hi: "निकासी ऑपरेटर ({type})" },
+  "nikasi.bricksDamaged": { en: "{count} bricks damaged", hi: "{count} ईंटें नुकसान" },
+  "nikasi.operatorProfile": { en: "Operator profile", hi: "ऑपरेटर प्रोफ़ाइल" },
+  "nikasi.monthlySalaryLabel": { en: "Monthly salary (₹)", hi: "मासिक वेतन (₹)" },
+  "nikasi.eg10000": { en: "e.g. 10000", hi: "उदा. 10000" },
+  "nikasi.salarySettledNote": {
+    en: 'Settled manually via the ledger each month (category "Salary"), not computed from bricks unloaded.',
+    hi: 'हर महीने खाता-बही के ज़रिए मैन्युअल रूप से तय किया जाता है (श्रेणी "वेतन"), उतारी गई ईंटों से नहीं जोड़ा जाता।',
+  },
+  "nikasi.dueBalanceLedger": { en: "Due balance ledger", hi: "बकाया खाता-बही" },
+  "nikasi.unloadingWorkHistory": { en: "Unloading work history", hi: "निकासी कार्य इतिहास" },
+  "nikasi.noEntriesLoggedYet": { en: "No nikasi entries logged yet.", hi: "अभी तक कोई निकासी एंट्री दर्ज नहीं हुई।" },
+};

@@ -1,0 +1,149 @@
+import { Response } from "express";
+import { z } from "zod";
+import { AuthedRequest } from "../middleware/auth.middleware";
+import {
+  createPerson,
+  customerCreditAging,
+  enrollFace,
+  getPersonWithBalance,
+  listOutstandingAdvances,
+  listPaymentsDue,
+  listPeople,
+  updatePerson,
+} from "../services/person.service";
+import { addLedgerEntry, listLedgerForPerson } from "../services/ledger.service";
+import {
+  PERSON_STATUSES,
+  PERSON_TYPES,
+  SEX_OPTIONS,
+  WORK_TYPES,
+  LEDGER_CATEGORIES,
+  LEDGER_PAYMENT_MODES,
+  STACKING_STAGES,
+} from "../db/schema";
+
+const personTypeSchema = z.enum(PERSON_TYPES);
+
+const createSchema = z.object({
+  type: personTypeSchema,
+  name: z.string(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  idNumber: z.string().optional(),
+  age: z.number().int().positive().optional(),
+  sex: z.enum(SEX_OPTIONS).optional(),
+  workType: z.enum(WORK_TYPES).optional(),
+  notes: z.string().optional(),
+  status: z.enum(PERSON_STATUSES).optional(),
+  dailyWage: z.number().optional(),
+  ratePerThousand: z.number().optional(),
+  contractorId: z.string().optional(),
+  payType: z.enum(["MONTHLY", "PER_THOUSAND"]).optional(),
+  commissionPerThousand: z.number().optional(),
+  defaultRatePerThousand: z.number().optional(),
+  bharaiRatePerThousand: z.number().optional(),
+  monthlySalary: z.number().optional(),
+  stackingStage: z.enum(STACKING_STAGES).optional(),
+  bharaiContractorId: z.string().optional(),
+  nikasiContractorId: z.string().optional(),
+  firingShiftAnchorDate: z.string().optional(),
+  firingShiftAnchorType: z.enum(["DAY", "NIGHT"]).optional(),
+  vehicleNumber: z.string().optional(),
+  licenseNumber: z.string().optional(),
+  ratePerTrolley: z.number().optional(),
+  designation: z.string().optional(),
+  isOfficeStaff: z.boolean().optional(),
+  gstNumber: z.string().optional(),
+  contractRate: z.number().optional(),
+  contractUnit: z.string().optional(),
+  profitSharePercent: z.number().optional(),
+  khetArea: z.number().optional(),
+  khetAreaUnit: z.string().optional(),
+  khetLocation: z.string().optional(),
+  agreedDepthFeet: z.number().optional(),
+  creditLimit: z.number().optional(),
+});
+
+const updateSchema = createSchema.partial().extend({ active: z.boolean().optional() });
+
+const ledgerSchema = z.object({
+  direction: z.enum(["DUE", "PAID"]),
+  amount: z.number().positive(),
+  reason: z.string(),
+  date: z.string().optional(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
+  category: z.enum(LEDGER_CATEGORIES).optional(),
+});
+
+export async function create(req: AuthedRequest, res: Response) {
+  const input = createSchema.parse(req.body);
+  const person = await createPerson({
+    ...input,
+    kilnId: req.kiln!.id,
+    firingShiftAnchorDate: input.firingShiftAnchorDate ? new Date(input.firingShiftAnchorDate) : undefined,
+  });
+  res.status(201).json(person);
+}
+
+export async function list(req: AuthedRequest, res: Response) {
+  const type = req.query.type ? personTypeSchema.parse(req.query.type) : undefined;
+  const people = await listPeople(req.kiln!.id, type);
+  res.json(people);
+}
+
+export async function advances(req: AuthedRequest, res: Response) {
+  const result = await listOutstandingAdvances(req.kiln!.id);
+  res.json(result);
+}
+
+export async function paymentsDue(req: AuthedRequest, res: Response) {
+  const result = await listPaymentsDue(req.kiln!.id);
+  res.json(result);
+}
+
+export async function creditAging(req: AuthedRequest, res: Response) {
+  const result = await customerCreditAging(req.kiln!.id);
+  res.json(result);
+}
+
+export async function getOne(req: AuthedRequest, res: Response) {
+  const result = await getPersonWithBalance(req.kiln!.id, req.params.id);
+  res.json(result);
+}
+
+export async function update(req: AuthedRequest, res: Response) {
+  const input = updateSchema.parse(req.body);
+  const person = await updatePerson(req.kiln!.id, req.params.id, {
+    ...input,
+    firingShiftAnchorDate: input.firingShiftAnchorDate ? new Date(input.firingShiftAnchorDate) : undefined,
+  });
+  res.json(person);
+}
+
+export async function addLedger(req: AuthedRequest, res: Response) {
+  const input = ledgerSchema.parse(req.body);
+  const entry = await addLedgerEntry({
+    kilnId: req.kiln!.id,
+    personId: req.params.id,
+    direction: input.direction,
+    amount: input.amount,
+    reason: input.reason,
+    date: input.date ? new Date(input.date) : undefined,
+    paymentMode: input.paymentMode,
+    category: input.category,
+  });
+  res.status(201).json(entry);
+}
+
+export async function listLedger(req: AuthedRequest, res: Response) {
+  const entries = await listLedgerForPerson(req.kiln!.id, req.params.id);
+  res.json(entries);
+}
+
+const enrollFaceSchema = z.object({ descriptor: z.array(z.number()).length(128) });
+
+export async function enrollFaceHandler(req: AuthedRequest, res: Response) {
+  const input = enrollFaceSchema.parse(req.body);
+  const person = await enrollFace(req.kiln!.id, req.params.id, input.descriptor);
+  res.json(person);
+}

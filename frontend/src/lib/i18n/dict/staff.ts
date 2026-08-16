@@ -1,0 +1,144 @@
+import type { Locale } from "../translations";
+
+// Translation keys for: pages/Staff.tsx, pages/Kiosk.tsx, pages/Settings.tsx +
+// components/staff/StaffDetailPage. Merged into the main dictionary by
+// translations.ts.
+export const staffDict: Record<string, Record<Locale, string>> = {
+  // --- pages/Staff.tsx ---
+  "staff.munim": { en: "Munim", hi: "मुनीम" },
+  "staff.helperOffice": { en: "Helper (Office)", hi: "हेल्पर (कार्यालय)" },
+  "staff.chowkidar": { en: "Chowkidar", hi: "चौकीदार" },
+  "staff.driverStaff": { en: "Driver (Staff)", hi: "ड्राइवर (स्टाफ़)" },
+  "staff.adminTitle": { en: "Bhatta Administration & Personnel", hi: "भट्टा प्रशासन व कार्मिक" },
+  "staff.adminSubtitle": {
+    en: "Permanent office/admin staff — Munim, Chowkidar, Helper, Driver",
+    hi: "स्थायी कार्यालय/प्रशासन स्टाफ़ — मुनीम, चौकीदार, हेल्पर, ड्राइवर",
+  },
+  "staff.totalOnRoster": { en: "total staff on roster", hi: "कुल पंजीकृत स्टाफ़" },
+  "staff.settled": { en: "settled", hi: "चुकता" },
+  "staff.dueAmount": { en: "₹{amount} due", hi: "₹{amount} बकाया" },
+  "staff.advanceAmount": { en: "₹{amount} advance", hi: "₹{amount} एडवांस" },
+  "staff.perMonth": { en: "· ₹{amount}/month", hi: "· ₹{amount}/माह" },
+
+  // --- components/staff/StaffDetailPage.tsx ---
+  "staff.advanceCategoryAdvance": { en: "Advance (Peshgi)", hi: "एडवांस (पेशगी)" },
+  "staff.advanceCategoryKharchi": { en: "Kharchi", hi: "खर्ची" },
+  "staff.advanceCategoryMedical": { en: "Medical", hi: "चिकित्सा" },
+  "staff.advanceCategoryFestival": { en: "Festival (Tyohar)", hi: "त्योहार" },
+  "staff.advanceCategoryOther": { en: "Other", hi: "अन्य" },
+  "staff.confirmDeleteProfile": {
+    en: "Delete {name}'s profile? Their past ledger records are kept, but they'll no longer appear in any list.",
+    hi: "{name} की प्रोफ़ाइल हटाएं? उनके पुराने खाता-बही रिकॉर्ड सुरक्षित रहेंगे, लेकिन वे अब किसी भी सूची में नहीं दिखेंगे।",
+  },
+  "staff.backToStaff": { en: "Back to Staff", hi: "स्टाफ़ पर वापस जाएं" },
+  "staff.advanceSalaryButton": { en: "Advance / Salary", hi: "एडवांस / वेतन" },
+  "staff.staffProfile": { en: "Staff profile", hi: "स्टाफ़ प्रोफ़ाइल" },
+  "staff.address": { en: "Address", hi: "पता" },
+  "staff.aadharIdNumber": { en: "Aadhar / ID number", hi: "आधार / पहचान पत्र नंबर" },
+  "staff.saveProfile": { en: "Save profile", hi: "प्रोफ़ाइल सहेजें" },
+  "staff.designationSalary": { en: "Designation & salary", hi: "पदनाम व वेतन" },
+  "staff.designationPlaceholder": { en: 'Designation (e.g. "Main Munim")', hi: 'पदनाम (जैसे "मुख्य मुनीम")' },
+  "staff.monthlySalary": { en: "Monthly salary (₹)", hi: "मासिक वेतन (₹)" },
+  "staff.salaryExample": { en: "e.g. 15000", hi: "जैसे 15000" },
+  "staff.financialLedger": { en: "Financial ledger", hi: "वित्तीय खाता-बही" },
+  "staff.totalEarnings": { en: "total earnings", hi: "कुल कमाई" },
+  "staff.advancesKharchiExpenses": { en: "advances/kharchi/expenses", hi: "एडवांस/खर्ची/खर्च" },
+  "staff.netDue": { en: "net due", hi: "कुल बकाया" },
+  "staff.advanceOutstanding": { en: "advance outstanding", hi: "बकाया एडवांस" },
+
+  // --- pages/Kiosk.tsx ---
+  "kiosk.geolocationNotSupported": {
+    en: "Geolocation not supported on this device",
+    hi: "इस डिवाइस पर जियोलोकेशन उपलब्ध नहीं है",
+  },
+  "kiosk.noFaceDetected": {
+    en: "No face detected — look at the camera and try again",
+    hi: "कोई चेहरा नहीं मिला — कैमरे की ओर देखें और फिर कोशिश करें",
+  },
+  "kiosk.markedPresent": { en: "Marked present: {name}", hi: "उपस्थित दर्ज: {name}" },
+  "kiosk.title": { en: "Attendance Kiosk", hi: "हाज़िरी कियोस्क" },
+  "kiosk.loadingFaceModel": { en: "Loading face model…", hi: "फेस मॉडल लोड हो रहा है…" },
+  "kiosk.checkingLocation": { en: "Checking location…", hi: "स्थान जांचा जा रहा है…" },
+  "kiosk.scanningFace": { en: "Scanning face…", hi: "चेहरा स्कैन हो रहा है…" },
+  "kiosk.scanToCheckIn": { en: "Scan to check in", hi: "हाज़िरी के लिए स्कैन करें" },
+  "kiosk.preparing": { en: "Preparing…", hi: "तैयार हो रहा है…" },
+  "kiosk.radiusNotice": {
+    en: "Attendance is only accepted within the bhatta's set radius.",
+    hi: "हाज़िरी केवल भट्टे की तय सीमा के भीतर ही स्वीकार होगी।",
+  },
+
+  // --- pages/Settings.tsx ---
+  "settings.attendanceGeofence": { en: "Attendance geofence", hi: "हाज़िरी जियोफ़ेंस" },
+  "settings.geofenceDescription": {
+    en: "Face-scan attendance is only accepted within this radius of the bhatta.",
+    hi: "फेस-स्कैन हाज़िरी केवल भट्टे की इस सीमा के भीतर ही स्वीकार होगी।",
+  },
+  "settings.useCurrentLocation": { en: "Use my current location", hi: "मेरा वर्तमान स्थान उपयोग करें" },
+  "settings.latitude": { en: "Latitude", hi: "अक्षांश" },
+  "settings.longitude": { en: "Longitude", hi: "देशांतर" },
+  "settings.radiusMeters": { en: "Radius (meters)", hi: "दायरा (मीटर)" },
+  "settings.saved": { en: "Saved ✓", hi: "सहेजा गया ✓" },
+  "settings.savingEllipsis": { en: "Saving…", hi: "सहेजा जा रहा है…" },
+  "settings.saveGeofence": { en: "Save geofence", hi: "जियोफ़ेंस सहेजें" },
+  "settings.kilnChambers": { en: "Kiln chambers (Gher)", hi: "भट्टा चैंबर (घर)" },
+  "settings.chambersDescription": {
+    en: "How many chambers does this bhatta have? Safe to increase later — existing chambers and their current stage are never reset.",
+    hi: "इस भट्टे में कितने चैंबर हैं? बाद में संख्या बढ़ाना सुरक्षित है — मौजूदा चैंबर व उनका वर्तमान चरण कभी रीसेट नहीं होता।",
+  },
+  "settings.numberOfChambers": { en: "Number of chambers", hi: "चैंबरों की संख्या" },
+  "settings.saveChamberCount": { en: "Save chamber count", hi: "चैंबर संख्या सहेजें" },
+  "settings.dryingYardCapacity": { en: "Drying yard capacity", hi: "सुखाने के यार्ड की क्षमता" },
+  "settings.yardCapacityDescription": {
+    en: "How many kacchi bricks can the patheri/drying yard hold at once? Used to warn before new molding has nowhere to go.",
+    hi: "पथेरी/सुखाने के यार्ड में एक बार में कितनी कच्ची ईंटें रखी जा सकती हैं? नई पथाई के लिए जगह न होने पर चेतावनी देने हेतु उपयोग होता है।",
+  },
+  "settings.yardCapacityPlaceholder": { en: "Yard capacity (bricks)", hi: "यार्ड क्षमता (ईंटें)" },
+  "settings.saveCapacity": { en: "Save capacity", hi: "क्षमता सहेजें" },
+  "settings.pcbConsent": { en: "PCB Consent to Operate", hi: "PCB संचालन सहमति" },
+  "settings.miningRoyaltyLicense": { en: "Mining Royalty License", hi: "खनन रॉयल्टी लाइसेंस" },
+  "settings.zigZagCertificate": { en: "Zig-Zag Conversion Certificate", hi: "ज़िग-ज़ैग परिवर्तन प्रमाणपत्र" },
+  "settings.environmentalClearance": { en: "Environmental Clearance", hi: "पर्यावरण स्वीकृति" },
+  "settings.complianceOther": { en: "Other", hi: "अन्य" },
+  "settings.legalComplianceDocuments": { en: "Legal & compliance documents", hi: "कानूनी व अनुपालन दस्तावेज़" },
+  "settings.complianceDescription": {
+    en: "PCB consent, royalty license, Zig-Zag certificate — tracked so a renewal never lapses unnoticed.",
+    hi: "PCB सहमति, रॉयल्टी लाइसेंस, ज़िग-ज़ैग प्रमाणपत्र — ताकि नवीनीकरण की तारीख कभी छूटे नहीं।",
+  },
+  "settings.titleReferenceNumber": { en: "Title / reference number", hi: "शीर्षक / संदर्भ संख्या" },
+  "settings.saveDocument": { en: "Save document", hi: "दस्तावेज़ सहेजें" },
+  "settings.noDocumentsYet": { en: "No documents added yet.", hi: "अभी तक कोई दस्तावेज़ नहीं जोड़ा गया।" },
+  "settings.expired": { en: "Expired", hi: "समाप्त" },
+  "settings.daysLeft": { en: "{days}d left", hi: "{days} दिन शेष" },
+  "settings.physicalStockAudit": { en: "Physical stock audit", hi: "भौतिक स्टॉक ऑडिट" },
+  "settings.stockAuditDescription": {
+    en: "Count bricks by hand and compare against the register — catches theft, missed entries, and yard shrinkage before season-end settlement.",
+    hi: "ईंटों को हाथ से गिनें और रजिस्टर से मिलान करें — इससे सीज़न खत्म होने से पहले चोरी, छूटी हुई एंट्री व यार्ड में कमी पकड़ में आती है।",
+  },
+  "settings.itemPlaceholder": { en: "Item (e.g. A-1 Finished Goods)", hi: "वस्तु (जैसे A-1 तैयार माल)" },
+  "settings.physicalCountPlaceholder": { en: "Physical count (hand-counted)", hi: "भौतिक गिनती (हाथ से गिनी गई)" },
+  "settings.saveAuditButton": {
+    en: "Save audit — compares to register live",
+    hi: "ऑडिट सहेजें — रजिस्टर से तुरंत मिलान होगा",
+  },
+  "settings.noAuditsYet": { en: "No audits logged yet.", hi: "अभी तक कोई ऑडिट दर्ज नहीं हुआ।" },
+  "settings.registerPhysicalDate": {
+    en: "Register {register} · Physical {physical} · {date}",
+    hi: "रजिस्टर {register} · भौतिक {physical} · {date}",
+  },
+
+  "settings.kilnProfile": { en: "Bhatta profile", hi: "भट्टा प्रोफ़ाइल" },
+  "settings.kilnProfileDescription": {
+    en: "Basic details about this bhatta — shown across the app and on printed slips.",
+    hi: "इस भट्टे की बुनियादी जानकारी — पूरे ऐप और प्रिंट की गई पर्चियों पर दिखती है।",
+  },
+  "settings.saveProfile": { en: "Save profile", hi: "प्रोफ़ाइल सहेजें" },
+  "settings.account": { en: "Your account", hi: "आपका खाता" },
+  "settings.accountDescription": { en: "Your login details for this bhatta.", hi: "इस भट्टे के लिए आपकी लॉगिन जानकारी।" },
+  "settings.currentPassword": { en: "Current password", hi: "मौजूदा पासवर्ड" },
+  "settings.newPassword": { en: "New password", hi: "नया पासवर्ड" },
+  "settings.confirmNewPassword": { en: "Confirm new password", hi: "नया पासवर्ड दोबारा लिखें" },
+  "settings.changePassword": { en: "Change password", hi: "पासवर्ड बदलें" },
+  "settings.savePassword": { en: "Update password", hi: "पासवर्ड अपडेट करें" },
+  "settings.passwordUpdated": { en: "Password updated ✓", hi: "पासवर्ड अपडेट हो गया ✓" },
+  "settings.passwordMismatch": { en: "New passwords don't match", hi: "नए पासवर्ड मेल नहीं खाते" },
+};

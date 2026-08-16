@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --plane: #f5f5f6;
+  --ink-primary: #1c2130;
+  --ink-secondary: #5a5f78;
+  --ink-muted: #8489a3;
+  --gridline: #e7e9f3;
+  --baseline: #d3d7e8;
+  --border-hairline: rgba(28, 33, 48, 0.09);
+
+  /* A real, vivid palette — six distinct hues, not shades of one accent.
+     series-1 (blue) is the primary/default accent (buttons, focus rings,
+     links); 2-6 give stat-card icon chips, avatar initials, and sidebar
+     nav items their own color instead of repeating blue everywhere. */
+  --series-1: #3b6cf6;
+  --series-2: #8b5cf6;
+  --series-3: #f5941f;
+  --series-4: #ef4a63;
+  --series-5: #16b871;
+  --series-6: #f4c22b;
+
+  --status-good: #16b871;
+  --status-warning: #e0a300;
+  --status-serious: #f5941f;
+  --status-critical: #ef4a63;
+
+  --glass-bg: #ffffff;
+  --glass-border: rgba(28, 33, 48, 0.07);
+  --shadow-glass: 0 1px 2px rgba(20, 20, 60, 0.04), 0 10px 24px -14px rgba(20, 20, 60, 0.14);
+
+  /* Tinted glow per series tone, used by shadow-glow-N in tailwind.config
+     — the active nav pill, primary buttons, and floating actions actually
+     glow in their own color instead of a neutral drop shadow. */
+  --glow-1: rgba(59, 108, 246, 0.35);
+  --glow-2: rgba(139, 92, 246, 0.35);
+  --glow-3: rgba(245, 148, 31, 0.35);
+  --glow-4: rgba(239, 74, 99, 0.35);
+  --glow-5: rgba(22, 184, 113, 0.35);
+  --glow-6: rgba(244, 194, 43, 0.35);
+  --glow-pulse: rgba(22, 184, 113, 0.45);
+
+  --gradient-brand: linear-gradient(120deg, var(--series-1), var(--series-2));
+
+  /* The one dark surface in the app — the nav rail only, never the main
+     canvas (the brief was explicit: white/light background). Distinct
+     from --ink-* so sidebar text stays legible against its own dark
+     ground regardless of what the light theme's ink tokens are doing. */
+  --sidebar: #171d33;
+  --sidebar-raised: #1f2642;
+  --sidebar-ink: #ffffff;
+  --sidebar-ink-soft: #aeb4cc;
+  --sidebar-ink-faint: #6b7291;
+  --sidebar-line: #2b3355;
+}
+
+.dark {
+  --surface: #171a24;
+  --surface-raised: #1e2230;
+  --plane: #10121a;
+  --ink-primary: #f4f5fa;
+  --ink-secondary: #b7bcd4;
+  --ink-muted: #838aa8;
+  --gridline: #2a2e42;
+  --baseline: #3a3f5c;
+  --border-hairline: rgba(255, 255, 255, 0.1);
+
+  --series-1: #6d93ff;
+  --series-2: #ab8bff;
+  --series-3: #ffab52;
+  --series-4: #ff7d94;
+  --series-5: #4fd897;
+  --series-6: #ffd766;
+
+  --glass-bg: #171a24;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --shadow-glass: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 24px -14px rgba(0, 0, 0, 0.5);
+
+  --glow-1: rgba(109, 147, 255, 0.4);
+  --glow-2: rgba(171, 139, 255, 0.4);
+  --glow-3: rgba(255, 171, 82, 0.4);
+  --glow-4: rgba(255, 125, 148, 0.4);
+  --glow-5: rgba(79, 216, 151, 0.4);
+  --glow-6: rgba(255, 215, 102, 0.4);
+  --glow-pulse: rgba(79, 216, 151, 0.5);
+
+  --sidebar: #0d0f18;
+  --sidebar-raised: #171a24;
+  --sidebar-ink: #ffffff;
+  --sidebar-ink-soft: #9aa0bd;
+  --sidebar-ink-faint: #5c6284;
+  --sidebar-line: #262b40;
+}
+
+body {
+  background-color: var(--plane);
+  color: var(--ink-primary);
+}
+
+.dark body {
+  background-color: var(--plane);
+}
+
+.glass-panel {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  position: relative;
+}
+
+.gradient-brand {
+  background-image: var(--gradient-brand);
+}
+
+/* Reserved for headings/brand moments only (see tailwind.config.ts's
+   `display` font entry) — applied via className, not globally, so dense
+   card titles stay in Inter. */
+.font-display {
+  font-family: "Poppins", "Inter", system-ui, sans-serif;
+}
+
+/* Baseline interactivity affordances applied app-wide, so a raw <button>
+   that forgot its own hover/focus treatment still reads as clickable
+   instead of inert text. Components that already set these explicitly are
+   unaffected — this only fills gaps. */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:not(:disabled):focus-visible,
+[role="button"]:not(:disabled):focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--series-1);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
