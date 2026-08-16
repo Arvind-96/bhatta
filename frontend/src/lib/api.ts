@@ -172,6 +172,11 @@ export const api = {
       paymentMode?: PaymentMode;
       cashAmount?: number;
       onlineAmount?: number;
+      categoryId?: string;
+      vehicleNumber?: string;
+      vehicleType?: string;
+      driverTipAmount?: number;
+      discountAmount?: number;
     }) => post<Dispatch>("/dispatch", input, true),
     totals: (days = 7) => get<DispatchTotals>(`/dispatch/totals?days=${days}`, true),
     adjustment: (id: string, input: { breakageCount?: number; returnedCount?: number; returnReason?: string }) =>
@@ -206,6 +211,7 @@ export const api = {
       patch("/kilns/shift-times", { dayShiftStart, dayShiftEnd }, true),
     updateProfile: (input: { name?: string; location?: string; phone?: string }) =>
       patch("/kilns/profile", input, true),
+    updateGst: (gstNumber: string | null) => patch("/kilns/gst", { gstNumber }, true),
     completeOnboarding: () => post("/kilns/onboarding/complete", {}, true),
   },
 
@@ -531,6 +537,7 @@ export const api = {
       tipAmount?: number;
       loadingCharge?: number;
       categoryId?: string;
+      discountAmount?: number;
       dispatchId?: string;
       notes?: string;
     }) => post<BrickLoadingEntry>("/brick-loading", input, true),
@@ -634,9 +641,9 @@ export const api = {
 
   brickCategories: {
     list: () => get<BrickCategory[]>("/brick-categories", true),
-    create: (category: BrickCategoryName, pricePerBrick?: number) =>
-      post<BrickCategory>("/brick-categories", { category, pricePerBrick }, true),
-    update: (id: string, input: Partial<{ quantity: number; pricePerBrick: number }>) =>
+    create: (category: BrickCategoryName, pricePerBrick?: number, grade?: string) =>
+      post<BrickCategory>("/brick-categories", { category, pricePerBrick, grade }, true),
+    update: (id: string, input: Partial<{ category: string; grade: string | null; quantity: number; pricePerBrick: number }>) =>
       patch<BrickCategory>(`/brick-categories/${id}`, input, true),
     remove: (id: string) => del(`/brick-categories/${id}`, true),
     listProduction: (days = 60) => get<BrickProductionEntry[]>(`/brick-categories/production?days=${days}`, true),

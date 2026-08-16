@@ -5,6 +5,7 @@ import {
   createAdditionalKiln,
   defaultKilnPublicInfo,
   listUserKilns,
+  setGstNumber,
   setKilnGeofence,
   setSeason,
   setShiftTimes,
@@ -48,6 +49,10 @@ const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const shiftTimesSchema = z.object({
   dayShiftStart: z.string().regex(TIME_REGEX, "must be HH:MM (24-hour)"),
   dayShiftEnd: z.string().regex(TIME_REGEX, "must be HH:MM (24-hour)"),
+});
+
+const gstSchema = z.object({
+  gstNumber: z.string().trim().min(1).nullable(),
 });
 
 const profileSchema = z.object({
@@ -98,6 +103,12 @@ export async function updateSeason(req: AuthedRequest, res: Response) {
 export async function updateShiftTimes(req: AuthedRequest, res: Response) {
   const input = shiftTimesSchema.parse(req.body);
   const kiln = await setShiftTimes(req.kiln!.id, input.dayShiftStart, input.dayShiftEnd);
+  res.json(kiln);
+}
+
+export async function updateGst(req: AuthedRequest, res: Response) {
+  const input = gstSchema.parse(req.body);
+  const kiln = await setGstNumber(req.kiln!.id, input.gstNumber);
   res.json(kiln);
 }
 

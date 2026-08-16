@@ -30,6 +30,17 @@ export const dispatches = sqliteTable("dispatches", {
   // automatically on dispatches auto-created from a Brick Loading trip;
   // left null on manually-created dispatches.
   categoryId: text("categoryId"),
+  // Print-only fields for the Gate Pass/Challan — auto-populated from the
+  // originating brickLoadingEntries row when this dispatch was created by
+  // the Brick Loading auto-sync; otherwise settable directly on a manual
+  // dispatch.
+  vehicleNumber: text("vehicleNumber"),
+  vehicleType: text("vehicleType"),
+  driverTipAmount: real("driverTipAmount"),
+  // Stored purely for transparent display on the Challan ("gross − discount
+  // = net"); `amount` above is already the net, post-discount figure so
+  // every downstream revenue total keeps working unchanged.
+  discountAmount: real("discountAmount"),
   dispatchedOn: dateColumn("dispatchedOn"),
   localId: text("localId"),
   createdAt: createdAtColumn(),

@@ -5,6 +5,7 @@ import {
   listKilns,
   publicKiln,
   updateGeofence,
+  updateGst,
   updateProfile,
   updateSeason,
   updateShiftTimes,
@@ -24,5 +25,6 @@ kilnRouter.patch("/geofence", resolveKiln, asyncHandler(updateGeofence));
 kilnRouter.patch("/yard-capacity", resolveKiln, asyncHandler(updateYardCapacity));
 kilnRouter.patch("/season", resolveKiln, asyncHandler(updateSeason));
 kilnRouter.patch("/shift-times", resolveKiln, asyncHandler(updateShiftTimes));
+kilnRouter.patch("/gst", resolveKiln, asyncHandler(updateGst));
 kilnRouter.patch("/profile", resolveKiln, asyncHandler(updateProfile));
 kilnRouter.post("/onboarding/complete", resolveKiln, asyncHandler(finishOnboarding));

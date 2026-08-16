@@ -28,7 +28,14 @@ export function Billing() {
   const [editingReceipt, setEditingReceipt] = useState<PaymentReceipt | null>(null);
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
-  const kilnName = kilns.find((k) => k.kilnId === activeKilnId)?.name ?? "Bhatta Cloud";
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const kilnName = activeKiln?.name ?? "Bhatta Cloud";
+  const kilnInfo = {
+    name: kilnName,
+    location: activeKiln?.location,
+    phone: activeKiln?.phone,
+    gstNumber: activeKiln?.gstNumber,
+  };
   const { t } = useTranslation();
   const { page, setPage, pageCount, pageItems: pagedDispatches, total } = usePagination(dispatches, 10);
   const receiptsPg = usePagination(receipts, 10);
@@ -37,6 +44,16 @@ export function Billing() {
     JHAMA: t("billing.gradeJhama"),
     PELA: t("billing.gradePela"),
   };
+  // Prefer the free-form category+grade this dispatch was linked to; fall
+  // back to the older fixed A1/JHAMA/PELA classification otherwise — same
+  // rule the print templates and Dispatch.tsx use.
+  function categoryGradeLabel(d: DispatchEntry) {
+    const cat = d.categoryId;
+    if (cat && typeof cat === "object") {
+      return cat.grade ? `${cat.category} (${cat.grade})` : cat.category;
+    }
+    return GRADE_LABELS[d.grade] ?? d.grade;
+  }
 
   async function refresh() {
     const [dispatchData, totalsData, agingData, receiptData] = await Promise.all([
@@ -59,6 +76,22 @@ export function Billing() {
   useKilnEvent("dispatch:update", () => refresh());
   useKilnEvent("ledger:update", () => refresh());
   useKilnEvent("paymentReceipt:update", () => refresh());
+
+  // The customer's account balance isn't stored on the dispatch — fetched
+  // live right before printing so the Challan never shows a stale figure.
+  async function handlePrintInvoice(d: DispatchEntry) {
+    const customerId = typeof d.customerId === "object" ? d.customerId?._id : d.customerId;
+    let balance: number | undefined;
+    if (customerId) {
+      try {
+        const res = await api.people.get(customerId);
+        balance = res.balance;
+      } catch {
+        balance = undefined;
+      }
+    }
+    printInvoice(d, kilnInfo, balance);
+  }
 
   async function deleteReceipt(r: PaymentReceipt, name: string) {
     if (!confirm(t("billing.confirmDeleteReceipt", { receiptNumber: r.receiptNumber, name }))) return;
@@ -116,14 +149,14 @@ export function Billing() {
                     <td className="py-3 text-ink-secondary">{new Date(d.dispatchedOn).toLocaleDateString("en-IN")}</td>
                     <td className="py-3 text-ink-secondary">{d.customerName}</td>
                     <td className="py-3">
-                      <Badge variant="neutral">{GRADE_LABELS[d.grade] ?? d.grade}</Badge>
+                      <Badge variant="neutral">{categoryGradeLabel(d)}</Badge>
                     </td>
                     <td className="py-3 tabular-nums text-ink-secondary">{d.bricksCount.toLocaleString("en-IN")}</td>
                     <td className="py-3 text-ink-secondary">{d.paymentMode ?? "—"}</td>
                     <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(d.amount)}</td>
                     <td className="py-3 text-right">
                       <button
-                        onClick={() => printInvoice(d, kilnName)}
+                        onClick={() => handlePrintInvoice(d)}
                         className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
                       >
                         <Printer className="h-3.5 w-3.5" /> {t("common.print")}

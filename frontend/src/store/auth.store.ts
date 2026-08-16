@@ -12,6 +12,7 @@ export interface UserKiln {
   name: string;
   location?: string;
   phone?: string;
+  gstNumber?: string;
   seasonStartMonth?: number;
   seasonStartDay?: number;
   dayShiftStart?: string;

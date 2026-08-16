@@ -24,11 +24,11 @@ export type PaymentMode = "CASH" | "BANK" | "UPI" | "GST_INVOICE" | "CASH_AND_ON
 export interface Dispatch {
   _id: string;
   customerName: string;
-  customerId?: { _id: string; name: string } | string;
+  customerId?: { _id: string; name: string; phone?: string; address?: string } | string;
   grade: BrickGrade;
   bricksCount: number;
   amount: number;
-  driverId?: { _id: string; name: string } | string;
+  driverId?: { _id: string; name: string; phone?: string } | string;
   slipNumber: string;
   invoiceNumber?: string;
   transportCost?: number;
@@ -39,7 +39,11 @@ export interface Dispatch {
   paymentMode?: PaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
-  categoryId?: { _id: string; category: BrickCategoryName } | string;
+  categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
+  vehicleNumber?: string;
+  vehicleType?: string;
+  driverTipAmount?: number;
+  discountAmount?: number;
   dispatchedOn: string;
 }
 
@@ -157,6 +161,7 @@ export type BrickCategoryName = string;
 export interface BrickCategory {
   _id: string;
   category: BrickCategoryName;
+  grade?: string;
   quantity: number;
   pricePerBrick: number;
   createdAt: string;
@@ -164,7 +169,7 @@ export interface BrickCategory {
 
 export interface BrickProductionEntry {
   _id: string;
-  categoryId: { _id: string; category: BrickCategoryName } | string;
+  categoryId: { _id: string; category: BrickCategoryName; grade?: string } | string;
   bricksCount: number;
   date: string;
   notes?: string;
@@ -172,7 +177,7 @@ export interface BrickProductionEntry {
 
 export interface StockLoadingEntry {
   _id: string;
-  categoryId: { _id: string; category: BrickCategoryName } | string;
+  categoryId: { _id: string; category: BrickCategoryName; grade?: string } | string;
   bricksCount: number;
   date: string;
   notes?: string;
@@ -746,7 +751,7 @@ export interface BrickLoadingEntry {
   bricksCount: number;
   tipAmount: number;
   loadingCharge?: number;
-  categoryId?: { _id: string; category: BrickCategoryName } | string;
+  categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
   dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
   date: string;
   notes?: string;

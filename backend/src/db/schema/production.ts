@@ -170,6 +170,11 @@ export const brickCategories = sqliteTable("brick_categories", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
   category: text("category").notNull(),
+  // Free-form too, same philosophy as `category` itself — e.g. "A1",
+  // "Second Class", or whatever this kiln calls its own grades. Shown
+  // alongside the category name everywhere a category is displayed
+  // (Stock, Brick Loading, Dispatch, Gate Pass/Challan).
+  grade: text("grade"),
   quantity: integer("quantity").default(0),
   pricePerBrick: real("pricePerBrick").default(0),
   createdAt: createdAtColumn(),

@@ -115,6 +115,7 @@ export function BrickLoading() {
     tipAmount: "",
     loadingCharge: "",
     categoryId: "",
+    discountAmount: "",
     dispatchId: "",
     notes: "",
   });
@@ -187,10 +188,11 @@ export function BrickLoading() {
         tipAmount: form.tipAmount ? Number(form.tipAmount) : undefined,
         loadingCharge: form.loadingCharge ? Number(form.loadingCharge) : undefined,
         categoryId: form.categoryId || undefined,
+        discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
         dispatchId: form.dispatchId || undefined,
         notes: form.notes || undefined,
       });
-      setForm({ vehicleType: "TRUCK", vehicleNumber: "", driverId: "", bricksCount: "", tipAmount: "", loadingCharge: "", categoryId: "", dispatchId: "", notes: "" });
+      setForm({ vehicleType: "TRUCK", vehicleNumber: "", driverId: "", bricksCount: "", tipAmount: "", loadingCharge: "", categoryId: "", discountAmount: "", dispatchId: "", notes: "" });
       setShowForm(false);
       await refresh();
     } finally {
@@ -199,10 +201,12 @@ export function BrickLoading() {
   }
 
   const selectedCategory = categories.find((c) => c._id === form.categoryId);
-  const estimatedDispatchAmount =
+  const estimatedGrossAmount =
     selectedCategory && form.bricksCount && selectedCategory.pricePerBrick > 0
       ? Number(form.bricksCount) * selectedCategory.pricePerBrick
       : null;
+  const discountForPreview = Number(form.discountAmount) || 0;
+  const estimatedNetAmount = estimatedGrossAmount != null ? Math.max(0, estimatedGrossAmount - discountForPreview) : null;
 
   return (
     <div className="space-y-4">
@@ -280,7 +284,7 @@ export function BrickLoading() {
               <option value="">{t("brickLoading.categoryPlaceholder")}</option>
               {categories.map((c) => (
                 <option key={c._id} value={c._id}>
-                  {c.category}
+                  {c.grade ? `${c.category} (${c.grade})` : c.category}
                 </option>
               ))}
             </select>
@@ -296,10 +300,28 @@ export function BrickLoading() {
                 </option>
               ))}
             </select>
-            {estimatedDispatchAmount != null && (
+            <input
+              type="number"
+              placeholder={t("brickLoading.discountPlaceholder")}
+              value={form.discountAmount}
+              onChange={(e) => setForm((f) => ({ ...f, discountAmount: e.target.value }))}
+              className={inputClass}
+            />
+            {estimatedGrossAmount != null && (
               <p className="col-span-2 text-sm text-ink-secondary">
-                {t("brickLoading.estimatedDispatchAmount")}: <span className="font-semibold text-ink-primary">₹{formatINR(estimatedDispatchAmount)}</span>
+                {t("brickLoading.grossAmountLabel")}: <span className="font-semibold text-ink-primary">₹{formatINR(estimatedGrossAmount)}</span>
+                {discountForPreview > 0 && (
+                  <>
+                    {" · "}
+                    {t("brickLoading.discountLabel")}: <span className="font-semibold text-ink-primary">− ₹{formatINR(discountForPreview)}</span>
+                    {" · "}
+                    {t("brickLoading.netAmountLabel")}: <span className="font-semibold text-ink-primary">₹{formatINR(estimatedNetAmount ?? 0)}</span>
+                  </>
+                )}
               </p>
+            )}
+            {estimatedNetAmount != null && estimatedNetAmount <= 0 && discountForPreview > 0 && (
+              <p className="col-span-2 text-sm text-status-warning">{t("brickLoading.discountExceedsGrossWarning")}</p>
             )}
             <input
               placeholder={t("common.notes")}
@@ -328,6 +350,7 @@ export function BrickLoading() {
                   <th className="pb-2 font-medium">{t("common.date")}</th>
                   <th className="pb-2 font-medium">{t("common.vehicle")}</th>
                   <th className="pb-2 font-medium">{t("common.driver")}</th>
+                  <th className="pb-2 font-medium">{t("brickLoading.categoryHeader")}</th>
                   <th className="pb-2 font-medium">{t("brickLoading.bricksHeader")}</th>
                   <th className="pb-2 font-medium">{t("brickLoading.tipHeader")}</th>
                   <th className="pb-2 font-medium">{t("brickLoading.dispatchHeader")}</th>
@@ -337,6 +360,7 @@ export function BrickLoading() {
               <tbody>
                 {pagedEntries.map((entry) => {
                   const driver = typeof entry.driverId === "object" ? entry.driverId : null;
+                  const category = typeof entry.categoryId === "object" ? entry.categoryId : null;
                   return (
                   <tr key={entry._id} className="border-b border-border/60 last:border-0">
                     <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
@@ -351,6 +375,9 @@ export function BrickLoading() {
                       ) : (
                         "—"
                       )}
+                    </td>
+                    <td className="py-3 text-ink-secondary">
+                      {category ? (category.grade ? `${category.category} (${category.grade})` : category.category) : "—"}
                     </td>
                     <td className="py-3 tabular-nums text-ink-secondary">{entry.bricksCount.toLocaleString("en-IN")}</td>
                     <td className="py-3 tabular-nums text-ink-secondary">{entry.tipAmount ? `₹${formatINR(entry.tipAmount)}` : "—"}</td>

@@ -133,6 +133,8 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "stock.addCategory": { en: "Add category", hi: "श्रेणी जोड़ें" },
   "stock.category": { en: "Category", hi: "श्रेणी" },
   "stock.categoryNamePlaceholder": { en: "Category name (e.g. Abbal, Doyam)", hi: "श्रेणी का नाम (जैसे अब्बल, दोयम)" },
+  "stock.grade": { en: "Grade", hi: "ग्रेड" },
+  "stock.gradePlaceholder": { en: "Grade (e.g. A1, optional)", hi: "ग्रेड (जैसे A1, वैकल्पिक)" },
   "stock.pricePerBrick": { en: "Price per brick", hi: "प्रति ईंट कीमत" },
   "stock.selectCategoryPlaceholder": { en: "Select category…", hi: "श्रेणी चुनें…" },
   "stock.noCategoriesYet": {

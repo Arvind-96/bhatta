@@ -17,11 +17,12 @@ import {
 const createCategorySchema = z.object({
   category: z.string().min(1),
   pricePerBrick: z.number().min(0).optional(),
+  grade: z.string().min(1).optional(),
 });
 
 export async function createCategory(req: AuthedRequest, res: Response) {
   const input = createCategorySchema.parse(req.body);
-  const category = await createBrickCategory(req.kiln!.id, input.category, input.pricePerBrick);
+  const category = await createBrickCategory(req.kiln!.id, input.category, input.pricePerBrick, input.grade);
   res.status(201).json(category);
 }
 
@@ -31,6 +32,11 @@ export async function listCategories(req: AuthedRequest, res: Response) {
 }
 
 const updateCategorySchema = z.object({
+  category: z.string().min(1).optional(),
+  // Nullable (not just optional) so the admin can explicitly clear a
+  // grade they set by mistake — an absent key leaves it untouched, but
+  // `null` here is a real "remove the grade" request.
+  grade: z.string().min(1).nullable().optional(),
   quantity: z.number().optional(),
   pricePerBrick: z.number().min(0).optional(),
 });

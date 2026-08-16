@@ -18,6 +18,10 @@ export interface CreateBrickLoadingInput {
   tipAmount?: number;
   loadingCharge?: number;
   categoryId?: string;
+  // Applied against the auto-computed gross (bricksCount * pricePerBrick)
+  // before the auto-created Dispatch is saved — see createDispatch's own
+  // netting logic, which this just triggers.
+  discountAmount?: number;
   dispatchId?: string;
   date?: Date;
   notes?: string;
@@ -36,8 +40,12 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
     if (!dispatch) throw new Error("Referenced dispatch not found in this kiln");
   }
 
+  // discountAmount only ever feeds the auto-created Dispatch below — it's
+  // not a column on brickLoadingEntries, so it's kept out of the insert.
+  const { discountAmount, ...entryInput } = input;
+
   const _id = randomUUID();
-  db.insert(brickLoadingEntries).values({ ...input, _id }).run();
+  db.insert(brickLoadingEntries).values({ ...entryInput, _id }).run();
   let entry = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)).get()!;
 
   if (input.tipAmount && input.tipAmount > 0) {
@@ -75,16 +83,22 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
       // failure undo the already-saved loading entry or the stock
       // deduction above — worst case is just no auto-linked dispatch, not
       // a lost trip.
-      if (!input.dispatchId && category.pricePerBrick && category.pricePerBrick > 0) {
+      const grossAmount = Math.round(input.bricksCount * (category.pricePerBrick ?? 0) * 100) / 100;
+      const netAmount = discountAmount ? Math.round((grossAmount - discountAmount) * 100) / 100 : grossAmount;
+
+      if (!input.dispatchId && category.pricePerBrick && category.pricePerBrick > 0 && netAmount > 0) {
         try {
-          const amount = Math.round(input.bricksCount * category.pricePerBrick * 100) / 100;
           const dispatch = await createDispatch({
             kilnId: input.kilnId,
             customerName: `Brick Loading — ${input.vehicleNumber}, ${(input.date ?? new Date()).toLocaleDateString("en-IN")}`,
             bricksCount: input.bricksCount,
-            amount,
+            amount: grossAmount,
+            discountAmount,
             driverId: input.driverId,
             categoryId: input.categoryId,
+            vehicleNumber: input.vehicleNumber,
+            vehicleType: input.vehicleType,
+            driverTipAmount: input.tipAmount,
             dispatchedOn: input.date,
           });
           db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, _id)).run();

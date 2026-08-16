@@ -37,6 +37,32 @@ const GRADE_LABELS: Record<string, string> = {
   PELA: "Pela / Seem",
 };
 
+// Prefer the free-form category+grade (e.g. "Second Class (A1)") when this
+// dispatch is linked to one; fall back to the older fixed A1/JHAMA/PELA
+// classification otherwise.
+function categoryGradeLabel(dispatch: Dispatch) {
+  const cat = dispatch.categoryId;
+  if (cat && typeof cat === "object") {
+    return cat.grade ? `${cat.category} (${cat.grade})` : cat.category;
+  }
+  return GRADE_LABELS[dispatch.grade] ?? dispatch.grade;
+}
+
+function customerAddress(ref: Dispatch["customerId"]) {
+  return ref && typeof ref === "object" ? ref.address : undefined;
+}
+
+function driverPhone(ref: Dispatch["driverId"]) {
+  return ref && typeof ref === "object" ? ref.phone : undefined;
+}
+
+export interface KilnPrintInfo {
+  name: string;
+  location?: string;
+  phone?: string;
+  gstNumber?: string;
+}
+
 function openPrintWindow(title: string, bodyHtml: string) {
   const html = `<!doctype html>
 <html>
@@ -74,51 +100,86 @@ ${bodyHtml}
   }
 }
 
-export function printGatePass(dispatch: Dispatch, kilnName: string) {
+// Exit-authorization slip — what the driver physically carries out of the
+// yard. Focused on what a gate guard needs to check (vehicle, driver,
+// bricks, quantity), not billing detail — that's the Challan's job.
+export function printGatePass(dispatch: Dispatch, kiln: KilnPrintInfo) {
   const driver = personName(dispatch.driverId);
+  const driverPh = driverPhone(dispatch.driverId);
+  const clientAddress = customerAddress(dispatch.customerId);
   const body = `
     <div class="row">
       <div>
-        <h1>Gate Pass &amp; Challan</h1>
-        <p class="muted">${escapeHtml(kilnName)}</p>
+        <h1>Gate Pass</h1>
+        <p class="muted">${escapeHtml(kiln.name)}</p>
+        ${kiln.location ? `<p class="muted">${escapeHtml(kiln.location)}</p>` : ""}
+        ${kiln.phone ? `<p class="muted">Ph: ${escapeHtml(kiln.phone)}</p>` : ""}
+        ${kiln.gstNumber ? `<p class="muted">GSTIN: ${escapeHtml(kiln.gstNumber)}</p>` : ""}
       </div>
       <div style="text-align:right">
         <p class="value">${escapeHtml(dispatch.slipNumber)}</p>
         <p class="muted">${new Date(dispatch.dispatchedOn).toLocaleDateString("en-IN")}</p>
+        <p class="muted">Printed: ${new Date().toLocaleDateString("en-IN")}</p>
       </div>
     </div>
     <table>
       <tr><td class="label">Issued to (vehicle owner / customer)</td><td class="value">${escapeHtml(dispatch.customerName)}</td></tr>
+      ${clientAddress ? `<tr><td class="label">Client address</td><td class="value">${escapeHtml(clientAddress)}</td></tr>` : ""}
+      <tr><td class="label">Vehicle number</td><td class="value">${escapeHtml(dispatch.vehicleNumber || "—")}</td></tr>
+      <tr><td class="label">Vehicle type</td><td class="value">${escapeHtml(dispatch.vehicleType || "—")}</td></tr>
       <tr><td class="label">Driver</td><td class="value">${escapeHtml(driver || "—")}</td></tr>
-      <tr><td class="label">Grade</td><td class="value">${escapeHtml(GRADE_LABELS[dispatch.grade] ?? dispatch.grade)}</td></tr>
+      <tr><td class="label">Driver mobile</td><td class="value">${escapeHtml(driverPh || "—")}</td></tr>
+      <tr><td class="label">Brick type / grade</td><td class="value">${escapeHtml(categoryGradeLabel(dispatch))}</td></tr>
       <tr><td class="label">Bricks loaded</td><td class="value">${dispatch.bricksCount.toLocaleString("en-IN")}</td></tr>
+      ${dispatch.driverTipAmount ? `<tr><td class="label">Driver tip / inaam</td><td class="value">₹${formatINR(dispatch.driverTipAmount)}</td></tr>` : ""}
       ${dispatch.transportCost ? `<tr><td class="label">Transport cost</td><td class="value">₹${formatINR(dispatch.transportCost)} (paid by ${escapeHtml(dispatch.transportPaidBy ?? "—")})</td></tr>` : ""}
     </table>
     <div class="footer">
-      <div class="sign">Gate / Chowkidar</div>
+      <div class="sign">Gate / Chowkidar<br />(Stamp &amp; Signature)</div>
       <div class="sign">Driver signature</div>
-      <div class="sign">Munim / Owner</div>
+      <div class="sign">Munim / Owner<br />(Stamp &amp; Signature)</div>
     </div>
   `;
   openPrintWindow(`Gate Pass ${dispatch.slipNumber}`, body);
 }
 
-export function printInvoice(dispatch: Dispatch, kilnName: string) {
-  const rate = dispatch.bricksCount > 0 ? dispatch.amount / dispatch.bricksCount : 0;
+// Billing/delivery document — the customer's copy of what they owe and
+// what's been settled so far. `accountBalance` is the customer's current
+// ledger balance (positive = still due to the kiln, negative = advance the
+// kiln is holding), fetched live by the caller right before printing so the
+// figure is never stale.
+export function printInvoice(dispatch: Dispatch, kiln: KilnPrintInfo, accountBalance?: number) {
+  const discount = dispatch.discountAmount ?? 0;
+  const netAmount = dispatch.amount;
+  const grossAmount = netAmount + discount;
+  const rate = dispatch.bricksCount > 0 ? grossAmount / dispatch.bricksCount : 0;
+  const clientAddress = customerAddress(dispatch.customerId);
+  const driver = personName(dispatch.driverId);
+  const driverPh = driverPhone(dispatch.driverId);
   const body = `
     <div class="row">
       <div>
-        <h1>Bill / Invoice</h1>
-        <p class="muted">${escapeHtml(kilnName)}</p>
+        <h1>Challan</h1>
+        <p class="muted">${escapeHtml(kiln.name)}</p>
+        ${kiln.location ? `<p class="muted">${escapeHtml(kiln.location)}</p>` : ""}
+        ${kiln.phone ? `<p class="muted">Ph: ${escapeHtml(kiln.phone)}</p>` : ""}
+        ${kiln.gstNumber ? `<p class="muted">GSTIN: ${escapeHtml(kiln.gstNumber)}</p>` : ""}
       </div>
       <div style="text-align:right">
         <p class="value">${escapeHtml(dispatch.invoiceNumber ?? dispatch.slipNumber)}</p>
         <p class="muted">${new Date(dispatch.dispatchedOn).toLocaleDateString("en-IN")}</p>
+        <p class="muted">Printed: ${new Date().toLocaleDateString("en-IN")}</p>
       </div>
     </div>
     <table>
       <tr><td class="label">Billed to</td><td class="value">${escapeHtml(dispatch.customerName)}</td></tr>
+      ${clientAddress ? `<tr><td class="label">Client address</td><td class="value">${escapeHtml(clientAddress)}</td></tr>` : ""}
       <tr><td class="label">Payment mode</td><td class="value">${escapeHtml(paymentModeLabel(dispatch))}</td></tr>
+      ${dispatch.vehicleNumber ? `<tr><td class="label">Vehicle number</td><td class="value">${escapeHtml(dispatch.vehicleNumber)}</td></tr>` : ""}
+      ${dispatch.vehicleType ? `<tr><td class="label">Vehicle type</td><td class="value">${escapeHtml(dispatch.vehicleType)}</td></tr>` : ""}
+      ${driver ? `<tr><td class="label">Driver</td><td class="value">${escapeHtml(driver)}</td></tr>` : ""}
+      ${driverPh ? `<tr><td class="label">Driver mobile</td><td class="value">${escapeHtml(driverPh)}</td></tr>` : ""}
+      ${dispatch.driverTipAmount ? `<tr><td class="label">Driver tip / inaam</td><td class="value">₹${formatINR(dispatch.driverTipAmount)}</td></tr>` : ""}
     </table>
     <table>
       <thead>
@@ -126,11 +187,16 @@ export function printInvoice(dispatch: Dispatch, kilnName: string) {
       </thead>
       <tbody>
         <tr>
-          <td>Bricks (${escapeHtml(GRADE_LABELS[dispatch.grade] ?? dispatch.grade)})</td>
+          <td>Bricks (${escapeHtml(categoryGradeLabel(dispatch))})</td>
           <td>${dispatch.bricksCount.toLocaleString("en-IN")}</td>
           <td>₹${rate.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
-          <td style="text-align:right">₹${formatINR(dispatch.amount)}</td>
+          <td style="text-align:right">₹${formatINR(grossAmount)}</td>
         </tr>
+        ${
+          discount > 0
+            ? `<tr><td>Discount</td><td>—</td><td>—</td><td style="text-align:right">− ₹${formatINR(discount)}</td></tr>`
+            : ""
+        }
         ${
           dispatch.transportCost
             ? `<tr><td>Transport (paid by ${escapeHtml(dispatch.transportPaidBy ?? "—")})</td><td>—</td><td>—</td><td style="text-align:right">₹${formatINR(dispatch.transportCost)}</td></tr>`
@@ -138,13 +204,20 @@ export function printInvoice(dispatch: Dispatch, kilnName: string) {
         }
       </tbody>
     </table>
-    <p class="amount">Total: ₹${formatINR(dispatch.amount)}</p>
+    <p class="amount">Total: ₹${formatINR(netAmount)}</p>
+    ${
+      accountBalance != null
+        ? `<table>
+            <tr><td class="label">${accountBalance >= 0 ? "Remaining due (account balance)" : "Advance held (account balance)"}</td><td class="value">₹${formatINR(Math.abs(accountBalance))}</td></tr>
+          </table>`
+        : ""
+    }
     <div class="footer">
-      <div class="sign">Customer signature</div>
-      <div class="sign">Authorised signatory</div>
+      <div class="sign">Customer<br />(Stamp &amp; Signature)</div>
+      <div class="sign">Authorised signatory<br />(Stamp &amp; Signature)</div>
     </div>
   `;
-  openPrintWindow(`Invoice ${dispatch.invoiceNumber ?? dispatch.slipNumber}`, body);
+  openPrintWindow(`Challan ${dispatch.invoiceNumber ?? dispatch.slipNumber}`, body);
 }
 
 // A payment receipt can be issued to anyone in the People directory, not

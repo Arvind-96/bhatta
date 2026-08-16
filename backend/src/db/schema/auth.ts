@@ -20,6 +20,9 @@ export const kilns = sqliteTable("kilns", {
   // so "Late" has a concrete meaning when marking someone manually.
   dayShiftStart: text("dayShiftStart").default("08:00"),
   dayShiftEnd: text("dayShiftEnd").default("18:00"),
+  // Printed on the Challan when set — optional, many small kilns aren't
+  // GST-registered.
+  gstNumber: text("gstNumber"),
   createdAt: createdAtColumn(),
 });
 

@@ -17,6 +17,7 @@ const createSchema = z.object({
   tipAmount: z.number().min(0).optional(),
   loadingCharge: z.number().min(0).optional(),
   categoryId: z.string().optional(),
+  discountAmount: z.number().min(0).optional(),
   dispatchId: z.string().optional(),
   date: z.string().optional(),
   notes: z.string().optional(),

@@ -73,25 +73,54 @@ function renderPdf(data: SlipData, filePath: string, lang: "en" | "hi"): Promise
     doc.moveDown(1.2);
 
     doc.fontSize(12);
-    const row = (label: string, value: string) => {
+    const headerRow = (label: string, value: string) => {
       doc.text(`${label}: ${value}`);
       doc.moveDown(0.4);
     };
-    row(t("Name", "नाम"), data.personName);
-    row(t("Designation", "पदनाम"), data.designation);
+    headerRow(t("Name", "नाम"), data.personName);
+    headerRow(t("Designation", "पदनाम"), data.designation);
     doc.moveDown(0.6);
 
-    row(t("Days in Month", "महीने के दिन"), String(data.summary.daysInMonth));
-    row(t("Days Present", "उपस्थित दिन"), String(data.summary.daysPresent));
-    row(t("Days Absent", "अनुपस्थित दिन"), String(data.summary.daysAbsent));
-    row(t("Half Days", "आधा दिन"), String(data.summary.daysHalfDay));
-    row(t("Late Days", "देर से आने के दिन"), String(data.summary.daysLate));
-    doc.moveDown(0.6);
+    // Two-column bordered grid: label cell + value cell per row, drawn
+    // manually since pdfkit has no built-in table primitive.
+    const tableLeft = doc.page.margins.left;
+    const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const labelColWidth = tableWidth * 0.6;
+    const rowHeight = 24;
 
-    row(t("Gross Salary", "सकल वेतन"), `Rs. ${data.grossSalary.toLocaleString("en-IN")}`);
-    row(t("Deductions", "कटौती"), `Rs. ${data.deductions.toLocaleString("en-IN")}`);
-    doc.fontSize(13);
-    row(t("Net Salary", "कुल वेतन"), `Rs. ${data.netSalary.toLocaleString("en-IN")}`);
+    function drawTable(rows: Array<[string, string]>, opts?: { boldLastRow?: boolean }) {
+      let y = doc.y;
+      const tableTop = y;
+      rows.forEach(([label, value], i) => {
+        const rowTop = tableTop + i * rowHeight;
+        const isLast = opts?.boldLastRow && i === rows.length - 1;
+        doc.fontSize(isLast ? 13 : 11).font(lang === "hi" ? "body" : isLast ? "Helvetica-Bold" : "Helvetica");
+        doc.rect(tableLeft, rowTop, labelColWidth, rowHeight).stroke("#ccc");
+        doc.rect(tableLeft + labelColWidth, rowTop, tableWidth - labelColWidth, rowHeight).stroke("#ccc");
+        doc.fillColor("#000").text(label, tableLeft + 8, rowTop + 6, { width: labelColWidth - 16 });
+        doc.text(value, tableLeft + labelColWidth + 8, rowTop + 6, { width: tableWidth - labelColWidth - 16 });
+      });
+      doc.y = tableTop + rows.length * rowHeight;
+      doc.font(lang === "hi" ? "body" : "Helvetica").fontSize(12);
+    }
+
+    drawTable([
+      [t("Days in Month", "महीने के दिन"), String(data.summary.daysInMonth)],
+      [t("Days Present", "उपस्थित दिन"), String(data.summary.daysPresent)],
+      [t("Days Absent", "अनुपस्थित दिन"), String(data.summary.daysAbsent)],
+      [t("Half Days", "आधा दिन"), String(data.summary.daysHalfDay)],
+      [t("Late Days", "देर से आने के दिन"), String(data.summary.daysLate)],
+    ]);
+    doc.moveDown(0.8);
+
+    drawTable(
+      [
+        [t("Gross Salary", "सकल वेतन"), `Rs. ${data.grossSalary.toLocaleString("en-IN")}`],
+        [t("Deductions", "कटौती"), `Rs. ${data.deductions.toLocaleString("en-IN")}`],
+        [t("Net Salary", "कुल वेतन"), `Rs. ${data.netSalary.toLocaleString("en-IN")}`],
+      ],
+      { boldLastRow: true }
+    );
 
     doc.moveDown(1.5);
     doc.fontSize(9).fillColor("#888").text(`${t("Generated on", "जनरेट किया गया")}: ${new Date().toLocaleDateString("en-IN")}`);

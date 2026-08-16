@@ -63,6 +63,7 @@ async function listMemberships(userId: string) {
         seasonStartDay: kiln?.seasonStartDay ?? 1,
         dayShiftStart: kiln?.dayShiftStart ?? "08:00",
         dayShiftEnd: kiln?.dayShiftEnd ?? "18:00",
+        gstNumber: kiln?.gstNumber ?? undefined,
         needsSetup: await needsSetup(m.kilnId, kiln?.onboardedAt),
       };
     })
@@ -146,6 +147,7 @@ export async function defaultKilnPublicInfo() {
     seasonStartDay: kiln.seasonStartDay ?? 1,
     dayShiftStart: kiln.dayShiftStart ?? "08:00",
     dayShiftEnd: kiln.dayShiftEnd ?? "18:00",
+    gstNumber: kiln.gstNumber ?? undefined,
     needsSetup: await needsSetup(kiln._id, kiln.onboardedAt),
   };
 }
@@ -179,6 +181,13 @@ export async function setSeason(kilnId: string, seasonStartMonth: number, season
 
 export async function setShiftTimes(kilnId: string, dayShiftStart: string, dayShiftEnd: string) {
   db.update(kilns).set({ dayShiftStart, dayShiftEnd }).where(eq(kilns._id, kilnId)).run();
+  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+  if (!kiln) throw new Error("Kiln not found");
+  return kiln;
+}
+
+export async function setGstNumber(kilnId: string, gstNumber: string | null) {
+  db.update(kilns).set({ gstNumber }).where(eq(kilns._id, kilnId)).run();
   const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
   if (!kiln) throw new Error("Kiln not found");
   return kiln;

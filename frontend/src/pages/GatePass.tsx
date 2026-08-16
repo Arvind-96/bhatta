@@ -19,7 +19,13 @@ export function GatePass() {
   const [dispatches, setDispatches] = useState<DispatchEntry[]>([]);
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
-  const kilnName = kilns.find((k) => k.kilnId === activeKilnId)?.name ?? "Bhatta Cloud";
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const kilnInfo = {
+    name: activeKiln?.name ?? "Bhatta Cloud",
+    location: activeKiln?.location,
+    phone: activeKiln?.phone,
+    gstNumber: activeKiln?.gstNumber,
+  };
   const { t } = useTranslation();
   const { page, setPage, pageCount, pageItems: pagedDispatches, total } = usePagination(dispatches, 10);
   const GRADE_LABELS: Record<string, string> = {
@@ -27,6 +33,16 @@ export function GatePass() {
     JHAMA: t("gatePass.gradeJhama"),
     PELA: t("gatePass.gradePela"),
   };
+  // Prefer the free-form category+grade this dispatch was linked to; fall
+  // back to the older fixed A1/JHAMA/PELA classification otherwise — same
+  // rule the print templates and Dispatch.tsx use.
+  function categoryGradeLabel(d: DispatchEntry) {
+    const cat = d.categoryId;
+    if (cat && typeof cat === "object") {
+      return cat.grade ? `${cat.category} (${cat.grade})` : cat.category;
+    }
+    return GRADE_LABELS[d.grade] ?? d.grade;
+  }
 
   async function refresh() {
     setDispatches(await api.dispatch.list(60));
@@ -71,12 +87,12 @@ export function GatePass() {
                     <td className="py-3 text-ink-secondary">{d.customerName}</td>
                     <td className="py-3 text-ink-secondary">{typeof d.driverId === "object" ? d.driverId?.name ?? "—" : "—"}</td>
                     <td className="py-3">
-                      <Badge variant="neutral">{GRADE_LABELS[d.grade] ?? d.grade}</Badge>
+                      <Badge variant="neutral">{categoryGradeLabel(d)}</Badge>
                     </td>
                     <td className="py-3 tabular-nums text-ink-secondary">{d.bricksCount.toLocaleString("en-IN")}</td>
                     <td className="py-3 text-right">
                       <button
-                        onClick={() => printGatePass(d, kilnName)}
+                        onClick={() => printGatePass(d, kilnInfo)}
                         className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
                       >
                         <Printer className="h-3.5 w-3.5" /> {t("common.print")}

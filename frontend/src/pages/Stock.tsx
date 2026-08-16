@@ -15,10 +15,11 @@ import type { BrickCategory, BrickProductionEntry, StockLoadingEntry } from "@/t
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
-function categoryLabel(categories: BrickCategory[], ref: { _id: string; category: string } | string) {
-  if (typeof ref === "object") return ref.category;
+function categoryLabel(categories: BrickCategory[], ref: { _id: string; category: string; grade?: string } | string) {
+  if (typeof ref === "object") return ref.grade ? `${ref.category} (${ref.grade})` : ref.category;
   const found = categories.find((c) => c._id === ref);
-  return found ? found.category : "—";
+  if (!found) return "—";
+  return found.grade ? `${found.category} (${found.grade})` : found.category;
 }
 
 // The Stock menu — an admin-managed brick-category ledger, independent of
@@ -35,13 +36,17 @@ function BrickStockSection() {
 
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState("");
+  const [newGrade, setNewGrade] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
 
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editCategoryName, setEditCategoryName] = useState("");
+  const [editGrade, setEditGrade] = useState("");
   const [editQuantity, setEditQuantity] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [savingQuantity, setSavingQuantity] = useState(false);
+  const [editError, setEditError] = useState("");
 
   const [productionForm, setProductionForm] = useState({ categoryId: "", bricksCount: "", notes: "" });
   const [savingProduction, setSavingProduction] = useState(false);
@@ -79,8 +84,9 @@ function BrickStockSection() {
     if (!newCategory.trim()) return;
     setSavingCategory(true);
     try {
-      await api.brickCategories.create(newCategory.trim(), newPrice ? Number(newPrice) : undefined);
+      await api.brickCategories.create(newCategory.trim(), newPrice ? Number(newPrice) : undefined, newGrade.trim() || undefined);
       setNewCategory("");
+      setNewGrade("");
       setNewPrice("");
       setShowAddCategory(false);
       await refresh();
@@ -97,18 +103,29 @@ function BrickStockSection() {
 
   function startEditQuantity(category: BrickCategory) {
     setEditingCategoryId(category._id);
+    setEditCategoryName(category.category);
+    setEditGrade(category.grade ?? "");
     setEditQuantity(String(category.quantity));
     setEditPrice(String(category.pricePerBrick ?? 0));
+    setEditError("");
   }
 
   async function saveQuantity(e: FormEvent) {
     e.preventDefault();
-    if (!editingCategoryId) return;
+    if (!editingCategoryId || !editCategoryName.trim()) return;
     setSavingQuantity(true);
+    setEditError("");
     try {
-      await api.brickCategories.update(editingCategoryId, { quantity: Number(editQuantity), pricePerBrick: Number(editPrice) });
+      await api.brickCategories.update(editingCategoryId, {
+        category: editCategoryName.trim(),
+        grade: editGrade.trim() || null,
+        quantity: Number(editQuantity),
+        pricePerBrick: Number(editPrice),
+      });
       setEditingCategoryId(null);
       await refresh();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingQuantity(false);
     }
@@ -184,6 +201,15 @@ function BrickStockSection() {
               />
             </div>
             <div className="w-36">
+              <label className="mb-1 block text-sm text-ink-muted">{t("stock.grade")}</label>
+              <input
+                placeholder={t("stock.gradePlaceholder")}
+                value={newGrade}
+                onChange={(e) => setNewGrade(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div className="w-36">
               <label className="mb-1 block text-sm text-ink-muted">{t("stock.pricePerBrick")}</label>
               <input
                 type="number"
@@ -211,7 +237,10 @@ function BrickStockSection() {
           {categories.map((c) => (
             <Card key={c._id}>
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-ink-primary">{c.category}</p>
+                <div>
+                  <p className="text-sm font-semibold text-ink-primary">{c.category}</p>
+                  {c.grade && <p className="text-sm text-ink-muted">{t("stock.grade")}: {c.grade}</p>}
+                </div>
                 <div className="flex shrink-0 gap-2">
                   <button onClick={() => startEditQuantity(c)} className="text-ink-muted hover:text-series-1">
                     <Pencil className="h-3.5 w-3.5" />
@@ -225,9 +254,27 @@ function BrickStockSection() {
               {editingCategoryId === c._id ? (
                 <form onSubmit={saveQuantity} className="mt-2 flex flex-col gap-2">
                   <div>
-                    <label className="mb-1 block text-sm text-ink-muted">{t("stock.bricksInStock")}</label>
+                    <label className="mb-1 block text-sm text-ink-muted">{t("stock.categoryNamePlaceholder")}</label>
                     <input
                       autoFocus
+                      required
+                      value={editCategoryName}
+                      onChange={(e) => setEditCategoryName(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm text-ink-muted">{t("stock.grade")}</label>
+                    <input
+                      placeholder={t("stock.gradePlaceholder")}
+                      value={editGrade}
+                      onChange={(e) => setEditGrade(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm text-ink-muted">{t("stock.bricksInStock")}</label>
+                    <input
                       type="number"
                       value={editQuantity}
                       onChange={(e) => setEditQuantity(e.target.value)}
@@ -245,6 +292,7 @@ function BrickStockSection() {
                       className={inputClass}
                     />
                   </div>
+                  {editError && <p className="text-sm text-status-critical">{editError}</p>}
                   <div className="flex gap-2">
                     <Button type="submit" size="sm" disabled={savingQuantity}>
                       {t("common.save")}
@@ -288,7 +336,7 @@ function BrickStockSection() {
                 <option value="">{t("stock.categoryPlaceholder")}</option>
                 {categories.map((c) => (
                   <option key={c._id} value={c._id}>
-                    {c.category}
+                    {c.grade ? `${c.category} (${c.grade})` : c.category}
                   </option>
                 ))}
               </select>
@@ -327,7 +375,7 @@ function BrickStockSection() {
                 <option value="">{t("stock.categoryPlaceholder")}</option>
                 {categories.map((c) => (
                   <option key={c._id} value={c._id}>
-                    {c.category}
+                    {c.grade ? `${c.category} (${c.grade})` : c.category}
                   </option>
                 ))}
               </select>

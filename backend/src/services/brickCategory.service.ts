@@ -7,10 +7,11 @@ import { emitToKiln } from "../config/socket";
 // Free-form name, admin-defined — not a fixed vocabulary. pricePerBrick
 // defaults to 0 (unpriced) until the admin sets a real rate; see
 // brickLoading.service.ts for how that price feeds the Dispatch auto-sync.
-export async function createBrickCategory(kilnId: string, category: string, pricePerBrick = 0) {
+// `grade` is likewise free-form and optional (e.g. "A1", "Second Class").
+export async function createBrickCategory(kilnId: string, category: string, pricePerBrick = 0, grade?: string) {
   try {
     const _id = randomUUID();
-    db.insert(brickCategories).values({ _id, kilnId, category, pricePerBrick }).run();
+    db.insert(brickCategories).values({ _id, kilnId, category, pricePerBrick, grade }).run();
     const created = db.select().from(brickCategories).where(eq(brickCategories._id, _id)).get()!;
     emitToKiln(kilnId, "brickCategory:update", created);
     return created;
@@ -26,17 +27,27 @@ export async function listBrickCategories(kilnId: string) {
   return db.select().from(brickCategories).where(eq(brickCategories.kilnId, kilnId)).orderBy(asc(brickCategories.category)).all();
 }
 
-// The admin's direct manual override of a category's stock and/or price —
-// same "always available, never blocked" correction path
-// InventoryItem.quantity gives for supply items.
+// The admin's direct manual override of a category's name/grade/stock/
+// price — same "always available, never blocked" correction path
+// InventoryItem.quantity gives for supply items. Renaming a category here
+// doesn't touch its existing production/loading entries, since those
+// reference it by categoryId, not by name — the new name/grade is simply
+// what shows up everywhere that categoryId gets resolved for display.
 export async function updateBrickCategory(
   kilnId: string,
   categoryId: string,
-  updates: { quantity?: number; pricePerBrick?: number }
+  updates: { category?: string; grade?: string | null; quantity?: number; pricePerBrick?: number }
 ) {
   const existing = db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))).get();
   if (!existing) throw new Error("Brick category not found in this kiln");
-  db.update(brickCategories).set(updates).where(eq(brickCategories._id, categoryId)).run();
+  try {
+    db.update(brickCategories).set(updates).where(eq(brickCategories._id, categoryId)).run();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("UNIQUE constraint failed")) {
+      throw new Error("This brick category name is already used by another category in this kiln");
+    }
+    throw err;
+  }
   const updated = db.select().from(brickCategories).where(eq(brickCategories._id, categoryId)).get()!;
   emitToKiln(kilnId, "brickCategory:update", updated);
   return updated;
@@ -146,7 +157,7 @@ export async function listStockLoadingEntries(kilnId: string, days = 60) {
 
 async function withCategory<T extends { categoryId: string }>(kilnId: string, rows: T[]) {
   const categoryIds = [...new Set(rows.map((r) => r.categoryId))];
-  const categoryRows = categoryIds.length ? await db.select({ _id: brickCategories._id, category: brickCategories.category }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all() : [];
+  const categoryRows = categoryIds.length ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all() : [];
   const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
   return rows.map((r) => ({ ...r, categoryId: categoryById.get(r.categoryId) ?? r.categoryId }));
 }

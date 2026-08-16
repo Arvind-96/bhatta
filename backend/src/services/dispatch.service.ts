@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "../db/client";
-import { dispatches, people, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import { dispatches, people, brickCategories, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
@@ -38,6 +38,15 @@ export interface CreateDispatchInput {
   cashAmount?: number;
   onlineAmount?: number;
   categoryId?: string;
+  vehicleNumber?: string;
+  vehicleType?: string;
+  driverTipAmount?: number;
+  // When given, `amount` above is treated as the GROSS figure and the
+  // stored/billed `amount` becomes `amount - discountAmount` — see
+  // brickLoading.service.ts's auto-dispatch flow, the primary caller of
+  // this. Manual dispatch creation may also pass this for display, in
+  // which case the same netting applies.
+  discountAmount?: number;
   dispatchedOn?: Date;
 }
 
@@ -56,10 +65,17 @@ export async function createDispatch(input: CreateDispatchInput) {
     await assertPersonOfType(input.kilnId, input.customerId, ["CUSTOMER"]);
   }
 
+  // `amount` is always the net, billed figure everywhere downstream
+  // (revenue totals, financial reports) — discount is applied here once,
+  // at creation, rather than left for every consumer to remember to
+  // subtract. `discountAmount` itself is kept only for transparent
+  // display on the Challan.
+  const netAmount = input.discountAmount ? Math.round((input.amount - input.discountAmount) * 100) / 100 : input.amount;
+
   const slipNumber = generateSlipNumber();
   const invoiceNumber = generateInvoiceNumber();
   const _id = randomUUID();
-  db.insert(dispatches).values({ ...input, _id, slipNumber, invoiceNumber }).run();
+  db.insert(dispatches).values({ ...input, amount: netAmount, _id, slipNumber, invoiceNumber }).run();
   const dispatch = db.select().from(dispatches).where(eq(dispatches._id, _id)).get()!;
 
   if (input.customerId) {
@@ -67,7 +83,7 @@ export async function createDispatch(input: CreateDispatchInput) {
       kilnId: input.kilnId,
       personId: input.customerId,
       direction: "DUE",
-      amount: input.amount,
+      amount: netAmount,
       reason: `Sale: ${input.bricksCount.toLocaleString()} bricks (${slipNumber})`,
       date: input.dispatchedOn,
     });
@@ -147,13 +163,22 @@ export async function listDispatches(kilnId: string, days = 30) {
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const customerIds = [...new Set(rows.map((r) => r.customerId).filter((v): v is string => !!v))];
   const ids = [...new Set([...driverIds, ...customerIds])];
-  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, ids)).all() : [];
+  // phone/address included so print templates (Gate Pass/Challan) can show
+  // client address and driver mobile without a second round trip.
+  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone, address: people.address }).from(people).where(inArray(people._id, ids)).all() : [];
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
+
+  const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
+  const categoryRows = categoryIds.length
+    ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all()
+    : [];
+  const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
 
   return rows.map((r) => ({
     ...r,
     driverId: r.driverId ? personById.get(r.driverId) ?? r.driverId : r.driverId,
     customerId: r.customerId ? personById.get(r.customerId) ?? r.customerId : r.customerId,
+    categoryId: r.categoryId ? categoryById.get(r.categoryId) ?? r.categoryId : r.categoryId,
   }));
 }
 

@@ -3,7 +3,6 @@ import { AlertTriangle, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -11,15 +10,31 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
-import type { BrickGrade, Dispatch as DispatchEntry, FinishedGoodsReconciliation, LoadingEntry, PaymentMode, Person } from "@/types";
+import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, FinishedGoodsReconciliation, PaymentMode, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
-function DispatchesTab() {
+function categoryGradeLabel(c: BrickCategory) {
+  return c.grade ? `${c.category} (${c.grade})` : c.category;
+}
+
+// Prefer the free-form category+grade this dispatch was linked to over the
+// older fixed A1/JHAMA/PELA classification — same fallback rule used on the
+// Gate Pass/Challan print templates.
+function dispatchCategoryGradeLabel(d: DispatchEntry, gradeLabels: Record<string, string>) {
+  const cat = d.categoryId;
+  if (cat && typeof cat === "object") {
+    return cat.grade ? `${cat.category} (${cat.grade})` : cat.category;
+  }
+  return gradeLabels[d.grade] ?? d.grade;
+}
+
+export function Dispatch() {
   const [dispatches, setDispatches] = useState<DispatchEntry[]>([]);
   const [customers, setCustomers] = useState<Person[]>([]);
   const [drivers, setDrivers] = useState<Person[]>([]);
+  const [categories, setCategories] = useState<BrickCategory[]>([]);
   const [reconciliation, setReconciliation] = useState<FinishedGoodsReconciliation | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
@@ -28,9 +43,14 @@ function DispatchesTab() {
     customerId: "",
     customerName: "",
     grade: "A1" as BrickGrade,
+    categoryId: "",
     bricksCount: "",
     amount: "",
+    discountAmount: "",
     driverId: "",
+    vehicleNumber: "",
+    vehicleType: "",
+    driverTipAmount: "",
     transportCost: "",
     transportPaidBy: "OWNER" as "OWNER" | "CUSTOMER",
     paymentMode: "CASH" as PaymentMode,
@@ -42,18 +62,25 @@ function DispatchesTab() {
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
   const { page, setPage, pageCount, pageItems: pagedDispatches, total } = usePagination(dispatches, 10);
+  const GRADE_LABELS: Record<string, string> = {
+    A1: t("dispatch.gradeA1"),
+    JHAMA: t("dispatch.gradeJhama"),
+    PELA: t("dispatch.gradePela"),
+  };
 
   async function refresh() {
-    const [dispatchData, customerData, driverData, recon] = await Promise.all([
+    const [dispatchData, customerData, driverData, recon, categoryData] = await Promise.all([
       api.dispatch.list(),
       api.people.list("CUSTOMER"),
       api.people.list("DRIVER"),
       api.finishedGoodsReconciliation(),
+      api.brickCategories.list(),
     ]);
     setDispatches(dispatchData);
     setCustomers(customerData);
     setDrivers(driverData);
     setReconciliation(recon);
+    setCategories(categoryData);
   }
 
   useEffect(() => {
@@ -72,8 +99,13 @@ function DispatchesTab() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.customerName || !form.bricksCount || !form.amount) return;
-    if (isPaymentSplitMismatched(form.paymentMode, Number(form.amount), form.cashAmount, form.onlineAmount)) {
-      setFormError(t("payment.splitMismatch", { total: Number(form.amount).toLocaleString("en-IN") }));
+    const netAmount = Number(form.amount) - (Number(form.discountAmount) || 0);
+    if (Number(form.discountAmount) > Number(form.amount)) {
+      setFormError(t("dispatch.discountExceedsAmount"));
+      return;
+    }
+    if (isPaymentSplitMismatched(form.paymentMode, netAmount, form.cashAmount, form.onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: netAmount.toLocaleString("en-IN") }));
       return;
     }
     setFormError("");
@@ -83,9 +115,14 @@ function DispatchesTab() {
         customerName: form.customerName,
         customerId: form.customerId || undefined,
         grade: form.grade,
+        categoryId: form.categoryId || undefined,
         bricksCount: Number(form.bricksCount),
         amount: Number(form.amount),
+        discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
         driverId: form.driverId || undefined,
+        vehicleNumber: form.vehicleNumber || undefined,
+        vehicleType: form.vehicleType || undefined,
+        driverTipAmount: form.driverTipAmount ? Number(form.driverTipAmount) : undefined,
         transportCost: form.transportCost ? Number(form.transportCost) : undefined,
         transportPaidBy: form.transportCost ? form.transportPaidBy : undefined,
         paymentMode: form.paymentMode,
@@ -96,9 +133,14 @@ function DispatchesTab() {
         customerId: "",
         customerName: "",
         grade: "A1",
+        categoryId: "",
         bricksCount: "",
         amount: "",
+        discountAmount: "",
         driverId: "",
+        vehicleNumber: "",
+        vehicleType: "",
+        driverTipAmount: "",
         transportCost: "",
         transportPaidBy: "OWNER",
         paymentMode: "CASH",
@@ -176,6 +218,18 @@ function DispatchesTab() {
               <option value="PELA">{t("dispatch.gradePela")}</option>
             </select>
             <select
+              value={form.categoryId}
+              onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+              className={inputClass}
+            >
+              <option value="">{t("dispatch.categoryPlaceholder")}</option>
+              {categories.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {categoryGradeLabel(c)}
+                </option>
+              ))}
+            </select>
+            <select
               value={form.paymentMode}
               onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value as PaymentMode }))}
               className={inputClass}
@@ -188,7 +242,7 @@ function DispatchesTab() {
             </select>
             {form.paymentMode === "CASH_AND_ONLINE" && (
               <PaymentSplitFields
-                totalAmount={Number(form.amount) || 0}
+                totalAmount={Math.max(0, (Number(form.amount) || 0) - (Number(form.discountAmount) || 0))}
                 cashAmount={form.cashAmount}
                 onlineAmount={form.onlineAmount}
                 onCashAmountChange={(v) => setForm((f) => ({ ...f, cashAmount: v }))}
@@ -212,6 +266,21 @@ function DispatchesTab() {
               onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
               className={inputClass}
             />
+            <input
+              type="number"
+              placeholder={t("dispatch.discountPlaceholder")}
+              value={form.discountAmount}
+              onChange={(e) => setForm((f) => ({ ...f, discountAmount: e.target.value }))}
+              className={inputClass}
+            />
+            {form.discountAmount && Number(form.discountAmount) > 0 && form.amount && (
+              <p className="col-span-2 text-sm text-ink-secondary">
+                {t("dispatch.netAmountPreview")}:{" "}
+                <span className="font-semibold text-ink-primary">
+                  ₹{formatINR(Math.max(0, Number(form.amount) - Number(form.discountAmount)))}
+                </span>
+              </p>
+            )}
             <select
               value={form.driverId}
               onChange={(e) => setForm((f) => ({ ...f, driverId: e.target.value }))}
@@ -223,6 +292,28 @@ function DispatchesTab() {
                   {d.name} {d.vehicleNumber ? `— ${d.vehicleNumber}` : ""}
                 </option>
               ))}
+            </select>
+            <input
+              placeholder={t("dispatch.driverTipPlaceholder")}
+              type="number"
+              value={form.driverTipAmount}
+              onChange={(e) => setForm((f) => ({ ...f, driverTipAmount: e.target.value }))}
+              className={inputClass}
+            />
+            <input
+              placeholder={t("dispatch.vehicleNumberPlaceholder")}
+              value={form.vehicleNumber}
+              onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
+              className={inputClass}
+            />
+            <select
+              value={form.vehicleType}
+              onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value }))}
+              className={inputClass}
+            >
+              <option value="">{t("dispatch.vehicleTypePlaceholder")}</option>
+              <option value="TRUCK">{t("brickLoading.truck")}</option>
+              <option value="TRACTOR">{t("brickLoading.tractor")}</option>
             </select>
             <input
               type="number"
@@ -272,7 +363,7 @@ function DispatchesTab() {
                       <td className="py-3 text-sm text-ink-muted">{d.slipNumber}</td>
                       <td className="py-3 text-ink-primary">{d.customerName}</td>
                       <td className="py-3">
-                        <Badge variant="neutral">{d.grade}</Badge>
+                        <Badge variant="neutral">{dispatchCategoryGradeLabel(d, GRADE_LABELS)}</Badge>
                       </td>
                       <td className="py-3 tabular-nums text-ink-secondary">{d.bricksCount.toLocaleString("en-IN")}</td>
                       <td className="py-3">
@@ -328,174 +419,6 @@ function DispatchesTab() {
           </div>
         )}
       </Card>
-    </div>
-  );
-}
-
-function LoadingTab() {
-  const [entries, setEntries] = useState<LoadingEntry[]>([]);
-  const [palledars, setPalledars] = useState<Person[]>([]);
-  const [dispatches, setDispatches] = useState<DispatchEntry[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ dispatchId: "", palledarId: "", bricksCount: "", ratePerThousand: "" });
-  const [loading, setLoading] = useState(false);
-  const [mismatchWarning, setMismatchWarning] = useState<string | null>(null);
-  const activeKilnId = useAuthStore((s) => s.activeKilnId);
-  const { t } = useTranslation();
-  const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(entries, 10);
-
-  async function refresh() {
-    const [entryData, workers, contractors, dispatchData] = await Promise.all([
-      api.loadingEntries.list(),
-      api.people.list("WORKER"),
-      api.people.list("LABOUR_CONTRACTOR"),
-      api.dispatch.list(),
-    ]);
-    setEntries(entryData);
-    setPalledars([...workers, ...contractors]);
-    setDispatches(dispatchData);
-  }
-
-  useEffect(() => {
-    if (!activeKilnId) return;
-    refresh().catch(console.error);
-  }, [activeKilnId]);
-
-  useKilnEvent("loading:update", () => refresh());
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!form.palledarId || !form.bricksCount || !form.ratePerThousand) return;
-    setLoading(true);
-    setMismatchWarning(null);
-    try {
-      const result = await api.loadingEntries.create({
-        dispatchId: form.dispatchId || undefined,
-        palledarId: form.palledarId,
-        bricksCount: Number(form.bricksCount),
-        ratePerThousand: Number(form.ratePerThousand),
-      });
-      if (result.countMismatch) {
-        setMismatchWarning(
-          t("dispatch.loadedCountMismatchWarning", { count: result.dispatchBricksCount?.toLocaleString("en-IN") ?? "" })
-        );
-      }
-      setForm({ dispatchId: "", palledarId: "", bricksCount: "", ratePerThousand: "" });
-      setShowForm(false);
-      await refresh();
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setShowForm((s) => !s)}>
-          <Plus className="h-4 w-4" /> {t("dispatch.logLoadingEntry")}
-        </Button>
-      </div>
-
-      {showForm && (
-        <Card>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-            <select
-              required
-              value={form.palledarId}
-              onChange={(e) => setForm((f) => ({ ...f, palledarId: e.target.value }))}
-              className={cn(inputClass, "col-span-2")}
-            >
-              <option value="">{t("dispatch.palledarGangPlaceholder")}</option>
-              {palledars.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={form.dispatchId}
-              onChange={(e) => setForm((f) => ({ ...f, dispatchId: e.target.value }))}
-              className={cn(inputClass, "col-span-2")}
-            >
-              <option value="">{t("dispatch.linkDispatchOptional")}</option>
-              {dispatches.map((d) => (
-                <option key={d._id} value={d._id}>
-                  {d.slipNumber} — {d.customerName} ({d.bricksCount.toLocaleString("en-IN")} {t("dispatch.bricksUnit")})
-                </option>
-              ))}
-            </select>
-            <input
-              required
-              type="number"
-              placeholder={t("brickLoading.bricksLoadedPlaceholder")}
-              value={form.bricksCount}
-              onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              required
-              type="number"
-              placeholder={t("dispatch.ratePerThousandPlaceholder")}
-              value={form.ratePerThousand}
-              onChange={(e) => setForm((f) => ({ ...f, ratePerThousand: e.target.value }))}
-              className={inputClass}
-            />
-            <Button type="submit" disabled={loading} className="col-span-2">
-              {t("common.save")}
-            </Button>
-          </form>
-        </Card>
-      )}
-
-      {mismatchWarning && (
-        <Card className="border-status-warning/40 bg-status-warning/5">
-          <p className="text-sm text-status-warning">{mismatchWarning}</p>
-        </Card>
-      )}
-
-      <Card>
-        {entries.length === 0 ? (
-          <p className="py-8 text-center text-sm text-ink-muted">{t("dispatch.noLoadingEntriesYet")}</p>
-        ) : (
-          <div className="space-y-1">
-            {pagedEntries.map((e) => (
-              <div key={e._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
-                <div>
-                  <p className="text-ink-primary">
-                    {typeof e.palledarId === "object" ? e.palledarId.name : "—"}
-                    {typeof e.dispatchId === "object" && e.dispatchId ? ` · ${e.dispatchId.slipNumber}` : ""}
-                    {e.countMismatch && <Badge variant="critical" className="ml-2">{t("dispatch.countMismatchBadge")}</Badge>}
-                  </p>
-                  <p className="text-sm text-ink-muted">{new Date(e.date).toLocaleDateString("en-IN")}</p>
-                </div>
-                <span className="tabular-nums font-medium text-ink-primary">{e.bricksCount.toLocaleString("en-IN")}</span>
-              </div>
-            ))}
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-export function Dispatch() {
-  const [tab, setTab] = useState<"dispatches" | "loading">("dispatches");
-  const { t } = useTranslation();
-
-  return (
-    <div className="space-y-4">
-      <SegmentedTabs
-        options={[
-          { value: "dispatches" as const, label: t("dispatch.dispatchesTab") },
-          { value: "loading" as const, label: t("dispatch.loadingPalledarTab") },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-
-      {tab === "dispatches" && <DispatchesTab />}
-      {tab === "loading" && <LoadingTab />}
     </div>
   );
 }

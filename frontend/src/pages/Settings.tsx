@@ -375,6 +375,57 @@ function ShiftSettings() {
   );
 }
 
+function GstSettings() {
+  const { t } = useTranslation();
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const setKilns = useAuthStore((s) => s.setKilns);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+
+  const [gstNumber, setGstNumber] = useState(activeKiln?.gstNumber ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setGstNumber(activeKiln?.gstNumber ?? "");
+  }, [activeKilnId]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const trimmed = gstNumber.trim();
+      await api.kilns.updateGst(trimmed || null);
+      setKilns(kilns.map((k) => (k.kilnId === activeKilnId ? { ...k, gstNumber: trimmed || undefined } : k)));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle>{t("settings.gstNumber")}</CardTitle>
+      </CardHeader>
+      <p className="mb-4 text-sm text-ink-muted">{t("settings.gstNumberDescription")}</p>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <input
+          placeholder={t("settings.gstNumberPlaceholder")}
+          value={gstNumber}
+          onChange={(e) => setGstNumber(e.target.value)}
+          className={inputClass}
+        />
+        <Button type="submit" disabled={saving}>
+          {saved ? t("settings.saved") : saving ? t("settings.savingEllipsis") : t("settings.saveGstNumber")}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
 const COMPLIANCE_LABEL_KEYS: Record<ComplianceDocumentType, string> = {
   PCB_CONSENT_TO_OPERATE: "settings.pcbConsent",
   MINING_ROYALTY_LICENSE: "settings.miningRoyaltyLicense",
@@ -602,6 +653,7 @@ export function Settings() {
       <YardCapacitySettings />
       <SeasonSettings />
       <ShiftSettings />
+      <GstSettings />
       <ComplianceSettings />
       <StockAuditSettings />
     </div>

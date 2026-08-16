@@ -93,6 +93,13 @@ export const staffDict: Record<string, Record<Locale, string>> = {
   "settings.shiftStart": { en: "Shift start", hi: "शिफ़्ट शुरू" },
   "settings.shiftEnd": { en: "Shift end", hi: "शिफ़्ट समाप्त" },
   "settings.saveShiftTimings": { en: "Save shift timings", hi: "शिफ़्ट समय सहेजें" },
+  "settings.gstNumber": { en: "GST Number", hi: "जीएसटी नंबर" },
+  "settings.gstNumberDescription": {
+    en: "Optional — printed on the Challan when set. Leave blank if this kiln isn't GST-registered.",
+    hi: "वैकल्पिक — यदि सेट किया गया है तो चालान पर प्रिंट होगा। यदि यह भट्टा जीएसटी में पंजीकृत नहीं है तो खाली छोड़ें।",
+  },
+  "settings.gstNumberPlaceholder": { en: "GSTIN (e.g. 22AAAAA0000A1Z5)", hi: "जीएसटीआईएन (जैसे 22AAAAA0000A1Z5)" },
+  "settings.saveGstNumber": { en: "Save GST number", hi: "जीएसटी नंबर सहेजें" },
   "settings.pcbConsent": { en: "PCB Consent to Operate", hi: "PCB संचालन सहमति" },
   "settings.miningRoyaltyLicense": { en: "Mining Royalty License", hi: "खनन रॉयल्टी लाइसेंस" },
   "settings.zigZagCertificate": { en: "Zig-Zag Conversion Certificate", hi: "ज़िग-ज़ैग परिवर्तन प्रमाणपत्र" },
