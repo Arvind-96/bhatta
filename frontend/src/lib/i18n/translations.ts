@@ -106,6 +106,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.save": { en: "Save", hi: "सहेजें" },
   "common.saveChanges": { en: "Save changes", hi: "बदलाव सहेजें" },
   "common.cancel": { en: "Cancel", hi: "रद्द करें" },
+  "common.somethingWentWrong": { en: "Something went wrong — please try again", hi: "कुछ गड़बड़ हो गई — कृपया फिर से कोशिश करें" },
   "common.loading": { en: "Loading…", hi: "लोड हो रहा है…" },
   "common.name": { en: "Name", hi: "नाम" },
   "common.phone": { en: "Phone", hi: "फ़ोन" },

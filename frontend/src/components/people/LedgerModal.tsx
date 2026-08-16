@@ -8,7 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import type { LedgerCategory, LedgerEntry, LedgerPaymentMode, Person } from "@/types";
 import { formatINR } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
-import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 
 interface LedgerModalProps {
   person: Person;
@@ -73,10 +73,14 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
       setFormError(t("people.enterReasonForEntry"));
       return;
     }
+    const usingSplit = form.direction === "PAID" && form.paymentMode === "CASH_AND_ONLINE";
+    if (usingSplit && isPaymentSplitMismatched(form.paymentMode, Number(form.amount), form.cashAmount, form.onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: Number(form.amount).toLocaleString("en-IN") }));
+      return;
+    }
     setFormError("");
     setLoading(true);
     try {
-      const usingSplit = form.direction === "PAID" && form.paymentMode === "CASH_AND_ONLINE";
       await api.people.addLedger(person._id, {
         direction: form.direction,
         amount: Number(form.amount),

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
-import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import type { LedgerPaymentMode, PaymentReceipt } from "@/types";
 
 const inputClass =
@@ -33,13 +33,19 @@ export function EditPaymentReceiptModal({ receipt, personName, onClose, onSaved 
   const [date, setDate] = useState(receipt.date.slice(0, 10));
   const [notes, setNotes] = useState(receipt.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!amountPaid) return;
+    const usingSplit = paymentMode === "CASH_AND_ONLINE";
+    if (usingSplit && isPaymentSplitMismatched(paymentMode, Number(amountPaid), cashAmount, onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: Number(amountPaid).toLocaleString("en-IN") }));
+      return;
+    }
+    setFormError("");
     setSaving(true);
     try {
-      const usingSplit = paymentMode === "CASH_AND_ONLINE";
       await api.paymentReceipts.update(receipt._id, {
         amountPaid: Number(amountPaid),
         totalAgreedAmount: totalAgreedAmount ? Number(totalAgreedAmount) : undefined,
@@ -51,6 +57,8 @@ export function EditPaymentReceiptModal({ receipt, personName, onClose, onSaved 
       });
       onSaved();
       onClose();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -123,6 +131,7 @@ export function EditPaymentReceiptModal({ receipt, personName, onClose, onSaved 
             onChange={(e) => setNotes(e.target.value)}
             className={cn(inputClass, "w-full")}
           />
+          {formError && <p className="text-sm text-status-critical">{formError}</p>}
 
           <Button type="submit" disabled={saving} className="w-full">
             {t("common.saveChanges")}

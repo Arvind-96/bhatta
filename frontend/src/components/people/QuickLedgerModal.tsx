@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { LedgerCategory, LedgerPaymentMode, Person } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
-import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 
 export type QuickLedgerCategory = "ADVANCE" | "KHARCHI" | "MEDICAL" | "FESTIVAL";
 
@@ -63,6 +63,10 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
     e.preventDefault();
     if (!amount || Number(amount) <= 0) {
       setError(t("people.enterAmountGreaterThanZero"));
+      return;
+    }
+    if (isPaymentSplitMismatched(paymentMode, Number(amount), cashAmount, onlineAmount)) {
+      setError(t("payment.splitMismatch", { total: Number(amount).toLocaleString("en-IN") }));
       return;
     }
     setError("");

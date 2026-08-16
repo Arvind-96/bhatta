@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { printPaymentReceipt } from "@/lib/printDocument";
 import { useTranslation } from "@/hooks/useTranslation";
 import { usePersonTypeMeta, PERSON_TYPES } from "@/components/people/personTypes";
-import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import type { LedgerPaymentMode, Person, PersonType } from "@/types";
 
 const inputClass =
@@ -45,6 +45,7 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
   const [date, setDate] = useState(todayIso());
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
   const { t } = useTranslation();
   const personTypeMeta = usePersonTypeMeta();
 
@@ -83,9 +84,14 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!selectedPerson || !amountPaid) return;
+    const usingSplit = paymentMode === "CASH_AND_ONLINE";
+    if (usingSplit && isPaymentSplitMismatched(paymentMode, Number(amountPaid), cashAmount, onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: Number(amountPaid).toLocaleString("en-IN") }));
+      return;
+    }
+    setFormError("");
     setSaving(true);
     try {
-      const usingSplit = paymentMode === "CASH_AND_ONLINE";
       const receipt = await api.paymentReceipts.create({
         personId: selectedPerson._id,
         amountPaid: Number(amountPaid),
@@ -99,6 +105,8 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
       printPaymentReceipt(receipt, selectedPerson.name, kilnName);
       onCreated();
       onClose();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -258,6 +266,7 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
               {t("billing.remainingBalanceAfterPayment", { amount: projectedBalance.toLocaleString("en-IN") })}
             </p>
           )}
+          {formError && <p className="text-sm text-status-critical">{formError}</p>}
 
           <Button type="submit" disabled={saving || !selectedPerson} className="w-full">
             {t("billing.savePrintReceipt")}

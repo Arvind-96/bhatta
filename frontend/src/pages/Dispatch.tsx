@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import { PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import type { BrickGrade, Dispatch as DispatchEntry, FinishedGoodsReconciliation, LoadingEntry, PaymentMode, Person } from "@/types";
 
 const inputClass =
@@ -38,6 +38,7 @@ function DispatchesTab() {
     onlineAmount: "",
   });
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
   const { page, setPage, pageCount, pageItems: pagedDispatches, total } = usePagination(dispatches, 10);
@@ -71,6 +72,11 @@ function DispatchesTab() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.customerName || !form.bricksCount || !form.amount) return;
+    if (isPaymentSplitMismatched(form.paymentMode, Number(form.amount), form.cashAmount, form.onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: Number(form.amount).toLocaleString("en-IN") }));
+      return;
+    }
+    setFormError("");
     setLoading(true);
     try {
       await api.dispatch.create({
@@ -101,6 +107,8 @@ function DispatchesTab() {
       });
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -233,6 +241,7 @@ function DispatchesTab() {
                 <option value="CUSTOMER">{t("dispatch.transportPaidByCustomer")}</option>
               </select>
             )}
+            {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
             <Button type="submit" disabled={loading} className="col-span-2">
               {t("dispatch.saveDispatch")}
             </Button>
