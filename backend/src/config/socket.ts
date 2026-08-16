@@ -1,7 +1,7 @@
 import { Server as HttpServer } from "http";
 import { Server as SocketServer } from "socket.io";
 import { asc, eq } from "drizzle-orm";
-import { env } from "./env";
+import { isAllowedOrigin } from "./env";
 import { db } from "../db/client";
 import { kilns } from "../db/schema";
 
@@ -9,7 +9,13 @@ let io: SocketServer | null = null;
 
 export function initSocket(httpServer: HttpServer) {
   io = new SocketServer(httpServer, {
-    cors: { origin: env.corsOrigin, credentials: true },
+    cors: {
+      origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        callback(new Error("Not allowed by CORS"));
+      },
+      credentials: true,
+    },
   });
 
   // No login, so no membership to verify — a kilnId is honored if it names

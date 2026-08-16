@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
-import { env } from "./config/env";
+import { env, isAllowedOrigin } from "./config/env";
 import { runMigrations } from "./db/client";
 import { initSocket } from "./config/socket";
 import { registerSocketHandlers } from "./sockets";
@@ -21,7 +21,15 @@ process.on("uncaughtException", (err) => {
 });
 
 const app = express();
-app.use(cors({ origin: env.corsOrigin, credentials: true }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) return callback(null, true);
+      callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
