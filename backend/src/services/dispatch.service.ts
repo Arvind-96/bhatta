@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { dispatches, people, brickCategories, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import { dispatches, people, brickCategories, kilns, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
@@ -16,8 +16,55 @@ const GRADE_STOCK_ITEM: Record<BrickGrade, string> = {
   PELA: "Bricks (Pela/Seem)",
 };
 
-function generateSlipNumber() {
-  return `GP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+// Same server-local-midnight convention used everywhere else in this app
+// (see attendance.service.ts's startOfDay) — keeps the slip number's "day"
+// boundary consistent with how every other day-bucketed query in this
+// codebase already resolves it.
+function startOfDay(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfDay(date: Date) {
+  const d = startOfDay(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function formatDDMMYYYY(date: Date) {
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  return `${dd}-${mm}-${date.getFullYear()}`;
+}
+
+// e.g. "JVS Bricks" -> "JVS" — the kiln's own short prefix, not a fixed
+// abbreviation scheme.
+function kilnPrefix(kilnName: string) {
+  const firstWord = kilnName.trim().split(/\s+/)[0] ?? "";
+  const alnum = firstWord.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return alnum || "KILN";
+}
+
+// Human-readable and sequential per kiln per calendar day — e.g.
+// "JVS-16-08-2026-01" — so a munim can read a slip number straight off a
+// printed Gate Pass/Challan and know the kiln, the day, and which dispatch
+// of that day it was, instead of an opaque random code. Resets to 01 every
+// day. better-sqlite3 is synchronous, so the count-then-insert in
+// createDispatch below never has an async gap for two same-day dispatches
+// to race into the same sequence number.
+function generateSlipNumber(kilnId: string, dispatchedOn: Date) {
+  const kiln = db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)).get();
+  const prefix = kilnPrefix(kiln?.name ?? "KILN");
+  const dayStart = startOfDay(dispatchedOn);
+  const dayEnd = endOfDay(dispatchedOn);
+  const countRow = db
+    .select({ count: sql<number>`count(*)` })
+    .from(dispatches)
+    .where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, dayStart), lte(dispatches.dispatchedOn, dayEnd)))
+    .get();
+  const seq = (countRow?.count ?? 0) + 1;
+  return `${prefix}-${formatDDMMYYYY(dayStart)}-${String(seq).padStart(2, "0")}`;
 }
 
 function generateInvoiceNumber() {
@@ -72,10 +119,15 @@ export async function createDispatch(input: CreateDispatchInput) {
   // display on the Challan.
   const netAmount = input.discountAmount ? Math.round((input.amount - input.discountAmount) * 100) / 100 : input.amount;
 
-  const slipNumber = generateSlipNumber();
+  // Resolved once so the slip number's date component and the row's own
+  // dispatchedOn always agree — letting Drizzle's own $defaultFn pick a
+  // separate `new Date()` at insert time could disagree by the odd
+  // millisecond and, right at midnight, land on a different calendar day.
+  const dispatchedOn = input.dispatchedOn ?? new Date();
+  const slipNumber = generateSlipNumber(input.kilnId, dispatchedOn);
   const invoiceNumber = generateInvoiceNumber();
   const _id = randomUUID();
-  db.insert(dispatches).values({ ...input, amount: netAmount, _id, slipNumber, invoiceNumber }).run();
+  db.insert(dispatches).values({ ...input, amount: netAmount, dispatchedOn, _id, slipNumber, invoiceNumber }).run();
   const dispatch = db.select().from(dispatches).where(eq(dispatches._id, _id)).get()!;
 
   if (input.customerId) {
@@ -85,7 +137,7 @@ export async function createDispatch(input: CreateDispatchInput) {
       direction: "DUE",
       amount: netAmount,
       reason: `Sale: ${input.bricksCount.toLocaleString()} bricks (${slipNumber})`,
-      date: input.dispatchedOn,
+      date: dispatchedOn,
     });
   }
 

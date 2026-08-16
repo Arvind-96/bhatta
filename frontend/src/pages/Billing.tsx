@@ -145,7 +145,7 @@ export function Billing() {
               <tbody>
                 {pagedDispatches.map((d) => (
                   <tr key={d._id} className="border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                    <td className="py-3 text-ink-primary">{d.invoiceNumber ?? d.slipNumber}</td>
+                    <td className="py-3 text-ink-primary">{d.slipNumber}</td>
                     <td className="py-3 text-ink-secondary">{new Date(d.dispatchedOn).toLocaleDateString("en-IN")}</td>
                     <td className="py-3 text-ink-secondary">{d.customerName}</td>
                     <td className="py-3">

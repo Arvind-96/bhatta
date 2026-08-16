@@ -114,6 +114,8 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "inventory.saveItem": { en: "Save item", hi: "सामान सहेजें" },
   "inventory.noItemsYet": { en: "No inventory items added yet.", hi: "अभी तक कोई सामान नहीं जोड़ा गया।" },
   "inventory.itemColumn": { en: "Item", hi: "सामान" },
+  "inventory.remainingQuantity": { en: "Remaining", hi: "शेष" },
+  "inventory.usedQuantity": { en: "Used", hi: "उपयोग हुआ" },
   "inventory.unit": { en: "Unit", hi: "इकाई" },
   "inventory.confirmDelete": {
     en: 'Delete "{name}" from inventory? This can\'t be undone.',

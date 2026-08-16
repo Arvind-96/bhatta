@@ -120,7 +120,7 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "billing.billsLast30Days": { en: "bills (last 30 days)", hi: "बिल संख्या (पिछले 30 दिन)" },
   "billing.outstandingCredit": { en: "outstanding credit", hi: "बकाया उधार" },
   "billing.noBillsLast60Days": { en: "No bills in the last 60 days.", hi: "पिछले 60 दिनों में कोई बिल नहीं।" },
-  "billing.invoiceHeader": { en: "Invoice #", hi: "इनवॉइस #" },
+  "billing.invoiceHeader": { en: "Slip #", hi: "पर्ची #" },
   "billing.customerHeader": { en: "Customer", hi: "ग्राहक" },
   "billing.gradeHeader": { en: "Grade", hi: "ग्रेड" },
   "billing.bricksHeader": { en: "Bricks", hi: "ईंटें" },

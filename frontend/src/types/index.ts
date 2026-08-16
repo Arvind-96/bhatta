@@ -141,6 +141,9 @@ export interface InventoryItem {
   _id: string;
   name: string;
   quantity: number;
+  // Running total ever supplied out to labourers — always present on
+  // list responses (computed, never stored).
+  usedQuantity: number;
   unit: string;
   notes?: string;
   createdAt: string;

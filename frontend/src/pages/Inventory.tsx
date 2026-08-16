@@ -143,7 +143,8 @@ export function Inventory() {
               <thead>
                 <tr className="border-b border-border text-left text-sm text-ink-muted">
                   <th className="pb-2 font-medium">{t("inventory.itemColumn")}</th>
-                  <th className="pb-2 font-medium">{t("common.quantity")}</th>
+                  <th className="pb-2 font-medium">{t("inventory.remainingQuantity")}</th>
+                  <th className="pb-2 font-medium">{t("inventory.usedQuantity")}</th>
                   <th className="pb-2 font-medium">{t("inventory.unit")}</th>
                   <th className="pb-2 font-medium">{t("common.notes")}</th>
                   <th className="pb-2 font-medium text-right">{t("common.actions")}</th>
@@ -153,7 +154,7 @@ export function Inventory() {
                 {pagedItems.map((item) =>
                   editingId === item._id ? (
                     <tr key={item._id} className="border-b border-border/60 last:border-0">
-                      <td className="py-2 pr-2" colSpan={5}>
+                      <td className="py-2 pr-2" colSpan={6}>
                         <form onSubmit={saveEdit} className="grid grid-cols-5 items-center gap-2">
                           <input
                             required
@@ -199,6 +200,7 @@ export function Inventory() {
                       <td className={`py-3 tabular-nums ${item.quantity <= 0 ? "text-status-critical" : "text-ink-secondary"}`}>
                         {item.quantity.toLocaleString("en-IN")}
                       </td>
+                      <td className="py-3 tabular-nums text-ink-secondary">{item.usedQuantity.toLocaleString("en-IN")}</td>
                       <td className="py-3 text-ink-secondary">{item.unit}</td>
                       <td className="py-3 text-ink-muted">{item.notes ?? "—"}</td>
                       <td className="py-3">

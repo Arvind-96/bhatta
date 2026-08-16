@@ -166,7 +166,7 @@ export function printInvoice(dispatch: Dispatch, kiln: KilnPrintInfo, accountBal
         ${kiln.gstNumber ? `<p class="muted">GSTIN: ${escapeHtml(kiln.gstNumber)}</p>` : ""}
       </div>
       <div style="text-align:right">
-        <p class="value">${escapeHtml(dispatch.invoiceNumber ?? dispatch.slipNumber)}</p>
+        <p class="value">${escapeHtml(dispatch.slipNumber)}</p>
         <p class="muted">${new Date(dispatch.dispatchedOn).toLocaleDateString("en-IN")}</p>
         <p class="muted">Printed: ${new Date().toLocaleDateString("en-IN")}</p>
       </div>
@@ -217,7 +217,7 @@ export function printInvoice(dispatch: Dispatch, kiln: KilnPrintInfo, accountBal
       <div class="sign">Authorised signatory<br />(Stamp &amp; Signature)</div>
     </div>
   `;
-  openPrintWindow(`Challan ${dispatch.invoiceNumber ?? dispatch.slipNumber}`, body);
+  openPrintWindow(`Challan ${dispatch.slipNumber}`, body);
 }
 
 // A payment receipt can be issued to anyone in the People directory, not

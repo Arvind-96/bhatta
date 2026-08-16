@@ -45,7 +45,12 @@ export const dispatches = sqliteTable("dispatches", {
   localId: text("localId"),
   createdAt: createdAtColumn(),
 }, (t) => ({
-  slipNumberUnique: uniqueIndex("dispatch_slip_unique").on(t.slipNumber),
+  // Scoped to (kilnId, slipNumber), not slipNumber alone — the slip number
+  // is now a human-readable per-kiln document number ("JVS-16-08-2026-01"),
+  // deterministic from the kiln's name/date/daily-sequence, so two
+  // different kilns (e.g. two same-named ones under one account) can
+  // legitimately land on the identical-looking text without colliding.
+  slipNumberUnique: uniqueIndex("dispatch_slip_unique").on(t.kilnId, t.slipNumber),
   invoiceNumberUnique: uniqueIndex("dispatch_invoice_unique").on(t.invoiceNumber),
   localIdUnique: uniqueIndex("dispatch_localid_unique").on(t.localId),
   kilnDispatchedIdx: index("dispatch_kiln_dispatched_idx").on(t.kilnId, t.dispatchedOn),
