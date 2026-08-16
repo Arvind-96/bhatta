@@ -37,6 +37,7 @@ export interface CreateDispatchInput {
   paymentMode?: PaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
+  categoryId?: string;
   dispatchedOn?: Date;
 }
 

@@ -15,6 +15,13 @@
       "when": 1786882296387,
       "tag": "0001_fuzzy_pixie",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786895495007,
+      "tag": "0002_curved_annihilus",
+      "breakpoints": true
     }
   ]
 }

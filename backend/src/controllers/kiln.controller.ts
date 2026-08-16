@@ -7,6 +7,7 @@ import {
   listUserKilns,
   setKilnGeofence,
   setSeason,
+  setShiftTimes,
   setYardCapacity,
   updateKilnProfile,
 } from "../services/auth.service";
@@ -42,6 +43,12 @@ const seasonSchema = z
     message: "seasonStartDay is not valid for the selected seasonStartMonth",
     path: ["seasonStartDay"],
   });
+
+const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const shiftTimesSchema = z.object({
+  dayShiftStart: z.string().regex(TIME_REGEX, "must be HH:MM (24-hour)"),
+  dayShiftEnd: z.string().regex(TIME_REGEX, "must be HH:MM (24-hour)"),
+});
 
 const profileSchema = z.object({
   name: z.string().min(1).optional(),
@@ -85,6 +92,12 @@ export async function updateYardCapacity(req: AuthedRequest, res: Response) {
 export async function updateSeason(req: AuthedRequest, res: Response) {
   const input = seasonSchema.parse(req.body);
   const kiln = await setSeason(req.kiln!.id, input.seasonStartMonth, input.seasonStartDay);
+  res.json(kiln);
+}
+
+export async function updateShiftTimes(req: AuthedRequest, res: Response) {
+  const input = shiftTimesSchema.parse(req.body);
+  const kiln = await setShiftTimes(req.kiln!.id, input.dayShiftStart, input.dayShiftEnd);
   res.json(kiln);
 }
 

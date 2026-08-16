@@ -39,7 +39,6 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   "people.noThekedarsYet": { en: "No thekedars added yet.", hi: "अभी तक कोई ठेकेदार नहीं जोड़ा गया।" },
   "people.other": { en: "Other", hi: "अन्य" },
   "people.noOneAddedYet": { en: "No one added yet.", hi: "अभी तक कोई नहीं जोड़ा गया।" },
-  "people.face": { en: "Face", hi: "चेहरा" },
   "people.profitShare": { en: "{percent}% share", hi: "{percent}% हिस्सा" },
   "people.creditLimit": { en: "Limit ₹{amount}", hi: "सीमा ₹{amount}" },
   "people.noLimitSet": { en: "No limit set", hi: "कोई सीमा तय नहीं" },
@@ -177,13 +176,4 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
 
   // --- components/people/EditWorkEntryModal.tsx ---
   "people.editWorkEntry": { en: "Edit work entry", hi: "काम की एंट्री बदलें" },
-
-  // --- components/people/EnrollFaceModal.tsx ---
-  "people.enrollFaceTitle": { en: "Enroll face — {name}", hi: "चेहरा पंजीकृत करें — {name}" },
-  "people.loadingFaceModel": { en: "Loading face model…", hi: "चेहरा मॉडल लोड हो रहा है…" },
-  "people.noFaceDetected": {
-    en: "No face detected — face the camera and try again",
-    hi: "कोई चेहरा नहीं मिला — कैमरे की ओर देखें और फिर से प्रयास करें",
-  },
-  "people.captureFace": { en: "Capture face", hi: "चेहरा कैप्चर करें" },
 };

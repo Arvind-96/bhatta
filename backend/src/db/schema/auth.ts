@@ -15,6 +15,11 @@ export const kilns = sqliteTable("kilns", {
   // season-scoped reporting. Month is 1-12, day is 1-31.
   seasonStartMonth: integer("seasonStartMonth").default(8),
   seasonStartDay: integer("seasonStartDay").default(1),
+  // Reference info for the Attendance roster page — not an auto clock-in
+  // (there's no check-in device), just the shift window shown to the admin
+  // so "Late" has a concrete meaning when marking someone manually.
+  dayShiftStart: text("dayShiftStart").default("08:00"),
+  dayShiftEnd: text("dayShiftEnd").default("18:00"),
   createdAt: createdAtColumn(),
 });
 

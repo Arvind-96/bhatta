@@ -25,6 +25,11 @@ export const dispatches = sqliteTable("dispatches", {
   // Only set when paymentMode is CASH_AND_ONLINE — must sum to `amount`.
   cashAmount: real("cashAmount"),
   onlineAmount: real("onlineAmount"),
+  // Which free-form brick category this dispatch moved — independent of
+  // `grade` (a separate, older fixed A1/JHAMA/PELA classification). Set
+  // automatically on dispatches auto-created from a Brick Loading trip;
+  // left null on manually-created dispatches.
+  categoryId: text("categoryId"),
   dispatchedOn: dateColumn("dispatchedOn"),
   localId: text("localId"),
   createdAt: createdAtColumn(),

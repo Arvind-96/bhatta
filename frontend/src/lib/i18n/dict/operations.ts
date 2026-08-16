@@ -131,8 +131,9 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
     hi: "केवल यहाँ जोड़ी गई श्रेणियाँ ट्रैक होती हैं — जो इस भट्टे में उपयोग नहीं होतीं उन्हें हटा दें।",
   },
   "stock.addCategory": { en: "Add category", hi: "श्रेणी जोड़ें" },
-  "stock.allCategoriesAdded": { en: "All categories added", hi: "सभी श्रेणियां जोड़ी जा चुकी हैं" },
   "stock.category": { en: "Category", hi: "श्रेणी" },
+  "stock.categoryNamePlaceholder": { en: "Category name (e.g. Abbal, Doyam)", hi: "श्रेणी का नाम (जैसे अब्बल, दोयम)" },
+  "stock.pricePerBrick": { en: "Price per brick", hi: "प्रति ईंट कीमत" },
   "stock.selectCategoryPlaceholder": { en: "Select category…", hi: "श्रेणी चुनें…" },
   "stock.noCategoriesYet": {
     en: "No brick categories added yet — add one above to start tracking its stock.",

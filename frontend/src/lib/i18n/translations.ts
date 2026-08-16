@@ -50,7 +50,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "nav.fleet": { en: "Fleet & Machines", hi: "वाहन व मशीन" },
   "nav.staff": { en: "Staff", hi: "स्टाफ" },
   "nav.salary": { en: "Salary", hi: "वेतन" },
-  "nav.kiosk": { en: "Attendance", hi: "हाज़िरी" },
+  "nav.attendance": { en: "Attendance", hi: "हाज़िरी" },
   "nav.settings": { en: "Settings", hi: "सेटिंग्स" },
 
   "topbar.kilnOverview": { en: "Kiln Overview", hi: "भट्टा अवलोकन" },
@@ -178,8 +178,6 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "people.addPerson": { en: "Add person", hi: "व्यक्ति जोड़ें" },
   "people.ledger": { en: "Ledger", hi: "खाता-बही" },
   "people.balanceDue": { en: "Balance due", hi: "बकाया राशि" },
-  "people.enroll": { en: "Enroll", hi: "पंजीकृत करें" },
-  "people.reenroll": { en: "Re-enroll", hi: "फिर से पंजीकृत करें" },
 };
 
 export const translations: Record<string, Record<Locale, string>> = {

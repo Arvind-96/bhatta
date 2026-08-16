@@ -1,21 +1,21 @@
 import { useTranslation } from "@/hooks/useTranslation";
 import type { FamilyRelation, PersonType, WorkType } from "@/types";
 
-export function usePersonTypeMeta(): Record<PersonType, { label: string; hasWage: boolean; hasFace: boolean }> {
+export function usePersonTypeMeta(): Record<PersonType, { label: string; hasWage: boolean }> {
   const { t } = useTranslation();
   return {
-    DRIVER: { label: t("people.typeDriver"), hasWage: false, hasFace: false },
-    LABOUR_CONTRACTOR: { label: t("people.typeLabourContractor"), hasWage: false, hasFace: false },
-    SUPPLIER: { label: t("people.typeSupplier"), hasWage: false, hasFace: false },
-    THEKEDAR: { label: t("people.typeThekedar"), hasWage: false, hasFace: false },
-    PARTNER: { label: t("people.typePartner"), hasWage: false, hasFace: false },
-    WORKER: { label: t("people.typeWorker"), hasWage: true, hasFace: true },
-    HELPER: { label: t("people.typeHelper"), hasWage: true, hasFace: true },
-    LANDOWNER: { label: t("people.typeLandowner"), hasWage: false, hasFace: false },
-    FITTER: { label: t("people.typeFitter"), hasWage: false, hasFace: false },
-    CUSTOMER: { label: t("people.typeCustomer"), hasWage: false, hasFace: false },
-    MUNIM: { label: t("people.typeMunim"), hasWage: false, hasFace: false },
-    CHOWKIDAR: { label: t("people.typeChowkidar"), hasWage: false, hasFace: false },
+    DRIVER: { label: t("people.typeDriver"), hasWage: false },
+    LABOUR_CONTRACTOR: { label: t("people.typeLabourContractor"), hasWage: false },
+    SUPPLIER: { label: t("people.typeSupplier"), hasWage: false },
+    THEKEDAR: { label: t("people.typeThekedar"), hasWage: false },
+    PARTNER: { label: t("people.typePartner"), hasWage: false },
+    WORKER: { label: t("people.typeWorker"), hasWage: true },
+    HELPER: { label: t("people.typeHelper"), hasWage: true },
+    LANDOWNER: { label: t("people.typeLandowner"), hasWage: false },
+    FITTER: { label: t("people.typeFitter"), hasWage: false },
+    CUSTOMER: { label: t("people.typeCustomer"), hasWage: false },
+    MUNIM: { label: t("people.typeMunim"), hasWage: false },
+    CHOWKIDAR: { label: t("people.typeChowkidar"), hasWage: false },
   };
 }
 

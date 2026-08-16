@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Handshake, Plus, ScanFace, UserPlus, Users } from "lucide-react";
+import { Handshake, Plus, UserPlus, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,6 @@ import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { AddThekedarModal } from "@/components/people/AddThekedarModal";
 import { AddLabourModal } from "@/components/people/AddLabourModal";
 import { LedgerModal } from "@/components/people/LedgerModal";
-import { EnrollFaceModal } from "@/components/people/EnrollFaceModal";
 import { LabourDetailPage } from "@/components/people/LabourDetailPage";
 import { ThekedarDetailPage } from "@/components/people/ThekedarDetailPage";
 import { LandownerDetailPage } from "@/components/people/LandownerDetailPage";
@@ -276,7 +275,6 @@ function OtherTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [ledgerFor, setLedgerFor] = useState<Person | null>(null);
-  const [faceFor, setFaceFor] = useState<Person | null>(null);
   const { t: tr } = useTranslation();
   const personTypeMeta = usePersonTypeMeta();
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -333,7 +331,6 @@ function OtherTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }
                   <th className="pb-2 font-medium">{tr("common.type")}</th>
                   <th className="pb-2 font-medium">{tr("common.phone")}</th>
                   <th className="pb-2 font-medium">{tr("common.details")}</th>
-                  <th className="pb-2 font-medium">{tr("people.face")}</th>
                   <th className="pb-2 font-medium text-right">{tr("people.ledger")}</th>
                 </tr>
               </thead>
@@ -362,19 +359,6 @@ function OtherTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }
                       {p.type === "FITTER" && (p.monthlySalary ? tr("people.ratePerMonth", { amount: p.monthlySalary.toLocaleString("en-IN") }) : "—")}
                       {!["DRIVER", "PARTNER", "LANDOWNER", "CUSTOMER", "FITTER"].includes(p.type) && "—"}
                     </td>
-                    <td className="py-3">
-                      {personTypeMeta[p.type].hasFace ? (
-                        <button
-                          onClick={() => setFaceFor(p)}
-                          className="flex items-center gap-1 text-sm text-ink-muted hover:text-series-1"
-                        >
-                          <ScanFace className="h-3.5 w-3.5" />
-                          {p.faceDescriptor?.length ? tr("people.reenroll") : tr("people.enroll")}
-                        </button>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
                     <td className="py-3 text-right">
                       <button onClick={() => setLedgerFor(p)} className="text-xs font-medium text-series-1 hover:underline">
                         {tr("common.view")}
@@ -397,14 +381,6 @@ function OtherTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }
         />
       )}
       {ledgerFor && <LedgerModal person={ledgerFor} onClose={() => setLedgerFor(null)} />}
-      {faceFor && (
-        <EnrollFaceModal
-          personId={faceFor._id}
-          personName={faceFor.name}
-          onClose={() => setFaceFor(null)}
-          onEnrolled={refresh}
-        />
-      )}
     </div>
   );
 }

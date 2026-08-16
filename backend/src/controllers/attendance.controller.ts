@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { attendanceForPersonMonth, faceCheckIn, listAttendanceForDay, markAttendance } from "../services/attendance.service";
+import { attendanceForPersonMonth, listAttendanceForDay, listAttendanceRoster, markAttendance } from "../services/attendance.service";
 
 const markSchema = z.object({
   personId: z.string(),
@@ -39,18 +39,12 @@ export async function forPerson(req: AuthedRequest, res: Response) {
   res.json(days);
 }
 
-const faceCheckInSchema = z.object({
-  descriptor: z.array(z.number()).length(128),
-  latitude: z.number(),
-  longitude: z.number(),
+const rosterQuerySchema = z.object({
+  date: z.string().optional(),
 });
 
-export async function faceCheckInHandler(req: AuthedRequest, res: Response) {
-  try {
-    const input = faceCheckInSchema.parse(req.body);
-    const result = await faceCheckIn({ kilnId: req.kiln!.id, ...input });
-    res.status(201).json(result);
-  } catch (err) {
-    res.status(422).json({ error: (err as Error).message });
-  }
+export async function roster(req: AuthedRequest, res: Response) {
+  const { date } = rosterQuerySchema.parse(req.query);
+  const entries = await listAttendanceRoster(req.kiln!.id, date ? new Date(date) : new Date());
+  res.json(entries);
 }

@@ -1,15 +1,16 @@
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { brickCategories, brickProductionEntries, stockLoadingEntries, BRICK_CATEGORIES } from "../db/schema";
+import { brickCategories, brickProductionEntries, stockLoadingEntries } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
-export type BrickCategoryName = (typeof BRICK_CATEGORIES)[number];
-
-export async function createBrickCategory(kilnId: string, category: BrickCategoryName) {
+// Free-form name, admin-defined — not a fixed vocabulary. pricePerBrick
+// defaults to 0 (unpriced) until the admin sets a real rate; see
+// brickLoading.service.ts for how that price feeds the Dispatch auto-sync.
+export async function createBrickCategory(kilnId: string, category: string, pricePerBrick = 0) {
   try {
     const _id = randomUUID();
-    db.insert(brickCategories).values({ _id, kilnId, category }).run();
+    db.insert(brickCategories).values({ _id, kilnId, category, pricePerBrick }).run();
     const created = db.select().from(brickCategories).where(eq(brickCategories._id, _id)).get()!;
     emitToKiln(kilnId, "brickCategory:update", created);
     return created;
@@ -25,13 +26,17 @@ export async function listBrickCategories(kilnId: string) {
   return db.select().from(brickCategories).where(eq(brickCategories.kilnId, kilnId)).orderBy(asc(brickCategories.category)).all();
 }
 
-// The admin's direct manual override of a category's stock figure — same
-// "always available, never blocked" correction path InventoryItem.quantity
-// gives for supply items.
-export async function updateBrickCategoryQuantity(kilnId: string, categoryId: string, quantity: number) {
+// The admin's direct manual override of a category's stock and/or price —
+// same "always available, never blocked" correction path
+// InventoryItem.quantity gives for supply items.
+export async function updateBrickCategory(
+  kilnId: string,
+  categoryId: string,
+  updates: { quantity?: number; pricePerBrick?: number }
+) {
   const existing = db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))).get();
   if (!existing) throw new Error("Brick category not found in this kiln");
-  db.update(brickCategories).set({ quantity }).where(eq(brickCategories._id, categoryId)).run();
+  db.update(brickCategories).set(updates).where(eq(brickCategories._id, categoryId)).run();
   const updated = db.select().from(brickCategories).where(eq(brickCategories._id, categoryId)).get()!;
   emitToKiln(kilnId, "brickCategory:update", updated);
   return updated;

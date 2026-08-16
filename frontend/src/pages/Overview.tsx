@@ -31,7 +31,6 @@ import { api } from "@/lib/api";
 import { cn, formatINR } from "@/lib/utils";
 import { avatarToneClass, initialOf } from "@/lib/avatarTone";
 import {
-  BRICK_CATEGORY_LABELS,
   type BrickCategory,
   type DashboardStockSummary,
   type DispatchTotals,
@@ -327,7 +326,7 @@ function DashboardStockPanel() {
                   key={c._id}
                   className="-mx-2 flex items-center justify-between rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-ink-primary/5"
                 >
-                  <span className="text-ink-secondary">{BRICK_CATEGORY_LABELS[c.category]}</span>
+                  <span className="text-ink-secondary">{c.category}</span>
                   <span className="font-semibold tabular-nums text-ink-primary">
                     {c.quantity.toLocaleString("en-IN")}
                   </span>

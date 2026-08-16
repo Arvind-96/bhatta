@@ -1,14 +1,8 @@
 import { randomUUID } from "crypto";
-import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/client";
-import { attendances, people, kilns } from "../db/schema";
+import { attendances, people } from "../db/schema";
 import { emitToKiln } from "../config/socket";
-import { euclideanDistance, haversineDistanceMeters } from "../utils/geo";
-
-// face-api.js descriptors: a match is typically < 0.5-0.6 euclidean distance
-// between two faces; this threshold trades a few false rejections (worker
-// scans again) for near-zero false accepts (wrong person credited).
-const FACE_MATCH_THRESHOLD = 0.5;
 
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "LATE";
 
@@ -20,8 +14,8 @@ export interface MarkAttendanceInput {
   wageAmount?: number;
 }
 
-// Eligible for attendance marking: WORKER/HELPER (piece-rate, kiosk
-// check-in) plus anyone with a monthlySalary set — not a fixed type list,
+// Eligible for attendance marking: WORKER/HELPER (piece-rate) plus anyone
+// with a monthlySalary set — not a fixed type list,
 // since which types actually carry a monthly salary varies by kiln (this
 // deployment's real data includes salaried FITTERs, for instance) and the
 // Salary module needs attendance for exactly that same "has monthlySalary"
@@ -158,61 +152,43 @@ export async function attendanceSummaryForMonth(
   return summary;
 }
 
-export interface FaceCheckInInput {
-  kilnId: string;
-  descriptor: number[];
-  latitude: number;
-  longitude: number;
+export interface RosterEntry {
+  person: { _id: string; name: string; type: string; designation: string | null };
+  status: AttendanceStatus;
+  recorded: boolean;
 }
 
-// Kiosk flow: worker looks at the camera, no name/ID selection needed.
-// 1) reject if outside the kiln's geofence, 2) find the closest enrolled
-// face among this kiln's workers/helpers, 3) reject if even the closest
-// match is too far in face-space to trust, 4) mark today's attendance.
-export async function faceCheckIn(input: FaceCheckInInput) {
-  const kiln = db.select().from(kilns).where(eq(kilns._id, input.kilnId)).get();
-  if (!kiln) throw new Error("Kiln not found");
+// Every attendance-eligible person in the kiln, with their status for one
+// specific date (present-by-default, same rule as attendanceForPersonMonth)
+// — powers the Attendance page's daily roster, where the admin marks
+// exceptions directly against the full staff list rather than one person's
+// calendar at a time.
+export async function listAttendanceRoster(kilnId: string, date: Date): Promise<RosterEntry[]> {
+  const day = startOfDay(date);
 
-  if (kiln.latitude != null && kiln.longitude != null) {
-    const distance = haversineDistanceMeters(kiln.latitude, kiln.longitude, input.latitude, input.longitude);
-    if (distance > (kiln.radiusMeters ?? 200)) {
-      throw new Error(`Outside kiln radius (${Math.round(distance)}m away, allowed ${kiln.radiusMeters ?? 200}m)`);
-    }
-  }
-
-  const candidates = await db
+  const eligiblePeople = await db
     .select()
     .from(people)
-    .where(
-      and(
-        eq(people.kilnId, input.kilnId),
-        inArray(people.type, ["WORKER", "HELPER"]),
-        eq(people.active, true),
-        isNotNull(people.faceDescriptor)
-      )
-    )
+    .where(and(eq(people.kilnId, kilnId), eq(people.active, true)))
     .all();
+  const rosterPeople = eligiblePeople.filter((p) => p.type === "WORKER" || p.type === "HELPER" || p.monthlySalary != null);
+  if (rosterPeople.length === 0) return [];
 
-  let best: (typeof candidates)[number] | null = null;
-  let bestDistance = Infinity;
-  for (const candidate of candidates) {
-    const distance = euclideanDistance(candidate.faceDescriptor as number[], input.descriptor);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      best = candidate;
-    }
-  }
+  const rows = await db
+    .select()
+    .from(attendances)
+    .where(and(eq(attendances.kilnId, kilnId), eq(attendances.date, day), inArray(attendances.personId, rosterPeople.map((p) => p._id))))
+    .all();
+  const rowByPerson = new Map(rows.map((r) => [r.personId, r]));
 
-  if (!best || bestDistance > FACE_MATCH_THRESHOLD) {
-    throw new Error("Face not recognized — try again or check in manually");
-  }
-
-  const record = await markAttendance({
-    kilnId: input.kilnId,
-    personId: best._id,
-    date: new Date(),
-    status: "PRESENT",
-  });
-
-  return { record, person: { id: best._id, name: best.name }, matchDistance: bestDistance };
+  return rosterPeople
+    .map((p) => {
+      const row = rowByPerson.get(p._id);
+      return {
+        person: { _id: p._id, name: p.name, type: p.type, designation: p.designation },
+        status: (row?.status as AttendanceStatus) ?? "PRESENT",
+        recorded: !!row,
+      };
+    })
+    .sort((a, b) => a.person.name.localeCompare(b.person.name));
 }

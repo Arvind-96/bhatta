@@ -11,7 +11,7 @@ import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { BrickLoadingDriverSummary, BrickLoadingEntry, BrickVehicleType, Dispatch, Person } from "@/types";
+import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, BrickVehicleType, Dispatch, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -113,25 +113,30 @@ export function BrickLoading() {
     driverId: "",
     bricksCount: "",
     tipAmount: "",
+    loadingCharge: "",
+    categoryId: "",
     dispatchId: "",
     notes: "",
   });
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<BrickCategory[]>([]);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
   const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(entries, 10);
 
   async function refresh() {
-    const [entriesData, driversData, dispatchData, summary] = await Promise.all([
+    const [entriesData, driversData, dispatchData, summary, categoryData] = await Promise.all([
       api.brickLoading.list(),
       api.people.list("DRIVER"),
       api.dispatch.list(),
       api.brickLoading.driverSummary(),
+      api.brickCategories.list(),
     ]);
     setEntries(entriesData);
     setDrivers(driversData);
     setDispatches(dispatchData);
     setDriverSummary(summary);
+    setCategories(categoryData);
   }
 
   useEffect(() => {
@@ -148,13 +153,25 @@ export function BrickLoading() {
     if (person) setLedgerFor(person);
   }
 
-  function handleDriverChange(driverId: string) {
-    const driver = drivers.find((d) => d._id === driverId);
+  function handleDriverChange(driverId: string, driverList: Person[] = drivers) {
+    const driver = driverList.find((d) => d._id === driverId);
     setForm((f) => ({
       ...f,
       driverId,
       vehicleNumber: driver?.vehicleNumber ? driver.vehicleNumber : f.vehicleNumber,
     }));
+  }
+
+  // A driver created via "+ New driver" (opened from within this same form)
+  // should end up selected, not left for the admin to find and reselect
+  // from a list that just grew by one — found by diffing driver ids before
+  // vs. after, since Person doesn't carry a createdAt field client-side.
+  async function handleDriverCreated() {
+    const previousIds = new Set(drivers.map((d) => d._id));
+    const freshDrivers = await api.people.list("DRIVER");
+    setDrivers(freshDrivers);
+    const newest = freshDrivers.find((d) => !previousIds.has(d._id));
+    if (newest) handleDriverChange(newest._id, freshDrivers);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -168,16 +185,24 @@ export function BrickLoading() {
         driverId: form.driverId,
         bricksCount: Number(form.bricksCount),
         tipAmount: form.tipAmount ? Number(form.tipAmount) : undefined,
+        loadingCharge: form.loadingCharge ? Number(form.loadingCharge) : undefined,
+        categoryId: form.categoryId || undefined,
         dispatchId: form.dispatchId || undefined,
         notes: form.notes || undefined,
       });
-      setForm({ vehicleType: "TRUCK", vehicleNumber: "", driverId: "", bricksCount: "", tipAmount: "", dispatchId: "", notes: "" });
+      setForm({ vehicleType: "TRUCK", vehicleNumber: "", driverId: "", bricksCount: "", tipAmount: "", loadingCharge: "", categoryId: "", dispatchId: "", notes: "" });
       setShowForm(false);
       await refresh();
     } finally {
       setLoading(false);
     }
   }
+
+  const selectedCategory = categories.find((c) => c._id === form.categoryId);
+  const estimatedDispatchAmount =
+    selectedCategory && form.bricksCount && selectedCategory.pricePerBrick > 0
+      ? Number(form.bricksCount) * selectedCategory.pricePerBrick
+      : null;
 
   return (
     <div className="space-y-4">
@@ -207,14 +232,24 @@ export function BrickLoading() {
               onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
               className={inputClass}
             />
-            <select required value={form.driverId} onChange={(e) => handleDriverChange(e.target.value)} className={inputClass}>
-              <option value="">{t("brickLoading.driverPlaceholder")}</option>
-              {drivers.map((d) => (
-                <option key={d._id} value={d._id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select required value={form.driverId} onChange={(e) => handleDriverChange(e.target.value)} className={cn(inputClass, "flex-1")}>
+                <option value="">{t("brickLoading.driverPlaceholder")}</option>
+                {drivers.map((d) => (
+                  <option key={d._id} value={d._id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowAddDriver(true)}
+                title={t("brickLoading.newDriver")}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-ink-primary/5 text-ink-muted hover:bg-ink-primary/10 hover:text-ink-primary"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
             <input
               required
               type="number"
@@ -230,6 +265,25 @@ export function BrickLoading() {
               onChange={(e) => setForm((f) => ({ ...f, tipAmount: e.target.value }))}
               className={inputClass}
             />
+            <input
+              type="number"
+              placeholder={t("brickLoading.loadingChargePlaceholder")}
+              value={form.loadingCharge}
+              onChange={(e) => setForm((f) => ({ ...f, loadingCharge: e.target.value }))}
+              className={inputClass}
+            />
+            <select
+              value={form.categoryId}
+              onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+              className={inputClass}
+            >
+              <option value="">{t("brickLoading.categoryPlaceholder")}</option>
+              {categories.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.category}
+                </option>
+              ))}
+            </select>
             <select
               value={form.dispatchId}
               onChange={(e) => setForm((f) => ({ ...f, dispatchId: e.target.value }))}
@@ -242,6 +296,11 @@ export function BrickLoading() {
                 </option>
               ))}
             </select>
+            {estimatedDispatchAmount != null && (
+              <p className="col-span-2 text-sm text-ink-secondary">
+                {t("brickLoading.estimatedDispatchAmount")}: <span className="font-semibold text-ink-primary">₹{formatINR(estimatedDispatchAmount)}</span>
+              </p>
+            )}
             <input
               placeholder={t("common.notes")}
               value={form.notes}
@@ -315,7 +374,7 @@ export function BrickLoading() {
 
       {ledgerFor && <LedgerModal person={ledgerFor} onClose={() => setLedgerFor(null)} />}
       {showAddDriver && (
-        <AddPersonModal defaultType="DRIVER" onClose={() => setShowAddDriver(false)} onCreated={refresh} />
+        <AddPersonModal defaultType="DRIVER" onClose={() => setShowAddDriver(false)} onCreated={handleDriverCreated} />
       )}
       {editingEntry && (
         <EditBrickLoadingEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} onSaved={refresh} />

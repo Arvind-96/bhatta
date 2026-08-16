@@ -20,7 +20,7 @@ export type AppView =
   | "fleet"
   | "staff"
   | "salary"
-  | "kiosk"
+  | "attendance"
   | "settings";
 
 interface UiState {

@@ -39,6 +39,7 @@ export interface Dispatch {
   paymentMode?: PaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
+  categoryId?: { _id: string; category: BrickCategoryName } | string;
   dispatchedOn: string;
 }
 
@@ -109,7 +110,6 @@ export interface Person {
   khetLocation?: string;
   agreedDepthFeet?: number;
   creditLimit?: number;
-  faceDescriptor?: number[];
   active: boolean;
 }
 
@@ -151,22 +151,14 @@ export interface SuppliedItem {
   notes?: string;
 }
 
-export const BRICK_CATEGORIES = ["ABBAL", "DOYAM", "PILA", "TALSA", "TEDA_KHACHA", "SIDHA_KHACHA"] as const;
-export type BrickCategoryName = (typeof BRICK_CATEGORIES)[number];
-
-export const BRICK_CATEGORY_LABELS: Record<BrickCategoryName, string> = {
-  ABBAL: "Abbal (First-class)",
-  DOYAM: "Doyam (Second-class)",
-  PILA: "Pila (Yellow/under-baked)",
-  TALSA: "Talsa",
-  TEDA_KHACHA: "Teda Khacha (Twisted/irregular)",
-  SIDHA_KHACHA: "Sidha Khacha",
-};
+// Free-form, admin-defined — no longer a fixed vocabulary.
+export type BrickCategoryName = string;
 
 export interface BrickCategory {
   _id: string;
   category: BrickCategoryName;
   quantity: number;
+  pricePerBrick: number;
   createdAt: string;
 }
 
@@ -753,6 +745,8 @@ export interface BrickLoadingEntry {
   driverId: { _id: string; name: string; type: PersonType } | string;
   bricksCount: number;
   tipAmount: number;
+  loadingCharge?: number;
+  categoryId?: { _id: string; category: BrickCategoryName } | string;
   dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
   date: string;
   notes?: string;
@@ -1135,4 +1129,10 @@ export interface SalarySlip {
 export interface SalaryStatusEntry {
   person: { _id: string; name: string; designation: string; monthlySalary: number };
   slip: SalarySlip | null;
+}
+
+export interface RosterEntry {
+  person: { _id: string; name: string; type: PersonType; designation: string | null };
+  status: AttendanceStatus;
+  recorded: boolean;
 }

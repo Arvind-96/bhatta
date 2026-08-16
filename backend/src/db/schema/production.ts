@@ -152,19 +152,26 @@ export const brickLoadingEntries = sqliteTable("brick_loading_entries", {
   driverId: text("driverId").notNull(),
   bricksCount: integer("bricksCount").notNull(),
   tipAmount: real("tipAmount").default(0),
+  loadingCharge: real("loadingCharge"),
+  // Which brick category was loaded — drives the auto-created Dispatch's
+  // amount (bricksCount * that category's pricePerBrick). See
+  // brickLoading.service.ts.
+  categoryId: text("categoryId"),
   dispatchId: text("dispatchId"),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("brickloading_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const BRICK_CATEGORIES = ["ABBAL", "DOYAM", "PILA", "TALSA", "TEDA_KHACHA", "SIDHA_KHACHA"] as const;
-
+// Free-form, admin-defined — not a fixed vocabulary. The kiln can name
+// categories however it wants; the only constraint is no duplicate name
+// within one kiln (see the unique index below).
 export const brickCategories = sqliteTable("brick_categories", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  category: text("category", { enum: BRICK_CATEGORIES }).notNull(),
+  category: text("category").notNull(),
   quantity: integer("quantity").default(0),
+  pricePerBrick: real("pricePerBrick").default(0),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnCategoryUnique: uniqueIndex("brickcat_kiln_category_unique").on(t.kilnId, t.category) }));
 

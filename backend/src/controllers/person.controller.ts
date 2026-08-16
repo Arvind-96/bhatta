@@ -4,7 +4,6 @@ import { AuthedRequest } from "../middleware/auth.middleware";
 import {
   createPerson,
   customerCreditAging,
-  enrollFace,
   getPersonWithBalance,
   listOutstandingAdvances,
   listPaymentsDue,
@@ -147,10 +146,3 @@ export async function listLedger(req: AuthedRequest, res: Response) {
   res.json(entries);
 }
 
-const enrollFaceSchema = z.object({ descriptor: z.array(z.number()).length(128) });
-
-export async function enrollFaceHandler(req: AuthedRequest, res: Response) {
-  const input = enrollFaceSchema.parse(req.body);
-  const person = await enrollFace(req.kiln!.id, req.params.id, input.descriptor);
-  res.json(person);
-}

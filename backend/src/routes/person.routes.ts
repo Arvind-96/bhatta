@@ -4,7 +4,6 @@ import {
   advances,
   create,
   creditAging,
-  enrollFaceHandler,
   getOne,
   list,
   listLedger,
@@ -26,4 +25,3 @@ personRouter.get("/:id", asyncHandler(getOne));
 personRouter.patch("/:id", asyncHandler(update));
 personRouter.post("/:id/ledger", asyncHandler(addLedger));
 personRouter.get("/:id/ledger", asyncHandler(listLedger));
-personRouter.post("/:id/face", asyncHandler(enrollFaceHandler));

@@ -15,6 +15,8 @@ const createSchema = z.object({
   driverId: z.string(),
   bricksCount: z.number().int().positive(),
   tipAmount: z.number().min(0).optional(),
+  loadingCharge: z.number().min(0).optional(),
+  categoryId: z.string().optional(),
   dispatchId: z.string().optional(),
   date: z.string().optional(),
   notes: z.string().optional(),
@@ -43,6 +45,7 @@ const updateSchema = z.object({
   vehicleNumber: z.string().optional(),
   bricksCount: z.number().int().positive().optional(),
   tipAmount: z.number().min(0).optional(),
+  loadingCharge: z.number().min(0).optional(),
   notes: z.string().optional(),
 });
 

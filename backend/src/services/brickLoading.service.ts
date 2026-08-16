@@ -1,9 +1,10 @@
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "../db/client";
-import { brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
+import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
+import { createDispatch } from "./dispatch.service";
 import { emitToKiln } from "../config/socket";
 
 export type BrickVehicleType = (typeof BRICK_VEHICLE_TYPES)[number];
@@ -15,6 +16,8 @@ export interface CreateBrickLoadingInput {
   driverId: string;
   bricksCount: number;
   tipAmount?: number;
+  loadingCharge?: number;
+  categoryId?: string;
   dispatchId?: string;
   date?: Date;
   notes?: string;
@@ -35,7 +38,7 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
 
   const _id = randomUUID();
   db.insert(brickLoadingEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)).get()!;
+  let entry = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)).get()!;
 
   if (input.tipAmount && input.tipAmount > 0) {
     await addLedgerEntry({
@@ -49,6 +52,35 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
     });
   }
 
+  // Auto-create a matching Dispatch so this trip shows up on the Dispatch
+  // page without a manual step — only when the admin hasn't already linked
+  // an existing dispatch, a category was chosen, and that category has a
+  // real price set (dispatches require a positive amount, so an unpriced
+  // category can't produce a valid one yet). Never lets a dispatch failure
+  // undo the already-saved loading entry — worst case is just no
+  // auto-linked dispatch, not a lost trip.
+  if (!input.dispatchId && input.categoryId) {
+    try {
+      const category = db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))).get();
+      if (category && category.pricePerBrick && category.pricePerBrick > 0) {
+        const amount = Math.round(input.bricksCount * category.pricePerBrick * 100) / 100;
+        const dispatch = await createDispatch({
+          kilnId: input.kilnId,
+          customerName: `Brick Loading — ${input.vehicleNumber}, ${(input.date ?? new Date()).toLocaleDateString("en-IN")}`,
+          bricksCount: input.bricksCount,
+          amount,
+          driverId: input.driverId,
+          categoryId: input.categoryId,
+          dispatchedOn: input.date,
+        });
+        db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, _id)).run();
+        entry = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)).get()!;
+      }
+    } catch (err) {
+      console.error("[brickLoading] auto-dispatch creation failed, loading entry still saved:", err);
+    }
+  }
+
   emitToKiln(input.kilnId, "brickLoading:update", entry);
   return entry;
 }
@@ -58,6 +90,7 @@ export interface UpdateBrickLoadingInput {
   vehicleNumber?: string;
   bricksCount?: number;
   tipAmount?: number;
+  loadingCharge?: number;
   notes?: string;
 }
 
@@ -119,16 +152,20 @@ export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickL
   const rows = await db.select().from(brickLoadingEntries).where(and(...conditions)).orderBy(desc(brickLoadingEntries.date)).all();
   const driverIds = [...new Set(rows.map((r) => r.driverId))];
   const dispatchIds = [...new Set(rows.map((r) => r.dispatchId).filter((v): v is string => !!v))];
-  const [driverRows, dispatchRows] = await Promise.all([
+  const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
+  const [driverRows, dispatchRows, categoryRows] = await Promise.all([
     driverIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, driverIds)).all() : [],
     dispatchIds.length ? db.select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName }).from(dispatches).where(inArray(dispatches._id, dispatchIds)).all() : [],
+    categoryIds.length ? db.select({ _id: brickCategories._id, category: brickCategories.category }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all() : [],
   ]);
   const driverById = new Map(driverRows.map((d) => [d._id, d]));
   const dispatchById = new Map(dispatchRows.map((d) => [d._id, d]));
+  const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
   return rows.map((r) => ({
     ...r,
     driverId: driverById.get(r.driverId) ?? r.driverId,
     dispatchId: r.dispatchId ? dispatchById.get(r.dispatchId) ?? r.dispatchId : r.dispatchId,
+    categoryId: r.categoryId ? categoryById.get(r.categoryId) ?? r.categoryId : r.categoryId,
   }));
 }
 

@@ -46,26 +46,11 @@ export const staffDict: Record<string, Record<Locale, string>> = {
   "staff.netDue": { en: "net due", hi: "कुल बकाया" },
   "staff.advanceOutstanding": { en: "advance outstanding", hi: "बकाया एडवांस" },
 
-  // --- pages/Kiosk.tsx ---
-  "kiosk.geolocationNotSupported": {
-    en: "Geolocation not supported on this device",
-    hi: "इस डिवाइस पर जियोलोकेशन उपलब्ध नहीं है",
-  },
-  "kiosk.noFaceDetected": {
-    en: "No face detected — look at the camera and try again",
-    hi: "कोई चेहरा नहीं मिला — कैमरे की ओर देखें और फिर कोशिश करें",
-  },
-  "kiosk.markedPresent": { en: "Marked present: {name}", hi: "उपस्थित दर्ज: {name}" },
-  "kiosk.title": { en: "Attendance", hi: "हाज़िरी" },
-  "kiosk.loadingFaceModel": { en: "Loading face model…", hi: "फेस मॉडल लोड हो रहा है…" },
-  "kiosk.checkingLocation": { en: "Checking location…", hi: "स्थान जांचा जा रहा है…" },
-  "kiosk.scanningFace": { en: "Scanning face…", hi: "चेहरा स्कैन हो रहा है…" },
-  "kiosk.scanToCheckIn": { en: "Scan to check in", hi: "हाज़िरी के लिए स्कैन करें" },
-  "kiosk.preparing": { en: "Preparing…", hi: "तैयार हो रहा है…" },
-  "kiosk.radiusNotice": {
-    en: "Attendance is only accepted within the bhatta's set radius.",
-    hi: "हाज़िरी केवल भट्टे की तय सीमा के भीतर ही स्वीकार होगी।",
-  },
+  // --- pages/Attendance.tsx ---
+  "attendance.title": { en: "Attendance", hi: "हाज़िरी" },
+  "attendance.subtitle": { en: "Mark today's exceptions — everyone else is Present by default", hi: "आज के अपवाद दर्ज करें — बाकी सभी डिफ़ॉल्ट रूप से उपस्थित हैं" },
+  "attendance.shiftLabel": { en: "Shift", hi: "शिफ़्ट" },
+  "attendance.noStaff": { en: "No attendance-eligible staff yet", hi: "अभी हाज़िरी योग्य कोई स्टाफ़ नहीं है" },
 
   // --- pages/Settings.tsx ---
   "settings.attendanceGeofence": { en: "Attendance geofence", hi: "हाज़िरी जियोफ़ेंस" },
@@ -100,6 +85,14 @@ export const staffDict: Record<string, Record<Locale, string>> = {
     hi: "भट्टा सीज़न आमतौर पर 1 अगस्त से 31 जुलाई तक चलता है। अगर इस भट्टे का सीज़न अलग से शुरू होता है तो यहाँ बदलें।",
   },
   "settings.saveSeason": { en: "Save season", hi: "सीज़न सहेजें" },
+  "settings.shiftTimings": { en: "Shift Timings", hi: "शिफ़्ट का समय" },
+  "settings.shiftTimingsDescription": {
+    en: "The default shift window shown on the Attendance page as a reference for what counts as Late — marking still happens by hand.",
+    hi: "हाज़िरी पृष्ठ पर दिखाई जाने वाली डिफ़ॉल्ट शिफ़्ट अवधि, जो यह तय करने में मदद करती है कि 'देर से' क्या माना जाए — हाज़िरी अब भी हाथ से दर्ज की जाती है।",
+  },
+  "settings.shiftStart": { en: "Shift start", hi: "शिफ़्ट शुरू" },
+  "settings.shiftEnd": { en: "Shift end", hi: "शिफ़्ट समाप्त" },
+  "settings.saveShiftTimings": { en: "Save shift timings", hi: "शिफ़्ट समय सहेजें" },
   "settings.pcbConsent": { en: "PCB Consent to Operate", hi: "PCB संचालन सहमति" },
   "settings.miningRoyaltyLicense": { en: "Mining Royalty License", hi: "खनन रॉयल्टी लाइसेंस" },
   "settings.zigZagCertificate": { en: "Zig-Zag Conversion Certificate", hi: "ज़िग-ज़ैग परिवर्तन प्रमाणपत्र" },

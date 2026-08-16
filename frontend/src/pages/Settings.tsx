@@ -319,6 +319,62 @@ function SeasonSettings() {
   );
 }
 
+function ShiftSettings() {
+  const { t } = useTranslation();
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const setKilns = useAuthStore((s) => s.setKilns);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+
+  const [start, setStart] = useState(activeKiln?.dayShiftStart ?? "08:00");
+  const [end, setEnd] = useState(activeKiln?.dayShiftEnd ?? "18:00");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setStart(activeKiln?.dayShiftStart ?? "08:00");
+    setEnd(activeKiln?.dayShiftEnd ?? "18:00");
+  }, [activeKilnId]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.kilns.updateShiftTimes(start, end);
+      setKilns(kilns.map((k) => (k.kilnId === activeKilnId ? { ...k, dayShiftStart: start, dayShiftEnd: end } : k)));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle>{t("settings.shiftTimings")}</CardTitle>
+      </CardHeader>
+      <p className="mb-4 text-sm text-ink-muted">{t("settings.shiftTimingsDescription")}</p>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm text-ink-muted">{t("settings.shiftStart")}</label>
+            <input type="time" required value={start} onChange={(e) => setStart(e.target.value)} className={inputClass} />
+          </div>
+          <div className="flex-1">
+            <label className="mb-1 block text-sm text-ink-muted">{t("settings.shiftEnd")}</label>
+            <input type="time" required value={end} onChange={(e) => setEnd(e.target.value)} className={inputClass} />
+          </div>
+        </div>
+        <Button type="submit" disabled={saving}>
+          {saved ? t("settings.saved") : saving ? t("settings.savingEllipsis") : t("settings.saveShiftTimings")}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
 const COMPLIANCE_LABEL_KEYS: Record<ComplianceDocumentType, string> = {
   PCB_CONSENT_TO_OPERATE: "settings.pcbConsent",
   MINING_ROYALTY_LICENSE: "settings.miningRoyaltyLicense",
@@ -545,6 +601,7 @@ export function Settings() {
       <ChamberSettings />
       <YardCapacitySettings />
       <SeasonSettings />
+      <ShiftSettings />
       <ComplianceSettings />
       <StockAuditSettings />
     </div>

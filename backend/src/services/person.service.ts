@@ -146,18 +146,6 @@ export async function updatePerson(kilnId: string, personId: string, input: Upda
   return person;
 }
 
-export async function enrollFace(kilnId: string, personId: string, descriptor: number[]) {
-  const existing = db
-    .select()
-    .from(people)
-    .where(and(eq(people._id, personId), eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"])))
-    .get();
-  if (!existing) throw new Error("Worker/helper not found");
-
-  db.update(people).set({ faceDescriptor: descriptor }).where(eq(people._id, personId)).run();
-  return db.select().from(people).where(eq(people._id, personId)).get()!;
-}
-
 // "Kis mazdoor/sardar ke paas kitna advance bacha hai" — a negative balance
 // means the kiln paid out more (advance/peshgi) than the person has earned
 // back in wages so far. Surfacing this list is the whole point: it's how an

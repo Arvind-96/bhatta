@@ -14,6 +14,8 @@ export interface UserKiln {
   phone?: string;
   seasonStartMonth?: number;
   seasonStartDay?: number;
+  dayShiftStart?: string;
+  dayShiftEnd?: string;
   needsSetup?: boolean;
 }
 

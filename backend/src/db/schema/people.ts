@@ -42,7 +42,6 @@ export const people = sqliteTable("people", {
   stackingStage: text("stackingStage", { enum: STACKING_STAGES }),
   bharaiContractorId: text("bharaiContractorId"),
   nikasiContractorId: text("nikasiContractorId"),
-  faceDescriptor: text("faceDescriptor", { mode: "json" }).$type<number[]>(),
   firingShiftAnchorDate: integer("firingShiftAnchorDate", { mode: "timestamp_ms" }),
   firingShiftAnchorType: text("firingShiftAnchorType", { enum: ["DAY", "NIGHT"] }),
   vehicleNumber: text("vehicleNumber"),
@@ -146,9 +145,8 @@ export const workEntries = sqliteTable("work_entries", {
 }));
 
 // A row here is always an *exception* — everyone is implicitly PRESENT on
-// any date with no row (see attendance.service.ts's computeStatusForRange).
-// Only Absent/Half-day/Late overrides, or a kiosk-verified PRESENT check-in,
-// ever get written.
+// any date with no row (see attendance.service.ts). Only an admin-recorded
+// Absent/Half-day/Late override ever gets written.
 export const attendances = sqliteTable("attendances", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),

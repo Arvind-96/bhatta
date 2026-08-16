@@ -10,16 +10,15 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { DieselSection } from "@/components/stock/DieselSection";
-import { BRICK_CATEGORIES, BRICK_CATEGORY_LABELS } from "@/types";
-import type { BrickCategory, BrickCategoryName, BrickProductionEntry, StockLoadingEntry } from "@/types";
+import type { BrickCategory, BrickProductionEntry, StockLoadingEntry } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
-function categoryLabel(categories: BrickCategory[], ref: { _id: string; category: BrickCategoryName } | string) {
-  if (typeof ref === "object") return BRICK_CATEGORY_LABELS[ref.category];
+function categoryLabel(categories: BrickCategory[], ref: { _id: string; category: string } | string) {
+  if (typeof ref === "object") return ref.category;
   const found = categories.find((c) => c._id === ref);
-  return found ? BRICK_CATEGORY_LABELS[found.category] : "—";
+  return found ? found.category : "—";
 }
 
 // The Stock menu — an admin-managed brick-category ledger, independent of
@@ -35,11 +34,13 @@ function BrickStockSection() {
   const [loadingHistory, setLoadingHistory] = useState<StockLoadingEntry[]>([]);
 
   const [showAddCategory, setShowAddCategory] = useState(false);
-  const [newCategory, setNewCategory] = useState<"" | BrickCategoryName>("");
+  const [newCategory, setNewCategory] = useState("");
+  const [newPrice, setNewPrice] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
 
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState("");
+  const [editPrice, setEditPrice] = useState("");
   const [savingQuantity, setSavingQuantity] = useState(false);
 
   const [productionForm, setProductionForm] = useState({ categoryId: "", bricksCount: "", notes: "" });
@@ -70,17 +71,17 @@ function BrickStockSection() {
   useKilnEvent("brickProduction:update", () => refresh());
   useKilnEvent("stockLoading:update", () => refresh());
 
-  const availableCategories = BRICK_CATEGORIES.filter((c) => !categories.some((bc) => bc.category === c));
   const productionPg = usePagination(productionHistory, 10);
   const loadingPg = usePagination(loadingHistory, 10);
 
   async function addCategory(e: FormEvent) {
     e.preventDefault();
-    if (!newCategory) return;
+    if (!newCategory.trim()) return;
     setSavingCategory(true);
     try {
-      await api.brickCategories.create(newCategory);
+      await api.brickCategories.create(newCategory.trim(), newPrice ? Number(newPrice) : undefined);
       setNewCategory("");
+      setNewPrice("");
       setShowAddCategory(false);
       await refresh();
     } finally {
@@ -89,8 +90,7 @@ function BrickStockSection() {
   }
 
   async function deleteCategory(category: BrickCategory) {
-    if (!confirm(t("stock.confirmRemoveCategory", { name: BRICK_CATEGORY_LABELS[category.category] })))
-      return;
+    if (!confirm(t("stock.confirmRemoveCategory", { name: category.category }))) return;
     await api.brickCategories.remove(category._id);
     await refresh();
   }
@@ -98,6 +98,7 @@ function BrickStockSection() {
   function startEditQuantity(category: BrickCategory) {
     setEditingCategoryId(category._id);
     setEditQuantity(String(category.quantity));
+    setEditPrice(String(category.pricePerBrick ?? 0));
   }
 
   async function saveQuantity(e: FormEvent) {
@@ -105,7 +106,7 @@ function BrickStockSection() {
     if (!editingCategoryId) return;
     setSavingQuantity(true);
     try {
-      await api.brickCategories.updateQuantity(editingCategoryId, Number(editQuantity));
+      await api.brickCategories.update(editingCategoryId, { quantity: Number(editQuantity), pricePerBrick: Number(editPrice) });
       setEditingCategoryId(null);
       await refresh();
     } finally {
@@ -164,33 +165,35 @@ function BrickStockSection() {
           <h3 className="text-sm font-semibold text-ink-primary">{t("stock.brickCategoriesHeading")}</h3>
           <p className="text-sm text-ink-muted">{t("stock.categoriesSubtitle")}</p>
         </div>
-        {availableCategories.length > 0 ? (
-          <Button size="sm" onClick={() => setShowAddCategory((s) => !s)}>
-            <Plus className="h-4 w-4" /> {t("stock.addCategory")}
-          </Button>
-        ) : (
-          <span className="rounded-full bg-ink-primary/5 px-2.5 py-1 text-sm text-ink-muted">{t("stock.allCategoriesAdded")}</span>
-        )}
+        <Button size="sm" onClick={() => setShowAddCategory((s) => !s)}>
+          <Plus className="h-4 w-4" /> {t("stock.addCategory")}
+        </Button>
       </div>
 
       {showAddCategory && (
         <Card>
-          <form onSubmit={addCategory} className="flex items-end gap-2">
-            <div className="flex-1">
+          <form onSubmit={addCategory} className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[10rem]">
               <label className="mb-1 block text-sm text-ink-muted">{t("stock.category")}</label>
-              <select
+              <input
                 required
+                placeholder={t("stock.categoryNamePlaceholder")}
                 value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value as "" | BrickCategoryName)}
+                onChange={(e) => setNewCategory(e.target.value)}
                 className={inputClass}
-              >
-                <option value="">{t("stock.selectCategoryPlaceholder")}</option>
-                {availableCategories.map((c) => (
-                  <option key={c} value={c}>
-                    {BRICK_CATEGORY_LABELS[c]}
-                  </option>
-                ))}
-              </select>
+              />
+            </div>
+            <div className="w-36">
+              <label className="mb-1 block text-sm text-ink-muted">{t("stock.pricePerBrick")}</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="₹"
+                value={newPrice}
+                onChange={(e) => setNewPrice(e.target.value)}
+                className={inputClass}
+              />
             </div>
             <Button type="submit" disabled={savingCategory}>
               {t("common.add")}
@@ -208,7 +211,7 @@ function BrickStockSection() {
           {categories.map((c) => (
             <Card key={c._id}>
               <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-semibold text-ink-primary">{BRICK_CATEGORY_LABELS[c.category]}</p>
+                <p className="text-sm font-semibold text-ink-primary">{c.category}</p>
                 <div className="flex shrink-0 gap-2">
                   <button onClick={() => startEditQuantity(c)} className="text-ink-muted hover:text-series-1">
                     <Pencil className="h-3.5 w-3.5" />
@@ -220,31 +223,52 @@ function BrickStockSection() {
               </div>
 
               {editingCategoryId === c._id ? (
-                <form onSubmit={saveQuantity} className="mt-2 flex items-center gap-2">
-                  <input
-                    autoFocus
-                    type="number"
-                    value={editQuantity}
-                    onChange={(e) => setEditQuantity(e.target.value)}
-                    className={inputClass}
-                  />
-                  <Button type="submit" size="sm" disabled={savingQuantity}>
-                    {t("common.save")}
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingCategoryId(null)}
-                    className="rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
-                  >
-                    {t("common.cancel")}
-                  </button>
+                <form onSubmit={saveQuantity} className="mt-2 flex flex-col gap-2">
+                  <div>
+                    <label className="mb-1 block text-sm text-ink-muted">{t("stock.bricksInStock")}</label>
+                    <input
+                      autoFocus
+                      type="number"
+                      value={editQuantity}
+                      onChange={(e) => setEditQuantity(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm text-ink-muted">{t("stock.pricePerBrick")}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={editPrice}
+                      onChange={(e) => setEditPrice(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" disabled={savingQuantity}>
+                      {t("common.save")}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingCategoryId(null)}
+                      className="rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+                    >
+                      {t("common.cancel")}
+                    </button>
+                  </div>
                 </form>
               ) : (
-                <p className={`mt-2 text-2xl font-semibold tabular-nums ${c.quantity < 0 ? "text-status-critical" : "text-ink-primary"}`}>
-                  {c.quantity.toLocaleString("en-IN")}
-                </p>
+                <>
+                  <p className={`mt-2 text-2xl font-semibold tabular-nums ${c.quantity < 0 ? "text-status-critical" : "text-ink-primary"}`}>
+                    {c.quantity.toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-sm text-ink-muted">{t("stock.bricksInStock")}</p>
+                  <p className="mt-1 text-sm text-ink-secondary">
+                    {t("stock.pricePerBrick")}: ₹{(c.pricePerBrick ?? 0).toLocaleString("en-IN")}
+                  </p>
+                </>
               )}
-              <p className="text-sm text-ink-muted">{t("stock.bricksInStock")}</p>
             </Card>
           ))}
         </div>
@@ -264,7 +288,7 @@ function BrickStockSection() {
                 <option value="">{t("stock.categoryPlaceholder")}</option>
                 {categories.map((c) => (
                   <option key={c._id} value={c._id}>
-                    {BRICK_CATEGORY_LABELS[c.category]}
+                    {c.category}
                   </option>
                 ))}
               </select>
@@ -303,7 +327,7 @@ function BrickStockSection() {
                 <option value="">{t("stock.categoryPlaceholder")}</option>
                 {categories.map((c) => (
                   <option key={c._id} value={c._id}>
-                    {BRICK_CATEGORY_LABELS[c.category]}
+                    {c.category}
                   </option>
                 ))}
               </select>

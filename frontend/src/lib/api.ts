@@ -1,6 +1,7 @@
 import type {
   AttendanceStatus,
   DayAttendance,
+  RosterEntry,
   SalarySlip,
   SalaryStatusEntry,
   SimplePaymentMode,
@@ -201,6 +202,8 @@ export const api = {
       patch("/kilns/yard-capacity", { yardCapacityBricks }, true),
     updateSeason: (seasonStartMonth: number, seasonStartDay: number) =>
       patch("/kilns/season", { seasonStartMonth, seasonStartDay }, true),
+    updateShiftTimes: (dayShiftStart: string, dayShiftEnd: string) =>
+      patch("/kilns/shift-times", { dayShiftStart, dayShiftEnd }, true),
     updateProfile: (input: { name?: string; location?: string; phone?: string }) =>
       patch("/kilns/profile", input, true),
     completeOnboarding: () => post("/kilns/onboarding/complete", {}, true),
@@ -225,8 +228,6 @@ export const api = {
       }
     ) => post<LedgerEntry>(`/people/${id}/ledger`, input, true),
     listLedger: (id: string) => get<LedgerEntry[]>(`/people/${id}/ledger`, true),
-    enrollFace: (id: string, descriptor: number[]) =>
-      post<Person>(`/people/${id}/face`, { descriptor }, true),
     advances: () => get<OutstandingAdvance[]>("/people/advances", true),
     paymentsDue: () => get<PaymentDue[]>("/people/payments-due", true),
     creditAging: () => get<CustomerCreditAging[]>("/people/credit-aging", true),
@@ -267,12 +268,7 @@ export const api = {
     listForDay: (date: string) => get(`/attendance?date=${date}`, true),
     forPerson: (personId: string, month: string) =>
       get<DayAttendance[]>(`/attendance/for-person/${personId}?month=${month}`, true),
-    faceCheckIn: (input: { descriptor: number[]; latitude: number; longitude: number }) =>
-      post<{ person: { id: string; name: string }; matchDistance: number }>(
-        "/attendance/face-checkin",
-        input,
-        true
-      ),
+    roster: (date: string) => get<RosterEntry[]>(`/attendance/roster?date=${date}`, true),
   },
 
   salary: {
@@ -533,12 +529,14 @@ export const api = {
       driverId: string;
       bricksCount: number;
       tipAmount?: number;
+      loadingCharge?: number;
+      categoryId?: string;
       dispatchId?: string;
       notes?: string;
     }) => post<BrickLoadingEntry>("/brick-loading", input, true),
     update: (
       id: string,
-      input: Partial<{ vehicleType: BrickVehicleType; vehicleNumber: string; bricksCount: number; tipAmount: number; notes: string }>
+      input: Partial<{ vehicleType: BrickVehicleType; vehicleNumber: string; bricksCount: number; tipAmount: number; loadingCharge: number; notes: string }>
     ) => patch<BrickLoadingEntry>(`/brick-loading/${id}`, input, true),
     driverSummary: () => get<BrickLoadingDriverSummary>("/brick-loading/driver-summary", true),
   },
@@ -636,9 +634,10 @@ export const api = {
 
   brickCategories: {
     list: () => get<BrickCategory[]>("/brick-categories", true),
-    create: (category: BrickCategoryName) => post<BrickCategory>("/brick-categories", { category }, true),
-    updateQuantity: (id: string, quantity: number) =>
-      patch<BrickCategory>(`/brick-categories/${id}`, { quantity }, true),
+    create: (category: BrickCategoryName, pricePerBrick?: number) =>
+      post<BrickCategory>("/brick-categories", { category, pricePerBrick }, true),
+    update: (id: string, input: Partial<{ quantity: number; pricePerBrick: number }>) =>
+      patch<BrickCategory>(`/brick-categories/${id}`, input, true),
     remove: (id: string) => del(`/brick-categories/${id}`, true),
     listProduction: (days = 60) => get<BrickProductionEntry[]>(`/brick-categories/production?days=${days}`, true),
     logProduction: (input: { categoryId: string; bricksCount: number; date?: string; notes?: string }) =>

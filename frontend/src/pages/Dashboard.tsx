@@ -21,7 +21,7 @@ import { Stock } from "@/pages/Stock";
 import { Fleet } from "@/pages/Fleet";
 import { Staff } from "@/pages/Staff";
 import { Salary } from "@/pages/Salary";
-import { Kiosk } from "@/pages/Kiosk";
+import { Attendance } from "@/pages/Attendance";
 import { Settings } from "@/pages/Settings";
 import { useSocket } from "@/hooks/useSocket";
 import { useLiveProduction } from "@/hooks/useLiveProduction";
@@ -51,7 +51,7 @@ const VIEWS = {
   fleet: Fleet,
   staff: Staff,
   salary: Salary,
-  kiosk: Kiosk,
+  attendance: Attendance,
   settings: Settings,
 };
 

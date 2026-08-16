@@ -23,6 +23,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   const [vehicleNumber, setVehicleNumber] = useState(entry.vehicleNumber);
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
   const [tipAmount, setTipAmount] = useState(String(entry.tipAmount ?? 0));
+  const [loadingCharge, setLoadingCharge] = useState(String(entry.loadingCharge ?? 0));
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
   const { t } = useTranslation();
@@ -36,6 +37,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
         vehicleNumber,
         bricksCount: Number(bricksCount),
         tipAmount: tipAmount ? Number(tipAmount) : 0,
+        loadingCharge: loadingCharge ? Number(loadingCharge) : 0,
         notes: notes || undefined,
       });
       onSaved();
@@ -80,6 +82,13 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
             placeholder={t("brickLoading.tipPlaceholderShort")}
             value={tipAmount}
             onChange={(e) => setTipAmount(e.target.value)}
+            className={inputClass}
+          />
+          <input
+            type="number"
+            placeholder={t("brickLoading.loadingChargePlaceholder")}
+            value={loadingCharge}
+            onChange={(e) => setLoadingCharge(e.target.value)}
             className={inputClass}
           />
           <input

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { faceCheckInHandler, forPerson, listForDay, mark } from "../controllers/attendance.controller";
+import { forPerson, listForDay, mark, roster } from "../controllers/attendance.controller";
 import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
@@ -9,4 +9,4 @@ attendanceRouter.use(requireAuth, resolveKiln);
 attendanceRouter.post("/", asyncHandler(mark));
 attendanceRouter.get("/", asyncHandler(listForDay));
 attendanceRouter.get("/for-person/:personId", asyncHandler(forPerson));
-attendanceRouter.post("/face-checkin", asyncHandler(faceCheckInHandler));
+attendanceRouter.get("/roster", asyncHandler(roster));

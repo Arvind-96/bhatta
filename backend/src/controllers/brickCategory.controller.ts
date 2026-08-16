@@ -1,7 +1,6 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { BRICK_CATEGORIES } from "../db/schema";
 import {
   createBrickCategory,
   createBrickProductionEntry,
@@ -12,16 +11,17 @@ import {
   listBrickCategories,
   listBrickProductionEntries,
   listStockLoadingEntries,
-  updateBrickCategoryQuantity,
+  updateBrickCategory,
 } from "../services/brickCategory.service";
 
 const createCategorySchema = z.object({
-  category: z.enum(BRICK_CATEGORIES),
+  category: z.string().min(1),
+  pricePerBrick: z.number().min(0).optional(),
 });
 
 export async function createCategory(req: AuthedRequest, res: Response) {
   const input = createCategorySchema.parse(req.body);
-  const category = await createBrickCategory(req.kiln!.id, input.category);
+  const category = await createBrickCategory(req.kiln!.id, input.category, input.pricePerBrick);
   res.status(201).json(category);
 }
 
@@ -30,13 +30,14 @@ export async function listCategories(req: AuthedRequest, res: Response) {
   res.json(categories);
 }
 
-const updateQuantitySchema = z.object({
-  quantity: z.number(),
+const updateCategorySchema = z.object({
+  quantity: z.number().optional(),
+  pricePerBrick: z.number().min(0).optional(),
 });
 
 export async function updateCategoryQuantity(req: AuthedRequest, res: Response) {
-  const input = updateQuantitySchema.parse(req.body);
-  const category = await updateBrickCategoryQuantity(req.kiln!.id, req.params.id, input.quantity);
+  const input = updateCategorySchema.parse(req.body);
+  const category = await updateBrickCategory(req.kiln!.id, req.params.id, input);
   res.json(category);
 }
 
