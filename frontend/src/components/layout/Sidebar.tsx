@@ -71,7 +71,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <KilnSwitcher />
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-2">
+      <nav className="sidebar-scroll flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-2">
         {GROUPS.map((group) => (
           <div key={group} className="flex flex-col gap-1">
             <span className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-sidebar-ink-faint">

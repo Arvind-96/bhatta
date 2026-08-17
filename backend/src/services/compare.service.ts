@@ -21,7 +21,7 @@ import { totalStacked } from "./stacking.service";
 import { totalA1Output } from "./chamberGrading.service";
 import { dispatchTotalsForRange } from "./dispatch.service";
 import { financialOverviewCustomRange } from "./financialOverview.service";
-import { getSeasonBoundaries, seasonMonthStrings, SeasonSetting } from "../utils/season";
+import { monthStringsInRange } from "../utils/season";
 
 export const COMPARE_MODULES = [
   "financial", "bricks", "molding", "stacking", "nikasi", "firing", "brickLoading",
@@ -149,8 +149,8 @@ async function compareAttendance(kilnId: string, from: Date, to: Date) {
   };
 }
 
-async function compareSalary(kilnId: string, seasonSetting: SeasonSetting, seasonYear: number) {
-  const months = seasonMonthStrings(seasonSetting, seasonYear);
+async function compareSalary(kilnId: string, from: Date, to: Date) {
+  const months = monthStringsInRange(from, to);
   const rows = await db.select().from(salarySlips).where(and(eq(salarySlips.kilnId, kilnId), inArray(salarySlips.month, months))).all();
   return {
     totalGrossSalary: rows.reduce((sum, s) => sum + s.grossSalary, 0),
@@ -185,30 +185,34 @@ async function compareLabor(kilnId: string, from: Date, to: Date) {
   };
 }
 
-export interface SeasonYearResult {
-  seasonYear: number;
+export interface DateRange {
+  from: Date;
+  to: Date;
+}
+
+export interface RangeResult {
   from: string;
   to: string;
   inProgress: boolean;
   metrics: Record<string, number | Record<string, number>>;
 }
 
-// One entry point for every module — resolves each requested season-year's
-// {from,to} window once, then dispatches to whichever module aggregator
-// applies. Financial reuses financialOverviewCustomRange as-is (already
+// One entry point for every module — takes two admin-picked date ranges
+// (Compare's calendar pickers, no longer tied to fixed Aug1-Jul31 season
+// boundaries) and dispatches each to whichever module aggregator applies.
+// Financial reuses financialOverviewCustomRange as-is (already
 // arbitrary-range); everything else is either an in-place-extended
 // existing "since" function or a small new range query following that
 // module's own existing simple query shape.
-export async function compareModule(kilnId: string, module: CompareModule, seasonSetting: SeasonSetting, seasonYears: number[]) {
+export async function compareModule(kilnId: string, module: CompareModule, ranges: DateRange[]) {
   const now = new Date();
-  const results: SeasonYearResult[] = [];
+  const results: RangeResult[] = [];
 
-  for (const seasonYear of seasonYears) {
-    const { from, to } = getSeasonBoundaries(seasonSetting, seasonYear);
+  for (const { from, to } of ranges) {
     const inProgress = to > now;
-    // Never query past "now" for an in-progress season — a raw `to` in the
+    // Never query past "now" for an in-progress range — a raw `to` in the
     // future would just behave the same for these <= comparisons, but
-    // clamping keeps intent explicit or the "in progress" badge implies.
+    // clamping keeps intent explicit for the "in progress" badge.
     const effectiveTo = inProgress ? now : to;
 
     let metrics: Record<string, number | Record<string, number>>;
@@ -265,7 +269,7 @@ export async function compareModule(kilnId: string, module: CompareModule, seaso
         metrics = await compareAttendance(kilnId, from, effectiveTo);
         break;
       case "salary":
-        metrics = await compareSalary(kilnId, seasonSetting, seasonYear);
+        metrics = await compareSalary(kilnId, from, effectiveTo);
         break;
       case "labor":
         metrics = await compareLabor(kilnId, from, effectiveTo);
@@ -276,7 +280,7 @@ export async function compareModule(kilnId: string, module: CompareModule, seaso
       }
     }
 
-    results.push({ seasonYear, from: from.toISOString(), to: to.toISOString(), inProgress, metrics });
+    results.push({ from: from.toISOString(), to: to.toISOString(), inProgress, metrics });
   }
 
   return results;

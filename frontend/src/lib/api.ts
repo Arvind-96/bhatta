@@ -840,7 +840,10 @@ export const api = {
   },
 
   compare: {
-    get: (module: CompareModule, seasonYears: number[]) =>
-      get<SeasonYearResult[]>(`/compare/${module}?years=${seasonYears.join(",")}`, true),
+    get: (module: CompareModule, rangeA: { from: string; to: string }, rangeB: { from: string; to: string }) =>
+      get<SeasonYearResult[]>(
+        `/compare/${module}?fromA=${rangeA.from}&toA=${rangeA.to}&fromB=${rangeB.from}&toB=${rangeB.to}`,
+        true
+      ),
   },
 };

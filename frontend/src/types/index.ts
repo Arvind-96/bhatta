@@ -1168,7 +1168,6 @@ export type CompareModule =
   | "dispatch" | "soil" | "diesel" | "fuel" | "expense" | "stock" | "attendance" | "salary" | "labor";
 
 export interface SeasonYearResult {
-  seasonYear: number;
   from: string;
   to: string;
   inProgress: boolean;
