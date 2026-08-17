@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { WorkEntry, WorkType } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
-import { useWorkTypeLabels } from "./personTypes";
+import { LOGGABLE_WORK_TYPES, useWorkTypeLabels } from "./personTypes";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -57,9 +57,9 @@ export function EditWorkEntryModal({ entry, onClose, onSaved }: EditWorkEntryMod
 
         <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
           <select value={workType} onChange={(e) => setWorkType(e.target.value as WorkType)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1">
-            {(Object.entries(workTypeLabels) as [WorkType, string][]).map(([value, label]) => (
+            {LOGGABLE_WORK_TYPES.map((value) => (
               <option key={value} value={value}>
-                {label}
+                {workTypeLabels[value]}
               </option>
             ))}
           </select>

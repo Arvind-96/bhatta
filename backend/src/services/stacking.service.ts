@@ -97,8 +97,10 @@ export async function listStackingEntries(kilnId: string, filter: ListStackingFi
   return rows.map((r) => ({ ...r, gangId: gangById.get(r.gangId) ?? r.gangId, gherId: gherById.get(r.gherId) ?? r.gherId }));
 }
 
-export async function totalStacked(kilnId: string, since: Date) {
-  const entries = await db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), gte(stackingEntries.date, since))).all();
+export async function totalStacked(kilnId: string, since: Date, until?: Date) {
+  const conditions = [eq(stackingEntries.kilnId, kilnId), gte(stackingEntries.date, since)];
+  if (until) conditions.push(lte(stackingEntries.date, until));
+  const entries = await db.select().from(stackingEntries).where(and(...conditions)).all();
   return {
     bricksCount: entries.reduce((sum, e) => sum + e.bricksCount, 0),
     damageCount: entries.reduce((sum, e) => sum + (e.damageCount ?? 0), 0),

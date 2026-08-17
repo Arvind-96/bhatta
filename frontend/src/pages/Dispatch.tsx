@@ -1,5 +1,5 @@
 import { Fragment, FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, FinishedGoodsReconciliation, PaymentMode, Person } from "@/types";
 
 const inputClass =
@@ -39,6 +40,7 @@ export function Dispatch() {
   const [showForm, setShowForm] = useState(false);
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({ breakageCount: "", returnedCount: "", returnReason: "" });
+  const [editingDispatch, setEditingDispatch] = useState<DispatchEntry | null>(null);
   const [form, setForm] = useState({
     customerId: "",
     customerName: "",
@@ -165,6 +167,12 @@ export function Dispatch() {
     setAdjustingId(null);
     setAdjustForm({ breakageCount: "", returnedCount: "", returnReason: "" });
     refresh();
+  }
+
+  async function deleteDispatch(d: DispatchEntry) {
+    if (!confirm(t("dispatch.confirmDeleteDispatch", { slipNumber: d.slipNumber }))) return;
+    await api.dispatch.remove(d._id);
+    await refresh();
   }
 
   return (
@@ -354,6 +362,7 @@ export function Dispatch() {
                   <th className="pb-2 font-medium">{t("dispatch.bricksHeader")}</th>
                   <th className="pb-2 font-medium">{t("dispatch.adjustmentsHeader")}</th>
                   <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
+                  <th className="pb-2 font-medium text-right" />
                 </tr>
               </thead>
               <tbody>
@@ -379,10 +388,26 @@ export function Dispatch() {
                       <td className="py-3 text-right tabular-nums font-medium text-ink-primary">
                         ₹{formatINR(d.amount)}
                       </td>
+                      <td className="py-3 text-right">
+                        <div className="flex justify-end gap-3">
+                          <button
+                            onClick={() => setEditingDispatch(d)}
+                            className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+                          >
+                            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                          </button>
+                          <button
+                            onClick={() => deleteDispatch(d)}
+                            className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                     {adjustingId === d._id && (
                       <tr key={`${d._id}-adjust`}>
-                        <td colSpan={6} className="bg-ink-primary/5 p-3">
+                        <td colSpan={7} className="bg-ink-primary/5 p-3">
                           <div className="flex flex-wrap items-end gap-2">
                             <input
                               type="number"
@@ -419,6 +444,14 @@ export function Dispatch() {
           </div>
         )}
       </Card>
+
+      {editingDispatch && (
+        <EditDispatchModal
+          dispatch={editingDispatch}
+          onClose={() => setEditingDispatch(null)}
+          onSaved={refresh}
+        />
+      )}
     </div>
   );
 }

@@ -51,7 +51,11 @@ export const dispatches = sqliteTable("dispatches", {
   // different kilns (e.g. two same-named ones under one account) can
   // legitimately land on the identical-looking text without colliding.
   slipNumberUnique: uniqueIndex("dispatch_slip_unique").on(t.kilnId, t.slipNumber),
-  invoiceNumberUnique: uniqueIndex("dispatch_invoice_unique").on(t.invoiceNumber),
+  // Scoped to (kilnId, invoiceNumber), not invoiceNumber alone — becoming a
+  // plain per-kiln sequential counter ("61") means two different kilns'
+  // Nth invoice would otherwise collide under a global constraint, the
+  // same class of bug already fixed for slipNumber above.
+  invoiceNumberUnique: uniqueIndex("dispatch_invoice_unique").on(t.kilnId, t.invoiceNumber),
   localIdUnique: uniqueIndex("dispatch_localid_unique").on(t.localId),
   kilnDispatchedIdx: index("dispatch_kiln_dispatched_idx").on(t.kilnId, t.dispatchedOn),
 }));

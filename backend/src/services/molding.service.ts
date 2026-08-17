@@ -99,12 +99,10 @@ export async function todayMoldingTotal(kilnId: string) {
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
 }
 
-export async function totalMolded(kilnId: string, since: Date) {
-  const entries = await db
-    .select()
-    .from(moldingEntries)
-    .where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, since), eq(moldingEntries.washedOut, false)))
-    .all();
+export async function totalMolded(kilnId: string, since: Date, until?: Date) {
+  const conditions = [eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, since), eq(moldingEntries.washedOut, false)];
+  if (until) conditions.push(lte(moldingEntries.date, until));
+  const entries = await db.select().from(moldingEntries).where(and(...conditions)).all();
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
 }
 

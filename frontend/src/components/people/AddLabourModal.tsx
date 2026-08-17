@@ -18,6 +18,9 @@ function getWorkTypeOptions(t: (key: string) => string): { value: WorkType; labe
     { value: "NIKASI", label: t("people.workTypeNikasi") },
     { value: "LOADING", label: t("people.workTypeLoading") },
     { value: "BHARAI_CHAMBER_STACKING", label: t("people.workTypeBharaiChamberStacking") },
+    { value: "TUDI", label: t("people.workTypeTudi") },
+    { value: "RAWAS", label: t("people.workTypeRawas") },
+    { value: "BELDAR", label: t("people.workTypeBeldar") },
   ];
 }
 

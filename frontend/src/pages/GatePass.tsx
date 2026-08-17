@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Printer } from "lucide-react";
+import { Pencil, Printer, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Pagination, usePagination } from "@/components/ui/pagination";
@@ -8,6 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { printGatePass } from "@/lib/printDocument";
+import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import type { Dispatch as DispatchEntry } from "@/types";
 
 // Every truck/tractor that's loaded and dispatched already gets a slip
@@ -17,6 +18,7 @@ import type { Dispatch as DispatchEntry } from "@/types";
 // Dispatch has on file.
 export function GatePass() {
   const [dispatches, setDispatches] = useState<DispatchEntry[]>([]);
+  const [editingDispatch, setEditingDispatch] = useState<DispatchEntry | null>(null);
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
@@ -55,6 +57,12 @@ export function GatePass() {
 
   useKilnEvent("dispatch:update", () => refresh());
 
+  async function deleteDispatch(d: DispatchEntry) {
+    if (!confirm(t("dispatch.confirmDeleteDispatch", { slipNumber: d.slipNumber }))) return;
+    await api.dispatch.remove(d._id);
+    await refresh();
+  }
+
   return (
     <div className="space-y-4">
       <Card>
@@ -91,12 +99,26 @@ export function GatePass() {
                     </td>
                     <td className="py-3 tabular-nums text-ink-secondary">{d.bricksCount.toLocaleString("en-IN")}</td>
                     <td className="py-3 text-right">
-                      <button
-                        onClick={() => printGatePass(d, kilnInfo)}
-                        className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
-                      >
-                        <Printer className="h-3.5 w-3.5" /> {t("common.print")}
-                      </button>
+                      <div className="flex justify-end gap-3">
+                        <button
+                          onClick={() => printGatePass(d, kilnInfo)}
+                          className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+                        >
+                          <Printer className="h-3.5 w-3.5" /> {t("common.print")}
+                        </button>
+                        <button
+                          onClick={() => setEditingDispatch(d)}
+                          className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary"
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                        </button>
+                        <button
+                          onClick={() => deleteDispatch(d)}
+                          className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -106,6 +128,10 @@ export function GatePass() {
           </div>
         )}
       </Card>
+
+      {editingDispatch && (
+        <EditDispatchModal dispatch={editingDispatch} onClose={() => setEditingDispatch(null)} onSaved={refresh} />
+      )}
     </div>
   );
 }

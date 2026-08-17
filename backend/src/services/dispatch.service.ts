@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { dispatches, people, brickCategories, kilns, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import { dispatches, people, brickCategories, brickLoadingEntries, kilns, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
@@ -67,8 +67,15 @@ function generateSlipNumber(kilnId: string, dispatchedOn: Date) {
   return `${prefix}-${formatDDMMYYYY(dayStart)}-${String(seq).padStart(2, "0")}`;
 }
 
-function generateInvoiceNumber() {
-  return `INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+// A plain, sequential per-kiln invoice counter ("1", "2", ... "61") — this
+// is what actually prints on the Challan, matching the kiln's real paper
+// invoice book. Never resets; unlike the slip number's daily reset, an
+// invoice book's numbering runs continuously. Read-count-then-insert is
+// synchronous (better-sqlite3), so two same-instant creates can't race
+// into the same number, same guarantee generateSlipNumber already relies on.
+function generateInvoiceNumber(kilnId: string) {
+  const countRow = db.select({ count: sql<number>`count(*)` }).from(dispatches).where(eq(dispatches.kilnId, kilnId)).get();
+  return String((countRow?.count ?? 0) + 1);
 }
 
 export interface CreateDispatchInput {
@@ -125,7 +132,7 @@ export async function createDispatch(input: CreateDispatchInput) {
   // millisecond and, right at midnight, land on a different calendar day.
   const dispatchedOn = input.dispatchedOn ?? new Date();
   const slipNumber = generateSlipNumber(input.kilnId, dispatchedOn);
-  const invoiceNumber = generateInvoiceNumber();
+  const invoiceNumber = generateInvoiceNumber(input.kilnId);
   const _id = randomUUID();
   db.insert(dispatches).values({ ...input, amount: netAmount, dispatchedOn, _id, slipNumber, invoiceNumber }).run();
   const dispatch = db.select().from(dispatches).where(eq(dispatches._id, _id)).get()!;
@@ -207,6 +214,239 @@ export async function recordDeliveryAdjustment(kilnId: string, dispatchId: strin
   return updated;
 }
 
+export interface UpdateDispatchInput {
+  customerName?: string;
+  customerId?: string | null;
+  grade?: BrickGrade;
+  bricksCount?: number;
+  amount?: number;
+  discountAmount?: number;
+  driverId?: string | null;
+  transportCost?: number;
+  transportPaidBy?: "OWNER" | "CUSTOMER";
+  paymentMode?: PaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
+  categoryId?: string | null;
+  vehicleNumber?: string;
+  vehicleType?: string;
+  driverTipAmount?: number;
+}
+
+// Corrects a dispatch after the fact (wrong customer, wrong amount, wrong
+// bricksCount, ...) without ever rewriting what was already posted to the
+// ledger or stock — same delta-correction convention as
+// updatePaymentReceipt/updateBrickLoadingEntry: post a new correction entry
+// for exactly the difference, never mutate the original. slipNumber and
+// invoiceNumber never change here, so a reprinted Gate Pass/Challan still
+// carries the same serial the original did.
+export async function updateDispatch(kilnId: string, dispatchId: string, input: UpdateDispatchInput) {
+  const existing = db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))).get();
+  if (!existing) throw new Error("Dispatch not found in this kiln");
+
+  if (input.driverId) {
+    await assertPersonOfType(kilnId, input.driverId, ["DRIVER"]);
+  }
+  if (input.customerId) {
+    await assertPersonOfType(kilnId, input.customerId, ["CUSTOMER"]);
+  }
+
+  const patch: Record<string, unknown> = {};
+  for (const key of [
+    "customerName", "grade", "driverId", "transportCost", "transportPaidBy",
+    "paymentMode", "cashAmount", "onlineAmount", "categoryId", "vehicleNumber",
+    "vehicleType", "driverTipAmount",
+  ] as const) {
+    if (input[key] !== undefined) patch[key] = input[key];
+  }
+
+  // `amount` (if given) is the GROSS figure, same convention createDispatch
+  // uses — recompute the net the same way so editing either amount or
+  // discountAmount alone still nets correctly.
+  const currentGross = existing.amount + (existing.discountAmount ?? 0);
+  const newGross = input.amount !== undefined ? input.amount : currentGross;
+  const newDiscount = input.discountAmount !== undefined ? input.discountAmount : (existing.discountAmount ?? 0);
+  // Guards a partial edit (e.g. discountAmount changed without amount also
+  // being resent) the same way createDispatch's caller-side schema guards
+  // creation — a discount bigger than the gross would net to a negative
+  // `amount`, corrupting every downstream revenue total.
+  if (newDiscount > newGross) {
+    throw new Error("discountAmount cannot exceed amount");
+  }
+  const newNetAmount = Math.round((newGross - newDiscount) * 100) / 100;
+  const amountChanged = newNetAmount !== existing.amount;
+  if (amountChanged || input.discountAmount !== undefined) {
+    patch.amount = newNetAmount;
+    patch.discountAmount = newDiscount;
+  }
+
+  const customerChanged = input.customerId !== undefined && (input.customerId ?? null) !== (existing.customerId ?? null);
+  if (customerChanged) {
+    patch.customerId = input.customerId;
+  }
+
+  if (Object.keys(patch).length > 0) {
+    db.update(dispatches).set(patch).where(eq(dispatches._id, dispatchId)).run();
+  }
+  const updated = db.select().from(dispatches).where(eq(dispatches._id, dispatchId)).get()!;
+
+  // Ledger: a customer reassignment reverses the full original DUE off the
+  // old customer and posts a fresh DUE on the new one; otherwise, only the
+  // net-amount delta (if any) gets corrected on the existing customer.
+  if (customerChanged) {
+    if (existing.customerId && existing.amount !== 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.customerId,
+        direction: "PAID",
+        amount: existing.amount,
+        reason: `Dispatch ${existing.slipNumber} reassigned to a different customer — reversing ₹${existing.amount.toLocaleString("en-IN")}`,
+      });
+    }
+    if (input.customerId && newNetAmount !== 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: input.customerId,
+        direction: "DUE",
+        amount: newNetAmount,
+        reason: `Sale: ${(input.bricksCount ?? existing.bricksCount).toLocaleString()} bricks (${existing.slipNumber}) — reassigned from another customer`,
+      });
+    }
+  } else if (existing.customerId && amountChanged) {
+    const delta = Math.round((newNetAmount - existing.amount) * 100) / 100;
+    if (delta > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.customerId,
+        direction: "DUE",
+        amount: delta,
+        reason: `Dispatch ${existing.slipNumber} correction: revised up to ₹${newNetAmount.toLocaleString("en-IN")}`,
+      });
+    } else if (delta < 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.customerId,
+        direction: "PAID",
+        amount: -delta,
+        reason: `Dispatch ${existing.slipNumber} correction: revised down to ₹${newNetAmount.toLocaleString("en-IN")}`,
+      });
+    }
+  }
+
+  // Stock: correct the grade-bucket deduction by the exact delta rather
+  // than re-deducting the new total, which would double-count. A grade
+  // change moves the whole quantity from the old bucket to the new one.
+  const bricksCountChanged = input.bricksCount !== undefined && input.bricksCount !== existing.bricksCount;
+  const gradeChanged = input.grade !== undefined && input.grade !== existing.grade;
+  if (bricksCountChanged || gradeChanged) {
+    if (bricksCountChanged) {
+      db.update(dispatches).set({ bricksCount: input.bricksCount }).where(eq(dispatches._id, dispatchId)).run();
+    }
+
+    const oldGrade = (existing.grade ?? "A1") as BrickGrade;
+    const newGrade = (input.grade ?? existing.grade ?? "A1") as BrickGrade;
+    const newBricksCount = input.bricksCount ?? existing.bricksCount;
+    if (oldGrade === newGrade) {
+      const delta = newBricksCount - existing.bricksCount;
+      if (delta !== 0) {
+        await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[oldGrade], quantity: -delta });
+      }
+    } else {
+      await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[oldGrade], quantity: existing.bricksCount });
+      await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[newGrade], quantity: -newBricksCount });
+    }
+
+    // Brick-Loading-linked dispatches keep a second, independent stock
+    // system (brickCategories.quantity) — correct that too, the same way
+    // updateBrickLoadingEntry corrects its own edits.
+    const categoryChanged = input.categoryId !== undefined && input.categoryId !== existing.categoryId;
+    if (bricksCountChanged || categoryChanged) {
+      const linkedEntry = db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))).get();
+      if (linkedEntry) {
+        const oldCategoryId = existing.categoryId;
+        const newCategoryId = input.categoryId !== undefined ? input.categoryId : existing.categoryId;
+        if (oldCategoryId && oldCategoryId === newCategoryId) {
+          const delta = newBricksCount - existing.bricksCount;
+          if (delta !== 0) {
+            db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${delta}` }).where(eq(brickCategories._id, oldCategoryId)).run();
+            emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, oldCategoryId)).get());
+          }
+        } else {
+          if (oldCategoryId) {
+            db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` }).where(eq(brickCategories._id, oldCategoryId)).run();
+            emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, oldCategoryId)).get());
+          }
+          if (newCategoryId) {
+            db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${newBricksCount}` }).where(eq(brickCategories._id, newCategoryId)).run();
+            emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, newCategoryId)).get());
+          }
+        }
+      }
+    }
+  }
+
+  const finalDispatch = db.select().from(dispatches).where(eq(dispatches._id, dispatchId)).get()!;
+  emitToKiln(kilnId, "dispatch:update", finalDispatch);
+  return finalDispatch;
+}
+
+// Deletes a dispatch and reverses every side effect it caused: the ledger
+// DUE (netted against any return already refunded, so a returned dispatch
+// isn't double-reversed), the finished-goods stock deduction (same
+// netting), and — if this dispatch was auto-created from a Brick Loading
+// trip — the separate brickCategories.quantity deduction that flow makes,
+// un-linking that loading entry (dispatchId -> null) rather than leaving it
+// dangling. The loading entry itself is never deleted; the physical
+// loading trip is a real, separate record.
+export async function deleteDispatch(kilnId: string, dispatchId: string) {
+  const existing = db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))).get();
+  if (!existing) throw new Error("Dispatch not found in this kiln");
+
+  // recordDeliveryAdjustment already posted its own partial reversal for
+  // any bricks returned — reverse only what's still outstanding from this
+  // dispatch, not the original gross figures again.
+  const returnedCount = existing.returnedCount ?? 0;
+  const unitPrice = existing.bricksCount > 0 ? existing.amount / existing.bricksCount : 0;
+  const alreadyRefunded = Math.round(unitPrice * returnedCount);
+  const remainingNetAmount = Math.round((existing.amount - alreadyRefunded) * 100) / 100;
+  const remainingBricksOut = existing.bricksCount - returnedCount;
+
+  if (existing.customerId && remainingNetAmount !== 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.customerId,
+      direction: "PAID",
+      amount: remainingNetAmount,
+      reason: `Dispatch ${existing.slipNumber} deleted — reversing ₹${remainingNetAmount.toLocaleString("en-IN")}`,
+    });
+  }
+
+  if (remainingBricksOut !== 0) {
+    const grade = (existing.grade ?? "A1") as BrickGrade;
+    await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[grade], quantity: remainingBricksOut });
+  }
+
+  const linkedEntry = db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))).get();
+  if (linkedEntry) {
+    // Restore by the DISPATCH's own current categoryId/bricksCount, not the
+    // loading entry's — updateDispatch above only ever corrects
+    // brickCategories.quantity against the dispatch's own fields (it never
+    // touches brickLoadingEntries), so those are what the stock was actually
+    // last deducted against if this dispatch was edited after creation.
+    // Using the loading entry's original (possibly stale) values here would
+    // restore the wrong category and/or the wrong quantity.
+    if (existing.categoryId) {
+      db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` }).where(eq(brickCategories._id, existing.categoryId)).run();
+      emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)).get());
+    }
+    db.update(brickLoadingEntries).set({ dispatchId: null }).where(eq(brickLoadingEntries._id, linkedEntry._id)).run();
+    emitToKiln(kilnId, "brickLoading:update", db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, linkedEntry._id)).get());
+  }
+
+  db.delete(dispatches).where(eq(dispatches._id, dispatchId)).run();
+  emitToKiln(kilnId, "dispatch:update", { _id: dispatchId, deleted: true });
+}
+
 export async function listDispatches(kilnId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
@@ -215,9 +455,9 @@ export async function listDispatches(kilnId: string, days = 30) {
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const customerIds = [...new Set(rows.map((r) => r.customerId).filter((v): v is string => !!v))];
   const ids = [...new Set([...driverIds, ...customerIds])];
-  // phone/address included so print templates (Gate Pass/Challan) can show
-  // client address and driver mobile without a second round trip.
-  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone, address: people.address }).from(people).where(inArray(people._id, ids)).all() : [];
+  // phone/address/gstNumber included so print templates (Gate Pass/Challan)
+  // can show client address/GSTIN and driver mobile without a second round trip.
+  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone, address: people.address, gstNumber: people.gstNumber }).from(people).where(inArray(people._id, ids)).all() : [];
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
 
   const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
@@ -234,6 +474,31 @@ export async function listDispatches(kilnId: string, days = 30) {
   }));
 }
 
+// Every dispatch ever billed to one customer, oldest first — no day
+// window, unlike listDispatches — used by the Reports page's full-history
+// view. Duplicates listDispatches's populate shape rather than factoring
+// it out, so a future change to one doesn't risk silently changing the
+// other's behavior too.
+export async function listDispatchesForCustomer(kilnId: string, customerId: string) {
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.customerId, customerId))).orderBy(desc(dispatches.dispatchedOn)).all();
+
+  const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
+  const driverRows = driverIds.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(inArray(people._id, driverIds)).all() : [];
+  const driverById = new Map(driverRows.map((p) => [p._id, p]));
+
+  const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
+  const categoryRows = categoryIds.length
+    ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all()
+    : [];
+  const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
+
+  return rows.map((r) => ({
+    ...r,
+    driverId: r.driverId ? driverById.get(r.driverId) ?? r.driverId : r.driverId,
+    categoryId: r.categoryId ? categoryById.get(r.categoryId) ?? r.categoryId : r.categoryId,
+  }));
+}
+
 export async function totalDispatchedSince(kilnId: string, since: Date) {
   const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since))).all();
   return rows.reduce((sum, d) => sum + d.bricksCount, 0);
@@ -246,6 +511,18 @@ export async function dispatchTotals(kilnId: string, days = 7) {
 
   return {
     days,
+    bricksCount: rows.reduce((sum, d) => sum + d.bricksCount, 0),
+    amount: rows.reduce((sum, d) => sum + d.amount, 0),
+    dispatchCount: rows.length,
+  };
+}
+
+// Separate from dispatchTotals — that one's `days` is always relative to
+// now, which isn't what a season-year comparison needs (an absolute,
+// possibly-past window). Same shape otherwise.
+export async function dispatchTotalsForRange(kilnId: string, from: Date, to: Date) {
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, from), lte(dispatches.dispatchedOn, to))).all();
+  return {
     bricksCount: rows.reduce((sum, d) => sum + d.bricksCount, 0),
     amount: rows.reduce((sum, d) => sum + d.amount, 0),
     dispatchCount: rows.length,

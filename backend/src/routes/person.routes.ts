@@ -8,6 +8,7 @@ import {
   list,
   listLedger,
   paymentsDue,
+  report,
   update,
 } from "../controllers/person.controller";
 import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
@@ -25,3 +26,4 @@ personRouter.get("/:id", asyncHandler(getOne));
 personRouter.patch("/:id", asyncHandler(update));
 personRouter.post("/:id/ledger", asyncHandler(addLedger));
 personRouter.get("/:id/ledger", asyncHandler(listLedger));
+personRouter.get("/:id/report", asyncHandler(report));

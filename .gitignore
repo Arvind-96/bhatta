@@ -12,6 +12,7 @@ sync-engine/local-data/
 backend/data/*.db
 backend/data/*.db-*
 backend/data/salary-slips/
+backups/
 tools/mongodb-data*/
 tools/mongodb-portable/
 tools/mongod.log

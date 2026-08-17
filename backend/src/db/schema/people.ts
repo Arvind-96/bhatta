@@ -7,6 +7,7 @@ export const PERSON_TYPES = [
 ] as const;
 export const WORK_TYPES = [
   "PATHAI", "BHARAI_TRANSPORT", "PAKAYI", "NIKASI", "LOADING", "BHARAI_CHAMBER_STACKING",
+  "TUDI", "RAWAS", "BELDAR",
 ] as const;
 export const SEX_OPTIONS = ["MALE", "FEMALE", "OTHER"] as const;
 export const PERSON_STATUSES = ["ACTIVE", "ABSCONDED"] as const;

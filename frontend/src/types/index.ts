@@ -24,7 +24,7 @@ export type PaymentMode = "CASH" | "BANK" | "UPI" | "GST_INVOICE" | "CASH_AND_ON
 export interface Dispatch {
   _id: string;
   customerName: string;
-  customerId?: { _id: string; name: string; phone?: string; address?: string } | string;
+  customerId?: { _id: string; name: string; phone?: string; address?: string; gstNumber?: string } | string;
   grade: BrickGrade;
   bricksCount: number;
   amount: number;
@@ -71,7 +71,9 @@ export type PersonType =
 export type PersonStatus = "ACTIVE" | "ABSCONDED";
 export type PayType = "MONTHLY" | "PER_THOUSAND";
 export type Sex = "MALE" | "FEMALE" | "OTHER";
-export type WorkType = "PATHAI" | "BHARAI_TRANSPORT" | "PAKAYI" | "NIKASI" | "LOADING" | "BHARAI_CHAMBER_STACKING";
+export type WorkType =
+  | "PATHAI" | "BHARAI_TRANSPORT" | "PAKAYI" | "NIKASI" | "LOADING" | "BHARAI_CHAMBER_STACKING"
+  | "TUDI" | "RAWAS" | "BELDAR";
 
 export interface Person {
   _id: string;
@@ -1143,4 +1145,54 @@ export interface RosterEntry {
   person: { _id: string; name: string; type: PersonType; designation: string | null };
   status: AttendanceStatus;
   recorded: boolean;
+}
+
+// Raw attendance row as returned by listAttendanceForPerson — exception
+// rows only (a day with no row here is implicitly PRESENT), unlike
+// DayAttendance which is already expanded to one entry per calendar day.
+export interface AttendanceRecord {
+  _id: string;
+  personId: string;
+  date: string;
+  status: AttendanceStatus;
+  wageAmount: number | null;
+}
+
+// The Reports page's "everything about this person" payload — `sections`
+// only ever contains the keys relevant to this person's type/workType (see
+// backend/src/services/report.service.ts), so every field here is
+// optional and the page renders only whichever are actually present.
+// Mirrors backend/src/services/compare.service.ts's COMPARE_MODULES.
+export type CompareModule =
+  | "financial" | "bricks" | "molding" | "stacking" | "nikasi" | "firing" | "brickLoading"
+  | "dispatch" | "soil" | "diesel" | "fuel" | "expense" | "stock" | "attendance" | "salary" | "labor";
+
+export interface SeasonYearResult {
+  seasonYear: number;
+  from: string;
+  to: string;
+  inProgress: boolean;
+  metrics: Record<string, number | Record<string, number>>;
+}
+
+export interface PersonFullReport {
+  person: Person;
+  balance: number;
+  sections: {
+    ledger: LedgerEntry[];
+    paymentReceipts: PaymentReceipt[];
+    workEntries?: WorkEntry[];
+    family?: FamilyForPerson;
+    suppliedItems?: SuppliedItem[];
+    salarySlips?: SalarySlip[];
+    attendance?: AttendanceRecord[];
+    stackingEntries?: StackingEntry[];
+    nikasiEntries?: NikasiEntry[];
+    moldingContractor?: MoldingContractorEntry | null;
+    firingShifts?: FiringShift[];
+    soilArrivals?: SoilArrival[];
+    soilContracts?: SoilContract[];
+    brickLoadingEntries?: BrickLoadingEntry[];
+    dispatches?: Dispatch[];
+  };
 }

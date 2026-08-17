@@ -27,12 +27,15 @@ import { operationsDict } from "./dict/operations";
 import { staffDict } from "./dict/staff";
 import { overviewDict } from "./dict/overview";
 import { salaryDict } from "./dict/salary";
+import { reportsDict } from "./dict/reports";
+import { compareDict } from "./dict/compare";
 
 const coreDict: Record<string, Record<Locale, string>> = {
   "app.name": { en: "Bhatta Cloud", hi: "भट्टा क्लाउड" },
 
   "nav.overview": { en: "Overview", hi: "अवलोकन" },
   "nav.financialOverview": { en: "Financial Overview", hi: "वित्तीय विवरण" },
+  "nav.compare": { en: "Compare", hi: "तुलना" },
   "nav.people": { en: "People", hi: "लोग" },
   "nav.soil": { en: "Soil", hi: "मिट्टी" },
   "nav.molding": { en: "Molding (Pathai)", hi: "पथाई (ढलाई)" },
@@ -51,6 +54,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "nav.staff": { en: "Staff", hi: "स्टाफ" },
   "nav.salary": { en: "Salary", hi: "वेतन" },
   "nav.attendance": { en: "Attendance", hi: "हाज़िरी" },
+  "nav.reports": { en: "Reports", hi: "रिपोर्ट" },
   "nav.settings": { en: "Settings", hi: "सेटिंग्स" },
 
   "topbar.kilnOverview": { en: "Kiln Overview", hi: "भट्टा अवलोकन" },
@@ -193,6 +197,8 @@ export const translations: Record<string, Record<Locale, string>> = {
   ...staffDict,
   ...overviewDict,
   ...salaryDict,
+  ...reportsDict,
+  ...compareDict,
 };
 
 // params supports simple {name}-style interpolation for strings that embed

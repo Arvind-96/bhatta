@@ -11,6 +11,7 @@ import {
   updatePerson,
 } from "../services/person.service";
 import { addLedgerEntry, listLedgerForPerson } from "../services/ledger.service";
+import { getPersonFullReport } from "../services/report.service";
 import {
   PERSON_STATUSES,
   PERSON_TYPES,
@@ -144,5 +145,10 @@ export async function addLedger(req: AuthedRequest, res: Response) {
 export async function listLedger(req: AuthedRequest, res: Response) {
   const entries = await listLedgerForPerson(req.kiln!.id, req.params.id);
   res.json(entries);
+}
+
+export async function report(req: AuthedRequest, res: Response) {
+  const result = await getPersonFullReport(req.kiln!.id, req.params.id);
+  res.json(result);
 }
 

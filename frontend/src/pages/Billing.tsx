@@ -11,6 +11,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { printInvoice, printPaymentReceipt } from "@/lib/printDocument";
 import { CreatePaymentReceiptModal } from "@/components/billing/CreatePaymentReceiptModal";
 import { EditPaymentReceiptModal } from "@/components/billing/EditPaymentReceiptModal";
+import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import type { CustomerCreditAging, Dispatch as DispatchEntry, DispatchTotals, PaymentReceipt } from "@/types";
 import { formatINR } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ export function Billing() {
   const [receipts, setReceipts] = useState<PaymentReceipt[]>([]);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [editingReceipt, setEditingReceipt] = useState<PaymentReceipt | null>(null);
+  const [editingDispatch, setEditingDispatch] = useState<DispatchEntry | null>(null);
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
@@ -99,6 +101,12 @@ export function Billing() {
     await refresh();
   }
 
+  async function deleteDispatch(d: DispatchEntry) {
+    if (!confirm(t("dispatch.confirmDeleteDispatch", { slipNumber: d.slipNumber }))) return;
+    await api.dispatch.remove(d._id);
+    await refresh();
+  }
+
   const totalOutstanding = creditAging.reduce((sum, c) => sum + c.outstandingCredit, 0);
 
   return (
@@ -155,12 +163,26 @@ export function Billing() {
                     <td className="py-3 text-ink-secondary">{d.paymentMode ?? "—"}</td>
                     <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(d.amount)}</td>
                     <td className="py-3 text-right">
-                      <button
-                        onClick={() => handlePrintInvoice(d)}
-                        className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
-                      >
-                        <Printer className="h-3.5 w-3.5" /> {t("common.print")}
-                      </button>
+                      <div className="flex justify-end gap-3">
+                        <button
+                          onClick={() => handlePrintInvoice(d)}
+                          className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+                        >
+                          <Printer className="h-3.5 w-3.5" /> {t("common.print")}
+                        </button>
+                        <button
+                          onClick={() => setEditingDispatch(d)}
+                          className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary"
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                        </button>
+                        <button
+                          onClick={() => deleteDispatch(d)}
+                          className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -243,6 +265,9 @@ export function Billing() {
           onClose={() => setEditingReceipt(null)}
           onSaved={refresh}
         />
+      )}
+      {editingDispatch && (
+        <EditDispatchModal dispatch={editingDispatch} onClose={() => setEditingDispatch(null)} onSaved={refresh} />
       )}
     </div>
   );

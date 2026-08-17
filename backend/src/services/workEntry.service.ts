@@ -15,6 +15,9 @@ const WORK_TYPE_LABELS: Record<WorkType, string> = {
   NIKASI: "Nikasi",
   LOADING: "Loading",
   BHARAI_CHAMBER_STACKING: "Bharai (outside → inside ghera)",
+  TUDI: "Tudi",
+  RAWAS: "Rawas",
+  BELDAR: "Beldar",
 };
 
 function wageFor(quantity: number, ratePerThousand: number) {

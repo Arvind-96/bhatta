@@ -1,4 +1,4 @@
-import { Flame, LayoutGrid, Layers, CalendarCheck, Settings as SettingsIcon, Thermometer, Truck, Users, Hammer, PackageCheck, Wrench, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, Receipt, Wallet, Fuel as FuelIcon, Boxes, Warehouse, PieChart, Banknote, X } from "lucide-react";
+import { Flame, LayoutGrid, Layers, CalendarCheck, Settings as SettingsIcon, Thermometer, Truck, Users, Hammer, PackageCheck, Wrench, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, Receipt, Wallet, Fuel as FuelIcon, Boxes, Warehouse, PieChart, Banknote, FileSearch, GitCompare, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KilnSwitcher } from "./KilnSwitcher";
 import { useUiStore, type AppView } from "@/store/ui.store";
@@ -21,6 +21,7 @@ const CHIP_BG: Record<SeriesTone, string> = {
 export const navItems: { key: string; icon: typeof LayoutGrid; view: AppView; group: string }[] = [
   { key: "nav.overview", icon: LayoutGrid, view: "overview", group: "nav.group.dashboard" },
   { key: "nav.financialOverview", icon: PieChart, view: "financialOverview", group: "nav.group.dashboard" },
+  { key: "nav.compare", icon: GitCompare, view: "compare", group: "nav.group.dashboard" },
 
   { key: "nav.people", icon: Users, view: "people", group: "nav.group.production" },
   { key: "nav.soil", icon: Truck, view: "soil", group: "nav.group.production" },
@@ -43,6 +44,7 @@ export const navItems: { key: string; icon: typeof LayoutGrid; view: AppView; gr
   { key: "nav.staff", icon: UserCog, view: "staff", group: "nav.group.admin" },
   { key: "nav.salary", icon: Banknote, view: "salary", group: "nav.group.admin" },
   { key: "nav.attendance", icon: CalendarCheck, view: "attendance", group: "nav.group.admin" },
+  { key: "nav.reports", icon: FileSearch, view: "reports", group: "nav.group.admin" },
   { key: "nav.settings", icon: SettingsIcon, view: "settings", group: "nav.group.admin" },
 ];
 

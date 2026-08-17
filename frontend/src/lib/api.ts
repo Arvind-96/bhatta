@@ -69,7 +69,10 @@ import type {
   PaymentMode,
   PaymentReceipt,
   Person,
+  PersonFullReport,
   PersonType,
+  CompareModule,
+  SeasonYearResult,
   ProductionLog,
   ProductionSeriesPoint,
   Reconciliation,
@@ -181,6 +184,28 @@ export const api = {
     totals: (days = 7) => get<DispatchTotals>(`/dispatch/totals?days=${days}`, true),
     adjustment: (id: string, input: { breakageCount?: number; returnedCount?: number; returnReason?: string }) =>
       patch<Dispatch>(`/dispatch/${id}/adjustment`, input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        customerName: string;
+        customerId: string | null;
+        grade: BrickGrade;
+        bricksCount: number;
+        amount: number;
+        driverId: string | null;
+        transportCost: number;
+        transportPaidBy: "OWNER" | "CUSTOMER";
+        paymentMode: PaymentMode;
+        cashAmount: number;
+        onlineAmount: number;
+        categoryId: string | null;
+        vehicleNumber: string;
+        vehicleType: string;
+        driverTipAmount: number;
+        discountAmount: number;
+      }>
+    ) => patch<Dispatch>(`/dispatch/${id}`, input, true),
+    remove: (id: string) => del<void>(`/dispatch/${id}`, true),
   },
 
   login: (email: string, password: string) => post<AuthResponse>("/auth/login", { email, password }),
@@ -234,6 +259,7 @@ export const api = {
       }
     ) => post<LedgerEntry>(`/people/${id}/ledger`, input, true),
     listLedger: (id: string) => get<LedgerEntry[]>(`/people/${id}/ledger`, true),
+    report: (id: string) => get<PersonFullReport>(`/people/${id}/report`, true),
     advances: () => get<OutstandingAdvance[]>("/people/advances", true),
     paymentsDue: () => get<PaymentDue[]>("/people/payments-due", true),
     creditAging: () => get<CustomerCreditAging[]>("/people/credit-aging", true),
@@ -811,5 +837,10 @@ export const api = {
     get: () => get<FinancialOverview>("/financial-overview", true),
     customRange: (from: string, to: string) =>
       get<FinancialFlow>(`/financial-overview/custom-range?from=${from}&to=${to}`, true),
+  },
+
+  compare: {
+    get: (module: CompareModule, seasonYears: number[]) =>
+      get<SeasonYearResult[]>(`/compare/${module}?years=${seasonYears.join(",")}`, true),
   },
 };

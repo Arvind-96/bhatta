@@ -4,6 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Overview } from "@/pages/Overview";
 import { FinancialOverview } from "@/pages/FinancialOverview";
+import { Compare } from "@/pages/Compare";
 import { People } from "@/pages/People";
 import { Soil } from "@/pages/Soil";
 import { Molding } from "@/pages/Molding";
@@ -22,6 +23,7 @@ import { Fleet } from "@/pages/Fleet";
 import { Staff } from "@/pages/Staff";
 import { Salary } from "@/pages/Salary";
 import { Attendance } from "@/pages/Attendance";
+import { Reports } from "@/pages/Reports";
 import { Settings } from "@/pages/Settings";
 import { useSocket } from "@/hooks/useSocket";
 import { useLiveProduction } from "@/hooks/useLiveProduction";
@@ -34,6 +36,7 @@ import { SetupWizard } from "@/components/onboarding/SetupWizard";
 const VIEWS = {
   overview: Overview,
   financialOverview: FinancialOverview,
+  compare: Compare,
   people: People,
   soil: Soil,
   molding: Molding,
@@ -52,6 +55,7 @@ const VIEWS = {
   staff: Staff,
   salary: Salary,
   attendance: Attendance,
+  reports: Reports,
   settings: Settings,
 };
 

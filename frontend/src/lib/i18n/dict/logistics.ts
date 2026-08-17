@@ -83,6 +83,11 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "dispatch.discountPlaceholder": { en: "Discount (₹, optional)", hi: "छूट (₹, वैकल्पिक)" },
   "dispatch.netAmountPreview": { en: "Net amount after discount", hi: "छूट के बाद शुद्ध राशि" },
   "dispatch.discountExceedsAmount": { en: "Discount cannot be more than the amount", hi: "छूट राशि से अधिक नहीं हो सकती" },
+  "dispatch.editDispatch": { en: "Edit dispatch", hi: "डिस्पैच संपादित करें" },
+  "dispatch.confirmDeleteDispatch": {
+    en: "Delete {slipNumber}? This reverses its ledger entry and stock effect and can't be undone.",
+    hi: "{slipNumber} हटाएं? इससे इसकी लेजर एंट्री और स्टॉक प्रभाव वापस हो जाएगा और यह पूर्ववत नहीं हो सकता।",
+  },
   "dispatch.saveDispatch": { en: "Save dispatch", hi: "डिस्पैच सहेजें" },
   "dispatch.noDispatchesYet": { en: "No dispatches logged yet.", hi: "अभी तक कोई डिस्पैच दर्ज नहीं हुआ।" },
   "dispatch.slipHeader": { en: "Slip", hi: "पर्ची" },

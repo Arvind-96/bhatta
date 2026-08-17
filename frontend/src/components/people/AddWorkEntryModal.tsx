@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { Person, WorkType } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
-import { useWorkTypeLabels } from "./personTypes";
+import { LOGGABLE_WORK_TYPES, useWorkTypeLabels } from "./personTypes";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-border bg-ink-primary/5 px-3.5 text-sm text-ink-primary outline-none transition-shadow focus:ring-2 focus:ring-series-1";
@@ -98,9 +98,9 @@ export function AddWorkEntryModal({ personId, labourers, onClose, onCreated }: A
           <Field label={t("people.workTypeFieldLabel")}>
             <select required value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
               <option value="">{t("people.selectWorkType")}</option>
-              {(Object.entries(workTypeLabels) as [WorkType, string][]).map(([value, label]) => (
+              {LOGGABLE_WORK_TYPES.map((value) => (
                 <option key={value} value={value}>
-                  {label}
+                  {workTypeLabels[value]}
                 </option>
               ))}
             </select>

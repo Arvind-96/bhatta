@@ -28,8 +28,19 @@ export function useWorkTypeLabels(): Record<WorkType, string> {
     NIKASI: t("people.workTypeNikasi"),
     LOADING: t("people.workTypeLoading"),
     BHARAI_CHAMBER_STACKING: t("people.workTypeBharaiChamberStacking"),
+    TUDI: t("people.workTypeTudi"),
+    RAWAS: t("people.workTypeRawas"),
+    BELDAR: t("people.workTypeBeldar"),
   };
 }
+
+// The subset of WorkType that actually drives a production module's daily
+// entry-logging (Molding/Stacking/Nikasi work-entry forms) — Tudi/Rawas/
+// Beldar are classification-only categories with no dedicated tracking
+// module, so they must never appear as a loggable work-entry choice.
+export const LOGGABLE_WORK_TYPES: WorkType[] = [
+  "PATHAI", "BHARAI_TRANSPORT", "PAKAYI", "NIKASI", "LOADING", "BHARAI_CHAMBER_STACKING",
+];
 
 export function useFamilyRelationLabels(): Record<FamilyRelation, string> {
   const { t } = useTranslation();

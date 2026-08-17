@@ -81,6 +81,14 @@ export async function listAttendanceForDay(kilnId: string, date: Date) {
   return rows.map((r) => ({ ...r, personId: personById.get(r.personId) ?? r.personId }));
 }
 
+// Every explicitly-recorded attendance row for one person, oldest first —
+// used by the Reports page's full-history view. Like listAttendanceForDay,
+// this only returns exception rows (absent/half-day/late); days with no
+// row are implicitly PRESENT (see the attendances table's schema comment).
+export async function listAttendanceForPerson(kilnId: string, personId: string) {
+  return db.select().from(attendances).where(and(eq(attendances.kilnId, kilnId), eq(attendances.personId, personId))).orderBy(attendances.date).all();
+}
+
 export interface DayAttendance {
   date: Date;
   status: AttendanceStatus;
@@ -162,7 +170,12 @@ export interface RosterEntry {
 // specific date (present-by-default, same rule as attendanceForPersonMonth)
 // — powers the Attendance page's daily roster, where the admin marks
 // exceptions directly against the full staff list rather than one person's
-// calendar at a time.
+// calendar at a time. Eligibility mirrors Staff.tsx's own population
+// exactly (MUNIM/CHOWKIDAR, plus HELPER/DRIVER only when flagged
+// isOfficeStaff) — Attendance is specifically for the people managed on
+// the Staff page, not every wage-earning person in the kiln (Workers are
+// tracked via WorkEntry/molding-stacking-nikasi instead, not daily
+// present/absent marking).
 export async function listAttendanceRoster(kilnId: string, date: Date): Promise<RosterEntry[]> {
   const day = startOfDay(date);
 
@@ -171,7 +184,9 @@ export async function listAttendanceRoster(kilnId: string, date: Date): Promise<
     .from(people)
     .where(and(eq(people.kilnId, kilnId), eq(people.active, true)))
     .all();
-  const rosterPeople = eligiblePeople.filter((p) => p.type === "WORKER" || p.type === "HELPER" || p.monthlySalary != null);
+  const rosterPeople = eligiblePeople.filter(
+    (p) => p.type === "MUNIM" || p.type === "CHOWKIDAR" || ((p.type === "HELPER" || p.type === "DRIVER") && p.isOfficeStaff)
+  );
   if (rosterPeople.length === 0) return [];
 
   const rows = await db

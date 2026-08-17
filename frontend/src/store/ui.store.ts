@@ -21,7 +21,9 @@ export type AppView =
   | "staff"
   | "salary"
   | "attendance"
-  | "settings";
+  | "reports"
+  | "settings"
+  | "compare";
 
 interface UiState {
   view: AppView;

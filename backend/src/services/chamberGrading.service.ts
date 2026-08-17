@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { chamberGradings, ghers } from "../db/schema";
 import { assertGherInKiln } from "./gher.service";
@@ -83,7 +83,9 @@ export async function listGradings(kilnId: string, days = 60) {
   }));
 }
 
-export async function totalA1Output(kilnId: string, since: Date) {
-  const gradings = await db.select().from(chamberGradings).where(and(eq(chamberGradings.kilnId, kilnId), gte(chamberGradings.date, since))).all();
+export async function totalA1Output(kilnId: string, since: Date, until?: Date) {
+  const conditions = [eq(chamberGradings.kilnId, kilnId), gte(chamberGradings.date, since)];
+  if (until) conditions.push(lte(chamberGradings.date, until));
+  const gradings = await db.select().from(chamberGradings).where(and(...conditions)).all();
   return gradings.reduce((sum, g) => sum + g.a1Count, 0);
 }
