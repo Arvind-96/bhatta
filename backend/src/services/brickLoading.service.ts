@@ -2,9 +2,8 @@ import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
-import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
-import { createDispatch, deleteDispatch } from "./dispatch.service";
+import { createDispatch, deleteDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
 import { emitToKiln } from "../config/socket";
 
 export type BrickVehicleType = (typeof BRICK_VEHICLE_TYPES)[number];
@@ -13,104 +12,116 @@ export interface CreateBrickLoadingInput {
   kilnId: string;
   vehicleType: BrickVehicleType;
   vehicleNumber: string;
-  driverId: string;
   bricksCount: number;
-  tipAmount?: number;
+  categoryId: string;
   loadingCharge?: number;
-  categoryId?: string;
-  // Applied against the auto-computed gross (bricksCount * pricePerBrick)
-  // before the auto-created Dispatch is saved — see createDispatch's own
-  // netting logic, which this just triggers.
+  unloadingCharge?: number;
   discountAmount?: number;
-  dispatchId?: string;
   date?: Date;
-  notes?: string;
 }
 
-// The vehicle-loading operation record — which truck/tractor, which
-// driver, how many bricks — kept separate from Dispatch (the sale) and
-// LoadingEntry (the palledar's wage for the physical loading labor). A
-// tip/inaam given to the driver posts straight to their ledger, same
-// DUE-entry pattern used for every other bonus in this app (see
-// firingShift.service.ts's OT/bonus).
+// Plain, sequential per-kiln trip counter — same never-resets convention as
+// dispatch.service.ts's generateInvoiceNumber. Under MySQL this
+// count-then-insert can race between two concurrent creates for the same
+// kiln, same as slip/invoice numbers — closed by the retry loop in
+// createBrickLoadingEntry below, not by trying to make this atomic.
+async function generateTripNumber(kilnId: string) {
+  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId)))[0];
+  return String((countRow?.count ?? 0) + 1);
+}
+
+// The vehicle-loading operation record — which truck/tractor, how many
+// bricks, which category — kept separate from Dispatch (the sale) and
+// LoadingEntry (the palledar's wage for the physical loading labor). Every
+// trip gets a unique sequential trip number and an auto-computed final
+// amount: (category price × bricksCount − discount) + loadingCharge +
+// unloadingCharge — that same figure also becomes the auto-created
+// Dispatch's billed amount below.
 export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
-  await assertPersonOfType(input.kilnId, input.driverId, ["DRIVER"]);
-  if (input.dispatchId) {
-    const dispatch = (await db.select({ _id: dispatches._id }).from(dispatches).where(and(eq(dispatches._id, input.dispatchId), eq(dispatches.kilnId, input.kilnId))))[0];
-    if (!dispatch) throw new Error("Referenced dispatch not found in this kiln");
+  const category = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))))[0];
+  if (!category) throw new Error("Brick category not found in this kiln");
+
+  const grossAmount = Math.round(input.bricksCount * (category.pricePerBrick ?? 0) * 100) / 100;
+  const netAfterDiscount = input.discountAmount ? Math.round((grossAmount - input.discountAmount) * 100) / 100 : grossAmount;
+  // Clamped at 0 — a trip's billed amount can't be meaningfully negative
+  // even if a large discount outweighs the category price and charges.
+  const finalAmount = Math.max(0, Math.round((netAfterDiscount + (input.loadingCharge ?? 0) + (input.unloadingCharge ?? 0)) * 100) / 100);
+
+  // Retry loop: two concurrent creates for the same kiln can both compute
+  // the same trip number (the count-then-insert above isn't atomic under
+  // MySQL) — the (kilnId, tripNumber) unique constraint is the real
+  // guarantee; a collision surfaces as a duplicate-entry error, caught
+  // here, and the number is simply recomputed and retried.
+  let entry: typeof brickLoadingEntries.$inferSelect | undefined;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < MAX_NUMBER_GENERATION_ATTEMPTS; attempt++) {
+    const tripNumber = await generateTripNumber(input.kilnId);
+    const _id = randomUUID();
+    try {
+      await db.insert(brickLoadingEntries).values({
+        _id,
+        kilnId: input.kilnId,
+        tripNumber,
+        vehicleType: input.vehicleType,
+        vehicleNumber: input.vehicleNumber,
+        bricksCount: input.bricksCount,
+        categoryId: input.categoryId,
+        loadingCharge: input.loadingCharge,
+        unloadingCharge: input.unloadingCharge,
+        discountAmount: input.discountAmount,
+        amount: finalAmount,
+        date: input.date,
+      });
+      entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)))[0];
+      break;
+    } catch (err) {
+      lastError = err;
+      if (!isDuplicateEntryError(err)) throw err;
+    }
+  }
+  if (!entry) {
+    throw lastError instanceof Error ? lastError : new Error("Failed to create loading entry: could not allocate a unique trip number");
   }
 
-  // discountAmount only ever feeds the auto-created Dispatch below — it's
-  // not a column on brickLoadingEntries, so it's kept out of the insert.
-  const { discountAmount, ...entryInput } = input;
+  // The bricks physically left the yard on this trip — deduct from that
+  // category's stock the same way the Stock page's manual "loading out"
+  // flow does (createStockLoadingEntry), just without a separate
+  // stockLoadingEntries row, since this brickLoadingEntries row is already
+  // the audit trail for the same physical movement.
+  await db.update(brickCategories)
+    .set({ quantity: sql`${brickCategories.quantity} - ${input.bricksCount}` })
+    .where(eq(brickCategories._id, input.categoryId));
+  emitToKiln(input.kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0]);
 
-  const _id = randomUUID();
-  await db.insert(brickLoadingEntries).values({ ...entryInput, _id });
-  let entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)))[0]!;
-
-  if (input.tipAmount && input.tipAmount > 0) {
-    await addLedgerEntry({
-      kilnId: input.kilnId,
-      personId: input.driverId,
-      direction: "DUE",
-      amount: input.tipAmount,
-      reason: `Driver tip/inaam — ${input.vehicleNumber} (${input.bricksCount.toLocaleString()} bricks)`,
-      date: input.date,
-      category: "TIP",
-    });
-  }
-
-  if (input.categoryId) {
-    const category = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))))[0];
-
-    if (category) {
-      // The bricks physically left the yard on this trip — deduct from
-      // that category's stock the same way the Stock page's manual
-      // "loading out" flow does (createStockLoadingEntry), just without a
-      // separate stockLoadingEntries row, since this brickLoadingEntries
-      // row is already the audit trail for the same physical movement.
-      await db.update(brickCategories)
-        .set({ quantity: sql`${brickCategories.quantity} - ${input.bricksCount}` })
-        .where(eq(brickCategories._id, input.categoryId));
-      emitToKiln(input.kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0]);
-
-      // Auto-create a matching Dispatch so this trip shows up on the
-      // Dispatch page without a manual step — only when the admin hasn't
-      // already linked an existing dispatch and this category has a real
-      // price set (dispatches require a positive amount, so an unpriced
-      // category can't produce a valid one yet). Never lets a dispatch
-      // failure undo the already-saved loading entry or the stock
-      // deduction above — worst case is just no auto-linked dispatch, not
-      // a lost trip.
-      const grossAmount = Math.round(input.bricksCount * (category.pricePerBrick ?? 0) * 100) / 100;
-      const netAmount = discountAmount ? Math.round((grossAmount - discountAmount) * 100) / 100 : grossAmount;
-
-      if (!input.dispatchId && category.pricePerBrick && category.pricePerBrick > 0 && netAmount > 0) {
-        try {
-          const dispatch = await createDispatch({
-            kilnId: input.kilnId,
-            customerName: `Brick Loading — ${input.vehicleNumber}, ${(input.date ?? new Date()).toLocaleDateString("en-IN")}`,
-            bricksCount: input.bricksCount,
-            amount: grossAmount,
-            discountAmount,
-            driverId: input.driverId,
-            categoryId: input.categoryId,
-            vehicleNumber: input.vehicleNumber,
-            vehicleType: input.vehicleType,
-            driverTipAmount: input.tipAmount,
-            dispatchedOn: input.date,
-          });
-          await db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, _id));
-          entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)))[0]!;
-        } catch (err) {
-          console.error("[brickLoading] auto-dispatch creation failed, loading entry still saved:", err);
-          // Not persisted — just this one response — so the admin can see
-          // "trip saved, billing didn't auto-link" immediately instead of
-          // only finding out from a server log. The trip itself is still
-          // saved either way; this never blocks/undoes it.
-          return { ...entry, dispatchSyncFailed: true };
-        }
-      }
+  // Auto-create a matching Dispatch so this trip shows up on the Dispatch
+  // page without a manual step — only when this category has a real price
+  // set and the computed amount is actually billable (dispatches require a
+  // positive amount). Never lets a dispatch failure undo the already-saved
+  // loading entry or the stock deduction above — worst case is just no
+  // auto-linked dispatch, not a lost trip.
+  if (category.pricePerBrick && category.pricePerBrick > 0 && finalAmount > 0) {
+    try {
+      const dispatch = await createDispatch({
+        kilnId: input.kilnId,
+        customerName: `Brick Loading — ${input.vehicleNumber}, ${(input.date ?? new Date()).toLocaleDateString("en-IN")}`,
+        bricksCount: input.bricksCount,
+        amount: grossAmount + (input.loadingCharge ?? 0) + (input.unloadingCharge ?? 0),
+        discountAmount: input.discountAmount,
+        categoryId: input.categoryId,
+        vehicleNumber: input.vehicleNumber,
+        vehicleType: input.vehicleType,
+        dispatchedOn: input.date,
+      });
+      await db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, entry._id));
+      entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entry._id)))[0]!;
+    } catch (err) {
+      console.error("[brickLoading] auto-dispatch creation failed, loading entry still saved:", err);
+      // Not persisted — just this one response — so the admin can see
+      // "trip saved, billing didn't auto-link" immediately instead of
+      // only finding out from a server log. The trip itself is still
+      // saved either way; this never blocks/undoes it.
+      emitToKiln(input.kilnId, "brickLoading:update", entry);
+      return { ...entry, dispatchSyncFailed: true };
     }
   }
 
@@ -122,23 +133,47 @@ export interface UpdateBrickLoadingInput {
   vehicleType?: BrickVehicleType;
   vehicleNumber?: string;
   bricksCount?: number;
-  tipAmount?: number;
+  discountAmount?: number;
   loadingCharge?: number;
+  unloadingCharge?: number;
   notes?: string;
+  // Legacy — only meaningful for entries created before Driver/Tip were
+  // removed from the Log Trip form, i.e. rows that already have a
+  // driverId. See the driverId guard below.
+  tipAmount?: number;
 }
 
 // Full admin edit — never silently rewrites a tip already posted to the
 // driver's ledger; a changed tipAmount posts a correction entry for the
 // difference instead (DUE if raised, PAID if lowered), same convention as
 // every other correctable amount in this app (see stacking.service.ts's
-// original wage-delta pattern).
+// original wage-delta pattern). A changed bricksCount/discountAmount/
+// loadingCharge/unloadingCharge recomputes the stored `amount` against the
+// entry's existing category price — changing the category itself isn't
+// supported here (that would also need to move stock between categories),
+// so `amount` stays untouched if the entry never had one priced.
 export async function updateBrickLoadingEntry(kilnId: string, entryId: string, input: UpdateBrickLoadingInput) {
   const existing = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick loading entry not found in this kiln");
 
   const oldTip = existing.tipAmount ?? 0;
 
-  await db.update(brickLoadingEntries).set(input).where(eq(brickLoadingEntries._id, entryId));
+  let amountUpdate: { amount?: number } = {};
+  if (
+    existing.categoryId &&
+    (input.bricksCount !== undefined || input.discountAmount !== undefined || input.loadingCharge !== undefined || input.unloadingCharge !== undefined)
+  ) {
+    const category = (await db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)))[0];
+    const bricksCount = input.bricksCount ?? existing.bricksCount;
+    const discountAmount = input.discountAmount ?? existing.discountAmount ?? 0;
+    const loadingCharge = input.loadingCharge ?? existing.loadingCharge ?? 0;
+    const unloadingCharge = input.unloadingCharge ?? existing.unloadingCharge ?? 0;
+    const grossAmount = Math.round(bricksCount * (category?.pricePerBrick ?? 0) * 100) / 100;
+    const netAfterDiscount = discountAmount ? Math.round((grossAmount - discountAmount) * 100) / 100 : grossAmount;
+    amountUpdate = { amount: Math.max(0, Math.round((netAfterDiscount + loadingCharge + unloadingCharge) * 100) / 100) };
+  }
+
+  await db.update(brickLoadingEntries).set({ ...input, ...amountUpdate }).where(eq(brickLoadingEntries._id, entryId));
   const updated = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId)))[0]!;
 
   // A changed bricksCount means the original stock deduction (see
@@ -155,7 +190,7 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
     }
   }
 
-  if (input.tipAmount !== undefined) {
+  if (input.tipAmount !== undefined && updated.driverId) {
     const delta = Math.round((input.tipAmount - oldTip) * 100) / 100;
     if (delta > 0) {
       await addLedgerEntry({
@@ -200,7 +235,7 @@ export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
   const existing = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick loading entry not found in this kiln");
 
-  if (existing.tipAmount && existing.tipAmount > 0) {
+  if (existing.tipAmount && existing.tipAmount > 0 && existing.driverId) {
     await addLedgerEntry({
       kilnId,
       personId: existing.driverId,
@@ -239,7 +274,7 @@ export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickL
   }
 
   const rows = await db.select().from(brickLoadingEntries).where(and(...conditions)).orderBy(desc(brickLoadingEntries.date));
-  const driverIds = [...new Set(rows.map((r) => r.driverId))];
+  const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const dispatchIds = [...new Set(rows.map((r) => r.dispatchId).filter((v): v is string => !!v))];
   const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
   const [driverRows, dispatchRows, categoryRows] = await Promise.all([
@@ -252,7 +287,7 @@ export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickL
   const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
   return rows.map((r) => ({
     ...r,
-    driverId: driverById.get(r.driverId) ?? r.driverId,
+    driverId: r.driverId ? driverById.get(r.driverId) ?? r.driverId : undefined,
     dispatchId: r.dispatchId ? dispatchById.get(r.dispatchId) ?? r.dispatchId : r.dispatchId,
     categoryId: r.categoryId ? categoryById.get(r.categoryId) ?? r.categoryId : r.categoryId,
   }));
@@ -274,6 +309,7 @@ export async function brickLoadingDriverSummary(kilnId: string) {
   const allEntries = await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId));
   const entriesByDriver = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
+    if (!e.driverId) continue;
     const id = e.driverId;
     if (!entriesByDriver.has(id)) entriesByDriver.set(id, []);
     entriesByDriver.get(id)!.push(e);

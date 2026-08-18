@@ -15,6 +15,13 @@
       "when": 1787062268108,
       "tag": "0001_cool_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787071535308,
+      "tag": "0002_omniscient_riptide",
+      "breakpoints": true
     }
   ]
 }

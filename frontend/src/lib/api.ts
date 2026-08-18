@@ -605,18 +605,24 @@ export const api = {
     create: (input: {
       vehicleType: BrickVehicleType;
       vehicleNumber: string;
-      driverId: string;
       bricksCount: number;
-      tipAmount?: number;
+      categoryId: string;
       loadingCharge?: number;
-      categoryId?: string;
+      unloadingCharge?: number;
       discountAmount?: number;
-      dispatchId?: string;
-      notes?: string;
     }) => post<BrickLoadingEntry & { dispatchSyncFailed?: boolean }>("/brick-loading", input, true),
     update: (
       id: string,
-      input: Partial<{ vehicleType: BrickVehicleType; vehicleNumber: string; bricksCount: number; tipAmount: number; loadingCharge: number; notes: string }>
+      input: Partial<{
+        vehicleType: BrickVehicleType;
+        vehicleNumber: string;
+        bricksCount: number;
+        discountAmount: number;
+        loadingCharge: number;
+        unloadingCharge: number;
+        tipAmount: number;
+        notes: string;
+      }>
     ) => patch<BrickLoadingEntry>(`/brick-loading/${id}`, input, true),
     remove: (id: string) => del<void>(`/brick-loading/${id}`, true),
     driverSummary: () => get<BrickLoadingDriverSummary>("/brick-loading/driver-summary", true),

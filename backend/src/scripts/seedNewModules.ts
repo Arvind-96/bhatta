@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { and, asc, count, desc, eq, isNotNull } from "drizzle-orm";
 import { db, runMigrations } from "../db/client";
-import { kilns, people, dispatches, nikasiEntries, brickLoadingEntries } from "../db/schema";
+import { kilns, people, dispatches, nikasiEntries, brickLoadingEntries, brickCategories } from "../db/schema";
 
 import { createPerson } from "../services/person.service";
 import { listGhers } from "../services/gher.service";
@@ -9,6 +9,7 @@ import { createStackingEntry } from "../services/stacking.service";
 import { createStackingVehicle } from "../services/stackingVehicle.service";
 import { createNikasiEntry } from "../services/nikasi.service";
 import { createBrickLoadingEntry } from "../services/brickLoading.service";
+import { createBrickCategory } from "../services/brickCategory.service";
 import { addLedgerEntry } from "../services/ledger.service";
 
 // This is a companion to seed.ts, run separately, for the modules built
@@ -318,20 +319,21 @@ async function main() {
       );
     }
 
-    const recentDispatches = await db.select().from(dispatches).where(eq(dispatches.kilnId, kilnId)).orderBy(desc(dispatches.dispatchedOn)).limit(20);
+    let seedCategories = await db.select().from(brickCategories).where(eq(brickCategories.kilnId, kilnId));
+    if (seedCategories.length === 0) {
+      const created = await createBrickCategory(kilnId, "A-1 Grade", 7, "A1");
+      seedCategories = [created];
+    }
 
     for (let d = 14; d >= 0; d--) {
       if (Math.random() < 0.55) continue;
       const driver = randChoice(drivers);
-      const linkedDispatch = Math.random() < 0.4 && recentDispatches.length > 0 ? randChoice(recentDispatches) : null;
       await createBrickLoadingEntry({
         kilnId,
         vehicleType: randChoice(["TRUCK", "TRACTOR"] as const),
         vehicleNumber: driver.vehicleNumber || `HR-46-B-${randInt(1000, 9999)}`,
-        driverId: driver._id,
-        bricksCount: linkedDispatch ? linkedDispatch.bricksCount : randInt(3000, 9000),
-        tipAmount: Math.random() < 0.3 ? randInt(100, 400) : 0,
-        dispatchId: linkedDispatch ? linkedDispatch._id : undefined,
+        categoryId: randChoice(seedCategories)._id,
+        bricksCount: randInt(3000, 9000),
         date: dateAtOffset(d),
       });
     }

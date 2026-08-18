@@ -89,7 +89,7 @@ async function generateInvoiceNumber(kilnId: string) {
 // actual driver error (the one carrying `.code`) on `.cause` — not on the
 // thrown error directly. Checked both places since that wrapping isn't
 // guaranteed across drizzle-orm versions.
-function isDuplicateEntryError(err: unknown): boolean {
+export function isDuplicateEntryError(err: unknown): boolean {
   const hasCode = (e: unknown): boolean => !!e && typeof e === "object" && (e as { code?: unknown }).code === "ER_DUP_ENTRY";
   return hasCode(err) || hasCode((err as { cause?: unknown } | undefined)?.cause);
 }
@@ -120,7 +120,7 @@ export interface CreateDispatchInput {
   dispatchedOn?: Date;
 }
 
-const MAX_NUMBER_GENERATION_ATTEMPTS = 5;
+export const MAX_NUMBER_GENERATION_ATTEMPTS = 5;
 
 // Every dispatch gets a slip number the moment it's created — the point
 // isn't gate hardware (out of scope here), it's that "no record, no

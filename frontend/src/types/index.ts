@@ -754,12 +754,16 @@ export type BrickVehicleType = "TRUCK" | "TRACTOR";
 
 export interface BrickLoadingEntry {
   _id: string;
+  tripNumber?: string;
   vehicleType: BrickVehicleType;
   vehicleNumber: string;
-  driverId: { _id: string; name: string; type: PersonType } | string;
+  driverId?: { _id: string; name: string; type: PersonType } | string;
   bricksCount: number;
-  tipAmount: number;
+  tipAmount?: number;
   loadingCharge?: number;
+  unloadingCharge?: number;
+  discountAmount?: number;
+  amount?: number;
   categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
   dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
   date: string;

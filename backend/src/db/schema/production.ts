@@ -147,12 +147,28 @@ export const BRICK_VEHICLE_TYPES = ["TRUCK", "TRACTOR"] as const;
 export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  // Plain, sequential per-kiln trip counter ("1", "2", ...) — same
+  // never-resets convention as dispatches.invoiceNumber. Nullable at the DB
+  // level only because rows created before this field existed have none;
+  // every row created going forward always gets one (see
+  // generateTripNumber/the retry loop in createBrickLoadingEntry).
+  tripNumber: varchar("tripNumber", { length: 64 }),
   vehicleType: varchar("vehicleType", { length: 50, enum: BRICK_VEHICLE_TYPES }).notNull(),
   vehicleNumber: varchar("vehicleNumber", { length: 255 }).notNull(),
-  driverId: varchar("driverId", { length: 64 }).notNull(),
+  // Optional — no longer collected on the Log Trip form (see
+  // brickLoading.service.ts), kept only so rows created before this change
+  // still resolve their driver for display/history.
+  driverId: varchar("driverId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
   tipAmount: double("tipAmount").default(0),
   loadingCharge: double("loadingCharge"),
+  unloadingCharge: double("unloadingCharge"),
+  discountAmount: double("discountAmount"),
+  // The trip's final billed figure — (category price × bricksCount −
+  // discount) + loadingCharge + unloadingCharge — computed and stored at
+  // create/edit time so it displays reliably even if the auto-linked
+  // Dispatch below failed or was never created (e.g. unpriced category).
+  amount: double("amount"),
   // Which brick category was loaded — drives the auto-created Dispatch's
   // amount (bricksCount * that category's pricePerBrick). See
   // brickLoading.service.ts.
@@ -161,7 +177,13 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
-}, (t) => ({ kilnDateIdx: index("brickloading_kiln_date_idx").on(t.kilnId, t.date) }));
+}, (t) => ({
+  kilnDateIdx: index("brickloading_kiln_date_idx").on(t.kilnId, t.date),
+  // Not violated by historical NULL tripNumbers — MySQL unique indexes
+  // allow multiple NULLs — only real, generated numbers are ever checked
+  // against each other.
+  kilnTripNumberUnique: uniqueIndex("brickloading_kiln_tripnumber_unique").on(t.kilnId, t.tripNumber),
+}));
 
 // Free-form, admin-defined — not a fixed vocabulary. The kiln can name
 // categories however it wants; the only constraint is no duplicate name

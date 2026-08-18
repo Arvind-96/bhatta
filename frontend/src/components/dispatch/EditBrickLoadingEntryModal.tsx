@@ -17,16 +17,24 @@ interface EditBrickLoadingEntryModalProps {
 
 // Full admin edit — changing tipAmount never silently rewrites what was
 // already posted to the driver's ledger; the backend posts a correction
-// entry for the difference instead (see brickLoading.service.ts).
+// entry for the difference instead (see brickLoading.service.ts). The Tip
+// field only shows for entries that already have a driver — new trips
+// (created after Driver/Tip were removed from the Log Trip form) have
+// none. Category can't be changed here (that would also need to move
+// stock between categories) — bricksCount/discount/loading/unloading edits
+// recompute the stored `amount` against the entry's existing category.
 export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBrickLoadingEntryModalProps) {
   const [vehicleType, setVehicleType] = useState<BrickVehicleType>(entry.vehicleType);
   const [vehicleNumber, setVehicleNumber] = useState(entry.vehicleNumber);
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
-  const [tipAmount, setTipAmount] = useState(String(entry.tipAmount ?? 0));
+  const [discountAmount, setDiscountAmount] = useState(String(entry.discountAmount ?? 0));
   const [loadingCharge, setLoadingCharge] = useState(String(entry.loadingCharge ?? 0));
+  const [unloadingCharge, setUnloadingCharge] = useState(String(entry.unloadingCharge ?? 0));
+  const [tipAmount, setTipAmount] = useState(String(entry.tipAmount ?? 0));
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
   const { t } = useTranslation();
+  const hasDriver = !!entry.driverId;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,8 +44,10 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
         vehicleType,
         vehicleNumber,
         bricksCount: Number(bricksCount),
-        tipAmount: tipAmount ? Number(tipAmount) : 0,
+        discountAmount: discountAmount ? Number(discountAmount) : 0,
         loadingCharge: loadingCharge ? Number(loadingCharge) : 0,
+        unloadingCharge: unloadingCharge ? Number(unloadingCharge) : 0,
+        ...(hasDriver ? { tipAmount: tipAmount ? Number(tipAmount) : 0 } : {}),
         notes: notes || undefined,
       });
       onSaved();
@@ -51,7 +61,10 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <Card className="w-full max-w-md">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink-primary">{t("brickLoading.editEntryTitle")}</h3>
+          <h3 className="text-sm font-semibold text-ink-primary">
+            {t("brickLoading.editEntryTitle")}
+            {entry.tripNumber && <span className="ml-1.5 font-normal text-ink-muted">#{entry.tripNumber}</span>}
+          </h3>
           <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
             <X className="h-4 w-4" />
           </button>
@@ -79,9 +92,9 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
           />
           <input
             type="number"
-            placeholder={t("brickLoading.tipPlaceholderShort")}
-            value={tipAmount}
-            onChange={(e) => setTipAmount(e.target.value)}
+            placeholder={t("brickLoading.discountPlaceholder")}
+            value={discountAmount}
+            onChange={(e) => setDiscountAmount(e.target.value)}
             className={inputClass}
           />
           <input
@@ -91,6 +104,22 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
             onChange={(e) => setLoadingCharge(e.target.value)}
             className={inputClass}
           />
+          <input
+            type="number"
+            placeholder={t("brickLoading.unloadingChargePlaceholder")}
+            value={unloadingCharge}
+            onChange={(e) => setUnloadingCharge(e.target.value)}
+            className={inputClass}
+          />
+          {hasDriver && (
+            <input
+              type="number"
+              placeholder={t("brickLoading.tipPlaceholderShort")}
+              value={tipAmount}
+              onChange={(e) => setTipAmount(e.target.value)}
+              className={inputClass}
+            />
+          )}
           <input
             placeholder={t("common.notes")}
             value={notes}
