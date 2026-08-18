@@ -211,79 +211,79 @@ export function BrickLoading() {
 
       {showForm && (
         <Card>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-            <input
-              required
-              type="number"
-              placeholder={t("brickLoading.bricksLoadedPlaceholder")}
-              value={form.bricksCount}
-              onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
-              className={inputClass}
-            />
-            <select
-              required
-              value={form.categoryId}
-              onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-              className={inputClass}
-            >
-              <option value="">{t("brickLoading.categoryPlaceholder")}</option>
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.grade ? `${c.category} (${c.grade})` : c.category}
-                </option>
-              ))}
-            </select>
-            <select
-              value={form.vehicleType}
-              onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value as BrickVehicleType }))}
-              className={inputClass}
-            >
-              <option value="TRUCK">{t("brickLoading.truck")}</option>
-              <option value="TRACTOR">{t("brickLoading.tractor")}</option>
-            </select>
-            <input
-              required
-              placeholder={t("brickLoading.vehicleNumber")}
-              value={form.vehicleNumber}
-              onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              placeholder={t("brickLoading.discountPlaceholder")}
-              value={form.discountAmount}
-              onChange={(e) => setForm((f) => ({ ...f, discountAmount: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              placeholder={t("brickLoading.loadingChargePlaceholder")}
-              value={form.loadingCharge}
-              onChange={(e) => setForm((f) => ({ ...f, loadingCharge: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              placeholder={t("brickLoading.unloadingChargePlaceholder")}
-              value={form.unloadingCharge}
-              onChange={(e) => setForm((f) => ({ ...f, unloadingCharge: e.target.value }))}
-              className={inputClass}
-            />
-            <label className="col-span-2 flex flex-col gap-1">
-              <span className="text-xs text-ink-muted">{t("brickLoading.amountLabel")}</span>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <input
-                readOnly
-                disabled
-                value={`₹${formatINR(Math.max(0, computedAmount))}`}
-                className={`${inputClass} cursor-not-allowed font-semibold text-ink-primary`}
+                required
+                type="number"
+                placeholder={t("brickLoading.bricksLoadedPlaceholder")}
+                value={form.bricksCount}
+                onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
+                className={inputClass}
               />
-            </label>
+              <select
+                required
+                value={form.categoryId}
+                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                className={inputClass}
+              >
+                <option value="">{t("brickLoading.categoryPlaceholder")}</option>
+                {categories.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.grade ? `${c.category} (${c.grade})` : c.category}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={form.vehicleType}
+                onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value as BrickVehicleType }))}
+                className={inputClass}
+              >
+                <option value="TRUCK">{t("brickLoading.truck")}</option>
+                <option value="TRACTOR">{t("brickLoading.tractor")}</option>
+              </select>
+              <input
+                required
+                placeholder={t("brickLoading.vehicleNumber")}
+                value={form.vehicleNumber}
+                onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
 
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                type="number"
+                placeholder={t("brickLoading.discountPlaceholder")}
+                value={form.discountAmount}
+                onChange={(e) => setForm((f) => ({ ...f, discountAmount: e.target.value }))}
+                className={inputClass}
+              />
+              <input
+                type="number"
+                placeholder={t("brickLoading.loadingChargePlaceholder")}
+                value={form.loadingCharge}
+                onChange={(e) => setForm((f) => ({ ...f, loadingCharge: e.target.value }))}
+                className={inputClass}
+              />
+              <input
+                type="number"
+                placeholder={t("brickLoading.unloadingChargePlaceholder")}
+                value={form.unloadingCharge}
+                onChange={(e) => setForm((f) => ({ ...f, unloadingCharge: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-3">
+              <span className="text-sm font-medium text-ink-secondary">{t("brickLoading.amountLabel")}</span>
+              <span className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(Math.max(0, computedAmount))}</span>
+            </div>
             {selectedCategory && form.bricksCount && netAfterDiscount <= 0 && discountForPreview > 0 && (
-              <p className="col-span-2 text-sm text-status-warning">{t("brickLoading.discountExceedsGrossWarning")}</p>
+              <p className="text-sm text-status-warning">{t("brickLoading.discountExceedsGrossWarning")}</p>
             )}
 
-            <Button type="submit" disabled={loading} className="col-span-2">
+            <Button type="submit" disabled={loading}>
               {t("brickLoading.saveEntry")}
             </Button>
           </form>
