@@ -85,8 +85,13 @@ async function generateInvoiceNumber(kilnId: string) {
 // retry loop relies on, since the count-then-insert above can no longer
 // assume synchronous, race-free execution the way it could under
 // better-sqlite3.
+// Drizzle wraps the real mysql2 error inside a DrizzleQueryError, with the
+// actual driver error (the one carrying `.code`) on `.cause` — not on the
+// thrown error directly. Checked both places since that wrapping isn't
+// guaranteed across drizzle-orm versions.
 function isDuplicateEntryError(err: unknown): boolean {
-  return !!err && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ER_DUP_ENTRY";
+  const hasCode = (e: unknown): boolean => !!e && typeof e === "object" && (e as { code?: unknown }).code === "ER_DUP_ENTRY";
+  return hasCode(err) || hasCode((err as { cause?: unknown } | undefined)?.cause);
 }
 
 export interface CreateDispatchInput {
