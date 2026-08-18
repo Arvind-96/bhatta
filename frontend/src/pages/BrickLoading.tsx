@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
@@ -120,6 +120,7 @@ export function BrickLoading() {
     notes: "",
   });
   const [loading, setLoading] = useState(false);
+  const [syncWarning, setSyncWarning] = useState(false);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
@@ -180,7 +181,7 @@ export function BrickLoading() {
     if (!form.vehicleNumber || !form.driverId || !form.bricksCount) return;
     setLoading(true);
     try {
-      await api.brickLoading.create({
+      const created = await api.brickLoading.create({
         vehicleType: form.vehicleType,
         vehicleNumber: form.vehicleNumber,
         driverId: form.driverId,
@@ -192,12 +193,19 @@ export function BrickLoading() {
         dispatchId: form.dispatchId || undefined,
         notes: form.notes || undefined,
       });
+      setSyncWarning(!!created.dispatchSyncFailed);
       setForm({ vehicleType: "TRUCK", vehicleNumber: "", driverId: "", bricksCount: "", tipAmount: "", loadingCharge: "", categoryId: "", discountAmount: "", dispatchId: "", notes: "" });
       setShowForm(false);
       await refresh();
     } finally {
       setLoading(false);
     }
+  }
+
+  async function deleteEntry(entry: BrickLoadingEntry) {
+    if (!confirm(t("brickLoading.confirmDeleteTrip", { vehicleNumber: entry.vehicleNumber }))) return;
+    await api.brickLoading.remove(entry._id);
+    await refresh();
   }
 
   const selectedCategory = categories.find((c) => c._id === form.categoryId);
@@ -211,6 +219,17 @@ export function BrickLoading() {
   return (
     <div className="space-y-4">
       <DriverSummarySection summary={driverSummary} onOpenLedger={openLedgerFor} onAddDriver={() => setShowAddDriver(true)} />
+
+      {syncWarning && (
+        <Card className="border-status-warning/40 bg-status-warning/5">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm text-status-warning">{t("brickLoading.dispatchSyncFailedWarning")}</p>
+            <button onClick={() => setSyncWarning(false)} className="shrink-0 text-xs font-medium text-ink-muted hover:text-ink-primary">
+              {t("common.dismiss")}
+            </button>
+          </div>
+        </Card>
+      )}
 
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setShowForm((s) => !s)}>
@@ -385,9 +404,20 @@ export function BrickLoading() {
                       {typeof entry.dispatchId === "object" && entry.dispatchId ? entry.dispatchId.slipNumber : "—"}
                     </td>
                     <td className="py-3 text-right">
-                      <button onClick={() => setEditingEntry(entry)} className="text-xs font-medium text-series-1 hover:underline">
-                        {t("common.edit")}
-                      </button>
+                      <div className="flex justify-end gap-3">
+                        <button
+                          onClick={() => setEditingEntry(entry)}
+                          className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                        </button>
+                        <button
+                          onClick={() => deleteEntry(entry)}
+                          className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   );

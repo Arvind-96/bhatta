@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
+import fs from "fs";
+import path from "path";
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
-import { db } from "../db/client";
+import { db, DATA_DIR } from "../db/client";
 import { people, ledgerEntries, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
@@ -48,6 +50,8 @@ export interface CreatePersonInput {
   khetLocation?: string;
   agreedDepthFeet?: number;
   creditLimit?: number;
+  nickname?: string;
+  joiningDate?: Date;
 }
 
 // Shared by every service that accepts a personId from client input
@@ -142,6 +146,63 @@ export async function updatePerson(kilnId: string, personId: string, input: Upda
   const person = (await db.select().from(people).where(eq(people._id, personId)))[0]!;
   emitToKiln(kilnId, "person:update", person);
   return person;
+}
+
+const PEOPLE_FILES_DIR = path.join(DATA_DIR, "people");
+
+function personFileDir(personId: string) {
+  return path.join(PEOPLE_FILES_DIR, personId);
+}
+
+// Re-upload always replaces — there's exactly one current photo/ID-proof
+// per person, not a history of them, so any previous file for this
+// personId+kind is removed first rather than accumulating orphaned files
+// under a new extension.
+async function replacePersonFile(
+  kilnId: string,
+  personId: string,
+  kind: "photo" | "identity-proof",
+  columnName: "photoPath" | "identityProofPath",
+  file: { buffer: Buffer; originalname: string }
+) {
+  const existing = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Person not found in this kiln");
+
+  const dir = personFileDir(personId);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const stale of fs.readdirSync(dir).filter((f) => f.startsWith(kind))) {
+    fs.unlinkSync(path.join(dir, stale));
+  }
+
+  const ext = path.extname(file.originalname) || ".bin";
+  const relativePath = path.join("people", personId, `${kind}${ext}`);
+  fs.writeFileSync(path.join(DATA_DIR, relativePath), file.buffer);
+
+  await db.update(people).set({ [columnName]: relativePath }).where(eq(people._id, personId));
+  const person = (await db.select().from(people).where(eq(people._id, personId)))[0]!;
+  emitToKiln(kilnId, "person:update", person);
+  return person;
+}
+
+export async function savePersonPhoto(kilnId: string, personId: string, file: { buffer: Buffer; originalname: string }) {
+  return replacePersonFile(kilnId, personId, "photo", "photoPath", file);
+}
+
+export async function savePersonIdentityProof(kilnId: string, personId: string, file: { buffer: Buffer; originalname: string }) {
+  return replacePersonFile(kilnId, personId, "identity-proof", "identityProofPath", file);
+}
+
+// Resolves a stored relative path (e.g. "people/<id>/photo.jpg") to an
+// absolute on-disk path for res.sendFile — re-checks the person exists in
+// THIS kiln first, same defensive pattern as every other kiln-scoped
+// lookup in this file, so one kiln can never fetch another's uploaded
+// files just by guessing a personId.
+export async function getPersonFilePath(kilnId: string, personId: string, column: "photoPath" | "identityProofPath") {
+  const person = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
+  if (!person) throw new Error("Person not found in this kiln");
+  const relativePath = person[column];
+  if (!relativePath) return null;
+  return path.join(DATA_DIR, relativePath);
 }
 
 // "Kis mazdoor/sardar ke paas kitna advance bacha hai" — a negative balance

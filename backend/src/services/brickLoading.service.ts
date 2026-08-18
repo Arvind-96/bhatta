@@ -4,7 +4,7 @@ import { db } from "../db/client";
 import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
-import { createDispatch } from "./dispatch.service";
+import { createDispatch, deleteDispatch } from "./dispatch.service";
 import { emitToKiln } from "../config/socket";
 
 export type BrickVehicleType = (typeof BRICK_VEHICLE_TYPES)[number];
@@ -104,6 +104,11 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
           entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)))[0]!;
         } catch (err) {
           console.error("[brickLoading] auto-dispatch creation failed, loading entry still saved:", err);
+          // Not persisted — just this one response — so the admin can see
+          // "trip saved, billing didn't auto-link" immediately instead of
+          // only finding out from a server log. The trip itself is still
+          // saved either way; this never blocks/undoes it.
+          return { ...entry, dispatchSyncFailed: true };
         }
       }
     }
@@ -175,6 +180,48 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
 
   emitToKiln(kilnId, "brickLoading:update", updated);
   return updated;
+}
+
+// Reverses everything createBrickLoadingEntry could have caused: the
+// driver-tip ledger DUE (reversed via a PAID correction, current
+// `tipAmount` value — same "reverse what's outstanding now" convention as
+// deleteDispatch), and the brickCategories.quantity deduction. That
+// deduction is restored in one of two ways depending on whether this trip
+// auto-linked a Dispatch:
+//   - linked (dispatchId set): deleteDispatch already restores
+//     brickCategories using the DISPATCH's own current
+//     categoryId/bricksCount (the authoritative "what's actually deducted"
+//     state, even if either side was independently edited since creation)
+//     and un-links + deletes the dispatch itself — this function must NOT
+//     also restore the category here, or the quantity would be double-credited.
+//   - unlinked (no dispatchId, e.g. the category had no price set): nothing
+//     else will restore it, so this function does it directly.
+export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
+  const existing = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Brick loading entry not found in this kiln");
+
+  if (existing.tipAmount && existing.tipAmount > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.driverId,
+      direction: "PAID",
+      amount: existing.tipAmount,
+      reason: `Loading trip deleted — reversing driver tip for ${existing.vehicleNumber}`,
+      category: "TIP",
+    });
+  }
+
+  if (existing.dispatchId) {
+    await deleteDispatch(kilnId, existing.dispatchId);
+  } else if (existing.categoryId) {
+    await db.update(brickCategories)
+      .set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` })
+      .where(eq(brickCategories._id, existing.categoryId));
+    emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)))[0]);
+  }
+
+  await db.delete(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId));
+  emitToKiln(kilnId, "brickLoading:update", { _id: entryId, deleted: true });
 }
 
 export interface ListBrickLoadingFilter {

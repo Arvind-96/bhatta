@@ -8,6 +8,13 @@
       "when": 1787047686257,
       "tag": "0000_strong_next_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1787062268108,
+      "tag": "0001_cool_purifiers",
+      "breakpoints": true
     }
   ]
 }

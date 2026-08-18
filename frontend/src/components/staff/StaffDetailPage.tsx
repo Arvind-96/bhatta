@@ -1,10 +1,13 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { LedgerModal } from "@/components/people/LedgerModal";
+import { PersonAvatar } from "@/components/people/PersonAvatar";
+import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
+import { ProfileViewField } from "@/components/people/ProfileViewField";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { LedgerEntry, Person } from "@/types";
 import { formatINR } from "@/lib/utils";
@@ -45,8 +48,12 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [idNumber, setIdNumber] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
 
   async function refresh() {
@@ -60,6 +67,8 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
     setPhone(detail.person.phone ?? "");
     setAddress(detail.person.address ?? "");
     setIdNumber(detail.person.idNumber ?? "");
+    setNickname(detail.person.nickname ?? "");
+    setJoiningDate(detail.person.joiningDate ? detail.person.joiningDate.slice(0, 10) : "");
   }
 
   useEffect(() => {
@@ -78,6 +87,8 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
         phone: phone || undefined,
         address: address || undefined,
         idNumber: idNumber || undefined,
+        nickname: nickname.trim() || undefined,
+        joiningDate: joiningDate || undefined,
       });
       await refresh();
     } finally {
@@ -96,6 +107,42 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
       await refresh();
     } finally {
       setSaving(false);
+    }
+  }
+
+  function cancelEditing() {
+    if (staff) {
+      setName(staff.name);
+      setPhone(staff.phone ?? "");
+      setAddress(staff.address ?? "");
+      setIdNumber(staff.idNumber ?? "");
+      setNickname(staff.nickname ?? "");
+      setJoiningDate(staff.joiningDate ? staff.joiningDate.slice(0, 10) : "");
+      setSalaryInput(staff.monthlySalary ? String(staff.monthlySalary) : "");
+      setDesignationInput(staff.designation ?? "");
+    }
+    setIsEditing(false);
+  }
+
+  async function handlePhotoChange(file: File | Blob | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadPhoto(staffId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function handleIdentityProofChange(file: File | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadIdentityProof(staffId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
     }
   }
 
@@ -141,70 +188,148 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
     <div>
       {backButton}
 
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-ink-primary">{staff.name}</h3>
-          <p className="text-sm text-ink-muted">
-            {staff.designation || personTypeMeta[staff.type].label}
-          </p>
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <PersonAvatar personId={staffId} hasPhoto={!!staff.photoPath} name={staff.name} />
+            <div>
+              <h3 className="text-lg font-semibold text-ink-primary">
+                {staff.name}
+                {staff.nickname && <span className="ml-1.5 font-normal text-ink-muted">"{staff.nickname}"</span>}
+              </h3>
+              <p className="text-sm text-ink-muted">{staff.designation || personTypeMeta[staff.type].label}</p>
+              {staff.joiningDate && (
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  {t("people.joiningDate")}: {new Date(staff.joiningDate).toLocaleDateString("en-IN")}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+              >
+                <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+              </button>
+            )}
+            <Button size="sm" onClick={() => setLedgerOpen(true)}>
+              {t("staff.advanceSalaryButton")}
+            </Button>
+            <button
+              onClick={deleteProfile}
+              className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => setLedgerOpen(true)}>
-            {t("staff.advanceSalaryButton")}
-          </Button>
-          <button
-            onClick={deleteProfile}
-            className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-          </button>
-        </div>
-      </div>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("staff.staffProfile")}</h4>
-          <form onSubmit={saveContactInfo} className="flex flex-col gap-2">
-            <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-            <input placeholder={t("common.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
-            <input placeholder={t("staff.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
-            <input
-              placeholder={t("staff.aadharIdNumber")}
-              value={idNumber}
-              onChange={(e) => setIdNumber(e.target.value)}
-              className={inputClass}
-            />
-            <Button type="submit" size="sm" disabled={savingProfile}>
-              {t("staff.saveProfile")}
-            </Button>
-          </form>
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("staff.staffProfile")}</h4>
+            {isEditing && (
+              <button onClick={cancelEditing} className="flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-ink-primary">
+                <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+              </button>
+            )}
+          </div>
+          {isEditing ? (
+            <form onSubmit={saveContactInfo} className="flex flex-col gap-2">
+              <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.nickname")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
+              <input placeholder={t("common.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+              <input placeholder={t("staff.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+              <input
+                placeholder={t("staff.aadharIdNumber")}
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value)}
+                className={inputClass}
+              />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
+                <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+              </label>
+              <Button type="submit" size="sm" disabled={savingProfile}>
+                {t("staff.saveProfile")}
+              </Button>
+            </form>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <ProfileViewField label={t("common.phone")} value={staff.phone} />
+              <ProfileViewField label={t("staff.aadharIdNumber")} value={staff.idNumber} />
+              <ProfileViewField label={t("staff.address")} value={staff.address} />
+            </div>
+          )}
         </Card>
 
         <Card>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("staff.designationSalary")}</h4>
-          <form onSubmit={saveProfile} className="flex flex-col gap-2">
-            <input
-              placeholder={t("staff.designationPlaceholder")}
-              value={designationInput}
-              onChange={(e) => setDesignationInput(e.target.value)}
-              className={inputClass}
-            />
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <label className="mb-1 block text-sm text-ink-muted">{t("staff.monthlySalary")}</label>
-                <input
-                  type="number"
-                  value={salaryInput}
-                  onChange={(e) => setSalaryInput(e.target.value)}
-                  placeholder={t("staff.salaryExample")}
-                  className={inputClass}
-                />
+          {isEditing ? (
+            <form onSubmit={saveProfile} className="flex flex-col gap-2">
+              <input
+                placeholder={t("staff.designationPlaceholder")}
+                value={designationInput}
+                onChange={(e) => setDesignationInput(e.target.value)}
+                className={inputClass}
+              />
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="mb-1 block text-sm text-ink-muted">{t("staff.monthlySalary")}</label>
+                  <input
+                    type="number"
+                    value={salaryInput}
+                    onChange={(e) => setSalaryInput(e.target.value)}
+                    placeholder={t("staff.salaryExample")}
+                    className={inputClass}
+                  />
+                </div>
+                <Button type="submit" size="sm" disabled={saving}>
+                  {t("common.save")}
+                </Button>
               </div>
-              <Button type="submit" size="sm" disabled={saving}>
-                {t("common.save")}
-              </Button>
+
+              <div className="mt-2 border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.photo")}</p>
+                <PhotoCaptureInput value={null} onChange={handlePhotoChange} />
+                {uploadingPhoto && <p className="mt-1 text-sm text-ink-muted">{t("common.saving")}</p>}
+              </div>
+              <div className="border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.identityProof")}</p>
+                <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-ink-muted hover:border-series-1/40 hover:text-series-1">
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleIdentityProofChange(e.target.files?.[0] ?? null)} />
+                  {staff.identityProofPath ? t("people.replaceIdentityProof") : t("people.uploadIdentityProofHint")}
+                </label>
+              </div>
+            </form>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <ProfileViewField
+                label={t("staff.monthlySalary")}
+                value={staff.monthlySalary ? `₹${formatINR(staff.monthlySalary)}/mo` : undefined}
+              />
+              <ProfileViewField
+                label={t("people.identityProof")}
+                value={
+                  staff.identityProofPath ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const blob = await api.people.fetchIdentityProofBlob(staffId);
+                        if (blob) window.open(URL.createObjectURL(blob), "_blank");
+                      }}
+                      className="text-series-1 hover:underline"
+                    >
+                      {t("common.view")}
+                    </button>
+                  ) : undefined
+                }
+              />
             </div>
-          </form>
+          )}
         </Card>
 
         <Card className="lg:col-span-2">

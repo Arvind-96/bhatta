@@ -137,6 +137,29 @@ const del = <T>(path: string, scoped = false) => request<T>(path, { method: "DEL
 const patch = <T>(path: string, body: unknown, scoped = false) =>
   request<T>(path, { method: "PATCH", body: JSON.stringify(body) }, scoped);
 
+// Multipart upload — deliberately bypasses `request()`'s JSON Content-Type
+// header (the browser sets its own multipart boundary header when given a
+// FormData body directly), otherwise identical auth/kiln-scoping behavior.
+async function postFile<T>(path: string, fieldName: string, file: File | Blob, scoped = true): Promise<T> {
+  const { token, activeKilnId } = useAuthStore.getState();
+  const formData = new FormData();
+  formData.append(fieldName, file, file instanceof File ? file.name : "capture.jpg");
+  const res = await fetch(`${API_URL}/api${path}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(scoped && activeKilnId ? { "X-Kiln-Id": activeKilnId } : {}),
+    },
+    body: formData,
+  });
+  if (res.status === 401) useAuthStore.getState().logout();
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Upload failed: ${path}`);
+  }
+  return res.json();
+}
+
 export interface AuthResponse {
   token: string;
   user: AuthUser;
@@ -162,7 +185,7 @@ export const api = {
   },
 
   dispatch: {
-    list: (days = 30) => get<Dispatch[]>(`/dispatch?days=${days}`, true),
+    list: (days?: number) => get<Dispatch[]>(`/dispatch${days ? `?days=${days}` : ""}`, true),
     create: (input: {
       customerName: string;
       customerId?: string;
@@ -263,6 +286,30 @@ export const api = {
     advances: () => get<OutstandingAdvance[]>("/people/advances", true),
     paymentsDue: () => get<PaymentDue[]>("/people/payments-due", true),
     creditAging: () => get<CustomerCreditAging[]>("/people/credit-aging", true),
+    uploadPhoto: (id: string, file: File | Blob) => postFile<Person>(`/people/${id}/photo`, "photo", file),
+    uploadIdentityProof: (id: string, file: File | Blob) => postFile<Person>(`/people/${id}/identity-proof`, "document", file),
+    // Photo/ID-proof routes are kiln-scoped and read the same auth/X-Kiln-Id
+    // headers as every other request — a plain <img src="..."> can't send
+    // those, so callers fetch the bytes through this (same header handling
+    // as `request()`) and turn them into an object URL themselves. Returns
+    // null on a 404 (nothing uploaded yet) rather than throwing, since "no
+    // photo" is an expected, common state, not an error.
+    fetchPhotoBlob: async (id: string): Promise<Blob | null> => {
+      const { token, activeKilnId } = useAuthStore.getState();
+      const res = await fetch(`${API_URL}/api/people/${id}/photo`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(activeKilnId ? { "X-Kiln-Id": activeKilnId } : {}) },
+      });
+      if (!res.ok) return null;
+      return res.blob();
+    },
+    fetchIdentityProofBlob: async (id: string): Promise<Blob | null> => {
+      const { token, activeKilnId } = useAuthStore.getState();
+      const res = await fetch(`${API_URL}/api/people/${id}/identity-proof`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(activeKilnId ? { "X-Kiln-Id": activeKilnId } : {}) },
+      });
+      if (!res.ok) return null;
+      return res.blob();
+    },
   },
 
   paymentReceipts: {
@@ -566,11 +613,12 @@ export const api = {
       discountAmount?: number;
       dispatchId?: string;
       notes?: string;
-    }) => post<BrickLoadingEntry>("/brick-loading", input, true),
+    }) => post<BrickLoadingEntry & { dispatchSyncFailed?: boolean }>("/brick-loading", input, true),
     update: (
       id: string,
       input: Partial<{ vehicleType: BrickVehicleType; vehicleNumber: string; bricksCount: number; tipAmount: number; loadingCharge: number; notes: string }>
     ) => patch<BrickLoadingEntry>(`/brick-loading/${id}`, input, true),
+    remove: (id: string) => del<void>(`/brick-loading/${id}`, true),
     driverSummary: () => get<BrickLoadingDriverSummary>("/brick-loading/driver-summary", true),
   },
 

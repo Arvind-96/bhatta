@@ -116,6 +116,10 @@ export interface Person {
   khetLocation?: string;
   agreedDepthFeet?: number;
   creditLimit?: number;
+  nickname?: string;
+  joiningDate?: string;
+  photoPath?: string;
+  identityProofPath?: string;
   active: boolean;
 }
 

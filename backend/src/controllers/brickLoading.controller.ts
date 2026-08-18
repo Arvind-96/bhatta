@@ -4,6 +4,7 @@ import { AuthedRequest } from "../middleware/auth.middleware";
 import {
   brickLoadingDriverSummary,
   createBrickLoadingEntry,
+  deleteBrickLoadingEntry,
   listBrickLoadingEntries,
   updateBrickLoadingEntry,
 } from "../services/brickLoading.service";
@@ -54,6 +55,11 @@ export async function update(req: AuthedRequest, res: Response) {
   const input = updateSchema.parse(req.body);
   const entry = await updateBrickLoadingEntry(req.kiln!.id, req.params.id, input);
   res.json(entry);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deleteBrickLoadingEntry(req.kiln!.id, req.params.id);
+  res.status(204).end();
 }
 
 export async function driverSummary(req: AuthedRequest, res: Response) {

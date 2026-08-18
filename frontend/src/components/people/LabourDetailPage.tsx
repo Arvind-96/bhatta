@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,9 @@ import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddWorkEntryModal } from "@/components/people/AddWorkEntryModal";
 import { EditWorkEntryModal } from "@/components/people/EditWorkEntryModal";
+import { PersonAvatar } from "@/components/people/PersonAvatar";
+import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
+import { ProfileViewField } from "@/components/people/ProfileViewField";
 import { useFamilyRelationLabels, usePersonTypeMeta, useWorkTypeLabels } from "@/components/people/personTypes";
 import type {
   FamilyForPerson,
@@ -59,8 +62,12 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
   const [age, setAge] = useState("");
   const [sex, setSex] = useState<"" | Sex>("");
   const [workType, setWorkType] = useState<"" | WorkType>("");
+  const [nickname, setNickname] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPay, setSavingPay] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [workEntries, setWorkEntries] = useState<WorkEntry[]>([]);
   const [showAddWork, setShowAddWork] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
@@ -109,6 +116,8 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
     setAge(detail.person.age ? String(detail.person.age) : "");
     setSex(detail.person.sex ?? "");
     setWorkType(detail.person.workType ?? "");
+    setNickname(detail.person.nickname ?? "");
+    setJoiningDate(detail.person.joiningDate ? detail.person.joiningDate.slice(0, 10) : "");
   }
 
   useEffect(() => {
@@ -186,10 +195,53 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
         sex: sex || undefined,
         workType: workType || undefined,
         contractorId: contractorId || undefined,
+        nickname: nickname.trim() || undefined,
+        joiningDate: joiningDate || undefined,
       });
       await refresh();
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  function cancelEditing() {
+    if (labour) {
+      setName(labour.name);
+      setPhone(labour.phone ?? "");
+      setAddress(labour.address ?? "");
+      setIdNumber(labour.idNumber ?? "");
+      setAge(labour.age ? String(labour.age) : "");
+      setSex(labour.sex ?? "");
+      setWorkType(labour.workType ?? "");
+      setContractorId(labour.contractorId ?? "");
+      setNickname(labour.nickname ?? "");
+      setJoiningDate(labour.joiningDate ? labour.joiningDate.slice(0, 10) : "");
+      setPayType(labour.payType ?? "");
+      setMonthlySalary(labour.monthlySalary ? String(labour.monthlySalary) : "");
+      setRatePerThousand(labour.ratePerThousand ? String(labour.ratePerThousand) : "");
+    }
+    setIsEditing(false);
+  }
+
+  async function handlePhotoChange(file: File | Blob | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadPhoto(labourId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function handleIdentityProofChange(file: File | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadIdentityProof(labourId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
     }
   }
 
@@ -260,119 +312,211 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
     <div>
       {backButton}
 
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-ink-primary">{labour.name}</h3>
-          <p className="text-sm text-ink-muted">
-            {t("people.labourType", { type: personTypeMeta[labour.type].label })}
-            {labour.workType ? ` · ${workTypeLabels[labour.workType]}` : ""}
-            {thekedar ? (
-              <>
-                {t("people.underThekedar")}
-                <button onClick={() => onOpenThekedar(thekedar._id)} className="text-series-1 hover:underline">
-                  {thekedar.name}
-                </button>
-              </>
-            ) : (
-              t("people.noThekedarAssigned")
-            )}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex gap-2">
-            <button
-              onClick={toggleAbsconded}
-              className="rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
-            >
-              {labour.status === "ABSCONDED" ? t("people.markActive") : t("people.markAbsconded")}
-            </button>
-            <button
-              onClick={deleteProfile}
-              className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-            </button>
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <PersonAvatar personId={labourId} hasPhoto={!!labour.photoPath} name={labour.name} />
+            <div>
+              <h3 className="text-lg font-semibold text-ink-primary">
+                {labour.name}
+                {labour.nickname && <span className="ml-1.5 font-normal text-ink-muted">"{labour.nickname}"</span>}
+              </h3>
+              <p className="text-sm text-ink-muted">
+                {t("people.labourType", { type: personTypeMeta[labour.type].label })}
+                {labour.workType ? ` · ${workTypeLabels[labour.workType]}` : ""}
+                {thekedar ? (
+                  <>
+                    {t("people.underThekedar")}
+                    <button onClick={() => onOpenThekedar(thekedar._id)} className="text-series-1 hover:underline">
+                      {thekedar.name}
+                    </button>
+                  </>
+                ) : (
+                  t("people.noThekedarAssigned")
+                )}
+              </p>
+              {labour.joiningDate && (
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  {t("people.joiningDate")}: {new Date(labour.joiningDate).toLocaleDateString("en-IN")}
+                </p>
+              )}
+            </div>
           </div>
-          <LedgerQuickActions person={labour} onSaved={refresh} />
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex gap-2">
+              {!isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                </button>
+              )}
+              <button
+                onClick={toggleAbsconded}
+                className="rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+              >
+                {labour.status === "ABSCONDED" ? t("people.markActive") : t("people.markAbsconded")}
+              </button>
+              <button
+                onClick={deleteProfile}
+                className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+              </button>
+            </div>
+            <LedgerQuickActions person={labour} onSaved={refresh} />
+          </div>
         </div>
-      </div>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.profile")}</h4>
-          <form onSubmit={saveProfile} className="flex flex-col gap-2">
-            <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-            <div className="grid grid-cols-2 gap-2">
-              <input type="number" min={0} placeholder={t("people.age")} value={age} onChange={(e) => setAge(e.target.value)} className={inputClass} />
-              <select value={sex} onChange={(e) => setSex(e.target.value as "" | Sex)} className={inputClass}>
-                <option value="">{t("people.sex")}</option>
-                <option value="MALE">{t("people.male")}</option>
-                <option value="FEMALE">{t("people.female")}</option>
-                <option value="OTHER">{t("people.other")}</option>
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.profile")}</h4>
+            {isEditing && (
+              <button onClick={cancelEditing} className="flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-ink-primary">
+                <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+              </button>
+            )}
+          </div>
+          {isEditing ? (
+            <form onSubmit={saveProfile} className="flex flex-col gap-2">
+              <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.nickname")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" min={0} placeholder={t("people.age")} value={age} onChange={(e) => setAge(e.target.value)} className={inputClass} />
+                <select value={sex} onChange={(e) => setSex(e.target.value as "" | Sex)} className={inputClass}>
+                  <option value="">{t("people.sex")}</option>
+                  <option value="MALE">{t("people.male")}</option>
+                  <option value="FEMALE">{t("people.female")}</option>
+                  <option value="OTHER">{t("people.other")}</option>
+                </select>
+              </div>
+              <input placeholder={t("people.mobileNumber")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+              <input
+                placeholder={t("people.aadharCardNumber")}
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value)}
+                className={inputClass}
+              />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
+                <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+              </label>
+              <select value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
+                <option value="">{t("people.workTypeNotSet")}</option>
+                {(Object.entries(workTypeLabels) as [WorkType, string][]).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
+              <select value={contractorId} onChange={(e) => setContractorId(e.target.value)} className={inputClass}>
+                <option value="">{t("people.noThekedarIndependent")}</option>
+                {thekedars.map((t) => (
+                  <option key={t._id} value={t._id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" size="sm" disabled={savingProfile}>
+                {t("people.saveProfile")}
+              </Button>
+            </form>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <ProfileViewField label={t("people.age")} value={labour.age} />
+              <ProfileViewField label={t("people.sex")} value={labour.sex} />
+              <ProfileViewField label={t("people.mobileNumber")} value={labour.phone} />
+              <ProfileViewField label={t("people.aadharCardNumber")} value={labour.idNumber} />
+              <ProfileViewField label={t("people.address")} value={labour.address} />
+              <ProfileViewField label={t("people.workTypeFieldLabel")} value={labour.workType ? workTypeLabels[labour.workType] : undefined} />
             </div>
-            <input placeholder={t("people.mobileNumber")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
-            <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
-            <input
-              placeholder={t("people.aadharCardNumber")}
-              value={idNumber}
-              onChange={(e) => setIdNumber(e.target.value)}
-              className={inputClass}
-            />
-            <select value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
-              <option value="">{t("people.workTypeNotSet")}</option>
-              {(Object.entries(workTypeLabels) as [WorkType, string][]).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <select value={contractorId} onChange={(e) => setContractorId(e.target.value)} className={inputClass}>
-              <option value="">{t("people.noThekedarIndependent")}</option>
-              {thekedars.map((t) => (
-                <option key={t._id} value={t._id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <Button type="submit" size="sm" disabled={savingProfile}>
-              {t("people.saveProfile")}
-            </Button>
-          </form>
+          )}
         </Card>
 
         <Card>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.payTypeAndRate")}</h4>
-          <form onSubmit={savePay} className="flex flex-col gap-2">
-            <select value={payType} onChange={(e) => setPayType(e.target.value as "" | PayType)} className={inputClass}>
-              <option value="">{t("people.payTypeNotSet")}</option>
-              <option value="MONTHLY">{t("people.monthlySalaryOption")}</option>
-              <option value="PER_THOUSAND">{t("people.perThousandBricks")}</option>
-            </select>
-            {payType === "PER_THOUSAND" ? (
-              <input
-                type="number"
-                placeholder={t("people.ratePerThousandPlaceholder")}
-                value={ratePerThousand}
-                onChange={(e) => setRatePerThousand(e.target.value)}
-                className={inputClass}
-              />
-            ) : (
-              <input
-                type="number"
-                placeholder={t("people.monthlySalaryPlaceholder")}
-                value={monthlySalary}
-                onChange={(e) => setMonthlySalary(e.target.value)}
-                className={inputClass}
-              />
-            )}
-            <Button type="submit" size="sm" disabled={savingPay}>
-              {t("people.savePayType")}
-            </Button>
-          </form>
-          <p className="mt-2 text-sm text-ink-muted">
-            {t("people.payTypeNote")}
-          </p>
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.payTypeAndRate")}</h4>
+          </div>
+          {isEditing ? (
+            <form onSubmit={savePay} className="flex flex-col gap-2">
+              <select value={payType} onChange={(e) => setPayType(e.target.value as "" | PayType)} className={inputClass}>
+                <option value="">{t("people.payTypeNotSet")}</option>
+                <option value="MONTHLY">{t("people.monthlySalaryOption")}</option>
+                <option value="PER_THOUSAND">{t("people.perThousandBricks")}</option>
+              </select>
+              {payType === "PER_THOUSAND" ? (
+                <input
+                  type="number"
+                  placeholder={t("people.ratePerThousandPlaceholder")}
+                  value={ratePerThousand}
+                  onChange={(e) => setRatePerThousand(e.target.value)}
+                  className={inputClass}
+                />
+              ) : (
+                <input
+                  type="number"
+                  placeholder={t("people.monthlySalaryPlaceholder")}
+                  value={monthlySalary}
+                  onChange={(e) => setMonthlySalary(e.target.value)}
+                  className={inputClass}
+                />
+              )}
+              <Button type="submit" size="sm" disabled={savingPay}>
+                {t("people.savePayType")}
+              </Button>
+              <p className="text-sm text-ink-muted">{t("people.payTypeNote")}</p>
+
+              <div className="mt-2 border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.photo")}</p>
+                <PhotoCaptureInput value={null} onChange={handlePhotoChange} />
+                {uploadingPhoto && <p className="mt-1 text-sm text-ink-muted">{t("common.saving")}</p>}
+              </div>
+              <div className="border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.identityProof")}</p>
+                <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-ink-muted hover:border-series-1/40 hover:text-series-1">
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleIdentityProofChange(e.target.files?.[0] ?? null)} />
+                  {labour.identityProofPath ? t("people.replaceIdentityProof") : t("people.uploadIdentityProofHint")}
+                </label>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <ProfileViewField
+                  label={t("people.payTypeAndRate")}
+                  value={
+                    labour.payType === "MONTHLY"
+                      ? t("people.ratePerMonth", { amount: formatINR(labour.monthlySalary ?? 0) })
+                      : labour.payType === "PER_THOUSAND"
+                      ? t("people.ratePerThousandBricks", { amount: formatINR(labour.ratePerThousand ?? 0) })
+                      : undefined
+                  }
+                />
+                <ProfileViewField
+                  label={t("people.identityProof")}
+                  value={
+                    labour.identityProofPath ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const blob = await api.people.fetchIdentityProofBlob(labourId);
+                          if (blob) window.open(URL.createObjectURL(blob), "_blank");
+                        }}
+                        className="text-series-1 hover:underline"
+                      >
+                        {t("common.view")}
+                      </button>
+                    ) : undefined
+                  }
+                />
+              </div>
+              <p className="text-sm text-ink-muted">{t("people.payTypeNote")}</p>
+            </div>
+          )}
         </Card>
 
         <Card className="lg:col-span-2">

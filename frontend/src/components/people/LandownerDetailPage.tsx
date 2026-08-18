@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -8,6 +8,9 @@ import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddSoilArrivalModal } from "@/components/soil/AddSoilArrivalModal";
 import { EditSoilArrivalModal } from "@/components/soil/EditSoilArrivalModal";
 import { rateBasisLabel } from "@/components/soil/ContractDetailPage";
+import { PersonAvatar } from "@/components/people/PersonAvatar";
+import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
+import { ProfileViewField } from "@/components/people/ProfileViewField";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { LedgerEntry, Person, SoilArrival, SoilContract } from "@/types";
 import { formatINR } from "@/lib/utils";
@@ -45,7 +48,11 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   const [khetAreaUnit, setKhetAreaUnit] = useState("bigha");
   const [khetLocation, setKhetLocation] = useState("");
   const [agreedDepthFeet, setAgreedDepthFeet] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [showAddArrival, setShowAddArrival] = useState(false);
   const [editingArrival, setEditingArrival] = useState<SoilArrival | null>(null);
@@ -72,6 +79,8 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     setKhetAreaUnit(detail.person.khetAreaUnit ?? "bigha");
     setKhetLocation(detail.person.khetLocation ?? "");
     setAgreedDepthFeet(detail.person.agreedDepthFeet ? String(detail.person.agreedDepthFeet) : "");
+    setNickname(detail.person.nickname ?? "");
+    setJoiningDate(detail.person.joiningDate ? detail.person.joiningDate.slice(0, 10) : "");
   }
 
   useEffect(() => {
@@ -96,10 +105,51 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
         khetAreaUnit: khetAreaUnit || undefined,
         khetLocation: khetLocation || undefined,
         agreedDepthFeet: agreedDepthFeet ? Number(agreedDepthFeet) : undefined,
+        nickname: nickname.trim() || undefined,
+        joiningDate: joiningDate || undefined,
       });
       await refresh();
+      setIsEditing(false);
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  function cancelEditing() {
+    if (landowner) {
+      setName(landowner.name);
+      setPhone(landowner.phone ?? "");
+      setAddress(landowner.address ?? "");
+      setIdNumber(landowner.idNumber ?? "");
+      setKhetArea(landowner.khetArea ? String(landowner.khetArea) : "");
+      setKhetAreaUnit(landowner.khetAreaUnit ?? "bigha");
+      setKhetLocation(landowner.khetLocation ?? "");
+      setAgreedDepthFeet(landowner.agreedDepthFeet ? String(landowner.agreedDepthFeet) : "");
+      setNickname(landowner.nickname ?? "");
+      setJoiningDate(landowner.joiningDate ? landowner.joiningDate.slice(0, 10) : "");
+    }
+    setIsEditing(false);
+  }
+
+  async function handlePhotoChange(file: File | Blob | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadPhoto(landownerId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function handleIdentityProofChange(file: File | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadIdentityProof(landownerId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
     }
   }
 
@@ -139,41 +189,116 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     <div>
       {backButton}
 
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-ink-primary">{landowner.name}</h3>
-          <p className="text-sm text-ink-muted">{t("people.fieldOwnerLabel")}{khetLocation ? ` · ${khetLocation}` : ""}</p>
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <PersonAvatar personId={landownerId} hasPhoto={!!landowner.photoPath} name={landowner.name} />
+            <div>
+              <h3 className="text-lg font-semibold text-ink-primary">
+                {landowner.name}
+                {landowner.nickname && <span className="ml-1.5 font-normal text-ink-muted">"{landowner.nickname}"</span>}
+              </h3>
+              <p className="text-sm text-ink-muted">{t("people.fieldOwnerLabel")}{khetLocation ? ` · ${khetLocation}` : ""}</p>
+              {landowner.joiningDate && (
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  {t("people.joiningDate")}: {new Date(landowner.joiningDate).toLocaleDateString("en-IN")}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+              >
+                <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+              </button>
+            )}
+            <Button size="sm" onClick={() => setLedgerOpen(true)}>
+              {t("people.advanceKharchi")}
+            </Button>
+          </div>
         </div>
-        <Button size="sm" onClick={() => setLedgerOpen(true)}>
-          {t("people.advanceKharchi")}
-        </Button>
-      </div>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.profile")}</h4>
-          <form onSubmit={saveProfile} className="flex flex-col gap-2">
-            <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-            <input placeholder={t("people.mobileNumber")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
-            <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
-            <input placeholder={t("people.aadharIdNumber")} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className={inputClass} />
-            <input placeholder={t("people.khetLocation")} value={khetLocation} onChange={(e) => setKhetLocation(e.target.value)} className={inputClass} />
-            <div className="grid grid-cols-2 gap-2">
-              <input type="number" min={0} placeholder={t("people.khetArea")} value={khetArea} onChange={(e) => setKhetArea(e.target.value)} className={inputClass} />
-              <input placeholder={t("people.unitBigha")} value={khetAreaUnit} onChange={(e) => setKhetAreaUnit(e.target.value)} className={inputClass} />
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.profile")}</h4>
+            {isEditing && (
+              <button onClick={cancelEditing} className="flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-ink-primary">
+                <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+              </button>
+            )}
+          </div>
+          {isEditing ? (
+            <form onSubmit={saveProfile} className="flex flex-col gap-2">
+              <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.nickname")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.mobileNumber")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.aadharIdNumber")} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.khetLocation")} value={khetLocation} onChange={(e) => setKhetLocation(e.target.value)} className={inputClass} />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" min={0} placeholder={t("people.khetArea")} value={khetArea} onChange={(e) => setKhetArea(e.target.value)} className={inputClass} />
+                <input placeholder={t("people.unitBigha")} value={khetAreaUnit} onChange={(e) => setKhetAreaUnit(e.target.value)} className={inputClass} />
+              </div>
+              <input
+                type="number"
+                min={0}
+                placeholder={t("people.agreedDigDepth")}
+                value={agreedDepthFeet}
+                onChange={(e) => setAgreedDepthFeet(e.target.value)}
+                className={inputClass}
+              />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
+                <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+              </label>
+              <Button type="submit" size="sm" disabled={savingProfile}>
+                {t("people.saveProfile")}
+              </Button>
+
+              <div className="mt-2 border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.photo")}</p>
+                <PhotoCaptureInput value={null} onChange={handlePhotoChange} />
+                {uploadingPhoto && <p className="mt-1 text-sm text-ink-muted">{t("common.saving")}</p>}
+              </div>
+              <div className="border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.identityProof")}</p>
+                <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-ink-muted hover:border-series-1/40 hover:text-series-1">
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleIdentityProofChange(e.target.files?.[0] ?? null)} />
+                  {landowner.identityProofPath ? t("people.replaceIdentityProof") : t("people.uploadIdentityProofHint")}
+                </label>
+              </div>
+            </form>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <ProfileViewField label={t("people.mobileNumber")} value={landowner.phone} />
+              <ProfileViewField label={t("people.aadharIdNumber")} value={landowner.idNumber} />
+              <ProfileViewField label={t("people.address")} value={landowner.address} />
+              <ProfileViewField label={t("people.khetArea")} value={landowner.khetArea ? `${landowner.khetArea} ${landowner.khetAreaUnit ?? "bigha"}` : undefined} />
+              <ProfileViewField label={t("people.agreedDigDepth")} value={landowner.agreedDepthFeet} />
+              <ProfileViewField
+                label={t("people.identityProof")}
+                value={
+                  landowner.identityProofPath ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const blob = await api.people.fetchIdentityProofBlob(landownerId);
+                        if (blob) window.open(URL.createObjectURL(blob), "_blank");
+                      }}
+                      className="text-series-1 hover:underline"
+                    >
+                      {t("common.view")}
+                    </button>
+                  ) : undefined
+                }
+              />
             </div>
-            <input
-              type="number"
-              min={0}
-              placeholder={t("people.agreedDigDepth")}
-              value={agreedDepthFeet}
-              onChange={(e) => setAgreedDepthFeet(e.target.value)}
-              className={inputClass}
-            />
-            <Button type="submit" size="sm" disabled={savingProfile}>
-              {t("people.saveProfile")}
-            </Button>
-          </form>
+          )}
         </Card>
 
         <Card>

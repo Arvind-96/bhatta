@@ -60,6 +60,17 @@ export const people = mysqlTable("people", {
   agreedDepthFeet: double("agreedDepthFeet"),
   creditLimit: double("creditLimit"),
   active: boolean("active").default(true),
+  // What everyone actually calls this person day-to-day — distinct from
+  // `name` (the formal/legal name used on ledgers, slips, and receipts).
+  nickname: varchar("nickname", { length: 255 }),
+  // Admin-set, no default — same shape as firingShiftAnchorDate above.
+  joiningDate: datetime("joiningDate", { mode: "date" }),
+  // Server-relative file paths under DATA_DIR/people/<personId>/ — see
+  // person.service.ts's savePersonPhoto/savePersonIdentityProof. Never
+  // served via a static mount; always through an explicit kiln-scoped
+  // GET route, same convention as salary.service.ts's PDF paths.
+  photoPath: varchar("photoPath", { length: 512 }),
+  identityProofPath: varchar("identityProofPath", { length: 512 }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnTypeIdx: index("people_kiln_type_idx").on(t.kilnId, t.type),

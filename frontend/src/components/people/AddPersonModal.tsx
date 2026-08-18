@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type { PayType, Person, PersonType, ShiftType, StackingStage, WorkType } from "@/types";
 import { usePersonTypeMeta, useWorkTypeLabels, PERSON_TYPES } from "./personTypes";
 import { useTranslation } from "@/hooks/useTranslation";
+import { PhotoCaptureInput } from "./PhotoCaptureInput";
 
 interface AddPersonModalProps {
   defaultType: PersonType;
@@ -58,6 +59,11 @@ export function AddPersonModal({
   const [isOfficeStaff, setIsOfficeStaff] = useState(defaultIsOfficeStaff ?? false);
   const [contractors, setContractors] = useState<Person[]>([]);
   const [loading, setLoading] = useState(false);
+  const [nickname, setNickname] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [photo, setPhoto] = useState<File | Blob | null>(null);
+  const [identityProof, setIdentityProof] = useState<File | null>(null);
+  const [uploadWarning, setUploadWarning] = useState("");
   const { t } = useTranslation();
   const personTypeMeta = usePersonTypeMeta();
   const workTypeLabels = useWorkTypeLabels();
@@ -74,7 +80,7 @@ export function AddPersonModal({
     if (!name.trim()) return;
     setLoading(true);
     try {
-      await api.people.create({
+      const person = await api.people.create({
         type,
         name: name.trim(),
         phone: phone || undefined,
@@ -118,9 +124,32 @@ export function AddPersonModal({
             ? designation
             : undefined,
         isOfficeStaff: (type === "HELPER" || type === "DRIVER") && isOfficeStaff ? true : undefined,
+        nickname: nickname.trim() || undefined,
+        joiningDate: joiningDate || undefined,
       });
+
+      let warning = "";
+      if (photo) {
+        try {
+          await api.people.uploadPhoto(person._id, photo);
+        } catch {
+          warning = t("people.photoUploadFailedAfterCreate", { name: person.name });
+        }
+      }
+      if (identityProof) {
+        try {
+          await api.people.uploadIdentityProof(person._id, identityProof);
+        } catch {
+          warning = t("people.identityProofUploadFailedAfterCreate", { name: person.name });
+        }
+      }
+
       onCreated();
-      onClose();
+      if (warning) {
+        setUploadWarning(warning);
+      } else {
+        onClose();
+      }
     } finally {
       setLoading(false);
     }
@@ -361,9 +390,44 @@ export function AddPersonModal({
             </>
           )}
 
-          <Button type="submit" disabled={loading} className="mt-1 w-full">
-            {t("common.add")}
-          </Button>
+          <div className="border-t border-border pt-3">
+            <div className="flex gap-2">
+              <input placeholder={t("people.nicknamePlaceholder")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
+              <input
+                type="date"
+                aria-label={t("people.joiningDate")}
+                value={joiningDate}
+                onChange={(e) => setJoiningDate(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                <p className="mb-1 text-xs text-ink-muted">{t("people.photoOptional")}</p>
+                <PhotoCaptureInput value={photo} onChange={setPhoto} />
+              </div>
+              <div>
+                <p className="mb-1 text-xs text-ink-muted">{t("people.identityProofOptional")}</p>
+                <label className="flex h-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border px-2 text-center text-sm text-ink-muted hover:border-series-1/40 hover:text-series-1">
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setIdentityProof(e.target.files?.[0] ?? null)} />
+                  <span>{identityProof ? identityProof.name : t("people.uploadIdentityProofHint")}</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {uploadWarning ? (
+            <div className="mt-1 flex flex-col gap-2 rounded-xl border border-status-warning/30 bg-status-warning/10 p-3">
+              <p className="text-sm text-status-warning">{uploadWarning}</p>
+              <Button type="button" onClick={onClose} className="w-full">
+                {t("common.close")}
+              </Button>
+            </div>
+          ) : (
+            <Button type="submit" disabled={loading} className="mt-1 w-full">
+              {t("common.add")}
+            </Button>
+          )}
         </form>
       </Card>
     </div>

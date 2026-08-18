@@ -487,10 +487,20 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
   emitToKiln(kilnId, "dispatch:update", { _id: dispatchId, deleted: true });
 }
 
-export async function listDispatches(kilnId: string, days = 30) {
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since))).orderBy(desc(dispatches.dispatchedOn));
+// `days` is optional and unbounded (all-time) when omitted — mirrors
+// listBrickLoadingEntries's own "only filter if a window was actually
+// requested" pattern. Previously defaulted to 30, which silently hid any
+// dispatch (including a Brick-Loading-linked one) older than a month from
+// the Dispatch/Billing/Gate-Pass pages, even though it was fully visible
+// and correctly linked on the Brick Loading page the whole time.
+export async function listDispatches(kilnId: string, days?: number) {
+  const conditions = [eq(dispatches.kilnId, kilnId)];
+  if (days) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    conditions.push(gte(dispatches.dispatchedOn, since));
+  }
+  const rows = await db.select().from(dispatches).where(and(...conditions)).orderBy(desc(dispatches.dispatchedOn));
 
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const customerIds = [...new Set(rows.map((r) => r.customerId).filter((v): v is string => !!v))];

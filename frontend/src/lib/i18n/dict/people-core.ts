@@ -4,6 +4,26 @@ import type { Locale } from "../translations";
 // AddThekedarModal, AddLabourModal, AddWorkEntryModal, EditWorkEntryModal,
 // EnrollFaceModal. Merged into the main dictionary by translations.ts.
 export const peopleCoreDict: Record<string, Record<Locale, string>> = {
+  // --- PhotoCaptureInput + new Add-modal fields (joining date, nickname, photo, ID proof) ---
+  "people.uploadPhoto": { en: "Upload", hi: "अपलोड करें" },
+  "people.takePhoto": { en: "Take photo", hi: "फ़ोटो लें" },
+  "people.clickToUploadPhoto": { en: "Click to upload a photo", hi: "फ़ोटो अपलोड करने के लिए क्लिक करें" },
+  "people.startingCamera": { en: "Starting camera…", hi: "कैमरा शुरू हो रहा है…" },
+  "people.cameraAccessFailed": { en: "Couldn't access the camera — check permissions, or upload a photo instead.", hi: "कैमरा एक्सेस नहीं हो सका — अनुमतियां जांचें, या इसके बजाय फ़ोटो अपलोड करें।" },
+  "people.capture": { en: "Capture", hi: "कैप्चर करें" },
+  "people.retake": { en: "Retake", hi: "फिर से लें" },
+  "people.photo": { en: "Photo", hi: "फ़ोटो" },
+  "people.photoOptional": { en: "Photo (optional)", hi: "फ़ोटो (वैकल्पिक)" },
+  "people.nickname": { en: "Nickname", hi: "उपनाम" },
+  "people.nicknamePlaceholder": { en: "What everyone calls them", hi: "जिस नाम से सब बुलाते हैं" },
+  "people.joiningDate": { en: "Joining date", hi: "शामिल होने की तारीख" },
+  "people.identityProof": { en: "Identity proof", hi: "पहचान प्रमाण" },
+  "people.identityProofOptional": { en: "Identity proof (optional)", hi: "पहचान प्रमाण (वैकल्पिक)" },
+  "people.uploadIdentityProofHint": { en: "Image or PDF", hi: "छवि या PDF" },
+  "people.replaceIdentityProof": { en: "Replace document", hi: "दस्तावेज़ बदलें" },
+  "people.photoUploadFailedAfterCreate": { en: "{name} was saved, but the photo didn't upload — try adding it again from their profile.", hi: "{name} सहेजा गया, लेकिन फ़ोटो अपलोड नहीं हुआ — कृपया उनकी प्रोफ़ाइल से फिर से जोड़ने का प्रयास करें।" },
+  "people.identityProofUploadFailedAfterCreate": { en: "{name} was saved, but the ID document didn't upload — try adding it again from their profile.", hi: "{name} सहेजा गया, लेकिन पहचान दस्तावेज़ अपलोड नहीं हुआ — कृपया उनकी प्रोफ़ाइल से फिर से जोड़ने का प्रयास करें।" },
+
   // --- pages/People.tsx ---
   "people.absconded": { en: "Absconded", hi: "फरार" },
   "people.ratePerThousandBricks": { en: "₹{amount}/1000 bricks", hi: "₹{amount}/1000 ईंट" },

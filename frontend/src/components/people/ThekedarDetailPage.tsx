@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -9,6 +9,9 @@ import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategor
 import { AddLabourModal } from "@/components/people/AddLabourModal";
 import { AddWorkEntryModal } from "@/components/people/AddWorkEntryModal";
 import { EditWorkEntryModal } from "@/components/people/EditWorkEntryModal";
+import { PersonAvatar } from "@/components/people/PersonAvatar";
+import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
+import { ProfileViewField } from "@/components/people/ProfileViewField";
 import type { LedgerEntry, PayType, Person, WorkEntry, WorkType } from "@/types";
 import { formatINR } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -43,8 +46,12 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
   const [address, setAddress] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [workType, setWorkType] = useState<"" | WorkType>("");
+  const [nickname, setNickname] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPay, setSavingPay] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [showAddLabour, setShowAddLabour] = useState(false);
   const [workEntries, setWorkEntries] = useState<WorkEntry[]>([]);
   const [showAddWork, setShowAddWork] = useState(false);
@@ -78,6 +85,8 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
     setAddress(detail.person.address ?? "");
     setIdNumber(detail.person.idNumber ?? "");
     setWorkType(detail.person.workType ?? "");
+    setNickname(detail.person.nickname ?? "");
+    setJoiningDate(detail.person.joiningDate ? detail.person.joiningDate.slice(0, 10) : "");
   }
 
   useEffect(() => {
@@ -98,10 +107,50 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
         address: address || undefined,
         idNumber: idNumber || undefined,
         workType: workType || undefined,
+        nickname: nickname.trim() || undefined,
+        joiningDate: joiningDate || undefined,
       });
       await refresh();
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  function cancelEditing() {
+    if (thekedar) {
+      setName(thekedar.name);
+      setPhone(thekedar.phone ?? "");
+      setAddress(thekedar.address ?? "");
+      setIdNumber(thekedar.idNumber ?? "");
+      setWorkType(thekedar.workType ?? "");
+      setNickname(thekedar.nickname ?? "");
+      setJoiningDate(thekedar.joiningDate ? thekedar.joiningDate.slice(0, 10) : "");
+      setPayType(thekedar.payType ?? "");
+      setMonthlySalary(thekedar.monthlySalary ? String(thekedar.monthlySalary) : "");
+      setCommissionPerThousand(thekedar.commissionPerThousand ? String(thekedar.commissionPerThousand) : "");
+    }
+    setIsEditing(false);
+  }
+
+  async function handlePhotoChange(file: File | Blob | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadPhoto(thekedarId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function handleIdentityProofChange(file: File | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadIdentityProof(thekedarId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
     }
   }
 
@@ -189,90 +238,177 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
     <div>
       {backButton}
 
-      <div className="mb-4 flex items-start justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-ink-primary">{thekedar.name}</h3>
-          <p className="text-sm text-ink-muted">
-            {t("people.thekedarLabel")}
-            {thekedar.workType ? ` · ${workTypeLabels[thekedar.workType]}` : ""}
-            {t("people.countLabour", { count: labourers.length })}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex gap-2">
-            <button
-              onClick={toggleAbsconded}
-              className="rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
-            >
-              {thekedar.status === "ABSCONDED" ? t("people.markActive") : t("people.markAbsconded")}
-            </button>
-            <button
-              onClick={deleteProfile}
-              className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-            </button>
+      <Card className="mb-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <PersonAvatar personId={thekedarId} hasPhoto={!!thekedar.photoPath} name={thekedar.name} />
+            <div>
+              <h3 className="text-lg font-semibold text-ink-primary">
+                {thekedar.name}
+                {thekedar.nickname && <span className="ml-1.5 font-normal text-ink-muted">"{thekedar.nickname}"</span>}
+              </h3>
+              <p className="text-sm text-ink-muted">
+                {t("people.thekedarLabel")}
+                {thekedar.workType ? ` · ${workTypeLabels[thekedar.workType]}` : ""}
+                {t("people.countLabour", { count: labourers.length })}
+              </p>
+              {thekedar.joiningDate && (
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  {t("people.joiningDate")}: {new Date(thekedar.joiningDate).toLocaleDateString("en-IN")}
+                </p>
+              )}
+            </div>
           </div>
-          <LedgerQuickActions person={thekedar} onSaved={refresh} />
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex gap-2">
+              {!isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                </button>
+              )}
+              <button
+                onClick={toggleAbsconded}
+                className="rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+              >
+                {thekedar.status === "ABSCONDED" ? t("people.markActive") : t("people.markAbsconded")}
+              </button>
+              <button
+                onClick={deleteProfile}
+                className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+              </button>
+            </div>
+            <LedgerQuickActions person={thekedar} onSaved={refresh} />
+          </div>
         </div>
-      </div>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.profile")}</h4>
-          <form onSubmit={saveProfile} className="flex flex-col gap-2">
-            <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-            <input placeholder={t("common.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
-            <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
-            <input
-              placeholder={t("people.aadharIdNumber")}
-              value={idNumber}
-              onChange={(e) => setIdNumber(e.target.value)}
-              className={inputClass}
-            />
-            <select value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
-              <option value="">{t("people.thekedarWorkTypeNotSet")}</option>
-              {(Object.entries(workTypeLabels) as [WorkType, string][]).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <Button type="submit" size="sm" disabled={savingProfile}>
-              {t("people.saveProfile")}
-            </Button>
-          </form>
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.profile")}</h4>
+            {isEditing && (
+              <button onClick={cancelEditing} className="flex items-center gap-1 text-xs font-medium text-ink-muted hover:text-ink-primary">
+                <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+              </button>
+            )}
+          </div>
+          {isEditing ? (
+            <form onSubmit={saveProfile} className="flex flex-col gap-2">
+              <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.nickname")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
+              <input placeholder={t("common.phone")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+              <input
+                placeholder={t("people.aadharIdNumber")}
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value)}
+                className={inputClass}
+              />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
+                <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+              </label>
+              <select value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
+                <option value="">{t("people.thekedarWorkTypeNotSet")}</option>
+                {(Object.entries(workTypeLabels) as [WorkType, string][]).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" size="sm" disabled={savingProfile}>
+                {t("people.saveProfile")}
+              </Button>
+            </form>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <ProfileViewField label={t("common.phone")} value={thekedar.phone} />
+              <ProfileViewField label={t("people.aadharIdNumber")} value={thekedar.idNumber} />
+              <ProfileViewField label={t("people.address")} value={thekedar.address} />
+              <ProfileViewField label={t("people.contractorWorkTypeLabel")} value={thekedar.workType ? workTypeLabels[thekedar.workType] : undefined} />
+            </div>
+          )}
         </Card>
 
         <Card>
           <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.payTypeAndRate")}</h4>
-          <form onSubmit={savePay} className="flex flex-col gap-2">
-            <select value={payType} onChange={(e) => setPayType(e.target.value as "" | PayType)} className={inputClass}>
-              <option value="">{t("people.payTypeNotSet")}</option>
-              <option value="MONTHLY">{t("people.monthlySalaryOption")}</option>
-              <option value="PER_THOUSAND">{t("people.perThousandBricksCommission")}</option>
-            </select>
-            {payType === "PER_THOUSAND" ? (
-              <input
-                type="number"
-                placeholder={t("people.commissionPerThousandPlaceholder")}
-                value={commissionPerThousand}
-                onChange={(e) => setCommissionPerThousand(e.target.value)}
-                className={inputClass}
+          {isEditing ? (
+            <form onSubmit={savePay} className="flex flex-col gap-2">
+              <select value={payType} onChange={(e) => setPayType(e.target.value as "" | PayType)} className={inputClass}>
+                <option value="">{t("people.payTypeNotSet")}</option>
+                <option value="MONTHLY">{t("people.monthlySalaryOption")}</option>
+                <option value="PER_THOUSAND">{t("people.perThousandBricksCommission")}</option>
+              </select>
+              {payType === "PER_THOUSAND" ? (
+                <input
+                  type="number"
+                  placeholder={t("people.commissionPerThousandPlaceholder")}
+                  value={commissionPerThousand}
+                  onChange={(e) => setCommissionPerThousand(e.target.value)}
+                  className={inputClass}
+                />
+              ) : (
+                <input
+                  type="number"
+                  placeholder={t("people.monthlySalaryPlaceholder")}
+                  value={monthlySalary}
+                  onChange={(e) => setMonthlySalary(e.target.value)}
+                  className={inputClass}
+                />
+              )}
+              <Button type="submit" size="sm" disabled={savingPay}>
+                {t("people.savePayType")}
+              </Button>
+
+              <div className="mt-2 border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.photo")}</p>
+                <PhotoCaptureInput value={null} onChange={handlePhotoChange} />
+                {uploadingPhoto && <p className="mt-1 text-sm text-ink-muted">{t("common.saving")}</p>}
+              </div>
+              <div className="border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.identityProof")}</p>
+                <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-ink-muted hover:border-series-1/40 hover:text-series-1">
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleIdentityProofChange(e.target.files?.[0] ?? null)} />
+                  {thekedar.identityProofPath ? t("people.replaceIdentityProof") : t("people.uploadIdentityProofHint")}
+                </label>
+              </div>
+            </form>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <ProfileViewField
+                label={t("people.payTypeAndRate")}
+                value={
+                  thekedar.payType === "MONTHLY"
+                    ? t("people.ratePerMonth", { amount: formatINR(thekedar.monthlySalary ?? 0) })
+                    : thekedar.payType === "PER_THOUSAND"
+                    ? t("people.ratePerThousandBricks", { amount: formatINR(thekedar.commissionPerThousand ?? 0) })
+                    : undefined
+                }
               />
-            ) : (
-              <input
-                type="number"
-                placeholder={t("people.monthlySalaryPlaceholder")}
-                value={monthlySalary}
-                onChange={(e) => setMonthlySalary(e.target.value)}
-                className={inputClass}
+              <ProfileViewField
+                label={t("people.identityProof")}
+                value={
+                  thekedar.identityProofPath ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const blob = await api.people.fetchIdentityProofBlob(thekedarId);
+                        if (blob) window.open(URL.createObjectURL(blob), "_blank");
+                      }}
+                      className="text-series-1 hover:underline"
+                    >
+                      {t("common.view")}
+                    </button>
+                  ) : undefined
+                }
               />
-            )}
-            <Button type="submit" size="sm" disabled={savingPay}>
-              {t("people.savePayType")}
-            </Button>
-          </form>
+            </div>
+          )}
         </Card>
 
         <Card className="lg:col-span-2">

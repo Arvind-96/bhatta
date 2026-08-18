@@ -4,15 +4,20 @@ import {
   advances,
   create,
   creditAging,
+  getIdentityProof,
   getOne,
+  getPhoto,
   list,
   listLedger,
   paymentsDue,
   report,
   update,
+  uploadIdentityProof as uploadIdentityProofHandler,
+  uploadPhoto as uploadPhotoHandler,
 } from "../controllers/person.controller";
 import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { uploadPhoto, uploadIdentityProof } from "../middleware/upload.middleware";
 
 export const personRouter = Router();
 
@@ -27,3 +32,7 @@ personRouter.patch("/:id", asyncHandler(update));
 personRouter.post("/:id/ledger", asyncHandler(addLedger));
 personRouter.get("/:id/ledger", asyncHandler(listLedger));
 personRouter.get("/:id/report", asyncHandler(report));
+personRouter.post("/:id/photo", uploadPhoto, asyncHandler(uploadPhotoHandler));
+personRouter.get("/:id/photo", asyncHandler(getPhoto));
+personRouter.post("/:id/identity-proof", uploadIdentityProof, asyncHandler(uploadIdentityProofHandler));
+personRouter.get("/:id/identity-proof", asyncHandler(getIdentityProof));

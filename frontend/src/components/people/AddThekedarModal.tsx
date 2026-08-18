@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type { PayType, WorkType } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useWorkTypeLabels } from "./personTypes";
+import { PhotoCaptureInput } from "./PhotoCaptureInput";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-border bg-ink-primary/5 px-3.5 text-sm text-ink-primary outline-none transition-shadow focus:ring-2 focus:ring-series-1";
@@ -41,6 +42,11 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
   const [commissionPerThousand, setCommissionPerThousand] = useState("");
   const [workType, setWorkType] = useState<"" | WorkType>("");
   const [loading, setLoading] = useState(false);
+  const [nickname, setNickname] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [photo, setPhoto] = useState<File | Blob | null>(null);
+  const [identityProof, setIdentityProof] = useState<File | null>(null);
+  const [uploadWarning, setUploadWarning] = useState("");
   const { t } = useTranslation();
   const workTypeLabels = useWorkTypeLabels();
 
@@ -49,7 +55,7 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
     if (!name.trim()) return;
     setLoading(true);
     try {
-      await api.people.create({
+      const person = await api.people.create({
         type: "LABOUR_CONTRACTOR",
         name: name.trim(),
         phone: phone || undefined,
@@ -59,9 +65,32 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
         monthlySalary: payType === "MONTHLY" && monthlySalary ? Number(monthlySalary) : undefined,
         commissionPerThousand: payType === "PER_THOUSAND" && commissionPerThousand ? Number(commissionPerThousand) : undefined,
         workType: workType || undefined,
+        nickname: nickname.trim() || undefined,
+        joiningDate: joiningDate || undefined,
       });
+
+      let warning = "";
+      if (photo) {
+        try {
+          await api.people.uploadPhoto(person._id, photo);
+        } catch {
+          warning = t("people.photoUploadFailedAfterCreate", { name: person.name });
+        }
+      }
+      if (identityProof) {
+        try {
+          await api.people.uploadIdentityProof(person._id, identityProof);
+        } catch {
+          warning = t("people.identityProofUploadFailedAfterCreate", { name: person.name });
+        }
+      }
+
       onCreated();
-      onClose();
+      if (warning) {
+        setUploadWarning(warning);
+      } else {
+        onClose();
+      }
     } finally {
       setLoading(false);
     }
@@ -144,9 +173,40 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
             </select>
           </Field>
 
-          <Button type="submit" disabled={loading} className="mt-2 w-full">
-            {t("people.addThekedarModalTitle")}
-          </Button>
+          <div className="mt-1 border-t border-border pt-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t("people.nickname")}>
+                <input placeholder={t("people.nicknamePlaceholder")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
+              </Field>
+              <Field label={t("people.joiningDate")}>
+                <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+              </Field>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Field label={t("people.photoOptional")}>
+                <PhotoCaptureInput value={photo} onChange={setPhoto} />
+              </Field>
+              <Field label={t("people.identityProofOptional")}>
+                <label className="flex h-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border px-2 text-center text-sm text-ink-muted hover:border-series-1/40 hover:text-series-1">
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setIdentityProof(e.target.files?.[0] ?? null)} />
+                  <span>{identityProof ? identityProof.name : t("people.uploadIdentityProofHint")}</span>
+                </label>
+              </Field>
+            </div>
+          </div>
+
+          {uploadWarning ? (
+            <div className="mt-2 flex flex-col gap-2 rounded-xl border border-status-warning/30 bg-status-warning/10 p-3">
+              <p className="text-sm text-status-warning">{uploadWarning}</p>
+              <Button type="button" onClick={onClose} className="w-full">
+                {t("common.close")}
+              </Button>
+            </div>
+          ) : (
+            <Button type="submit" disabled={loading} className="mt-2 w-full">
+              {t("people.addThekedarModalTitle")}
+            </Button>
+          )}
         </form>
       </Card>
     </div>

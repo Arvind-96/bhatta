@@ -4,10 +4,13 @@ import { AuthedRequest } from "../middleware/auth.middleware";
 import {
   createPerson,
   customerCreditAging,
+  getPersonFilePath,
   getPersonWithBalance,
   listOutstandingAdvances,
   listPaymentsDue,
   listPeople,
+  savePersonIdentityProof,
+  savePersonPhoto,
   updatePerson,
 } from "../services/person.service";
 import { addLedgerEntry, listLedgerForPerson } from "../services/ledger.service";
@@ -63,6 +66,8 @@ const createSchema = z.object({
   khetLocation: z.string().optional(),
   agreedDepthFeet: z.number().optional(),
   creditLimit: z.number().optional(),
+  nickname: z.string().optional(),
+  joiningDate: z.string().optional(),
 });
 
 const updateSchema = createSchema.partial().extend({ active: z.boolean().optional() });
@@ -86,6 +91,7 @@ export async function create(req: AuthedRequest, res: Response) {
     ...input,
     kilnId: req.kiln!.id,
     firingShiftAnchorDate: input.firingShiftAnchorDate ? new Date(input.firingShiftAnchorDate) : undefined,
+    joiningDate: input.joiningDate ? new Date(input.joiningDate) : undefined,
   });
   res.status(201).json(person);
 }
@@ -121,8 +127,33 @@ export async function update(req: AuthedRequest, res: Response) {
   const person = await updatePerson(req.kiln!.id, req.params.id, {
     ...input,
     firingShiftAnchorDate: input.firingShiftAnchorDate ? new Date(input.firingShiftAnchorDate) : undefined,
+    joiningDate: input.joiningDate ? new Date(input.joiningDate) : undefined,
   });
   res.json(person);
+}
+
+export async function uploadPhoto(req: AuthedRequest & { file?: Express.Multer.File }, res: Response) {
+  if (!req.file) return res.status(400).json({ error: "No photo file uploaded" });
+  const person = await savePersonPhoto(req.kiln!.id, req.params.id, { buffer: req.file.buffer, originalname: req.file.originalname });
+  res.json(person);
+}
+
+export async function uploadIdentityProof(req: AuthedRequest & { file?: Express.Multer.File }, res: Response) {
+  if (!req.file) return res.status(400).json({ error: "No document file uploaded" });
+  const person = await savePersonIdentityProof(req.kiln!.id, req.params.id, { buffer: req.file.buffer, originalname: req.file.originalname });
+  res.json(person);
+}
+
+export async function getPhoto(req: AuthedRequest, res: Response) {
+  const filePath = await getPersonFilePath(req.kiln!.id, req.params.id, "photoPath");
+  if (!filePath) return res.status(404).json({ error: "No photo uploaded for this person" });
+  res.sendFile(filePath);
+}
+
+export async function getIdentityProof(req: AuthedRequest, res: Response) {
+  const filePath = await getPersonFilePath(req.kiln!.id, req.params.id, "identityProofPath");
+  if (!filePath) return res.status(404).json({ error: "No identity proof uploaded for this person" });
+  res.sendFile(filePath);
 }
 
 export async function addLedger(req: AuthedRequest, res: Response) {

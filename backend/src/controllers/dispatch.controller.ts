@@ -100,7 +100,7 @@ export async function create(req: AuthedRequest, res: Response) {
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const days = req.query.days ? Number(req.query.days) : 30;
+  const days = req.query.days ? Number(req.query.days) : undefined;
   const dispatches = await listDispatches(req.kiln!.id, days);
   res.json(dispatches);
 }
