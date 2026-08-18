@@ -14,8 +14,8 @@ export interface CreateInventoryItemInput {
 
 export async function createInventoryItem(input: CreateInventoryItemInput) {
   const _id = randomUUID();
-  db.insert(inventoryItems).values({ ...input, _id }).run();
-  const item = db.select().from(inventoryItems).where(eq(inventoryItems._id, _id)).get()!;
+  await db.insert(inventoryItems).values({ ...input, _id });
+  const item = (await db.select().from(inventoryItems).where(eq(inventoryItems._id, _id)))[0]!;
   emitToKiln(input.kilnId, "inventory:update", item);
   return item;
 }
@@ -26,13 +26,12 @@ export async function createInventoryItem(input: CreateInventoryItemInput) {
 // remaining so the admin sees both "left" and "used" on the same screen,
 // not just the live balance.
 export async function listInventoryItems(kilnId: string) {
-  const items = await db.select().from(inventoryItems).where(eq(inventoryItems.kilnId, kilnId)).orderBy(asc(inventoryItems.name)).all();
+  const items = await db.select().from(inventoryItems).where(eq(inventoryItems.kilnId, kilnId)).orderBy(asc(inventoryItems.name));
   const usedRows = await db
     .select({ itemId: suppliedItems.itemId, used: sql<number>`sum(${suppliedItems.quantity})` })
     .from(suppliedItems)
     .where(eq(suppliedItems.kilnId, kilnId))
-    .groupBy(suppliedItems.itemId)
-    .all();
+    .groupBy(suppliedItems.itemId);
   const usedByItemId = new Map(usedRows.map((r) => [r.itemId, r.used]));
   return items.map((item) => ({ ...item, usedQuantity: usedByItemId.get(item._id) ?? 0 }));
 }
@@ -45,18 +44,18 @@ export interface UpdateInventoryItemInput {
 }
 
 export async function updateInventoryItem(kilnId: string, itemId: string, input: UpdateInventoryItemInput) {
-  const existing = db.select().from(inventoryItems).where(and(eq(inventoryItems._id, itemId), eq(inventoryItems.kilnId, kilnId))).get();
+  const existing = (await db.select().from(inventoryItems).where(and(eq(inventoryItems._id, itemId), eq(inventoryItems.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Inventory item not found in this kiln");
-  db.update(inventoryItems).set(input).where(eq(inventoryItems._id, itemId)).run();
-  const updated = db.select().from(inventoryItems).where(eq(inventoryItems._id, itemId)).get()!;
+  await db.update(inventoryItems).set(input).where(eq(inventoryItems._id, itemId));
+  const updated = (await db.select().from(inventoryItems).where(eq(inventoryItems._id, itemId)))[0]!;
   emitToKiln(kilnId, "inventory:update", updated);
   return updated;
 }
 
 export async function deleteInventoryItem(kilnId: string, itemId: string) {
-  const existing = db.select().from(inventoryItems).where(and(eq(inventoryItems._id, itemId), eq(inventoryItems.kilnId, kilnId))).get();
+  const existing = (await db.select().from(inventoryItems).where(and(eq(inventoryItems._id, itemId), eq(inventoryItems.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Inventory item not found in this kiln");
-  db.delete(inventoryItems).where(eq(inventoryItems._id, itemId)).run();
+  await db.delete(inventoryItems).where(eq(inventoryItems._id, itemId));
   emitToKiln(kilnId, "inventory:update", { _id: itemId, deleted: true });
   return existing;
 }
@@ -66,10 +65,10 @@ export async function deleteInventoryItem(kilnId: string, itemId: string) {
 // via the UI, never blocked) same as every other "did we overcommit"
 // check in this app (contract overruns, loading count mismatches, etc.).
 export async function adjustInventoryQuantity(kilnId: string, itemId: string, delta: number) {
-  const existing = db.select().from(inventoryItems).where(and(eq(inventoryItems._id, itemId), eq(inventoryItems.kilnId, kilnId))).get();
+  const existing = (await db.select().from(inventoryItems).where(and(eq(inventoryItems._id, itemId), eq(inventoryItems.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Inventory item not found in this kiln");
-  db.update(inventoryItems).set({ quantity: sql`${inventoryItems.quantity} + ${delta}` }).where(eq(inventoryItems._id, itemId)).run();
-  const updated = db.select().from(inventoryItems).where(eq(inventoryItems._id, itemId)).get()!;
+  await db.update(inventoryItems).set({ quantity: sql`${inventoryItems.quantity} + ${delta}` }).where(eq(inventoryItems._id, itemId));
+  const updated = (await db.select().from(inventoryItems).where(eq(inventoryItems._id, itemId)))[0]!;
   emitToKiln(kilnId, "inventory:update", updated);
   return updated;
 }

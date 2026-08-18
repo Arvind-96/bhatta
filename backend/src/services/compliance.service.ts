@@ -19,14 +19,14 @@ export interface CreateComplianceDocInput {
 
 export async function createComplianceDocument(input: CreateComplianceDocInput) {
   const _id = randomUUID();
-  db.insert(complianceDocuments).values({ ...input, _id }).run();
-  const doc = db.select().from(complianceDocuments).where(eq(complianceDocuments._id, _id)).get()!;
+  await db.insert(complianceDocuments).values({ ...input, _id });
+  const doc = (await db.select().from(complianceDocuments).where(eq(complianceDocuments._id, _id)))[0]!;
   emitToKiln(input.kilnId, "compliance:update", doc);
   return doc;
 }
 
 export async function listComplianceDocuments(kilnId: string) {
-  return db.select().from(complianceDocuments).where(eq(complianceDocuments.kilnId, kilnId)).orderBy(asc(complianceDocuments.expiryDate)).all();
+  return await db.select().from(complianceDocuments).where(eq(complianceDocuments.kilnId, kilnId)).orderBy(asc(complianceDocuments.expiryDate));
 }
 
 // Surfaced as a dashboard warning — a lapsed PCB consent or royalty
@@ -36,7 +36,7 @@ export async function listExpiringSoon(kilnId: string, withinDays = EXPIRY_WARNI
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() + withinDays);
 
-  const docs = await db.select().from(complianceDocuments).where(and(eq(complianceDocuments.kilnId, kilnId), lte(complianceDocuments.expiryDate, cutoff))).orderBy(asc(complianceDocuments.expiryDate)).all();
+  const docs = await db.select().from(complianceDocuments).where(and(eq(complianceDocuments.kilnId, kilnId), lte(complianceDocuments.expiryDate, cutoff))).orderBy(asc(complianceDocuments.expiryDate));
   return docs.map((doc) => ({
     ...doc,
     expired: doc.expiryDate!.getTime() < Date.now(),

@@ -19,8 +19,8 @@ export async function createFuelLog(input: CreateFuelLogInput) {
   await assertGherInKiln(input.kilnId, input.gherId);
   await assertFuelTypeExists(input.kilnId, input.fuelType);
   const _id = randomUUID();
-  db.insert(fuelLogs).values({ ...input, _id }).run();
-  const log = db.select().from(fuelLogs).where(eq(fuelLogs._id, _id)).get()!;
+  await db.insert(fuelLogs).values({ ...input, _id });
+  const log = (await db.select().from(fuelLogs).where(eq(fuelLogs._id, _id)))[0]!;
   emitToKiln(input.kilnId, "fuelLog:update", log);
   return log;
 }
@@ -28,16 +28,16 @@ export async function createFuelLog(input: CreateFuelLogInput) {
 export async function listFuelLogs(kilnId: string, days = 14) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, since))).orderBy(desc(fuelLogs.date)).all();
+  const rows = await db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, since))).orderBy(desc(fuelLogs.date));
 
   const gherIds = [...new Set(rows.map((r) => r.gherId))];
-  const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)).all() : [];
+  const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)) : [];
   const gherById = new Map(gherRows.map((g) => [g._id, g]));
   return rows.map((r) => ({ ...r, gherId: gherById.get(r.gherId) ?? r.gherId }));
 }
 
 export async function totalFuelConsumed(kilnId: string, since: Date) {
-  const logs = await db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, since))).all();
+  const logs = await db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, since)));
   return logs.reduce((sum, l) => sum + l.quantityKg, 0);
 }
 
@@ -55,10 +55,10 @@ export async function fuelLogPeriodTotals(kilnId: string) {
   yearAgo.setFullYear(yearAgo.getFullYear() - 1);
 
   const [today, week, month, year] = await Promise.all([
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, startOfDay))).all(),
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, weekAgo))).all(),
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, monthAgo))).all(),
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, yearAgo))).all(),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, startOfDay))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, weekAgo))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, monthAgo))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, yearAgo))),
   ]);
 
   function byFuelType(logs: typeof today) {

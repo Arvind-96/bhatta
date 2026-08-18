@@ -27,32 +27,30 @@ export async function createProductionLog(input: CreateProductionInput) {
   let wasCreated: boolean;
 
   const existing = input.localId
-    ? db.select().from(productionLogs).where(eq(productionLogs.localId, input.localId)).get()
+    ? (await db.select().from(productionLogs).where(eq(productionLogs.localId, input.localId)))[0]
     : undefined;
 
   if (existing) {
-    db.update(productionLogs)
+    await db
+      .update(productionLogs)
       .set({ bricksCount: input.bricksCount, qualityGrade: input.qualityGrade ?? "A", version: (existing.version ?? 1) + 1 })
-      .where(eq(productionLogs._id, existing._id))
-      .run();
-    log = db.select().from(productionLogs).where(eq(productionLogs._id, existing._id)).get()!;
+      .where(eq(productionLogs._id, existing._id));
+    log = (await db.select().from(productionLogs).where(eq(productionLogs._id, existing._id)))[0]!;
     wasCreated = false;
   } else {
     const _id = randomUUID();
-    db.insert(productionLogs)
-      .values({
-        _id,
-        kilnId: input.kilnId,
-        batchNumber: input.batchNumber,
-        bricksCount: input.bricksCount,
-        qualityGrade: input.qualityGrade ?? "A",
-        thekedarId: input.thekedarId,
-        producedOn: input.producedOn ?? new Date(),
-        localId: input.localId,
-        version: 1,
-      })
-      .run();
-    log = db.select().from(productionLogs).where(eq(productionLogs._id, _id)).get()!;
+    await db.insert(productionLogs).values({
+      _id,
+      kilnId: input.kilnId,
+      batchNumber: input.batchNumber,
+      bricksCount: input.bricksCount,
+      qualityGrade: input.qualityGrade ?? "A",
+      thekedarId: input.thekedarId,
+      producedOn: input.producedOn ?? new Date(),
+      localId: input.localId,
+      version: 1,
+    });
+    log = (await db.select().from(productionLogs).where(eq(productionLogs._id, _id)))[0]!;
     wasCreated = true;
   }
 
@@ -80,14 +78,14 @@ export async function getTodayProduction(kilnId: string) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  return db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), gte(productionLogs.producedOn, startOfDay))).orderBy(desc(productionLogs.producedOn)).all();
+  return await db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), gte(productionLogs.producedOn, startOfDay))).orderBy(desc(productionLogs.producedOn));
 }
 
 export async function getProductionSeries(kilnId: string, days = 14) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const logs = await db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), gte(productionLogs.producedOn, since))).orderBy(asc(productionLogs.producedOn)).all();
+  const logs = await db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), gte(productionLogs.producedOn, since))).orderBy(asc(productionLogs.producedOn));
 
   const byDay = new Map<string, number>();
   for (const log of logs) {

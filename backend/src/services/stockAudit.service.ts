@@ -23,8 +23,8 @@ export async function createStockAudit(input: CreateStockAuditInput) {
   const variance = input.physicalCount - registerCount;
 
   const _id = randomUUID();
-  db.insert(stockAudits).values({ ...input, _id, registerCount, variance }).run();
-  const audit = db.select().from(stockAudits).where(eq(stockAudits._id, _id)).get()!;
+  await db.insert(stockAudits).values({ ...input, _id, registerCount, variance });
+  const audit = (await db.select().from(stockAudits).where(eq(stockAudits._id, _id)))[0]!;
   emitToKiln(input.kilnId, "stockAudit:update", audit);
   return audit;
 }
@@ -32,5 +32,5 @@ export async function createStockAudit(input: CreateStockAuditInput) {
 export async function listStockAudits(kilnId: string, days = 365) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  return db.select().from(stockAudits).where(and(eq(stockAudits.kilnId, kilnId), gte(stockAudits.date, since))).orderBy(desc(stockAudits.date)).all();
+  return await db.select().from(stockAudits).where(and(eq(stockAudits.kilnId, kilnId), gte(stockAudits.date, since))).orderBy(desc(stockAudits.date));
 }

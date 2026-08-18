@@ -43,7 +43,7 @@ export async function createSoilTrip(input: CreateSoilTripInput) {
 
   let contract = null;
   if (input.contractId) {
-    contract = db.select().from(soilContracts).where(and(eq(soilContracts._id, input.contractId), eq(soilContracts.kilnId, input.kilnId))).get();
+    contract = (await db.select().from(soilContracts).where(and(eq(soilContracts._id, input.contractId), eq(soilContracts.kilnId, input.kilnId))))[0];
     if (!contract) throw new Error("Referenced soil contract not found in this kiln");
     if (contract.landownerId !== input.landownerId) {
       throw new Error("This trip's landowner does not match the contract's landowner");
@@ -52,8 +52,8 @@ export async function createSoilTrip(input: CreateSoilTripInput) {
 
   const trolleyCount = input.trolleyCount ?? 1;
   const _id = randomUUID();
-  db.insert(soilTrips).values({ ...input, _id, trolleyCount }).run();
-  const trip = db.select().from(soilTrips).where(eq(soilTrips._id, _id)).get()!;
+  await db.insert(soilTrips).values({ ...input, _id, trolleyCount });
+  const trip = (await db.select().from(soilTrips).where(eq(soilTrips._id, _id)))[0]!;
 
   if (!contract || contract.rateType === "PER_TROLLEY") {
     await addLedgerEntry({
@@ -98,11 +98,11 @@ export async function listSoilTrips(kilnId: string, filter: ListSoilTripsFilter 
   if (filter.from) conditions.push(gte(soilTrips.date, filter.from));
   if (filter.to) conditions.push(lte(soilTrips.date, filter.to));
 
-  const rows = await db.select().from(soilTrips).where(and(...conditions)).orderBy(desc(soilTrips.date)).all();
+  const rows = await db.select().from(soilTrips).where(and(...conditions)).orderBy(desc(soilTrips.date));
   const landownerIds = [...new Set(rows.map((r) => r.landownerId))];
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const ids = [...new Set([...landownerIds, ...driverIds])];
-  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, ids)).all() : [];
+  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, ids)) : [];
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
   return rows.map((r) => ({
     ...r,
@@ -112,10 +112,10 @@ export async function listSoilTrips(kilnId: string, filter: ListSoilTripsFilter 
 }
 
 export async function updateSoilTripStatus(kilnId: string, tripId: string, status: "ARRIVED" | "WEATHERING" | "READY") {
-  const existing = db.select().from(soilTrips).where(and(eq(soilTrips._id, tripId), eq(soilTrips.kilnId, kilnId))).get();
+  const existing = (await db.select().from(soilTrips).where(and(eq(soilTrips._id, tripId), eq(soilTrips.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Soil trip not found");
-  db.update(soilTrips).set({ status }).where(eq(soilTrips._id, tripId)).run();
-  const trip = db.select().from(soilTrips).where(eq(soilTrips._id, tripId)).get()!;
+  await db.update(soilTrips).set({ status }).where(eq(soilTrips._id, tripId));
+  const trip = (await db.select().from(soilTrips).where(eq(soilTrips._id, tripId)))[0]!;
   emitToKiln(kilnId, "soilTrip:update", trip);
   return trip;
 }
@@ -124,7 +124,7 @@ export async function soilInwardTotals(kilnId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const trips = await db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), gte(soilTrips.date, since))).all();
+  const trips = await db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), gte(soilTrips.date, since)));
   const totalTrolleys = trips.reduce((sum, t) => sum + (t.trolleyCount ?? 0), 0);
   const readyTrolleys = trips.filter((t) => t.status === "READY").reduce((sum, t) => sum + (t.trolleyCount ?? 0), 0);
 

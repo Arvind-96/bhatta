@@ -35,8 +35,8 @@ export async function createFuelPurchase(input: CreateFuelPurchaseInput) {
   }
 
   const _id = randomUUID();
-  db.insert(fuelPurchases).values({ ...input, _id }).run();
-  const purchase = db.select().from(fuelPurchases).where(eq(fuelPurchases._id, _id)).get()!;
+  await db.insert(fuelPurchases).values({ ...input, _id });
+  const purchase = (await db.select().from(fuelPurchases).where(eq(fuelPurchases._id, _id)))[0]!;
 
   if (input.supplierId && input.amount > 0) {
     await addLedgerEntry({
@@ -77,10 +77,10 @@ export async function createFuelPurchase(input: CreateFuelPurchaseInput) {
 export async function listFuelPurchases(kilnId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), gte(fuelPurchases.date, since))).orderBy(desc(fuelPurchases.date)).all();
+  const rows = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), gte(fuelPurchases.date, since))).orderBy(desc(fuelPurchases.date));
 
   const supplierIds = [...new Set(rows.map((r) => r.supplierId).filter((v): v is string => !!v))];
-  const supplierRows = supplierIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, supplierIds)).all() : [];
+  const supplierRows = supplierIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, supplierIds)) : [];
   const supplierById = new Map(supplierRows.map((s) => [s._id, s]));
   return rows.map((r) => ({ ...r, supplierId: r.supplierId ? supplierById.get(r.supplierId) ?? r.supplierId : r.supplierId }));
 }
@@ -89,8 +89,8 @@ export async function listFuelPurchases(kilnId: string, days = 30) {
 // minus everything fed into a chamber so far.
 export async function fuelStockBalance(kilnId: string) {
   const [purchases, logs] = await Promise.all([
-    db.select().from(fuelPurchases).where(eq(fuelPurchases.kilnId, kilnId)).all(),
-    db.select().from(fuelLogs).where(eq(fuelLogs.kilnId, kilnId)).all(),
+    db.select().from(fuelPurchases).where(eq(fuelPurchases.kilnId, kilnId)),
+    db.select().from(fuelLogs).where(eq(fuelLogs.kilnId, kilnId)),
   ]);
 
   const totals = new Map<string, number>();
@@ -114,11 +114,11 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // FUEL only, so a supplier who also sells soil or something else doesn't
 // have that mixed in here).
 export async function supplierFuelBalances(kilnId: string) {
-  const purchases = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), isNotNull(fuelPurchases.supplierId))).all();
+  const purchases = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), isNotNull(fuelPurchases.supplierId)));
   const supplierIds = Array.from(new Set(purchases.map((p) => p.supplierId!)));
   if (supplierIds.length === 0) return [];
 
-  const suppliers = await db.select().from(people).where(and(inArray(people._id, supplierIds), eq(people.kilnId, kilnId))).all();
+  const suppliers = await db.select().from(people).where(and(inArray(people._id, supplierIds), eq(people.kilnId, kilnId)));
 
   const results = await Promise.all(
     suppliers.map(async (supplier) => {

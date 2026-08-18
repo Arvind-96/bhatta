@@ -11,8 +11,8 @@ import { emitToKiln } from "../config/socket";
 export async function createBrickCategory(kilnId: string, category: string, pricePerBrick = 0, grade?: string) {
   try {
     const _id = randomUUID();
-    db.insert(brickCategories).values({ _id, kilnId, category, pricePerBrick, grade }).run();
-    const created = db.select().from(brickCategories).where(eq(brickCategories._id, _id)).get()!;
+    await db.insert(brickCategories).values({ _id, kilnId, category, pricePerBrick, grade });
+    const created = (await db.select().from(brickCategories).where(eq(brickCategories._id, _id)))[0]!;
     emitToKiln(kilnId, "brickCategory:update", created);
     return created;
   } catch (err: unknown) {
@@ -24,7 +24,7 @@ export async function createBrickCategory(kilnId: string, category: string, pric
 }
 
 export async function listBrickCategories(kilnId: string) {
-  return db.select().from(brickCategories).where(eq(brickCategories.kilnId, kilnId)).orderBy(asc(brickCategories.category)).all();
+  return db.select().from(brickCategories).where(eq(brickCategories.kilnId, kilnId)).orderBy(asc(brickCategories.category));
 }
 
 // The admin's direct manual override of a category's name/grade/stock/
@@ -38,31 +38,31 @@ export async function updateBrickCategory(
   categoryId: string,
   updates: { category?: string; grade?: string | null; quantity?: number; pricePerBrick?: number }
 ) {
-  const existing = db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))).get();
+  const existing = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick category not found in this kiln");
   try {
-    db.update(brickCategories).set(updates).where(eq(brickCategories._id, categoryId)).run();
+    await db.update(brickCategories).set(updates).where(eq(brickCategories._id, categoryId));
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes("UNIQUE constraint failed")) {
       throw new Error("This brick category name is already used by another category in this kiln");
     }
     throw err;
   }
-  const updated = db.select().from(brickCategories).where(eq(brickCategories._id, categoryId)).get()!;
+  const updated = (await db.select().from(brickCategories).where(eq(brickCategories._id, categoryId)))[0]!;
   emitToKiln(kilnId, "brickCategory:update", updated);
   return updated;
 }
 
 export async function deleteBrickCategory(kilnId: string, categoryId: string) {
-  const existing = db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))).get();
+  const existing = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick category not found in this kiln");
-  db.delete(brickCategories).where(eq(brickCategories._id, categoryId)).run();
+  await db.delete(brickCategories).where(eq(brickCategories._id, categoryId));
   emitToKiln(kilnId, "brickCategory:update", { _id: categoryId, deleted: true });
   return existing;
 }
 
 async function assertCategoryInKiln(kilnId: string, categoryId: string) {
-  const category = db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))).get();
+  const category = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))))[0];
   if (!category) throw new Error("Brick category not found in this kiln");
   return category;
 }
@@ -80,14 +80,13 @@ export interface CreateBrickProductionInput {
 export async function createBrickProductionEntry(input: CreateBrickProductionInput) {
   await assertCategoryInKiln(input.kilnId, input.categoryId);
   const _id = randomUUID();
-  db.insert(brickProductionEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(brickProductionEntries).where(eq(brickProductionEntries._id, _id)).get()!;
+  await db.insert(brickProductionEntries).values({ ...input, _id });
+  const entry = (await db.select().from(brickProductionEntries).where(eq(brickProductionEntries._id, _id)))[0]!;
 
-  db.update(brickCategories)
+  await db.update(brickCategories)
     .set({ quantity: sql`${brickCategories.quantity} + ${input.bricksCount}` })
-    .where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId)))
-    .run();
-  const category = db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)).get();
+    .where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId)));
+  const category = (await db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0];
 
   emitToKiln(input.kilnId, "brickProduction:update", entry);
   emitToKiln(input.kilnId, "brickCategory:update", category);
@@ -97,22 +96,21 @@ export async function createBrickProductionEntry(input: CreateBrickProductionInp
 export async function listBrickProductionEntries(kilnId: string, days = 60) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(brickProductionEntries).where(and(eq(brickProductionEntries.kilnId, kilnId), gte(brickProductionEntries.date, since))).orderBy(desc(brickProductionEntries.date)).all();
+  const rows = await db.select().from(brickProductionEntries).where(and(eq(brickProductionEntries.kilnId, kilnId), gte(brickProductionEntries.date, since))).orderBy(desc(brickProductionEntries.date));
   return withCategory(kilnId, rows);
 }
 
 // Striking off a mis-logged production entry reverses its stock effect —
 // same "delete undoes the create" rule as SuppliedItem.
 export async function deleteBrickProductionEntry(kilnId: string, entryId: string) {
-  const deleted = db.select().from(brickProductionEntries).where(and(eq(brickProductionEntries._id, entryId), eq(brickProductionEntries.kilnId, kilnId))).get();
+  const deleted = (await db.select().from(brickProductionEntries).where(and(eq(brickProductionEntries._id, entryId), eq(brickProductionEntries.kilnId, kilnId))))[0];
   if (!deleted) throw new Error("Production entry not found in this kiln");
-  db.delete(brickProductionEntries).where(eq(brickProductionEntries._id, entryId)).run();
+  await db.delete(brickProductionEntries).where(eq(brickProductionEntries._id, entryId));
 
-  db.update(brickCategories)
+  await db.update(brickCategories)
     .set({ quantity: sql`${brickCategories.quantity} - ${deleted.bricksCount}` })
-    .where(and(eq(brickCategories._id, deleted.categoryId), eq(brickCategories.kilnId, kilnId)))
-    .run();
-  const category = db.select().from(brickCategories).where(eq(brickCategories._id, deleted.categoryId)).get();
+    .where(and(eq(brickCategories._id, deleted.categoryId), eq(brickCategories.kilnId, kilnId)));
+  const category = (await db.select().from(brickCategories).where(eq(brickCategories._id, deleted.categoryId)))[0];
 
   emitToKiln(kilnId, "brickProduction:update", { _id: entryId, deleted: true });
   if (category) emitToKiln(kilnId, "brickCategory:update", category);
@@ -134,14 +132,13 @@ export interface CreateStockLoadingInput {
 export async function createStockLoadingEntry(input: CreateStockLoadingInput) {
   await assertCategoryInKiln(input.kilnId, input.categoryId);
   const _id = randomUUID();
-  db.insert(stockLoadingEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(stockLoadingEntries).where(eq(stockLoadingEntries._id, _id)).get()!;
+  await db.insert(stockLoadingEntries).values({ ...input, _id });
+  const entry = (await db.select().from(stockLoadingEntries).where(eq(stockLoadingEntries._id, _id)))[0]!;
 
-  db.update(brickCategories)
+  await db.update(brickCategories)
     .set({ quantity: sql`${brickCategories.quantity} - ${input.bricksCount}` })
-    .where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId)))
-    .run();
-  const category = db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)).get();
+    .where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId)));
+  const category = (await db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0];
 
   emitToKiln(input.kilnId, "stockLoading:update", entry);
   emitToKiln(input.kilnId, "brickCategory:update", category);
@@ -151,27 +148,26 @@ export async function createStockLoadingEntry(input: CreateStockLoadingInput) {
 export async function listStockLoadingEntries(kilnId: string, days = 60) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(stockLoadingEntries).where(and(eq(stockLoadingEntries.kilnId, kilnId), gte(stockLoadingEntries.date, since))).orderBy(desc(stockLoadingEntries.date)).all();
+  const rows = await db.select().from(stockLoadingEntries).where(and(eq(stockLoadingEntries.kilnId, kilnId), gte(stockLoadingEntries.date, since))).orderBy(desc(stockLoadingEntries.date));
   return withCategory(kilnId, rows);
 }
 
 async function withCategory<T extends { categoryId: string }>(kilnId: string, rows: T[]) {
   const categoryIds = [...new Set(rows.map((r) => r.categoryId))];
-  const categoryRows = categoryIds.length ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all() : [];
+  const categoryRows = categoryIds.length ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)) : [];
   const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
   return rows.map((r) => ({ ...r, categoryId: categoryById.get(r.categoryId) ?? r.categoryId }));
 }
 
 export async function deleteStockLoadingEntry(kilnId: string, entryId: string) {
-  const deleted = db.select().from(stockLoadingEntries).where(and(eq(stockLoadingEntries._id, entryId), eq(stockLoadingEntries.kilnId, kilnId))).get();
+  const deleted = (await db.select().from(stockLoadingEntries).where(and(eq(stockLoadingEntries._id, entryId), eq(stockLoadingEntries.kilnId, kilnId))))[0];
   if (!deleted) throw new Error("Loading entry not found in this kiln");
-  db.delete(stockLoadingEntries).where(eq(stockLoadingEntries._id, entryId)).run();
+  await db.delete(stockLoadingEntries).where(eq(stockLoadingEntries._id, entryId));
 
-  db.update(brickCategories)
+  await db.update(brickCategories)
     .set({ quantity: sql`${brickCategories.quantity} + ${deleted.bricksCount}` })
-    .where(and(eq(brickCategories._id, deleted.categoryId), eq(brickCategories.kilnId, kilnId)))
-    .run();
-  const category = db.select().from(brickCategories).where(eq(brickCategories._id, deleted.categoryId)).get();
+    .where(and(eq(brickCategories._id, deleted.categoryId), eq(brickCategories.kilnId, kilnId)));
+  const category = (await db.select().from(brickCategories).where(eq(brickCategories._id, deleted.categoryId)))[0];
 
   emitToKiln(kilnId, "stockLoading:update", { _id: entryId, deleted: true });
   if (category) emitToKiln(kilnId, "brickCategory:update", category);

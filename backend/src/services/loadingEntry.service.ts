@@ -28,19 +28,19 @@ export async function createLoadingEntry(input: CreateLoadingInput) {
   let dispatchBricksCount: number | null = null;
 
   if (input.dispatchId) {
-    const dispatch = db.select().from(dispatches).where(and(eq(dispatches._id, input.dispatchId), eq(dispatches.kilnId, input.kilnId))).get();
+    const dispatch = (await db.select().from(dispatches).where(and(eq(dispatches._id, input.dispatchId), eq(dispatches.kilnId, input.kilnId))))[0];
     if (!dispatch) throw new Error("Referenced dispatch not found in this kiln");
     dispatchBricksCount = dispatch.bricksCount;
 
-    const priorEntries = await db.select().from(loadingEntries).where(and(eq(loadingEntries.kilnId, input.kilnId), eq(loadingEntries.dispatchId, input.dispatchId))).all();
+    const priorEntries = await db.select().from(loadingEntries).where(and(eq(loadingEntries.kilnId, input.kilnId), eq(loadingEntries.dispatchId, input.dispatchId)));
     const priorTotal = priorEntries.reduce((sum, e) => sum + e.bricksCount, 0);
     const newTotal = priorTotal + input.bricksCount;
     countMismatch = newTotal > dispatch.bricksCount * 1.02;
   }
 
   const _id = randomUUID();
-  db.insert(loadingEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(loadingEntries).where(eq(loadingEntries._id, _id)).get()!;
+  await db.insert(loadingEntries).values({ ...input, _id });
+  const entry = (await db.select().from(loadingEntries).where(eq(loadingEntries._id, _id)))[0]!;
 
   const wage = (input.bricksCount / 1000) * input.ratePerThousand;
   await addLedgerEntry({
@@ -59,13 +59,13 @@ export async function createLoadingEntry(input: CreateLoadingInput) {
 export async function listLoadingEntries(kilnId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(loadingEntries).where(and(eq(loadingEntries.kilnId, kilnId), gte(loadingEntries.date, since))).orderBy(desc(loadingEntries.date)).all();
+  const rows = await db.select().from(loadingEntries).where(and(eq(loadingEntries.kilnId, kilnId), gte(loadingEntries.date, since))).orderBy(desc(loadingEntries.date));
 
   const palledarIds = [...new Set(rows.map((r) => r.palledarId))];
   const dispatchIds = [...new Set(rows.map((r) => r.dispatchId).filter((v): v is string => !!v))];
   const [palledarRows, dispatchRows] = await Promise.all([
-    palledarIds.length ? db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, palledarIds)).all() : [],
-    dispatchIds.length ? db.select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, bricksCount: dispatches.bricksCount }).from(dispatches).where(inArray(dispatches._id, dispatchIds)).all() : [],
+    palledarIds.length ? db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, palledarIds)) : [],
+    dispatchIds.length ? db.select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, bricksCount: dispatches.bricksCount }).from(dispatches).where(inArray(dispatches._id, dispatchIds)) : [],
   ]);
   const palledarById = new Map(palledarRows.map((p) => [p._id, p]));
   const dispatchById = new Map(dispatchRows.map((d) => [d._id, d]));

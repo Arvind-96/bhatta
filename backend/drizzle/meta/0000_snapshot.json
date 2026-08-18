@@ -1,7 +1,7 @@
 {
-  "version": "6",
-  "dialect": "sqlite",
-  "id": "bcf30bae-9a35-4b14-86e1-ab5da6f4cfaf",
+  "version": "5",
+  "dialect": "mysql",
+  "id": "2faf7db7-bb80-4a62-8253-4e9329a0f15e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "kiln_memberships": {
@@ -9,35 +9,35 @@
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "userId": {
           "name": "userId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "role": {
           "name": "role",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -54,65 +54,72 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "kiln_memberships__id": {
+          "name": "kiln_memberships__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "kilns": {
       "name": "kilns",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "location": {
           "name": "location",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "phone": {
           "name": "phone",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "onboardedAt": {
           "name": "onboardedAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "latitude": {
           "name": "latitude",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "longitude": {
           "name": "longitude",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "radiusMeters": {
           "name": "radiusMeters",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -120,14 +127,53 @@
         },
         "yardCapacityBricks": {
           "name": "yardCapacityBricks",
-          "type": "integer",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "seasonStartMonth": {
+          "name": "seasonStartMonth",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 8
+        },
+        "seasonStartDay": {
+          "name": "seasonStartDay",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 1
+        },
+        "dayShiftStart": {
+          "name": "dayShiftStart",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'08:00'"
+        },
+        "dayShiftEnd": {
+          "name": "dayShiftEnd",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'18:00'"
+        },
+        "gstNumber": {
+          "name": "gstNumber",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -135,51 +181,58 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "kilns__id": {
+          "name": "kilns__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "sync_logs": {
       "name": "sync_logs",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "entityType": {
           "name": "entityType",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "entityId": {
           "name": "entityId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "action": {
           "name": "action",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -187,7 +240,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -195,44 +248,51 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "sync_logs__id": {
+          "name": "sync_logs__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "users": {
       "name": "users",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "email": {
           "name": "email",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "passwordHash": {
           "name": "passwordHash",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -248,58 +308,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "users__id": {
+          "name": "users__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "attendances": {
       "name": "attendances",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "personId": {
           "name": "personId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "wageAmount": {
           "name": "wageAmount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -316,65 +383,72 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "attendances__id": {
+          "name": "attendances__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "family_members": {
       "name": "family_members",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "headPersonId": {
           "name": "headPersonId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "relation": {
           "name": "relation",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "age": {
           "name": "age",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "sex": {
           "name": "sex",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "isWorking": {
           "name": "isWorking",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -382,7 +456,7 @@
         },
         "workerId": {
           "name": "workerId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -396,7 +470,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -413,44 +487,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "family_members__id": {
+          "name": "family_members__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "ledger_entries": {
       "name": "ledger_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "personId": {
           "name": "personId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "direction": {
           "name": "direction",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "amount": {
           "name": "amount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -464,35 +545,49 @@
         },
         "category": {
           "name": "category",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "paymentMode": {
           "name": "paymentMode",
-          "type": "text",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cashAmount": {
+          "name": "cashAmount",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "onlineAmount": {
+          "name": "onlineAmount",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "contractId": {
           "name": "contractId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -510,72 +605,93 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "ledger_entries__id": {
+          "name": "ledger_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "payment_receipts": {
       "name": "payment_receipts",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "personId": {
           "name": "personId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "receiptNumber": {
           "name": "receiptNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "amountPaid": {
           "name": "amountPaid",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "totalAgreedAmount": {
           "name": "totalAgreedAmount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "balanceBefore": {
           "name": "balanceBefore",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "balanceAfter": {
           "name": "balanceAfter",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "paymentMode": {
           "name": "paymentMode",
-          "type": "text",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cashAmount": {
+          "name": "cashAmount",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "onlineAmount": {
+          "name": "onlineAmount",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -589,14 +705,14 @@
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -620,51 +736,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "payment_receipts__id": {
+          "name": "payment_receipts__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "people": {
       "name": "people",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "phone": {
           "name": "phone",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "address": {
           "name": "address",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -678,7 +801,7 @@
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -686,168 +809,161 @@
         },
         "idNumber": {
           "name": "idNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "age": {
           "name": "age",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "sex": {
           "name": "sex",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "workType": {
           "name": "workType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "dailyWage": {
           "name": "dailyWage",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "ratePerThousand": {
           "name": "ratePerThousand",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "contractorId": {
           "name": "contractorId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "familyHeadId": {
           "name": "familyHeadId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "payType": {
           "name": "payType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "commissionPerThousand": {
           "name": "commissionPerThousand",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "defaultRatePerThousand": {
           "name": "defaultRatePerThousand",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "bharaiRatePerThousand": {
           "name": "bharaiRatePerThousand",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "monthlySalary": {
           "name": "monthlySalary",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "stackingStage": {
           "name": "stackingStage",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "bharaiContractorId": {
           "name": "bharaiContractorId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "nikasiContractorId": {
           "name": "nikasiContractorId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "faceDescriptor": {
-          "name": "faceDescriptor",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "firingShiftAnchorDate": {
           "name": "firingShiftAnchorDate",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "firingShiftAnchorType": {
           "name": "firingShiftAnchorType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "vehicleNumber": {
           "name": "vehicleNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "licenseNumber": {
           "name": "licenseNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "ratePerTrolley": {
           "name": "ratePerTrolley",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "designation": {
           "name": "designation",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "isOfficeStaff": {
           "name": "isOfficeStaff",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -855,42 +971,42 @@
         },
         "gstNumber": {
           "name": "gstNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "contractRate": {
           "name": "contractRate",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "contractUnit": {
           "name": "contractUnit",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "profitSharePercent": {
           "name": "profitSharePercent",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "khetArea": {
           "name": "khetArea",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "khetAreaUnit": {
           "name": "khetAreaUnit",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -898,28 +1014,28 @@
         },
         "khetLocation": {
           "name": "khetLocation",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "agreedDepthFeet": {
           "name": "agreedDepthFeet",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "creditLimit": {
           "name": "creditLimit",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "active": {
           "name": "active",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -927,7 +1043,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -944,58 +1060,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "people__id": {
+          "name": "people__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "work_entries": {
       "name": "work_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "personId": {
           "name": "personId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "workType": {
           "name": "workType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "quantity": {
           "name": "quantity",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "ratePerThousand": {
           "name": "ratePerThousand",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1009,7 +1132,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1026,37 +1149,59 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "work_entries__id": {
+          "name": "work_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "brick_categories": {
       "name": "brick_categories",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "category": {
           "name": "category",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
+        "grade": {
+          "name": "grade",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "quantity": {
           "name": "quantity",
-          "type": "integer",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": 0
+        },
+        "pricePerBrick": {
+          "name": "pricePerBrick",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1064,7 +1209,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1081,73 +1226,94 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "brick_categories__id": {
+          "name": "brick_categories__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "brick_loading_entries": {
       "name": "brick_loading_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "vehicleType": {
           "name": "vehicleType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "vehicleNumber": {
           "name": "vehicleNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "driverId": {
           "name": "driverId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "tipAmount": {
           "name": "tipAmount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
           "default": 0
         },
+        "loadingCharge": {
+          "name": "loadingCharge",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "categoryId": {
+          "name": "categoryId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "dispatchId": {
           "name": "dispatchId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1161,7 +1327,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1178,44 +1344,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "brick_loading_entries__id": {
+          "name": "brick_loading_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "brick_production_entries": {
       "name": "brick_production_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "categoryId": {
           "name": "categoryId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1229,7 +1402,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1246,37 +1419,44 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "brick_production_entries__id": {
+          "name": "brick_production_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "chamber_gradings": {
       "name": "chamber_gradings",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gherId": {
           "name": "gherId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "a1Count": {
           "name": "a1Count",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
@@ -1284,7 +1464,7 @@
         },
         "jhamaCount": {
           "name": "jhamaCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
@@ -1292,7 +1472,7 @@
         },
         "pelaCount": {
           "name": "pelaCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
@@ -1300,7 +1480,7 @@
         },
         "rodaCount": {
           "name": "rodaCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
@@ -1308,14 +1488,14 @@
         },
         "stackedCount": {
           "name": "stackedCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1329,7 +1509,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1346,44 +1526,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "chamber_gradings__id": {
+          "name": "chamber_gradings__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "fire_movement_logs": {
       "name": "fire_movement_logs",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gherId": {
           "name": "gherId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gherNumber": {
           "name": "gherNumber",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "startedAt": {
           "name": "startedAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1400,44 +1587,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "fire_movement_logs__id": {
+          "name": "fire_movement_logs__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "firing_shifts": {
       "name": "firing_shifts",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "fitterId": {
           "name": "fitterId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gherId": {
           "name": "gherId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "shiftType": {
           "name": "shiftType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1451,7 +1645,7 @@
         },
         "overtimeHours": {
           "name": "overtimeHours",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1459,14 +1653,14 @@
         },
         "overtimeRate": {
           "name": "overtimeRate",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "bonusAmount": {
           "name": "bonusAmount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1474,14 +1668,14 @@
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1498,37 +1692,44 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "firing_shifts__id": {
+          "name": "firing_shifts__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "ghers": {
       "name": "ghers",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "number": {
           "name": "number",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1536,14 +1737,14 @@
         },
         "cycleStartedAt": {
           "name": "cycleStartedAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "updatedAt": {
           "name": "updatedAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1560,37 +1761,44 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "ghers__id": {
+          "name": "ghers__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "kiln_incidents": {
       "name": "kiln_incidents",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gherId": {
           "name": "gherId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -1604,7 +1812,7 @@
         },
         "repairCost": {
           "name": "repairCost",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1612,7 +1820,7 @@
         },
         "bricksLost": {
           "name": "bricksLost",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1620,7 +1828,7 @@
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1634,7 +1842,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1651,58 +1859,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "kiln_incidents__id": {
+          "name": "kiln_incidents__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "loading_entries": {
       "name": "loading_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "dispatchId": {
           "name": "dispatchId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "palledarId": {
           "name": "palledarId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "ratePerThousand": {
           "name": "ratePerThousand",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1716,7 +1931,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1733,51 +1948,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "loading_entries__id": {
+          "name": "loading_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "molding_entries": {
       "name": "molding_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "workerId": {
           "name": "workerId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "ratePerThousand": {
           "name": "ratePerThousand",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "damagedCount": {
           "name": "damagedCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1785,14 +2007,14 @@
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "washedOut": {
           "name": "washedOut",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1807,7 +2029,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1824,51 +2046,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "molding_entries__id": {
+          "name": "molding_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "nikasi_entries": {
       "name": "nikasi_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gherId": {
           "name": "gherId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gangId": {
           "name": "gangId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "damagedCount": {
           "name": "damagedCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1876,7 +2105,7 @@
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1890,7 +2119,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1907,44 +2136,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "nikasi_entries__id": {
+          "name": "nikasi_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "production_logs": {
       "name": "production_logs",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "batchNumber": {
           "name": "batchNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "qualityGrade": {
           "name": "qualityGrade",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1952,28 +2188,28 @@
         },
         "producedOn": {
           "name": "producedOn",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "thekedarId": {
           "name": "thekedarId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "localId": {
           "name": "localId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "version": {
           "name": "version",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -1981,7 +2217,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2005,58 +2241,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "production_logs__id": {
+          "name": "production_logs__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "stacking_entries": {
       "name": "stacking_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gherId": {
           "name": "gherId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gangId": {
           "name": "gangId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "stage": {
           "name": "stage",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "damageCount": {
           "name": "damageCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2064,14 +2307,14 @@
         },
         "ratePerThousand": {
           "name": "ratePerThousand",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "qualityRating": {
           "name": "qualityRating",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2079,28 +2322,28 @@
         },
         "mode": {
           "name": "mode",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "tractorNumber": {
           "name": "tractorNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "buggiCount": {
           "name": "buggiCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2114,7 +2357,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2131,65 +2374,72 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "stacking_entries__id": {
+          "name": "stacking_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "stacking_vehicles": {
       "name": "stacking_vehicles",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "contractorId": {
           "name": "contractorId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "vehicleType": {
           "name": "vehicleType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "vehicleNumber": {
           "name": "vehicleNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "buggiCount": {
           "name": "buggiCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "driverName": {
           "name": "driverName",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2204,7 +2454,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2221,51 +2471,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "stacking_vehicles__id": {
+          "name": "stacking_vehicles__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "wastage_logs": {
       "name": "wastage_logs",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "cause": {
           "name": "cause",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "quantity": {
           "name": "quantity",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "unit": {
           "name": "unit",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2273,7 +2530,7 @@
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2287,7 +2544,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2304,51 +2561,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "wastage_logs__id": {
+          "name": "wastage_logs__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "compliance_documents": {
       "name": "compliance_documents",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "documentType": {
           "name": "documentType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "title": {
           "name": "title",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "issueDate": {
           "name": "issueDate",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "expiryDate": {
           "name": "expiryDate",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -2362,7 +2626,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2379,44 +2643,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "compliance_documents__id": {
+          "name": "compliance_documents__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "dispatches": {
       "name": "dispatches",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "customerName": {
           "name": "customerName",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "customerId": {
           "name": "customerId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "grade": {
           "name": "grade",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2424,56 +2695,56 @@
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "amount": {
           "name": "amount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "driverId": {
           "name": "driverId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "slipNumber": {
           "name": "slipNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "invoiceNumber": {
           "name": "invoiceNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "transportCost": {
           "name": "transportCost",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "transportPaidBy": {
           "name": "transportPaidBy",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "breakageCount": {
           "name": "breakageCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2481,7 +2752,7 @@
         },
         "returnedCount": {
           "name": "returnedCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2496,28 +2767,77 @@
         },
         "paymentMode": {
           "name": "paymentMode",
-          "type": "text",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cashAmount": {
+          "name": "cashAmount",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "onlineAmount": {
+          "name": "onlineAmount",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "categoryId": {
+          "name": "categoryId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vehicleNumber": {
+          "name": "vehicleNumber",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "vehicleType": {
+          "name": "vehicleType",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "driverTipAmount": {
+          "name": "driverTipAmount",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "discountAmount": {
+          "name": "discountAmount",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "dispatchedOn": {
           "name": "dispatchedOn",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "localId": {
           "name": "localId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2527,6 +2847,7 @@
         "dispatch_slip_unique": {
           "name": "dispatch_slip_unique",
           "columns": [
+            "kilnId",
             "slipNumber"
           ],
           "isUnique": true
@@ -2534,6 +2855,7 @@
         "dispatch_invoice_unique": {
           "name": "dispatch_invoice_unique",
           "columns": [
+            "kilnId",
             "invoiceNumber"
           ],
           "isUnique": true
@@ -2555,51 +2877,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "dispatches__id": {
+          "name": "dispatches__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "expenses": {
       "name": "expenses",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "category": {
           "name": "category",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "amount": {
           "name": "amount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
+        "paymentMode": {
+          "name": "paymentMode",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "hours": {
           "name": "hours",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2613,28 +2949,28 @@
         },
         "soilTripId": {
           "name": "soilTripId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "incidentId": {
           "name": "incidentId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "dispatchId": {
           "name": "dispatchId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2659,58 +2995,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "expenses__id": {
+          "name": "expenses__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "stock_audits": {
       "name": "stock_audits",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "itemName": {
           "name": "itemName",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "registerCount": {
           "name": "registerCount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "physicalCount": {
           "name": "physicalCount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "variance": {
           "name": "variance",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2724,7 +3067,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2741,51 +3084,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "stock_audits__id": {
+          "name": "stock_audits__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "stock_entries": {
       "name": "stock_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "itemName": {
           "name": "itemName",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "quantity": {
           "name": "quantity",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "unit": {
           "name": "unit",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2793,21 +3143,21 @@
         },
         "recordedOn": {
           "name": "recordedOn",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "localId": {
           "name": "localId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "version": {
           "name": "version",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -2815,7 +3165,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2839,44 +3189,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "stock_entries__id": {
+          "name": "stock_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "stock_loading_entries": {
       "name": "stock_loading_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "categoryId": {
           "name": "categoryId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "bricksCount": {
           "name": "bricksCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2890,7 +3247,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2907,72 +3264,79 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "stock_loading_entries__id": {
+          "name": "stock_loading_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "jcb_work_logs": {
       "name": "jcb_work_logs",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "landId": {
           "name": "landId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "landownerId": {
           "name": "landownerId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "machineId": {
           "name": "machineId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "driverId": {
           "name": "driverId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "contractId": {
           "name": "contractId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "hoursWorked": {
           "name": "hoursWorked",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -2986,7 +3350,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3011,107 +3375,114 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "jcb_work_logs__id": {
+          "name": "jcb_work_logs__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "lands": {
       "name": "lands",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "landownerId": {
           "name": "landownerId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "village": {
           "name": "village",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "tehsil": {
           "name": "tehsil",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "district": {
           "name": "district",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "state": {
           "name": "state",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "khasraNumber": {
           "name": "khasraNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "khataNumber": {
           "name": "khataNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "latitude": {
           "name": "latitude",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "longitude": {
           "name": "longitude",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "area": {
           "name": "area",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "areaUnit": {
           "name": "areaUnit",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3119,21 +3490,21 @@
         },
         "soilType": {
           "name": "soilType",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "estimatedSoilQuantity": {
           "name": "estimatedSoilQuantity",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3148,7 +3519,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3165,44 +3536,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "lands__id": {
+          "name": "lands__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "soil_arrivals": {
       "name": "soil_arrivals",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "landownerId": {
           "name": "landownerId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "contractId": {
           "name": "contractId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "jcbUsed": {
           "name": "jcbUsed",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3210,7 +3588,7 @@
         },
         "tractorUsed": {
           "name": "tractorUsed",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3218,35 +3596,35 @@
         },
         "jcbDriverId": {
           "name": "jcbDriverId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "tractorDriverId": {
           "name": "tractorDriverId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "trolleyCount": {
           "name": "trolleyCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "depthFeet": {
           "name": "depthFeet",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "paymentGiven": {
           "name": "paymentGiven",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3254,7 +3632,7 @@
         },
         "paymentPending": {
           "name": "paymentPending",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3262,14 +3640,14 @@
         },
         "soilRemaining": {
           "name": "soilRemaining",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3283,7 +3661,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3300,58 +3678,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "soil_arrivals__id": {
+          "name": "soil_arrivals__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "soil_contracts": {
       "name": "soil_contracts",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "contractNumber": {
           "name": "contractNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "landId": {
           "name": "landId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "landownerId": {
           "name": "landownerId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "soilType": {
           "name": "soilType",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "rateType": {
           "name": "rateType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3359,42 +3744,42 @@
         },
         "contractedQuantity": {
           "name": "contractedQuantity",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "ratePerTrolley": {
           "name": "ratePerTrolley",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "contractedAreaBigha": {
           "name": "contractedAreaBigha",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "ratePerBigha": {
           "name": "ratePerBigha",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "contractedDepth": {
           "name": "contractedDepth",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "depthUnit": {
           "name": "depthUnit",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3402,21 +3787,21 @@
         },
         "ratePerDepthUnit": {
           "name": "ratePerDepthUnit",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "totalContractValue": {
           "name": "totalContractValue",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "advanceAmount": {
           "name": "advanceAmount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3424,21 +3809,21 @@
         },
         "startDate": {
           "name": "startDate",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "endDate": {
           "name": "endDate",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "agreedDepthFeet": {
           "name": "agreedDepthFeet",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3452,7 +3837,7 @@
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3467,7 +3852,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3500,65 +3885,72 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "soil_contracts__id": {
+          "name": "soil_contracts__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "soil_trips": {
       "name": "soil_trips",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "landownerId": {
           "name": "landownerId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "driverId": {
           "name": "driverId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "contractId": {
           "name": "contractId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "landId": {
           "name": "landId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "tractorNumber": {
           "name": "tractorNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "trolleyCount": {
           "name": "trolleyCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3566,35 +3958,35 @@
         },
         "receivedTrolleyCount": {
           "name": "receivedTrolleyCount",
-          "type": "integer",
+          "type": "int",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "ratePerTrolley": {
           "name": "ratePerTrolley",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "driverRatePerTrolley": {
           "name": "driverRatePerTrolley",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "depthFeet": {
           "name": "depthFeet",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "status": {
           "name": "status",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3602,7 +3994,7 @@
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3616,7 +4008,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3633,51 +4025,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "soil_trips__id": {
+          "name": "soil_trips__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "fuel_logs": {
       "name": "fuel_logs",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "gherId": {
           "name": "gherId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "fuelType": {
           "name": "fuelType",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "quantityKg": {
           "name": "quantityKg",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3691,7 +4090,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3708,80 +4107,94 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "fuel_logs__id": {
+          "name": "fuel_logs__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "fuel_purchases": {
       "name": "fuel_purchases",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "fuelType": {
           "name": "fuelType",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "supplierId": {
           "name": "supplierId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "vehicleNumber": {
           "name": "vehicleNumber",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "invoicedWeightKg": {
           "name": "invoicedWeightKg",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "actualWeightKg": {
           "name": "actualWeightKg",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "amount": {
           "name": "amount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "paidAmount": {
           "name": "paidAmount",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
           "default": 0
         },
+        "paymentMode": {
+          "name": "paymentMode",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3795,7 +4208,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3812,37 +4225,44 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "fuel_purchases__id": {
+          "name": "fuel_purchases__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "fuel_types": {
       "name": "fuel_types",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3859,37 +4279,44 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "fuel_types__id": {
+          "name": "fuel_types__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "inventory_items": {
       "name": "inventory_items",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "quantity": {
           "name": "quantity",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
@@ -3897,7 +4324,7 @@
         },
         "unit": {
           "name": "unit",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -3912,7 +4339,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3929,44 +4356,51 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "inventory_items__id": {
+          "name": "inventory_items__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "kiln_vehicles": {
       "name": "kiln_vehicles",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -3983,58 +4417,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "kiln_vehicles__id": {
+          "name": "kiln_vehicles__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "machine_fuel_logs": {
       "name": "machine_fuel_logs",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "machineId": {
           "name": "machineId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "fuelType": {
           "name": "fuelType",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "quantity": {
           "name": "quantity",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "hoursRun": {
           "name": "hoursRun",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4048,7 +4489,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4065,30 +4506,37 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "machine_fuel_logs__id": {
+          "name": "machine_fuel_logs__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "machine_maintenance_logs": {
       "name": "machine_maintenance_logs",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "machineId": {
           "name": "machineId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -4102,7 +4550,7 @@
         },
         "cost": {
           "name": "cost",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -4110,7 +4558,7 @@
         },
         "downtimeHours": {
           "name": "downtimeHours",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -4118,7 +4566,7 @@
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4132,7 +4580,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4149,51 +4597,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "machine_maintenance_logs__id": {
+          "name": "machine_maintenance_logs__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "machines": {
       "name": "machines",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "name": {
           "name": "name",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "type": {
           "name": "type",
-          "type": "text",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "identifier": {
           "name": "identifier",
-          "type": "text",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "active": {
           "name": "active",
-          "type": "integer",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
@@ -4208,7 +4663,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4225,51 +4680,58 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "machines__id": {
+          "name": "machines__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "supplied_items": {
       "name": "supplied_items",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "personId": {
           "name": "personId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "itemId": {
           "name": "itemId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "quantity": {
           "name": "quantity",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4283,7 +4745,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4300,51 +4762,65 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "supplied_items__id": {
+          "name": "supplied_items__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
     },
     "vehicle_diesel_entries": {
       "name": "vehicle_diesel_entries",
       "columns": {
         "_id": {
           "name": "_id",
-          "type": "text",
-          "primaryKey": true,
+          "type": "varchar(64)",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "kilnId": {
           "name": "kilnId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "vehicleId": {
           "name": "vehicleId",
-          "type": "text",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "quantityLiters": {
           "name": "quantityLiters",
-          "type": "real",
+          "type": "double",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
         "costAmount": {
           "name": "costAmount",
-          "type": "real",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paymentMode": {
+          "name": "paymentMode",
+          "type": "varchar(50)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
         "date": {
           "name": "date",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4358,7 +4834,7 @@
         },
         "createdAt": {
           "name": "createdAt",
-          "type": "integer",
+          "type": "datetime",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -4375,19 +4851,150 @@
         }
       },
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
+      "compositePrimaryKeys": {
+        "vehicle_diesel_entries__id": {
+          "name": "vehicle_diesel_entries__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "checkConstraint": {}
+    },
+    "salary_slips": {
+      "name": "salary_slips",
+      "columns": {
+        "_id": {
+          "name": "_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kilnId": {
+          "name": "kilnId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "personId": {
+          "name": "personId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "month": {
+          "name": "month",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "daysPresent": {
+          "name": "daysPresent",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "daysAbsent": {
+          "name": "daysAbsent",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "daysHalfDay": {
+          "name": "daysHalfDay",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "daysLate": {
+          "name": "daysLate",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "grossSalary": {
+          "name": "grossSalary",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deductions": {
+          "name": "deductions",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "netSalary": {
+          "name": "netSalary",
+          "type": "double",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pdfPathEn": {
+          "name": "pdfPathEn",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pdfPathHi": {
+          "name": "pdfPathHi",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "salary_person_month_unique": {
+          "name": "salary_person_month_unique",
+          "columns": [
+            "personId",
+            "month"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "salary_slips__id": {
+          "name": "salary_slips__id",
+          "columns": [
+            "_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
     }
   },
   "views": {},
-  "enums": {},
   "_meta": {
     "schemas": {},
     "tables": {},
     "columns": {}
   },
   "internal": {
+    "tables": {},
     "indexes": {}
   }
 }

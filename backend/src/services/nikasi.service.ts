@@ -28,8 +28,8 @@ export async function createNikasiEntry(input: CreateNikasiInput) {
   await assertGherInKiln(input.kilnId, input.gherId);
 
   const _id = randomUUID();
-  db.insert(nikasiEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(nikasiEntries).where(eq(nikasiEntries._id, _id)).get()!;
+  await db.insert(nikasiEntries).values({ ...input, _id });
+  const entry = (await db.select().from(nikasiEntries).where(eq(nikasiEntries._id, _id)))[0]!;
   emitToKiln(input.kilnId, "nikasi:update", entry);
   return entry;
 }
@@ -43,11 +43,11 @@ export interface UpdateNikasiInput {
 // Full admin edit — no wage is tied to this entry, so correcting
 // bricksCount is just fixing the production record, no ledger side effect.
 export async function updateNikasiEntry(kilnId: string, entryId: string, input: UpdateNikasiInput) {
-  const existing = db.select().from(nikasiEntries).where(and(eq(nikasiEntries._id, entryId), eq(nikasiEntries.kilnId, kilnId))).get();
+  const existing = (await db.select().from(nikasiEntries).where(and(eq(nikasiEntries._id, entryId), eq(nikasiEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Nikasi entry not found in this kiln");
 
-  db.update(nikasiEntries).set(input).where(eq(nikasiEntries._id, entryId)).run();
-  const updated = db.select().from(nikasiEntries).where(eq(nikasiEntries._id, entryId)).get()!;
+  await db.update(nikasiEntries).set(input).where(eq(nikasiEntries._id, entryId));
+  const updated = (await db.select().from(nikasiEntries).where(eq(nikasiEntries._id, entryId)))[0]!;
   emitToKiln(kilnId, "nikasi:update", updated);
   return updated;
 }
@@ -62,12 +62,12 @@ export async function listNikasiEntries(kilnId: string, filter: ListNikasiFilter
   if (filter.gherId) conditions.push(eq(nikasiEntries.gherId, filter.gherId));
   if (filter.gangId) conditions.push(eq(nikasiEntries.gangId, filter.gangId));
 
-  const rows = await db.select().from(nikasiEntries).where(and(...conditions)).all();
+  const rows = await db.select().from(nikasiEntries).where(and(...conditions));
   const gangIds = [...new Set(rows.map((r) => r.gangId))];
   const gherIds = [...new Set(rows.map((r) => r.gherId))];
   const [gangRows, gherRows] = await Promise.all([
-    gangIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, gangIds)).all() : [],
-    gherIds.length ? db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)).all() : [],
+    gangIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, gangIds)) : [],
+    gherIds.length ? db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)) : [],
   ]);
   const gangById = new Map(gangRows.map((g) => [g._id, g]));
   const gherById = new Map(gherRows.map((g) => [g._id, g]));
@@ -81,7 +81,7 @@ export async function listNikasiEntries(kilnId: string, filter: ListNikasiFilter
 // molding.service.ts's damagedMoldedSince and stacking.service.ts's
 // totalStacked().damageCount.
 export async function totalNikasiDamage(kilnId: string, since: Date) {
-  const entries = await db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, since))).all();
+  const entries = await db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, since)));
   return entries.reduce((sum, e) => sum + (e.damagedCount ?? 0), 0);
 }
 
@@ -97,9 +97,9 @@ export async function nikasiPeriodTotals(kilnId: string) {
   monthAgo.setDate(monthAgo.getDate() - 30);
 
   const [todayEntries, weekEntries, monthEntries] = await Promise.all([
-    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, startOfDay))).all(),
-    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, weekAgo))).all(),
-    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, monthAgo))).all(),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, startOfDay))),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, weekAgo))),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, monthAgo))),
   ]);
 
   const sum = (entries: typeof todayEntries, field: "bricksCount" | "damagedCount") =>
@@ -135,10 +135,9 @@ export async function nikasiOperatorSummary(kilnId: string) {
     .select()
     .from(people)
     .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.nikasiContractorId), eq(people.workType, "NIKASI"), eq(people.active, true)))
-    .orderBy(asc(people.name))
-    .all();
+    .orderBy(asc(people.name));
 
-  const allEntries = await db.select().from(nikasiEntries).where(eq(nikasiEntries.kilnId, kilnId)).all();
+  const allEntries = await db.select().from(nikasiEntries).where(eq(nikasiEntries.kilnId, kilnId));
   const entriesByGang = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
     const id = e.gangId;
@@ -151,7 +150,7 @@ export async function nikasiOperatorSummary(kilnId: string) {
     const opEntries = entriesByGang.get(operator._id) ?? [];
     if (opEntries.length === 0) continue;
 
-    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id))).all();
+    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id)));
     const { due, paid, balance } = sumByDirection(opLedgerEntries);
 
     results.push({
@@ -190,8 +189,8 @@ export async function nikasiOperatorSummary(kilnId: string) {
 // contractor summary for the same rule applied to Pathai).
 export async function nikasiContractorSummary(kilnId: string) {
   const [contractors, laborers] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true), eq(people.workType, "NIKASI"))).orderBy(asc(people.name)).all(),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true), eq(people.workType, "NIKASI"))).all(),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true), eq(people.workType, "NIKASI"))).orderBy(asc(people.name)),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true), eq(people.workType, "NIKASI"))),
   ]);
 
   const contractorResults = await Promise.all(
@@ -201,8 +200,8 @@ export async function nikasiContractorSummary(kilnId: string) {
       const personIds = [contractor._id, ...laborerIds];
 
       const [gangEntries, gangLedgerEntries] = await Promise.all([
-        db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), inArray(nikasiEntries.gangId, personIds))).all(),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))).all(),
+        db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), inArray(nikasiEntries.gangId, personIds))),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))),
       ]);
 
       const bricksByLaborer = new Map<string, number>();

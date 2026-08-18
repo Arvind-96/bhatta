@@ -35,8 +35,8 @@ export async function createChamberGrading(input: CreateGradingInput) {
   const stackedCount = await stackedSinceForGher(input.kilnId, input.gherId, gher.cycleStartedAt ?? undefined);
 
   const _id = randomUUID();
-  db.insert(chamberGradings).values({ ...input, _id, stackedCount }).run();
-  const grading = db.select().from(chamberGradings).where(eq(chamberGradings._id, _id)).get()!;
+  await db.insert(chamberGradings).values({ ...input, _id, stackedCount });
+  const grading = (await db.select().from(chamberGradings).where(eq(chamberGradings._id, _id)))[0]!;
 
   const counts = {
     a1Count: input.a1Count,
@@ -57,11 +57,11 @@ export async function createChamberGrading(input: CreateGradingInput) {
     }
   }
 
-  db.update(ghers).set({ status: "EMPTY", updatedAt: new Date() }).where(eq(ghers._id, input.gherId)).run();
+  await db.update(ghers).set({ status: "EMPTY", updatedAt: new Date() }).where(eq(ghers._id, input.gherId));
 
   const recoveryPercent = stackedCount > 0 ? Math.round((counts.a1Count / stackedCount) * 1000) / 10 : null;
 
-  emitToKiln(input.kilnId, "gher:update", db.select().from(ghers).where(eq(ghers._id, input.gherId)).get());
+  emitToKiln(input.kilnId, "gher:update", (await db.select().from(ghers).where(eq(ghers._id, input.gherId)))[0]);
   emitToKiln(input.kilnId, "grading:update", { ...grading, recoveryPercent });
 
   return { grading, recoveryPercent };
@@ -70,10 +70,10 @@ export async function createChamberGrading(input: CreateGradingInput) {
 export async function listGradings(kilnId: string, days = 60) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(chamberGradings).where(and(eq(chamberGradings.kilnId, kilnId), gte(chamberGradings.date, since))).orderBy(desc(chamberGradings.date)).all();
+  const rows = await db.select().from(chamberGradings).where(and(eq(chamberGradings.kilnId, kilnId), gte(chamberGradings.date, since))).orderBy(desc(chamberGradings.date));
 
   const gherIds = [...new Set(rows.map((r) => r.gherId))];
-  const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)).all() : [];
+  const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)) : [];
   const gherById = new Map(gherRows.map((g) => [g._id, g]));
 
   return rows.map((g) => ({
@@ -86,6 +86,6 @@ export async function listGradings(kilnId: string, days = 60) {
 export async function totalA1Output(kilnId: string, since: Date, until?: Date) {
   const conditions = [eq(chamberGradings.kilnId, kilnId), gte(chamberGradings.date, since)];
   if (until) conditions.push(lte(chamberGradings.date, until));
-  const gradings = await db.select().from(chamberGradings).where(and(...conditions)).all();
+  const gradings = await db.select().from(chamberGradings).where(and(...conditions));
   return gradings.reduce((sum, g) => sum + g.a1Count, 0);
 }

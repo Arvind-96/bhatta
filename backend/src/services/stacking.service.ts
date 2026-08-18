@@ -37,8 +37,8 @@ export async function createStackingEntry(input: CreateStackingInput) {
   await assertGherInKiln(input.kilnId, input.gherId);
 
   const _id = randomUUID();
-  db.insert(stackingEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(stackingEntries).where(eq(stackingEntries._id, _id)).get()!;
+  await db.insert(stackingEntries).values({ ...input, _id });
+  const entry = (await db.select().from(stackingEntries).where(eq(stackingEntries._id, _id)))[0]!;
 
   await updateGherStatus(input.kilnId, input.gherId, "STACKING");
 
@@ -61,11 +61,11 @@ export interface UpdateStackingInput {
 // or stage here is just fixing the production record; it never touches the
 // ledger (contrast with molding's piece-rate correction pattern).
 export async function updateStackingEntry(kilnId: string, entryId: string, input: UpdateStackingInput) {
-  const existing = db.select().from(stackingEntries).where(and(eq(stackingEntries._id, entryId), eq(stackingEntries.kilnId, kilnId))).get();
+  const existing = (await db.select().from(stackingEntries).where(and(eq(stackingEntries._id, entryId), eq(stackingEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Stacking entry not found in this kiln");
 
-  db.update(stackingEntries).set(input).where(eq(stackingEntries._id, entryId)).run();
-  const updated = db.select().from(stackingEntries).where(eq(stackingEntries._id, entryId)).get()!;
+  await db.update(stackingEntries).set(input).where(eq(stackingEntries._id, entryId));
+  const updated = (await db.select().from(stackingEntries).where(eq(stackingEntries._id, entryId)))[0]!;
 
   emitToKiln(kilnId, "stacking:update", updated);
   return updated;
@@ -85,12 +85,12 @@ export async function listStackingEntries(kilnId: string, filter: ListStackingFi
   if (filter.from) conditions.push(gte(stackingEntries.date, filter.from));
   if (filter.to) conditions.push(lte(stackingEntries.date, filter.to));
 
-  const rows = await db.select().from(stackingEntries).where(and(...conditions)).orderBy(desc(stackingEntries.date)).all();
+  const rows = await db.select().from(stackingEntries).where(and(...conditions)).orderBy(desc(stackingEntries.date));
   const gangIds = [...new Set(rows.map((r) => r.gangId))];
   const gherIds = [...new Set(rows.map((r) => r.gherId))];
   const [gangRows, gherRows] = await Promise.all([
-    gangIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, gangIds)).all() : [],
-    gherIds.length ? db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)).all() : [],
+    gangIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, gangIds)) : [],
+    gherIds.length ? db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)) : [],
   ]);
   const gangById = new Map(gangRows.map((g) => [g._id, g]));
   const gherById = new Map(gherRows.map((g) => [g._id, g]));
@@ -100,7 +100,7 @@ export async function listStackingEntries(kilnId: string, filter: ListStackingFi
 export async function totalStacked(kilnId: string, since: Date, until?: Date) {
   const conditions = [eq(stackingEntries.kilnId, kilnId), gte(stackingEntries.date, since)];
   if (until) conditions.push(lte(stackingEntries.date, until));
-  const entries = await db.select().from(stackingEntries).where(and(...conditions)).all();
+  const entries = await db.select().from(stackingEntries).where(and(...conditions));
   return {
     bricksCount: entries.reduce((sum, e) => sum + e.bricksCount, 0),
     damageCount: entries.reduce((sum, e) => sum + (e.damageCount ?? 0), 0),
@@ -113,7 +113,7 @@ export async function totalStacked(kilnId: string, since: Date, until?: Date) {
 export async function stackedSinceForGher(kilnId: string, gherId: string, since?: Date) {
   const conditions = [eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.gherId, gherId)];
   if (since) conditions.push(gte(stackingEntries.date, since));
-  const entries = await db.select().from(stackingEntries).where(and(...conditions)).all();
+  const entries = await db.select().from(stackingEntries).where(and(...conditions));
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
 }
 
@@ -135,11 +135,10 @@ export async function stackingOperatorSummary(kilnId: string) {
     .select()
     .from(people)
     .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true)))
-    .orderBy(asc(people.name))
-    .all();
+    .orderBy(asc(people.name));
   const independentOperators = operators.filter((o) => !o.bharaiContractorId);
 
-  const allEntries = await db.select().from(stackingEntries).where(eq(stackingEntries.kilnId, kilnId)).all();
+  const allEntries = await db.select().from(stackingEntries).where(eq(stackingEntries.kilnId, kilnId));
   const entriesByGang = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
     const id = e.gangId;
@@ -152,7 +151,7 @@ export async function stackingOperatorSummary(kilnId: string) {
     const opEntries = entriesByGang.get(operator._id) ?? [];
     if (opEntries.length === 0) continue;
 
-    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id))).all();
+    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id)));
     const { due, paid, balance } = sumByDirection(opLedgerEntries);
 
     const tractorNumbers = new Set<string>();
@@ -197,9 +196,9 @@ export async function stackingOperatorSummary(kilnId: string) {
 // roster. Same shape as molding.service.ts's moldingContractorSummary.
 export async function stackingContractorSummary(kilnId: string) {
   const [contractors, laborers, vehicles] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)).all(),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))).all(),
-    db.select().from(stackingVehicles).where(eq(stackingVehicles.kilnId, kilnId)).all(),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
+    db.select().from(stackingVehicles).where(eq(stackingVehicles.kilnId, kilnId)),
   ]);
 
   const contractorResults = await Promise.all(
@@ -209,8 +208,8 @@ export async function stackingContractorSummary(kilnId: string) {
       const personIds = [contractor._id, ...laborerIds];
 
       const [gangEntries, gangLedgerEntries] = await Promise.all([
-        db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), inArray(stackingEntries.gangId, personIds))).all(),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))).all(),
+        db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), inArray(stackingEntries.gangId, personIds))),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))),
       ]);
 
       const bricksByLaborer = new Map<string, number>();
@@ -279,11 +278,10 @@ export async function tractorFleetSummary(kilnId: string) {
   const entries = await db
     .select()
     .from(stackingEntries)
-    .where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.mode, "TRACTOR"), isNotNull(stackingEntries.tractorNumber)))
-    .all();
+    .where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.mode, "TRACTOR"), isNotNull(stackingEntries.tractorNumber)));
 
   const gangIds = [...new Set(entries.map((e) => e.gangId))];
-  const gangRows = gangIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, gangIds)).all() : [];
+  const gangRows = gangIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, gangIds)) : [];
   const gangById = new Map(gangRows.map((g) => [g._id, g]));
 
   const byTractor = new Map<

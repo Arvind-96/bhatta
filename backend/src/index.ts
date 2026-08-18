@@ -42,19 +42,30 @@ const httpServer = createServer(app);
 initSocket(httpServer);
 registerSocketHandlers();
 
-runMigrations();
+// Migrations must finish before the server accepts requests — unlike
+// better-sqlite3's synchronous migrate(), mysql2's is a real async
+// round-trip, so the rest of startup waits on it instead of firing
+// concurrently.
+async function start() {
+  await runMigrations();
 
-// Midnight on the 1st of every month, server-local time: generates the
-// just-completed month's salary slip for every staff member with a
-// monthlySalary set, across every kiln. Safe to also trigger manually
-// (Salary page's "Generate now") — regenerating an existing slip just
-// overwrites it with current attendance data, never duplicates.
-cron.schedule("0 0 1 * *", () => {
-  runMonthlySalaryGeneration()
-    .then((result) => console.log(`[salary-cron] ${result.month}: ${result.generated} generated, ${result.failed.length} failed`))
-    .catch((err) => console.error("[salary-cron] failed:", err));
-});
+  // Midnight on the 1st of every month, server-local time: generates the
+  // just-completed month's salary slip for every staff member with a
+  // monthlySalary set, across every kiln. Safe to also trigger manually
+  // (Salary page's "Generate now") — regenerating an existing slip just
+  // overwrites it with current attendance data, never duplicates.
+  cron.schedule("0 0 1 * *", () => {
+    runMonthlySalaryGeneration()
+      .then((result) => console.log(`[salary-cron] ${result.month}: ${result.generated} generated, ${result.failed.length} failed`))
+      .catch((err) => console.error("[salary-cron] failed:", err));
+  });
 
-httpServer.listen(env.port, () => {
-  console.log(`Bhatta Cloud API running on http://localhost:${env.port}`);
+  httpServer.listen(env.port, () => {
+    console.log(`Bhatta Cloud API running on http://localhost:${env.port}`);
+  });
+}
+
+start().catch((err) => {
+  console.error("[startup] failed to start server:", err);
+  process.exit(1);
 });

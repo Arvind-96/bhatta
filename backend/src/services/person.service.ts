@@ -56,7 +56,7 @@ export interface CreatePersonInput {
 // caller expects, so a stale/cross-kiln/wrong-type id fails loudly at
 // write time instead of silently corrupting a ledger or attendance record.
 export async function assertPersonOfType(kilnId: string, personId: string, allowedTypes: PersonType[]) {
-  const person = db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))).get();
+  const person = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!person) throw new Error("Referenced person not found in this kiln");
   if (!allowedTypes.includes(person.type as PersonType)) {
     throw new Error(`Expected ${allowedTypes.join(" or ")}, got ${person.type}`);
@@ -87,8 +87,8 @@ export async function createPerson(input: CreatePersonInput) {
     await assertPersonOfType(input.kilnId, input.nikasiContractorId, ["LABOUR_CONTRACTOR"]);
   }
   const _id = randomUUID();
-  db.insert(people).values({ ...input, _id, stackingStage: deriveStackingStage(input) }).run();
-  const person = db.select().from(people).where(eq(people._id, _id)).get()!;
+  await db.insert(people).values({ ...input, _id, stackingStage: deriveStackingStage(input) });
+  const person = (await db.select().from(people).where(eq(people._id, _id)))[0]!;
   emitToKiln(input.kilnId, "person:update", person);
   return person;
 }
@@ -96,15 +96,14 @@ export async function createPerson(input: CreatePersonInput) {
 export async function listPeople(kilnId: string, type?: PersonType) {
   const conditions = [eq(people.kilnId, kilnId), eq(people.active, true)];
   if (type) conditions.push(eq(people.type, type));
-  return db.select().from(people).where(and(...conditions)).orderBy(asc(people.name)).all();
+  return await db.select().from(people).where(and(...conditions)).orderBy(asc(people.name));
 }
 
 export async function getBalance(kilnId: string, personId: string) {
   const entries = await db
     .select()
     .from(ledgerEntries)
-    .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, personId)))
-    .all();
+    .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, personId)));
   const balance = entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0);
   // Summing many float amounts drifts off whole-paisa precision (e.g.
   // 0.1 + 0.2 territory) — round back to paisa here, the one place every
@@ -114,7 +113,7 @@ export async function getBalance(kilnId: string, personId: string) {
 }
 
 export async function getPersonWithBalance(kilnId: string, personId: string) {
-  const person = db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))).get();
+  const person = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!person) throw new Error("Person not found");
   const balance = await getBalance(kilnId, personId);
   return { person, balance };
@@ -134,14 +133,13 @@ export async function updatePerson(kilnId: string, personId: string, input: Upda
   if (input.nikasiContractorId) {
     await assertPersonOfType(kilnId, input.nikasiContractorId, ["LABOUR_CONTRACTOR"]);
   }
-  const existing = db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))).get();
+  const existing = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Person not found");
 
-  db.update(people)
+  await db.update(people)
     .set({ ...input, stackingStage: deriveStackingStage(input) })
-    .where(and(eq(people._id, personId), eq(people.kilnId, kilnId)))
-    .run();
-  const person = db.select().from(people).where(eq(people._id, personId)).get()!;
+    .where(and(eq(people._id, personId), eq(people.kilnId, kilnId)));
+  const person = (await db.select().from(people).where(eq(people._id, personId)))[0]!;
   emitToKiln(kilnId, "person:update", person);
   return person;
 }
@@ -155,8 +153,7 @@ export async function listOutstandingAdvances(kilnId: string) {
   const rows = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER", "LABOUR_CONTRACTOR"])))
-    .all();
+    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER", "LABOUR_CONTRACTOR"])));
 
   const results = [];
   for (const person of rows) {
@@ -164,8 +161,7 @@ export async function listOutstandingAdvances(kilnId: string) {
       .select()
       .from(ledgerEntries)
       .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, person._id)))
-      .orderBy(asc(ledgerEntries.date))
-      .all();
+      .orderBy(asc(ledgerEntries.date));
     const balance = Math.round(entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0) * 100) / 100;
     if (balance < 0) {
       const oldestAdvance = entries.find((e) => e.direction === "PAID");
@@ -191,16 +187,14 @@ export async function listPaymentsDue(kilnId: string) {
   const rows = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), ne(people.type, "CUSTOMER")))
-    .all();
+    .where(and(eq(people.kilnId, kilnId), ne(people.type, "CUSTOMER")));
 
   const results = [];
   for (const person of rows) {
     const entries = await db
       .select()
       .from(ledgerEntries)
-      .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, person._id)))
-      .all();
+      .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, person._id)));
     const balance = Math.round(entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0) * 100) / 100;
     if (balance > 0) {
       results.push({
@@ -220,7 +214,7 @@ export async function listPaymentsDue(kilnId: string) {
 // measured from their oldest still-unpaid sale, which is what actually
 // determines collection urgency, not just the total amount.
 export async function customerCreditAging(kilnId: string) {
-  const customers = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))).all();
+  const customers = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER")));
 
   const results = [];
   for (const person of customers) {
@@ -228,8 +222,7 @@ export async function customerCreditAging(kilnId: string) {
       .select()
       .from(ledgerEntries)
       .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, person._id)))
-      .orderBy(asc(ledgerEntries.date))
-      .all();
+      .orderBy(asc(ledgerEntries.date));
     const balance = Math.round(entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0) * 100) / 100;
     if (balance <= 0) continue;
 

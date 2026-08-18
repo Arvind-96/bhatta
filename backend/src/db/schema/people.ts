@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { double, int, mysqlTable, varchar, text, uniqueIndex, index, boolean, datetime } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
 
 export const PERSON_TYPES = [
@@ -18,48 +18,48 @@ export const STACKING_STAGES = ["TRANSPORT", "CHAMBER_STACKING"] as const;
 // khetArea only for LANDOWNER), left NULL otherwise. Kept wide rather than
 // split into per-type tables to match the existing shape 1:1 and avoid
 // touching every controller that reads/writes these fields generically.
-export const people = sqliteTable("people", {
+export const people = mysqlTable("people", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  type: text("type", { enum: PERSON_TYPES }).notNull(),
-  name: text("name").notNull(),
-  phone: text("phone"),
-  address: text("address"),
+  type: varchar("type", { length: 50, enum: PERSON_TYPES }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 255 }),
+  address: varchar("address", { length: 255 }),
   notes: text("notes"),
-  status: text("status", { enum: PERSON_STATUSES }).default("ACTIVE"),
-  idNumber: text("idNumber"),
-  age: integer("age"),
-  sex: text("sex", { enum: SEX_OPTIONS }),
-  workType: text("workType", { enum: WORK_TYPES }),
-  dailyWage: real("dailyWage"),
-  ratePerThousand: real("ratePerThousand"),
-  contractorId: text("contractorId"),
-  familyHeadId: text("familyHeadId"),
-  payType: text("payType", { enum: ["MONTHLY", "PER_THOUSAND"] }),
-  commissionPerThousand: real("commissionPerThousand"),
-  defaultRatePerThousand: real("defaultRatePerThousand"),
-  bharaiRatePerThousand: real("bharaiRatePerThousand"),
-  monthlySalary: real("monthlySalary"),
-  stackingStage: text("stackingStage", { enum: STACKING_STAGES }),
-  bharaiContractorId: text("bharaiContractorId"),
-  nikasiContractorId: text("nikasiContractorId"),
-  firingShiftAnchorDate: integer("firingShiftAnchorDate", { mode: "timestamp_ms" }),
-  firingShiftAnchorType: text("firingShiftAnchorType", { enum: ["DAY", "NIGHT"] }),
-  vehicleNumber: text("vehicleNumber"),
-  licenseNumber: text("licenseNumber"),
-  ratePerTrolley: real("ratePerTrolley"),
-  designation: text("designation"),
-  isOfficeStaff: integer("isOfficeStaff", { mode: "boolean" }).default(false),
-  gstNumber: text("gstNumber"),
-  contractRate: real("contractRate"),
-  contractUnit: text("contractUnit"),
-  profitSharePercent: real("profitSharePercent"),
-  khetArea: real("khetArea"),
-  khetAreaUnit: text("khetAreaUnit").default("bigha"),
-  khetLocation: text("khetLocation"),
-  agreedDepthFeet: real("agreedDepthFeet"),
-  creditLimit: real("creditLimit"),
-  active: integer("active", { mode: "boolean" }).default(true),
+  status: varchar("status", { length: 50, enum: PERSON_STATUSES }).default("ACTIVE"),
+  idNumber: varchar("idNumber", { length: 255 }),
+  age: int("age"),
+  sex: varchar("sex", { length: 50, enum: SEX_OPTIONS }),
+  workType: varchar("workType", { length: 50, enum: WORK_TYPES }),
+  dailyWage: double("dailyWage"),
+  ratePerThousand: double("ratePerThousand"),
+  contractorId: varchar("contractorId", { length: 64 }),
+  familyHeadId: varchar("familyHeadId", { length: 64 }),
+  payType: varchar("payType", { length: 50, enum: ["MONTHLY", "PER_THOUSAND"] }),
+  commissionPerThousand: double("commissionPerThousand"),
+  defaultRatePerThousand: double("defaultRatePerThousand"),
+  bharaiRatePerThousand: double("bharaiRatePerThousand"),
+  monthlySalary: double("monthlySalary"),
+  stackingStage: varchar("stackingStage", { length: 50, enum: STACKING_STAGES }),
+  bharaiContractorId: varchar("bharaiContractorId", { length: 64 }),
+  nikasiContractorId: varchar("nikasiContractorId", { length: 64 }),
+  firingShiftAnchorDate: dateColumn("firingShiftAnchorDate"),
+  firingShiftAnchorType: varchar("firingShiftAnchorType", { length: 50, enum: ["DAY", "NIGHT"] }),
+  vehicleNumber: varchar("vehicleNumber", { length: 255 }),
+  licenseNumber: varchar("licenseNumber", { length: 255 }),
+  ratePerTrolley: double("ratePerTrolley"),
+  designation: varchar("designation", { length: 255 }),
+  isOfficeStaff: boolean("isOfficeStaff").default(false),
+  gstNumber: varchar("gstNumber", { length: 255 }),
+  contractRate: double("contractRate"),
+  contractUnit: varchar("contractUnit", { length: 255 }),
+  profitSharePercent: double("profitSharePercent"),
+  khetArea: double("khetArea"),
+  khetAreaUnit: varchar("khetAreaUnit", { length: 50 }).default("bigha"),
+  khetLocation: varchar("khetLocation", { length: 255 }),
+  agreedDepthFeet: double("agreedDepthFeet"),
+  creditLimit: double("creditLimit"),
+  active: boolean("active").default(true),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnTypeIdx: index("people_kiln_type_idx").on(t.kilnId, t.type),
@@ -67,16 +67,16 @@ export const people = sqliteTable("people", {
 
 export const FAMILY_RELATIONS = ["SPOUSE", "CHILD", "PARENT", "SIBLING", "OTHER"] as const;
 
-export const familyMembers = sqliteTable("family_members", {
+export const familyMembers = mysqlTable("family_members", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  headPersonId: text("headPersonId").notNull(),
-  name: text("name").notNull(),
-  relation: text("relation", { enum: FAMILY_RELATIONS }).notNull(),
-  age: integer("age"),
-  sex: text("sex", { enum: SEX_OPTIONS }),
-  isWorking: integer("isWorking", { mode: "boolean" }).default(false),
-  workerId: text("workerId"),
+  headPersonId: varchar("headPersonId", { length: 64 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  relation: varchar("relation", { length: 50, enum: FAMILY_RELATIONS }).notNull(),
+  age: int("age"),
+  sex: varchar("sex", { length: 50, enum: SEX_OPTIONS }),
+  isWorking: boolean("isWorking").default(false),
+  workerId: varchar("workerId", { length: 64 }),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({
@@ -89,40 +89,40 @@ export const LEDGER_CATEGORIES = [
 ] as const;
 export const LEDGER_PAYMENT_MODES = ["CASH", "BANK", "UPI", "CASH_AND_ONLINE"] as const;
 
-export const ledgerEntries = sqliteTable("ledger_entries", {
+export const ledgerEntries = mysqlTable("ledger_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  personId: text("personId").notNull(),
-  direction: text("direction", { enum: ["DUE", "PAID"] }).notNull(),
-  amount: real("amount").notNull(),
+  personId: varchar("personId", { length: 64 }).notNull(),
+  direction: varchar("direction", { length: 50, enum: ["DUE", "PAID"] }).notNull(),
+  amount: double("amount").notNull(),
   reason: text("reason").notNull(),
-  category: text("category", { enum: LEDGER_CATEGORIES }),
-  paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
+  category: varchar("category", { length: 50, enum: LEDGER_CATEGORIES }),
+  paymentMode: varchar("paymentMode", { length: 50, enum: LEDGER_PAYMENT_MODES }),
   // Only set when paymentMode is CASH_AND_ONLINE — the two must sum to
   // `amount` (validated at the controller), so a split payment's cash vs.
   // online portions can still be reported on accurately elsewhere (e.g.
   // Financial Overview) instead of collapsing into one opaque label.
-  cashAmount: real("cashAmount"),
-  onlineAmount: real("onlineAmount"),
-  contractId: text("contractId"),
+  cashAmount: double("cashAmount"),
+  onlineAmount: double("onlineAmount"),
+  contractId: varchar("contractId", { length: 64 }),
   date: dateColumn(),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnPersonDateIdx: index("ledger_kiln_person_date_idx").on(t.kilnId, t.personId, t.date),
 }));
 
-export const paymentReceipts = sqliteTable("payment_receipts", {
+export const paymentReceipts = mysqlTable("payment_receipts", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  personId: text("personId").notNull(),
-  receiptNumber: text("receiptNumber").notNull(),
-  amountPaid: real("amountPaid").notNull(),
-  totalAgreedAmount: real("totalAgreedAmount"),
-  balanceBefore: real("balanceBefore").notNull(),
-  balanceAfter: real("balanceAfter").notNull(),
-  paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
-  cashAmount: real("cashAmount"),
-  onlineAmount: real("onlineAmount"),
+  personId: varchar("personId", { length: 64 }).notNull(),
+  receiptNumber: varchar("receiptNumber", { length: 255 }).notNull(),
+  amountPaid: double("amountPaid").notNull(),
+  totalAgreedAmount: double("totalAgreedAmount"),
+  balanceBefore: double("balanceBefore").notNull(),
+  balanceAfter: double("balanceAfter").notNull(),
+  paymentMode: varchar("paymentMode", { length: 50, enum: LEDGER_PAYMENT_MODES }),
+  cashAmount: double("cashAmount"),
+  onlineAmount: double("onlineAmount"),
   notes: text("notes"),
   date: dateColumn(),
   createdAt: createdAtColumn(),
@@ -131,13 +131,13 @@ export const paymentReceipts = sqliteTable("payment_receipts", {
   kilnDateIdx: index("receipt_kiln_date_idx").on(t.kilnId, t.date),
 }));
 
-export const workEntries = sqliteTable("work_entries", {
+export const workEntries = mysqlTable("work_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  personId: text("personId").notNull(),
-  workType: text("workType", { enum: WORK_TYPES }).notNull(),
-  quantity: real("quantity").notNull(),
-  ratePerThousand: real("ratePerThousand").notNull(),
+  personId: varchar("personId", { length: 64 }).notNull(),
+  workType: varchar("workType", { length: 50, enum: WORK_TYPES }).notNull(),
+  quantity: double("quantity").notNull(),
+  ratePerThousand: double("ratePerThousand").notNull(),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
@@ -148,13 +148,13 @@ export const workEntries = sqliteTable("work_entries", {
 // A row here is always an *exception* — everyone is implicitly PRESENT on
 // any date with no row (see attendance.service.ts). Only an admin-recorded
 // Absent/Half-day/Late override ever gets written.
-export const attendances = sqliteTable("attendances", {
+export const attendances = mysqlTable("attendances", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  personId: text("personId").notNull(),
+  personId: varchar("personId", { length: 64 }).notNull(),
   date: dateColumn().notNull(),
-  status: text("status", { enum: ["PRESENT", "ABSENT", "HALF_DAY", "LATE"] }).notNull(),
-  wageAmount: real("wageAmount"),
+  status: varchar("status", { length: 50, enum: ["PRESENT", "ABSENT", "HALF_DAY", "LATE"] }).notNull(),
+  wageAmount: double("wageAmount"),
   createdAt: createdAtColumn(),
 }, (t) => ({
   personDateUnique: uniqueIndex("attendance_person_date_unique").on(t.personId, t.date),

@@ -25,8 +25,8 @@ export interface CreateIncidentInput {
 // toward normal cost totals, but the incident record keeps the root cause.
 export async function createKilnIncident(input: CreateIncidentInput) {
   const _id = randomUUID();
-  db.insert(kilnIncidents).values({ ...input, _id }).run();
-  const incident = db.select().from(kilnIncidents).where(eq(kilnIncidents._id, _id)).get()!;
+  await db.insert(kilnIncidents).values({ ...input, _id });
+  const incident = (await db.select().from(kilnIncidents).where(eq(kilnIncidents._id, _id)))[0]!;
 
   if (input.repairCost && input.repairCost > 0) {
     await createExpense({
@@ -46,10 +46,10 @@ export async function createKilnIncident(input: CreateIncidentInput) {
 export async function listKilnIncidents(kilnId: string, days = 90) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(kilnIncidents).where(and(eq(kilnIncidents.kilnId, kilnId), gte(kilnIncidents.date, since))).orderBy(desc(kilnIncidents.date)).all();
+  const rows = await db.select().from(kilnIncidents).where(and(eq(kilnIncidents.kilnId, kilnId), gte(kilnIncidents.date, since))).orderBy(desc(kilnIncidents.date));
 
   const gherIds = [...new Set(rows.map((r) => r.gherId).filter((v): v is string => !!v))];
-  const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)).all() : [];
+  const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)) : [];
   const gherById = new Map(gherRows.map((g) => [g._id, g]));
   return rows.map((r) => ({ ...r, gherId: r.gherId ? gherById.get(r.gherId) ?? r.gherId : r.gherId }));
 }

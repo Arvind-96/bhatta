@@ -32,22 +32,23 @@ function toPublicUser(user: { _id: string; name: string; email: string }) {
 // needing setup.
 async function needsSetup(kilnId: string, onboardedAt: Date | null | undefined) {
   if (onboardedAt) return false;
-  const [personCount, gherCount] = await Promise.all([
-    db.select({ n: count() }).from(people).where(eq(people.kilnId, kilnId)).get(),
-    db.select({ n: count() }).from(ghers).where(eq(ghers.kilnId, kilnId)).get(),
+  const [personCountRows, gherCountRows] = await Promise.all([
+    db.select({ n: count() }).from(people).where(eq(people.kilnId, kilnId)),
+    db.select({ n: count() }).from(ghers).where(eq(ghers.kilnId, kilnId)),
   ]);
+  const personCount = personCountRows[0];
+  const gherCount = gherCountRows[0];
   return (personCount?.n ?? 0) === 0 && (gherCount?.n ?? 0) === 0;
 }
 
 async function listMemberships(userId: string) {
-  const memberships = await db.select().from(kilnMemberships).where(eq(kilnMemberships.userId, userId)).all();
+  const memberships = await db.select().from(kilnMemberships).where(eq(kilnMemberships.userId, userId));
   if (memberships.length === 0) return [];
 
   const kilnRows = await db
     .select()
     .from(kilns)
-    .where(inArray(kilns._id, memberships.map((m) => m.kilnId)))
-    .all();
+    .where(inArray(kilns._id, memberships.map((m) => m.kilnId)));
   const kilnById = new Map(kilnRows.map((k) => [k._id, k]));
 
   return Promise.all(
@@ -71,37 +72,37 @@ async function listMemberships(userId: string) {
 }
 
 export async function registerUser(input: RegisterInput) {
-  const existing = db.select().from(users).where(eq(users.email, input.email)).get();
+  const existing = (await db.select().from(users).where(eq(users.email, input.email)))[0];
   if (existing) throw new Error("Email already registered");
 
   const passwordHash = await bcrypt.hash(input.password, 10);
   const userId = randomUUID();
-  db.insert(users).values({ _id: userId, name: input.name, email: input.email, passwordHash }).run();
+  await db.insert(users).values({ _id: userId, name: input.name, email: input.email, passwordHash });
 
   let kilnId: string;
   let role: "OWNER" | "MANAGER" | "MUNIM";
 
   if (input.kilnId) {
-    const kiln = db.select().from(kilns).where(eq(kilns._id, input.kilnId)).get();
+    const kiln = (await db.select().from(kilns).where(eq(kilns._id, input.kilnId)))[0];
     if (!kiln) throw new Error("Kiln not found");
     kilnId = kiln._id;
     role = input.role ?? "MUNIM";
   } else {
     if (!input.kilnName) throw new Error("kilnName is required to create a new kiln");
     kilnId = randomUUID();
-    db.insert(kilns).values({ _id: kilnId, name: input.kilnName, location: input.kilnLocation }).run();
+    await db.insert(kilns).values({ _id: kilnId, name: input.kilnName, location: input.kilnLocation });
     role = "OWNER";
   }
 
-  db.insert(kilnMemberships).values({ _id: randomUUID(), userId, kilnId, role }).run();
+  await db.insert(kilnMemberships).values({ _id: randomUUID(), userId, kilnId, role });
 
-  const user = db.select().from(users).where(eq(users._id, userId)).get()!;
+  const user = (await db.select().from(users).where(eq(users._id, userId)))[0]!;
   const token = signToken(userId);
   return { token, user: toPublicUser(user), kilns: await listMemberships(userId) };
 }
 
 export async function loginUser(email: string, password: string) {
-  const user = db.select().from(users).where(eq(users.email, email)).get();
+  const user = (await db.select().from(users).where(eq(users.email, email)))[0];
   if (!user) throw new Error("Invalid email or password");
 
   const valid = await bcrypt.compare(password, user.passwordHash);
@@ -112,7 +113,7 @@ export async function loginUser(email: string, password: string) {
 }
 
 export async function getCurrentUser(userId: string) {
-  const user = db.select().from(users).where(eq(users._id, userId)).get();
+  const user = (await db.select().from(users).where(eq(users._id, userId)))[0];
   if (!user) throw new Error("User not found");
   return { user: toPublicUser(user), kilns: await listMemberships(userId) };
 }
@@ -120,8 +121,8 @@ export async function getCurrentUser(userId: string) {
 // An existing owner spinning up another bhatta under the same account.
 export async function createAdditionalKiln(userId: string, name: string, location?: string) {
   const kilnId = randomUUID();
-  db.insert(kilns).values({ _id: kilnId, name, location }).run();
-  db.insert(kilnMemberships).values({ _id: randomUUID(), userId, kilnId, role: "OWNER" }).run();
+  await db.insert(kilns).values({ _id: kilnId, name, location });
+  await db.insert(kilnMemberships).values({ _id: randomUUID(), userId, kilnId, role: "OWNER" });
   return { kilnId, role: "OWNER" as const, name, location };
 }
 
@@ -135,7 +136,7 @@ export async function listUserKilns(userId: string) {
 // deployment's one real bhatta (resolveKiln falls back to the same kiln
 // for every request that doesn't send an X-Kiln-Id).
 export async function defaultKilnPublicInfo() {
-  const kiln = db.select().from(kilns).orderBy(asc(kilns.createdAt)).get();
+  const kiln = (await db.select().from(kilns).orderBy(asc(kilns.createdAt)))[0];
   if (!kiln) throw new Error("No kiln configured yet");
   return {
     kilnId: kiln._id,
@@ -156,39 +157,38 @@ export async function setKilnGeofence(
   kilnId: string,
   input: { latitude: number; longitude: number; radiusMeters?: number }
 ) {
-  db.update(kilns)
+  await db.update(kilns)
     .set({ latitude: input.latitude, longitude: input.longitude, radiusMeters: input.radiusMeters ?? 200 })
-    .where(eq(kilns._id, kilnId))
-    .run();
-  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+    .where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
   if (!kiln) throw new Error("Kiln not found");
   return kiln;
 }
 
 export async function setYardCapacity(kilnId: string, yardCapacityBricks: number) {
-  db.update(kilns).set({ yardCapacityBricks }).where(eq(kilns._id, kilnId)).run();
-  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+  await db.update(kilns).set({ yardCapacityBricks }).where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
   if (!kiln) throw new Error("Kiln not found");
   return kiln;
 }
 
 export async function setSeason(kilnId: string, seasonStartMonth: number, seasonStartDay: number) {
-  db.update(kilns).set({ seasonStartMonth, seasonStartDay }).where(eq(kilns._id, kilnId)).run();
-  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+  await db.update(kilns).set({ seasonStartMonth, seasonStartDay }).where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
   if (!kiln) throw new Error("Kiln not found");
   return kiln;
 }
 
 export async function setShiftTimes(kilnId: string, dayShiftStart: string, dayShiftEnd: string) {
-  db.update(kilns).set({ dayShiftStart, dayShiftEnd }).where(eq(kilns._id, kilnId)).run();
-  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+  await db.update(kilns).set({ dayShiftStart, dayShiftEnd }).where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
   if (!kiln) throw new Error("Kiln not found");
   return kiln;
 }
 
 export async function setGstNumber(kilnId: string, gstNumber: string | null) {
-  db.update(kilns).set({ gstNumber }).where(eq(kilns._id, kilnId)).run();
-  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+  await db.update(kilns).set({ gstNumber }).where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
   if (!kiln) throw new Error("Kiln not found");
   return kiln;
 }
@@ -197,26 +197,26 @@ export async function updateKilnProfile(
   kilnId: string,
   input: { name?: string; location?: string; phone?: string }
 ) {
-  db.update(kilns).set(input).where(eq(kilns._id, kilnId)).run();
-  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+  await db.update(kilns).set(input).where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
   if (!kiln) throw new Error("Kiln not found");
   return kiln;
 }
 
 export async function completeOnboarding(kilnId: string) {
-  db.update(kilns).set({ onboardedAt: new Date() }).where(eq(kilns._id, kilnId)).run();
-  const kiln = db.select().from(kilns).where(eq(kilns._id, kilnId)).get();
+  await db.update(kilns).set({ onboardedAt: new Date() }).where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
   if (!kiln) throw new Error("Kiln not found");
   return kiln;
 }
 
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
-  const user = db.select().from(users).where(eq(users._id, userId)).get();
+  const user = (await db.select().from(users).where(eq(users._id, userId)))[0];
   if (!user) throw new Error("User not found");
 
   const valid = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!valid) throw new Error("Current password is incorrect");
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  db.update(users).set({ passwordHash }).where(eq(users._id, userId)).run();
+  await db.update(users).set({ passwordHash }).where(eq(users._id, userId));
 }

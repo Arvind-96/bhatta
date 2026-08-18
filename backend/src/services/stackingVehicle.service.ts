@@ -20,8 +20,8 @@ export interface CreateStackingVehicleInput {
 export async function createStackingVehicle(input: CreateStackingVehicleInput) {
   await assertPersonOfType(input.kilnId, input.contractorId, ["LABOUR_CONTRACTOR"]);
   const _id = randomUUID();
-  db.insert(stackingVehicles).values({ ...input, _id }).run();
-  const vehicle = db.select().from(stackingVehicles).where(eq(stackingVehicles._id, _id)).get()!;
+  await db.insert(stackingVehicles).values({ ...input, _id });
+  const vehicle = (await db.select().from(stackingVehicles).where(eq(stackingVehicles._id, _id)))[0]!;
   emitToKiln(input.kilnId, "stackingVehicle:update", vehicle);
   return vehicle;
 }
@@ -29,7 +29,7 @@ export async function createStackingVehicle(input: CreateStackingVehicleInput) {
 export async function listStackingVehicles(kilnId: string, contractorId?: string) {
   const conditions = [eq(stackingVehicles.kilnId, kilnId)];
   if (contractorId) conditions.push(eq(stackingVehicles.contractorId, contractorId));
-  return db.select().from(stackingVehicles).where(and(...conditions)).orderBy(desc(stackingVehicles.createdAt)).all();
+  return await db.select().from(stackingVehicles).where(and(...conditions)).orderBy(desc(stackingVehicles.createdAt));
 }
 
 export interface UpdateStackingVehicleInput {
@@ -42,11 +42,11 @@ export interface UpdateStackingVehicleInput {
 }
 
 export async function updateStackingVehicle(kilnId: string, vehicleId: string, input: UpdateStackingVehicleInput) {
-  const existing = db.select().from(stackingVehicles).where(and(eq(stackingVehicles._id, vehicleId), eq(stackingVehicles.kilnId, kilnId))).get();
+  const existing = (await db.select().from(stackingVehicles).where(and(eq(stackingVehicles._id, vehicleId), eq(stackingVehicles.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Stacking vehicle not found in this kiln");
 
-  db.update(stackingVehicles).set(input).where(eq(stackingVehicles._id, vehicleId)).run();
-  const vehicle = db.select().from(stackingVehicles).where(eq(stackingVehicles._id, vehicleId)).get()!;
+  await db.update(stackingVehicles).set(input).where(eq(stackingVehicles._id, vehicleId));
+  const vehicle = (await db.select().from(stackingVehicles).where(eq(stackingVehicles._id, vehicleId)))[0]!;
   emitToKiln(kilnId, "stackingVehicle:update", vehicle);
   return vehicle;
 }

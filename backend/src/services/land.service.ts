@@ -29,19 +29,19 @@ export interface CreateLandInput {
 export async function createLand(input: CreateLandInput) {
   await assertPersonOfType(input.kilnId, input.landownerId, ["LANDOWNER"]);
   const _id = randomUUID();
-  db.insert(lands).values({ ...input, _id }).run();
-  const land = db.select().from(lands).where(eq(lands._id, _id)).get()!;
+  await db.insert(lands).values({ ...input, _id });
+  const land = (await db.select().from(lands).where(eq(lands._id, _id)))[0]!;
   emitToKiln(input.kilnId, "land:update", land);
   return land;
 }
 
 async function excavatedQuantityForLand(kilnId: string, landId: string) {
-  const trips = await db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.landId, landId))).all();
+  const trips = await db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.landId, landId)));
   return trips.reduce((sum, t) => sum + (t.trolleyCount ?? 0), 0);
 }
 
-function withLandowner(land: typeof lands.$inferSelect) {
-  const owner = db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(eq(people._id, land.landownerId)).get();
+async function withLandowner(land: typeof lands.$inferSelect) {
+  const owner = (await db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(eq(people._id, land.landownerId)))[0];
   return { ...land, landownerId: owner ?? land.landownerId };
 }
 
@@ -51,11 +51,11 @@ function withLandowner(land: typeof lands.$inferSelect) {
 export async function listLands(kilnId: string, landownerId?: string) {
   const conditions = [eq(lands.kilnId, kilnId)];
   if (landownerId) conditions.push(eq(lands.landownerId, landownerId));
-  const rows = await db.select().from(lands).where(and(...conditions)).orderBy(asc(lands.name)).all();
+  const rows = await db.select().from(lands).where(and(...conditions)).orderBy(asc(lands.name));
 
   return Promise.all(
     rows.map(async (land) => ({
-      ...withLandowner(land),
+      ...(await withLandowner(land)),
       excavatedQuantity: await excavatedQuantityForLand(kilnId, land._id),
     }))
   );
@@ -65,9 +65,9 @@ export async function listLands(kilnId: string, landownerId?: string) {
 // own info plus its computed excavated total, same shape as one entry from
 // listLands but fetched directly by id instead of scanning the whole list.
 export async function getLand(kilnId: string, landId: string) {
-  const land = db.select().from(lands).where(and(eq(lands._id, landId), eq(lands.kilnId, kilnId))).get();
+  const land = (await db.select().from(lands).where(and(eq(lands._id, landId), eq(lands.kilnId, kilnId))))[0];
   if (!land) throw new Error("Land not found in this kiln");
-  return { ...withLandowner(land), excavatedQuantity: await excavatedQuantityForLand(kilnId, land._id) };
+  return { ...(await withLandowner(land)), excavatedQuantity: await excavatedQuantityForLand(kilnId, land._id) };
 }
 
 export interface UpdateLandInput extends Partial<Omit<CreateLandInput, "kilnId" | "landownerId">> {
@@ -75,16 +75,16 @@ export interface UpdateLandInput extends Partial<Omit<CreateLandInput, "kilnId" 
 }
 
 export async function updateLand(kilnId: string, landId: string, input: UpdateLandInput) {
-  const existing = db.select().from(lands).where(and(eq(lands._id, landId), eq(lands.kilnId, kilnId))).get();
+  const existing = (await db.select().from(lands).where(and(eq(lands._id, landId), eq(lands.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Land not found in this kiln");
-  db.update(lands).set(input).where(eq(lands._id, landId)).run();
-  const land = db.select().from(lands).where(eq(lands._id, landId)).get()!;
+  await db.update(lands).set(input).where(eq(lands._id, landId));
+  const land = (await db.select().from(lands).where(eq(lands._id, landId)))[0]!;
   emitToKiln(kilnId, "land:update", land);
   return land;
 }
 
 export async function assertLandInKiln(kilnId: string, landId: string) {
-  const land = db.select().from(lands).where(and(eq(lands._id, landId), eq(lands.kilnId, kilnId))).get();
+  const land = (await db.select().from(lands).where(and(eq(lands._id, landId), eq(lands.kilnId, kilnId))))[0];
   if (!land) throw new Error("Referenced land not found in this kiln");
   return land;
 }

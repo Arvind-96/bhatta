@@ -1,47 +1,12 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "mysql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1786860754671,
-      "tag": "0000_conscious_rocket_raccoon",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1786882296387,
-      "tag": "0001_fuzzy_pixie",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1786895495007,
-      "tag": "0002_curved_annihilus",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1786901020660,
-      "tag": "0003_nostalgic_spyke",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1786905668905,
-      "tag": "0004_windy_patriot",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1786947542088,
-      "tag": "0005_concerned_wildside",
+      "version": "5",
+      "when": 1787047686257,
+      "tag": "0000_strong_next_avengers",
       "breakpoints": true
     }
   ]

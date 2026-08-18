@@ -7,8 +7,8 @@ import { emitToKiln } from "../config/socket";
 export async function createFuelType(kilnId: string, name: string) {
   try {
     const _id = randomUUID();
-    db.insert(fuelTypes).values({ _id, kilnId, name: name.trim() }).run();
-    const created = db.select().from(fuelTypes).where(eq(fuelTypes._id, _id)).get()!;
+    await db.insert(fuelTypes).values({ _id, kilnId, name: name.trim() });
+    const created = (await db.select().from(fuelTypes).where(eq(fuelTypes._id, _id)))[0]!;
     emitToKiln(kilnId, "fuelType:update", created);
     return created;
   } catch (err: unknown) {
@@ -20,18 +20,18 @@ export async function createFuelType(kilnId: string, name: string) {
 }
 
 export async function listFuelTypes(kilnId: string) {
-  return db.select().from(fuelTypes).where(eq(fuelTypes.kilnId, kilnId)).orderBy(asc(fuelTypes.name)).all();
+  return await db.select().from(fuelTypes).where(eq(fuelTypes.kilnId, kilnId)).orderBy(asc(fuelTypes.name));
 }
 
 export async function deleteFuelType(kilnId: string, fuelTypeId: string) {
-  const existing = db.select().from(fuelTypes).where(and(eq(fuelTypes._id, fuelTypeId), eq(fuelTypes.kilnId, kilnId))).get();
+  const existing = (await db.select().from(fuelTypes).where(and(eq(fuelTypes._id, fuelTypeId), eq(fuelTypes.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Fuel type not found in this kiln");
-  db.delete(fuelTypes).where(eq(fuelTypes._id, fuelTypeId)).run();
+  await db.delete(fuelTypes).where(eq(fuelTypes._id, fuelTypeId));
   emitToKiln(kilnId, "fuelType:update", { _id: fuelTypeId, deleted: true });
   return existing;
 }
 
 export async function assertFuelTypeExists(kilnId: string, name: string) {
-  const exists = db.select({ _id: fuelTypes._id }).from(fuelTypes).where(and(eq(fuelTypes.kilnId, kilnId), eq(fuelTypes.name, name))).get();
+  const exists = (await db.select({ _id: fuelTypes._id }).from(fuelTypes).where(and(eq(fuelTypes.kilnId, kilnId), eq(fuelTypes.name, name))))[0];
   if (!exists) throw new Error(`Fuel type "${name}" has not been added for this kiln — add it on the Fuel page first`);
 }

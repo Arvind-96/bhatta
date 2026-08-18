@@ -50,7 +50,7 @@ const TOTAL_DAYS = 42; // 6-week rolling history
 async function main() {
   runMigrations();
 
-  const kiln = db.select().from(kilns).orderBy(asc(kilns.createdAt)).get();
+  const kiln = (await db.select().from(kilns).orderBy(asc(kilns.createdAt)))[0];
   if (!kiln) {
     console.error("No kiln found. Register an owner account through the app first (README Quick start), then re-run this script.");
     process.exit(1);
@@ -58,22 +58,21 @@ async function main() {
   const kilnId = kiln._id as string;
   console.log(`Seeding test data into kiln "${kiln.name}" (${kilnId})`);
 
-  const existingPeople = db.select({ c: count() }).from(people).where(eq(people.kilnId, kilnId)).get()!.c;
+  const existingPeople = (await db.select({ c: count() }).from(people).where(eq(people.kilnId, kilnId)))[0]!.c;
   if (existingPeople > 0) {
     console.log(`This kiln already has ${existingPeople} people on record — looks like it's already seeded. Skipping to avoid duplicates.`);
     process.exit(0);
   }
 
   if (!kiln.yardCapacityBricks || !kiln.latitude) {
-    db.update(kilns)
+    await db.update(kilns)
       .set({
         yardCapacityBricks: kiln.yardCapacityBricks ?? 400000,
         latitude: kiln.latitude ?? 29.0588,
         longitude: kiln.longitude ?? 76.0856,
         radiusMeters: kiln.radiusMeters ?? 250,
       })
-      .where(eq(kilns._id, kilnId))
-      .run();
+      .where(eq(kilns._id, kilnId));
     console.log("Set default geofence + yard capacity on kiln.");
   }
 
@@ -671,7 +670,7 @@ async function main() {
   console.log("Recording partial ledger settlements...");
 
   async function currentBalance(personId: string) {
-    const entries = db.select().from(ledgerEntries).where(eq(ledgerEntries.personId, personId)).all();
+    const entries = await db.select().from(ledgerEntries).where(eq(ledgerEntries.personId, personId));
     return entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0);
   }
 

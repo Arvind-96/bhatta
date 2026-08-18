@@ -21,11 +21,11 @@ export function initSocket(httpServer: HttpServer) {
   // No login, so no membership to verify — a kilnId is honored if it names
   // a real kiln, otherwise the socket joins the default (earliest-created)
   // kiln's room, mirroring resolveKiln's HTTP-side fallback.
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       const { kilnId } = socket.handshake.auth as { kilnId?: string };
-      const requested = kilnId ? db.select({ _id: kilns._id }).from(kilns).where(eq(kilns._id, kilnId)).get() : undefined;
-      const resolvedKilnId = requested?._id ?? db.select({ _id: kilns._id }).from(kilns).orderBy(asc(kilns.createdAt)).get()?._id;
+      const requested = kilnId ? (await db.select({ _id: kilns._id }).from(kilns).where(eq(kilns._id, kilnId)))[0] : undefined;
+      const resolvedKilnId = requested?._id ?? (await db.select({ _id: kilns._id }).from(kilns).orderBy(asc(kilns.createdAt)))[0]?._id;
       if (!resolvedKilnId) throw new Error("No kiln configured yet");
 
       socket.data.kilnId = resolvedKilnId;

@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { double, mysqlTable, varchar, text, uniqueIndex, index, boolean } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
 import { LEDGER_PAYMENT_MODES } from "./people";
 
@@ -7,113 +7,113 @@ export const MACHINE_TYPES = [
   "GENERATOR", "PUMP", "BLOWER", "OTHER",
 ] as const;
 
-export const machines = sqliteTable("machines", {
+export const machines = mysqlTable("machines", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  name: text("name").notNull(),
-  type: text("type", { enum: MACHINE_TYPES }).notNull(),
-  identifier: text("identifier"),
-  active: integer("active", { mode: "boolean" }).default(true),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50, enum: MACHINE_TYPES }).notNull(),
+  identifier: varchar("identifier", { length: 255 }),
+  active: boolean("active").default(true),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnTypeIdx: index("machine_kiln_type_idx").on(t.kilnId, t.type) }));
 
 export const MACHINE_FUEL_TYPES = ["DIESEL", "PETROL", "ELECTRICITY"] as const;
 
-export const machineFuelLogs = sqliteTable("machine_fuel_logs", {
+export const machineFuelLogs = mysqlTable("machine_fuel_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  machineId: text("machineId").notNull(),
-  fuelType: text("fuelType", { enum: MACHINE_FUEL_TYPES }).notNull(),
-  quantity: real("quantity").notNull(),
-  hoursRun: real("hoursRun"),
+  machineId: varchar("machineId", { length: 64 }).notNull(),
+  fuelType: varchar("fuelType", { length: 50, enum: MACHINE_FUEL_TYPES }).notNull(),
+  quantity: double("quantity").notNull(),
+  hoursRun: double("hoursRun"),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("machinefuel_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const machineMaintenanceLogs = sqliteTable("machine_maintenance_logs", {
+export const machineMaintenanceLogs = mysqlTable("machine_maintenance_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  machineId: text("machineId").notNull(),
+  machineId: varchar("machineId", { length: 64 }).notNull(),
   description: text("description").notNull(),
-  cost: real("cost").default(0),
-  downtimeHours: real("downtimeHours").default(0),
+  cost: double("cost").default(0),
+  downtimeHours: double("downtimeHours").default(0),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("machinemaint_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const inventoryItems = sqliteTable("inventory_items", {
+export const inventoryItems = mysqlTable("inventory_items", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  name: text("name").notNull(),
-  quantity: real("quantity").notNull().default(0),
-  unit: text("unit").default("pcs"),
+  name: varchar("name", { length: 255 }).notNull(),
+  quantity: double("quantity").notNull().default(0),
+  unit: varchar("unit", { length: 50 }).default("pcs"),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnNameIdx: index("inventoryitem_kiln_name_idx").on(t.kilnId, t.name) }));
 
-export const suppliedItems = sqliteTable("supplied_items", {
+export const suppliedItems = mysqlTable("supplied_items", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  personId: text("personId").notNull(),
-  itemId: text("itemId").notNull(),
-  quantity: real("quantity").notNull(),
+  personId: varchar("personId", { length: 64 }).notNull(),
+  itemId: varchar("itemId", { length: 64 }).notNull(),
+  quantity: double("quantity").notNull(),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnPersonIdx: index("supplieditem_kiln_person_idx").on(t.kilnId, t.personId) }));
 
-export const fuelTypes = sqliteTable("fuel_types", {
+export const fuelTypes = mysqlTable("fuel_types", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  name: text("name").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnNameUnique: uniqueIndex("fueltype_kiln_name_unique").on(t.kilnId, t.name) }));
 
-export const fuelPurchases = sqliteTable("fuel_purchases", {
+export const fuelPurchases = mysqlTable("fuel_purchases", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  fuelType: text("fuelType").notNull(),
-  supplierId: text("supplierId"),
-  vehicleNumber: text("vehicleNumber"),
-  invoicedWeightKg: real("invoicedWeightKg").notNull(),
-  actualWeightKg: real("actualWeightKg").notNull(),
-  amount: real("amount").notNull(),
-  paidAmount: real("paidAmount").default(0),
-  paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
+  fuelType: varchar("fuelType", { length: 255 }).notNull(),
+  supplierId: varchar("supplierId", { length: 64 }),
+  vehicleNumber: varchar("vehicleNumber", { length: 255 }),
+  invoicedWeightKg: double("invoicedWeightKg").notNull(),
+  actualWeightKg: double("actualWeightKg").notNull(),
+  amount: double("amount").notNull(),
+  paidAmount: double("paidAmount").default(0),
+  paymentMode: varchar("paymentMode", { length: 50, enum: LEDGER_PAYMENT_MODES }),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("fuelpurchase_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const fuelLogs = sqliteTable("fuel_logs", {
+export const fuelLogs = mysqlTable("fuel_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  gherId: text("gherId").notNull(),
-  fuelType: text("fuelType").notNull(),
-  quantityKg: real("quantityKg").notNull(),
+  gherId: varchar("gherId", { length: 64 }).notNull(),
+  fuelType: varchar("fuelType", { length: 255 }).notNull(),
+  quantityKg: double("quantityKg").notNull(),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("fuellog_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const kilnVehicles = sqliteTable("kiln_vehicles", {
+export const kilnVehicles = mysqlTable("kiln_vehicles", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  name: text("name").notNull(),
-  type: text("type").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 255 }).notNull(),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnNameIdx: index("kilnvehicle_kiln_name_idx").on(t.kilnId, t.name) }));
 
-export const vehicleDieselEntries = sqliteTable("vehicle_diesel_entries", {
+export const vehicleDieselEntries = mysqlTable("vehicle_diesel_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  vehicleId: text("vehicleId").notNull(),
-  quantityLiters: real("quantityLiters").notNull(),
-  costAmount: real("costAmount"),
-  paymentMode: text("paymentMode", { enum: LEDGER_PAYMENT_MODES }),
+  vehicleId: varchar("vehicleId", { length: 64 }).notNull(),
+  quantityLiters: double("quantityLiters").notNull(),
+  costAmount: double("costAmount"),
+  paymentMode: varchar("paymentMode", { length: 50, enum: LEDGER_PAYMENT_MODES }),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),

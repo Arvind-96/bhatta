@@ -24,8 +24,8 @@ export interface CreateMoldingInput {
 export async function createMoldingEntry(input: CreateMoldingInput) {
   const worker = await assertPersonOfType(input.kilnId, input.workerId, ["WORKER"]);
   const _id = randomUUID();
-  db.insert(moldingEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(moldingEntries).where(eq(moldingEntries._id, _id)).get()!;
+  await db.insert(moldingEntries).values({ ...input, _id });
+  const entry = (await db.select().from(moldingEntries).where(eq(moldingEntries._id, _id)))[0]!;
 
   if (!input.washedOut) {
     const wage = (input.bricksCount / 1000) * input.ratePerThousand;
@@ -44,11 +44,10 @@ export async function createMoldingEntry(input: CreateMoldingInput) {
     // moldingContractorSummary can roll up "what the whole gang is owed"
     // without re-deriving it from every worker's entries each time.
     if (worker.contractorId) {
-      const contractor = db
+      const contractor = (await db
         .select()
         .from(people)
-        .where(and(eq(people._id, worker.contractorId), eq(people.kilnId, input.kilnId), eq(people.type, "LABOUR_CONTRACTOR")))
-        .get();
+        .where(and(eq(people._id, worker.contractorId), eq(people.kilnId, input.kilnId), eq(people.type, "LABOUR_CONTRACTOR"))))[0];
       if (contractor?.commissionPerThousand) {
         const commission = (input.bricksCount / 1000) * contractor.commissionPerThousand;
         await addLedgerEntry({
@@ -80,10 +79,10 @@ export async function listMoldingEntries(kilnId: string, filter: ListMoldingFilt
   if (filter.from) conditions.push(gte(moldingEntries.date, filter.from));
   if (filter.to) conditions.push(lte(moldingEntries.date, filter.to));
 
-  const rows = await db.select().from(moldingEntries).where(and(...conditions)).orderBy(desc(moldingEntries.date)).all();
+  const rows = await db.select().from(moldingEntries).where(and(...conditions)).orderBy(desc(moldingEntries.date));
   const workerIds = [...new Set(rows.map((r) => r.workerId))];
   if (workerIds.length === 0) return rows;
-  const workerRows = await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, workerIds)).all();
+  const workerRows = await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, workerIds));
   const workerById = new Map(workerRows.map((w) => [w._id, w]));
   return rows.map((r) => ({ ...r, workerId: workerById.get(r.workerId) ?? r.workerId }));
 }
@@ -94,15 +93,14 @@ export async function todayMoldingTotal(kilnId: string) {
   const entries = await db
     .select()
     .from(moldingEntries)
-    .where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, startOfDay), eq(moldingEntries.washedOut, false)))
-    .all();
+    .where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, startOfDay), eq(moldingEntries.washedOut, false)));
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
 }
 
 export async function totalMolded(kilnId: string, since: Date, until?: Date) {
   const conditions = [eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, since), eq(moldingEntries.washedOut, false)];
   if (until) conditions.push(lte(moldingEntries.date, until));
-  const entries = await db.select().from(moldingEntries).where(and(...conditions)).all();
+  const entries = await db.select().from(moldingEntries).where(and(...conditions));
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
 }
 
@@ -110,7 +108,7 @@ export async function totalMolded(kilnId: string, since: Date, until?: Date) {
 // rained out can still have some bricks crack/break in handling, so this
 // deliberately doesn't filter washedOut the way totalMolded does.
 export async function damagedMoldedSince(kilnId: string, since: Date) {
-  const entries = await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, since))).all();
+  const entries = await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, since)));
   return entries.reduce((sum, e) => sum + (e.damagedCount ?? 0), 0);
 }
 
@@ -157,8 +155,8 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // which stay unfiltered.
 export async function moldingContractorSummary(kilnId: string) {
   const [contractors, workers] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true), eq(people.workType, "PATHAI"))).orderBy(asc(people.name)).all(),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"), eq(people.active, true), eq(people.workType, "PATHAI"))).all(),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true), eq(people.workType, "PATHAI"))).orderBy(asc(people.name)),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"), eq(people.active, true), eq(people.workType, "PATHAI"))),
   ]);
 
   const contractorResults = await Promise.all(
@@ -171,8 +169,8 @@ export async function moldingContractorSummary(kilnId: string) {
       // damagedCount are derived separately below instead of both being
       // gated on the same query filter.
       const [gangEntries, gangLedgerEntries] = await Promise.all([
-        workerIds.length ? db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.workerId, workerIds))).all() : [],
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, [contractor._id, ...workerIds]))).all(),
+        workerIds.length ? db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.workerId, workerIds))) : [],
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, [contractor._id, ...workerIds]))),
       ]);
 
       const bricksByWorker = new Map<string, number>();
@@ -213,7 +211,7 @@ export async function moldingContractorSummary(kilnId: string) {
 
   const unassignedWorkerIds = workers.filter((w) => !w.contractorId).map((w) => w._id);
   const unassignedEntries = unassignedWorkerIds.length
-    ? await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.workerId, unassignedWorkerIds))).all()
+    ? await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.workerId, unassignedWorkerIds)))
     : [];
   const unassignedBricksProduced = unassignedEntries
     .filter((e) => !e.washedOut)

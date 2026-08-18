@@ -27,16 +27,16 @@ export interface CreateSoilArrivalInput {
 // a contract must belong to this kiln and be against the same landowner
 // the arrival is being logged for.
 async function assertContractMatchesLandowner(kilnId: string, contractId: string, landownerId: string) {
-  const contract = db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))).get();
+  const contract = (await db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))))[0];
   if (!contract) throw new Error("Referenced soil contract not found in this kiln");
   if (contract.landownerId !== landownerId) {
     throw new Error("This arrival's landowner does not match the contract's landowner");
   }
 }
 
-function withPeople(arrival: typeof soilArrivals.$inferSelect) {
+async function withPeople(arrival: typeof soilArrivals.$inferSelect) {
   const ids = [arrival.landownerId, arrival.jcbDriverId, arrival.tractorDriverId].filter((v): v is string => !!v);
-  const rows = ids.length ? db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(inArray(people._id, ids)).all() : [];
+  const rows = ids.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(inArray(people._id, ids)) : [];
   const byId = new Map(rows.map((p) => [p._id, p]));
   return {
     ...arrival,
@@ -60,8 +60,8 @@ export async function createSoilArrival(input: CreateSoilArrivalInput) {
   if (input.contractId) await assertContractMatchesLandowner(input.kilnId, input.contractId, input.landownerId);
 
   const _id = randomUUID();
-  db.insert(soilArrivals).values({ ...input, _id }).run();
-  const entry = db.select().from(soilArrivals).where(eq(soilArrivals._id, _id)).get()!;
+  await db.insert(soilArrivals).values({ ...input, _id });
+  const entry = (await db.select().from(soilArrivals).where(eq(soilArrivals._id, _id)))[0]!;
 
   const given = input.paymentGiven ?? 0;
   const pending = input.paymentPending ?? 0;
@@ -114,7 +114,7 @@ export interface UpdateSoilArrivalInput {
 // given/pending figure posts a correction entry for the difference
 // instead, same convention as workEntry.service.ts's delta correction.
 export async function updateSoilArrival(kilnId: string, entryId: string, input: UpdateSoilArrivalInput) {
-  const existing = db.select().from(soilArrivals).where(and(eq(soilArrivals._id, entryId), eq(soilArrivals.kilnId, kilnId))).get();
+  const existing = (await db.select().from(soilArrivals).where(and(eq(soilArrivals._id, entryId), eq(soilArrivals.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Soil arrival not found in this kiln");
 
   if (input.jcbDriverId) await assertPersonOfType(kilnId, input.jcbDriverId, ["DRIVER"]);
@@ -125,8 +125,8 @@ export async function updateSoilArrival(kilnId: string, entryId: string, input: 
   const oldPending = existing.paymentPending ?? 0;
   const oldTotal = oldGiven + oldPending;
 
-  db.update(soilArrivals).set(input).where(eq(soilArrivals._id, entryId)).run();
-  const updated = db.select().from(soilArrivals).where(eq(soilArrivals._id, entryId)).get()!;
+  await db.update(soilArrivals).set(input).where(eq(soilArrivals._id, entryId));
+  const updated = (await db.select().from(soilArrivals).where(eq(soilArrivals._id, entryId)))[0]!;
 
   if (input.paymentGiven !== undefined || input.paymentPending !== undefined) {
     const newGiven = updated.paymentGiven ?? 0;
@@ -193,6 +193,6 @@ export async function listSoilArrivals(kilnId: string, filter: ListSoilArrivalFi
   const conditions = [eq(soilArrivals.kilnId, kilnId)];
   if (filter.landownerId) conditions.push(eq(soilArrivals.landownerId, filter.landownerId));
   if (filter.contractId) conditions.push(eq(soilArrivals.contractId, filter.contractId));
-  const rows = await db.select().from(soilArrivals).where(and(...conditions)).orderBy(desc(soilArrivals.date)).all();
-  return rows.map(withPeople);
+  const rows = await db.select().from(soilArrivals).where(and(...conditions)).orderBy(desc(soilArrivals.date));
+  return Promise.all(rows.map(withPeople));
 }

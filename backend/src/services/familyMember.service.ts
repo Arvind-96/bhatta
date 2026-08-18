@@ -16,9 +16,9 @@ export interface CreateFamilyMemberInput {
   notes?: string;
 }
 
-function withWorker(member: typeof familyMembers.$inferSelect) {
+async function withWorker(member: typeof familyMembers.$inferSelect) {
   if (!member.workerId) return member;
-  const worker = db.select({ _id: people._id, name: people.name, status: people.status }).from(people).where(eq(people._id, member.workerId)).get();
+  const worker = (await db.select({ _id: people._id, name: people.name, status: people.status }).from(people).where(eq(people._id, member.workerId)))[0];
   return { ...member, workerId: worker ?? member.workerId };
 }
 
@@ -48,7 +48,7 @@ export async function createFamilyMember(input: CreateFamilyMemberInput) {
   }
 
   const _id = randomUUID();
-  db.insert(familyMembers)
+  await db.insert(familyMembers)
     .values({
       _id,
       kilnId: input.kilnId,
@@ -60,10 +60,9 @@ export async function createFamilyMember(input: CreateFamilyMemberInput) {
       isWorking: !!input.isWorking,
       workerId,
       notes: input.notes,
-    })
-    .run();
+    });
 
-  const member = db.select().from(familyMembers).where(eq(familyMembers._id, _id)).get()!;
+  const member = (await db.select().from(familyMembers).where(eq(familyMembers._id, _id)))[0]!;
   emitToKiln(input.kilnId, "familyMember:update", member);
   if (workerId) emitToKiln(input.kilnId, "person:update", { _id: workerId });
   return member;
@@ -85,12 +84,12 @@ export interface UpdateFamilyMemberInput {
 // for the admin to make from their own profile (the existing Delete
 // button there), not an automatic side effect of a checkbox.
 export async function updateFamilyMember(kilnId: string, memberId: string, input: UpdateFamilyMemberInput) {
-  const existing = db.select().from(familyMembers).where(and(eq(familyMembers._id, memberId), eq(familyMembers.kilnId, kilnId))).get();
+  const existing = (await db.select().from(familyMembers).where(and(eq(familyMembers._id, memberId), eq(familyMembers.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Family member not found in this kiln");
 
   let workerId = existing.workerId ?? undefined;
   if (input.isWorking && !workerId) {
-    const head = db.select().from(people).where(and(eq(people._id, existing.headPersonId), eq(people.kilnId, kilnId))).get();
+    const head = (await db.select().from(people).where(and(eq(people._id, existing.headPersonId), eq(people.kilnId, kilnId))))[0];
     if (!head) throw new Error("Head person not found in this kiln");
     const worker = await createPerson({
       kilnId,
@@ -105,8 +104,8 @@ export async function updateFamilyMember(kilnId: string, memberId: string, input
     workerId = worker._id;
   }
 
-  db.update(familyMembers).set({ ...input, relation: input.relation as any, workerId }).where(eq(familyMembers._id, memberId)).run();
-  const updated = db.select().from(familyMembers).where(eq(familyMembers._id, memberId)).get()!;
+  await db.update(familyMembers).set({ ...input, relation: input.relation as any, workerId }).where(eq(familyMembers._id, memberId));
+  const updated = (await db.select().from(familyMembers).where(eq(familyMembers._id, memberId)))[0]!;
 
   emitToKiln(kilnId, "familyMember:update", updated);
   if (input.isWorking && workerId && workerId !== existing.workerId) {
@@ -116,9 +115,9 @@ export async function updateFamilyMember(kilnId: string, memberId: string, input
 }
 
 export async function deleteFamilyMember(kilnId: string, memberId: string) {
-  const existing = db.select().from(familyMembers).where(and(eq(familyMembers._id, memberId), eq(familyMembers.kilnId, kilnId))).get();
+  const existing = (await db.select().from(familyMembers).where(and(eq(familyMembers._id, memberId), eq(familyMembers.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Family member not found in this kiln");
-  db.delete(familyMembers).where(eq(familyMembers._id, memberId)).run();
+  await db.delete(familyMembers).where(eq(familyMembers._id, memberId));
   emitToKiln(kilnId, "familyMember:update", existing);
   return existing;
 }
@@ -128,9 +127,8 @@ export async function listFamilyMembers(kilnId: string, headPersonId: string) {
     .select()
     .from(familyMembers)
     .where(and(eq(familyMembers.kilnId, kilnId), eq(familyMembers.headPersonId, headPersonId)))
-    .orderBy(asc(familyMembers.createdAt))
-    .all();
-  return rows.map(withWorker);
+    .orderBy(asc(familyMembers.createdAt));
+  return Promise.all(rows.map(withWorker));
 }
 
 // Resolves "the family" for ANY person — whether they're the head
@@ -138,11 +136,11 @@ export async function listFamilyMembers(kilnId: string, headPersonId: string) {
 // land on the same head + the same full member list, so opening any one
 // family member's profile shows the rest.
 export async function getFamilyForPerson(kilnId: string, personId: string) {
-  const person = db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))).get();
+  const person = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!person) throw new Error("Person not found in this kiln");
 
   const headPersonId = person.familyHeadId ?? person._id;
-  const head = db.select().from(people).where(and(eq(people._id, headPersonId), eq(people.kilnId, kilnId))).get();
+  const head = (await db.select().from(people).where(and(eq(people._id, headPersonId), eq(people.kilnId, kilnId))))[0];
   const members = await listFamilyMembers(kilnId, headPersonId);
 
   return { head, members };

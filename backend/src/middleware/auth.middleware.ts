@@ -36,10 +36,10 @@ export async function resolveKiln(req: AuthedRequest, res: Response, next: NextF
   try {
     const requestedKilnId = req.header("X-Kiln-Id");
     const requested = requestedKilnId
-      ? db.select({ _id: kilns._id }).from(kilns).where(eq(kilns._id, requestedKilnId)).get()
+      ? (await db.select({ _id: kilns._id }).from(kilns).where(eq(kilns._id, requestedKilnId)))[0]
       : undefined;
 
-    const kilnId = requested?._id ?? db.select({ _id: kilns._id }).from(kilns).orderBy(asc(kilns.createdAt)).get()?._id;
+    const kilnId = requested?._id ?? (await db.select({ _id: kilns._id }).from(kilns).orderBy(asc(kilns.createdAt)))[0]?._id;
     if (!kilnId) {
       return res.status(500).json({ error: "No kiln configured yet" });
     }

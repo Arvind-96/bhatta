@@ -50,19 +50,20 @@ function kilnPrefix(kilnName: string) {
 // "JVS-16-08-2026-01" — so a munim can read a slip number straight off a
 // printed Gate Pass/Challan and know the kiln, the day, and which dispatch
 // of that day it was, instead of an opaque random code. Resets to 01 every
-// day. better-sqlite3 is synchronous, so the count-then-insert in
-// createDispatch below never has an async gap for two same-day dispatches
-// to race into the same sequence number.
-function generateSlipNumber(kilnId: string, dispatchedOn: Date) {
-  const kiln = db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)).get();
+// day. Under MySQL this count-then-insert CAN race between two concurrent
+// same-day creates for the same kiln (unlike the old synchronous
+// better-sqlite3 driver) — createDispatch below closes that gap with a
+// retry loop against the (kilnId, slipNumber) unique constraint, not by
+// trying to make this function itself atomic.
+async function generateSlipNumber(kilnId: string, dispatchedOn: Date) {
+  const kiln = (await db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)))[0];
   const prefix = kilnPrefix(kiln?.name ?? "KILN");
   const dayStart = startOfDay(dispatchedOn);
   const dayEnd = endOfDay(dispatchedOn);
-  const countRow = db
+  const countRow = (await db
     .select({ count: sql<number>`count(*)` })
     .from(dispatches)
-    .where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, dayStart), lte(dispatches.dispatchedOn, dayEnd)))
-    .get();
+    .where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, dayStart), lte(dispatches.dispatchedOn, dayEnd))))[0];
   const seq = (countRow?.count ?? 0) + 1;
   return `${prefix}-${formatDDMMYYYY(dayStart)}-${String(seq).padStart(2, "0")}`;
 }
@@ -70,12 +71,22 @@ function generateSlipNumber(kilnId: string, dispatchedOn: Date) {
 // A plain, sequential per-kiln invoice counter ("1", "2", ... "61") — this
 // is what actually prints on the Challan, matching the kiln's real paper
 // invoice book. Never resets; unlike the slip number's daily reset, an
-// invoice book's numbering runs continuously. Read-count-then-insert is
-// synchronous (better-sqlite3), so two same-instant creates can't race
-// into the same number, same guarantee generateSlipNumber already relies on.
-function generateInvoiceNumber(kilnId: string) {
-  const countRow = db.select({ count: sql<number>`count(*)` }).from(dispatches).where(eq(dispatches.kilnId, kilnId)).get();
+// invoice book's numbering runs continuously. Same race caveat as
+// generateSlipNumber above — closed by createDispatch's retry loop, not
+// here.
+async function generateInvoiceNumber(kilnId: string) {
+  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(dispatches).where(eq(dispatches.kilnId, kilnId)))[0];
   return String((countRow?.count ?? 0) + 1);
+}
+
+// MySQL's duplicate-entry error, thrown when an insert collides with an
+// existing unique constraint (here: (kilnId, slipNumber) or (kilnId,
+// invoiceNumber)) — the actual correctness guarantee createDispatch's
+// retry loop relies on, since the count-then-insert above can no longer
+// assume synchronous, race-free execution the way it could under
+// better-sqlite3.
+function isDuplicateEntryError(err: unknown): boolean {
+  return !!err && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === "ER_DUP_ENTRY";
 }
 
 export interface CreateDispatchInput {
@@ -104,6 +115,8 @@ export interface CreateDispatchInput {
   dispatchedOn?: Date;
 }
 
+const MAX_NUMBER_GENERATION_ATTEMPTS = 5;
+
 // Every dispatch gets a slip number the moment it's created — the point
 // isn't gate hardware (out of scope here), it's that "no record, no
 // number" makes an un-logged truck exit the exception a munim would have
@@ -131,11 +144,33 @@ export async function createDispatch(input: CreateDispatchInput) {
   // separate `new Date()` at insert time could disagree by the odd
   // millisecond and, right at midnight, land on a different calendar day.
   const dispatchedOn = input.dispatchedOn ?? new Date();
-  const slipNumber = generateSlipNumber(input.kilnId, dispatchedOn);
-  const invoiceNumber = generateInvoiceNumber(input.kilnId);
-  const _id = randomUUID();
-  db.insert(dispatches).values({ ...input, amount: netAmount, dispatchedOn, _id, slipNumber, invoiceNumber }).run();
-  const dispatch = db.select().from(dispatches).where(eq(dispatches._id, _id)).get()!;
+
+  // Retry loop: two concurrent createDispatch calls for the same kiln can
+  // both compute the same slip/invoice number (the count-then-insert below
+  // isn't atomic under MySQL). The (kilnId, slipNumber)/(kilnId,
+  // invoiceNumber) unique constraints are the real guarantee — a collision
+  // surfaces as a duplicate-entry error, caught here, and the numbers are
+  // simply recomputed and retried.
+  let dispatch: typeof dispatches.$inferSelect | undefined;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < MAX_NUMBER_GENERATION_ATTEMPTS; attempt++) {
+    const slipNumber = await generateSlipNumber(input.kilnId, dispatchedOn);
+    const invoiceNumber = await generateInvoiceNumber(input.kilnId);
+    const _id = randomUUID();
+    try {
+      await db.insert(dispatches).values({ ...input, amount: netAmount, dispatchedOn, _id, slipNumber, invoiceNumber });
+      dispatch = (await db.select().from(dispatches).where(eq(dispatches._id, _id)))[0];
+      break;
+    } catch (err) {
+      lastError = err;
+      if (!isDuplicateEntryError(err)) throw err;
+      // Otherwise: another request won this exact number just now — loop
+      // around and recompute against the now-updated count.
+    }
+  }
+  if (!dispatch) {
+    throw lastError instanceof Error ? lastError : new Error("Failed to create dispatch: could not allocate a unique slip/invoice number");
+  }
 
   if (input.customerId) {
     await addLedgerEntry({
@@ -143,7 +178,7 @@ export async function createDispatch(input: CreateDispatchInput) {
       personId: input.customerId,
       direction: "DUE",
       amount: netAmount,
-      reason: `Sale: ${input.bricksCount.toLocaleString()} bricks (${slipNumber})`,
+      reason: `Sale: ${input.bricksCount.toLocaleString()} bricks (${dispatch.slipNumber})`,
       date: dispatchedOn,
     });
   }
@@ -175,7 +210,7 @@ export interface DeliveryAdjustmentInput {
 // puts the (undamaged) returned bricks back in finished-goods stock; the
 // broken portion is just recorded, not reversed, since it's gone either way.
 export async function recordDeliveryAdjustment(kilnId: string, dispatchId: string, input: DeliveryAdjustmentInput) {
-  const dispatch = db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))).get();
+  const dispatch = (await db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))))[0];
   if (!dispatch) throw new Error("Dispatch not found in this kiln");
 
   const update: Record<string, unknown> = {};
@@ -184,9 +219,9 @@ export async function recordDeliveryAdjustment(kilnId: string, dispatchId: strin
   if (input.returnReason != null) update.returnReason = input.returnReason;
 
   if (Object.keys(update).length > 0) {
-    db.update(dispatches).set(update).where(eq(dispatches._id, dispatchId)).run();
+    await db.update(dispatches).set(update).where(eq(dispatches._id, dispatchId));
   }
-  const updated = db.select().from(dispatches).where(eq(dispatches._id, dispatchId)).get()!;
+  const updated = (await db.select().from(dispatches).where(eq(dispatches._id, dispatchId)))[0]!;
 
   if (input.returnedCount && input.returnedCount > 0) {
     const unitPrice = dispatch.bricksCount > 0 ? dispatch.amount / dispatch.bricksCount : 0;
@@ -241,7 +276,7 @@ export interface UpdateDispatchInput {
 // invoiceNumber never change here, so a reprinted Gate Pass/Challan still
 // carries the same serial the original did.
 export async function updateDispatch(kilnId: string, dispatchId: string, input: UpdateDispatchInput) {
-  const existing = db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))).get();
+  const existing = (await db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Dispatch not found in this kiln");
 
   if (input.driverId) {
@@ -286,9 +321,9 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
   }
 
   if (Object.keys(patch).length > 0) {
-    db.update(dispatches).set(patch).where(eq(dispatches._id, dispatchId)).run();
+    await db.update(dispatches).set(patch).where(eq(dispatches._id, dispatchId));
   }
-  const updated = db.select().from(dispatches).where(eq(dispatches._id, dispatchId)).get()!;
+  const updated = (await db.select().from(dispatches).where(eq(dispatches._id, dispatchId)))[0]!;
 
   // Ledger: a customer reassignment reverses the full original DUE off the
   // old customer and posts a fresh DUE on the new one; otherwise, only the
@@ -340,7 +375,7 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
   const gradeChanged = input.grade !== undefined && input.grade !== existing.grade;
   if (bricksCountChanged || gradeChanged) {
     if (bricksCountChanged) {
-      db.update(dispatches).set({ bricksCount: input.bricksCount }).where(eq(dispatches._id, dispatchId)).run();
+      await db.update(dispatches).set({ bricksCount: input.bricksCount }).where(eq(dispatches._id, dispatchId));
     }
 
     const oldGrade = (existing.grade ?? "A1") as BrickGrade;
@@ -361,31 +396,31 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
     // updateBrickLoadingEntry corrects its own edits.
     const categoryChanged = input.categoryId !== undefined && input.categoryId !== existing.categoryId;
     if (bricksCountChanged || categoryChanged) {
-      const linkedEntry = db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))).get();
+      const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
       if (linkedEntry) {
         const oldCategoryId = existing.categoryId;
         const newCategoryId = input.categoryId !== undefined ? input.categoryId : existing.categoryId;
         if (oldCategoryId && oldCategoryId === newCategoryId) {
           const delta = newBricksCount - existing.bricksCount;
           if (delta !== 0) {
-            db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${delta}` }).where(eq(brickCategories._id, oldCategoryId)).run();
-            emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, oldCategoryId)).get());
+            await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${delta}` }).where(eq(brickCategories._id, oldCategoryId));
+            emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, oldCategoryId)))[0]);
           }
         } else {
           if (oldCategoryId) {
-            db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` }).where(eq(brickCategories._id, oldCategoryId)).run();
-            emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, oldCategoryId)).get());
+            await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` }).where(eq(brickCategories._id, oldCategoryId));
+            emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, oldCategoryId)))[0]);
           }
           if (newCategoryId) {
-            db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${newBricksCount}` }).where(eq(brickCategories._id, newCategoryId)).run();
-            emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, newCategoryId)).get());
+            await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${newBricksCount}` }).where(eq(brickCategories._id, newCategoryId));
+            emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, newCategoryId)))[0]);
           }
         }
       }
     }
   }
 
-  const finalDispatch = db.select().from(dispatches).where(eq(dispatches._id, dispatchId)).get()!;
+  const finalDispatch = (await db.select().from(dispatches).where(eq(dispatches._id, dispatchId)))[0]!;
   emitToKiln(kilnId, "dispatch:update", finalDispatch);
   return finalDispatch;
 }
@@ -399,7 +434,7 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
 // dangling. The loading entry itself is never deleted; the physical
 // loading trip is a real, separate record.
 export async function deleteDispatch(kilnId: string, dispatchId: string) {
-  const existing = db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))).get();
+  const existing = (await db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Dispatch not found in this kiln");
 
   // recordDeliveryAdjustment already posted its own partial reversal for
@@ -426,7 +461,7 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
     await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[grade], quantity: remainingBricksOut });
   }
 
-  const linkedEntry = db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))).get();
+  const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (linkedEntry) {
     // Restore by the DISPATCH's own current categoryId/bricksCount, not the
     // loading entry's — updateDispatch above only ever corrects
@@ -436,33 +471,33 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
     // Using the loading entry's original (possibly stale) values here would
     // restore the wrong category and/or the wrong quantity.
     if (existing.categoryId) {
-      db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` }).where(eq(brickCategories._id, existing.categoryId)).run();
-      emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)).get());
+      await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` }).where(eq(brickCategories._id, existing.categoryId));
+      emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)))[0]);
     }
-    db.update(brickLoadingEntries).set({ dispatchId: null }).where(eq(brickLoadingEntries._id, linkedEntry._id)).run();
-    emitToKiln(kilnId, "brickLoading:update", db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, linkedEntry._id)).get());
+    await db.update(brickLoadingEntries).set({ dispatchId: null }).where(eq(brickLoadingEntries._id, linkedEntry._id));
+    emitToKiln(kilnId, "brickLoading:update", (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, linkedEntry._id)))[0]);
   }
 
-  db.delete(dispatches).where(eq(dispatches._id, dispatchId)).run();
+  await db.delete(dispatches).where(eq(dispatches._id, dispatchId));
   emitToKiln(kilnId, "dispatch:update", { _id: dispatchId, deleted: true });
 }
 
 export async function listDispatches(kilnId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since))).orderBy(desc(dispatches.dispatchedOn)).all();
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since))).orderBy(desc(dispatches.dispatchedOn));
 
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const customerIds = [...new Set(rows.map((r) => r.customerId).filter((v): v is string => !!v))];
   const ids = [...new Set([...driverIds, ...customerIds])];
   // phone/address/gstNumber included so print templates (Gate Pass/Challan)
   // can show client address/GSTIN and driver mobile without a second round trip.
-  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone, address: people.address, gstNumber: people.gstNumber }).from(people).where(inArray(people._id, ids)).all() : [];
+  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone, address: people.address, gstNumber: people.gstNumber }).from(people).where(inArray(people._id, ids)) : [];
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
 
   const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
   const categoryRows = categoryIds.length
-    ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all()
+    ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds))
     : [];
   const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
 
@@ -480,15 +515,15 @@ export async function listDispatches(kilnId: string, days = 30) {
 // it out, so a future change to one doesn't risk silently changing the
 // other's behavior too.
 export async function listDispatchesForCustomer(kilnId: string, customerId: string) {
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.customerId, customerId))).orderBy(desc(dispatches.dispatchedOn)).all();
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.customerId, customerId))).orderBy(desc(dispatches.dispatchedOn));
 
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
-  const driverRows = driverIds.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(inArray(people._id, driverIds)).all() : [];
+  const driverRows = driverIds.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(inArray(people._id, driverIds)) : [];
   const driverById = new Map(driverRows.map((p) => [p._id, p]));
 
   const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
   const categoryRows = categoryIds.length
-    ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all()
+    ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds))
     : [];
   const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
 
@@ -500,14 +535,14 @@ export async function listDispatchesForCustomer(kilnId: string, customerId: stri
 }
 
 export async function totalDispatchedSince(kilnId: string, since: Date) {
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since))).all();
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since)));
   return rows.reduce((sum, d) => sum + d.bricksCount, 0);
 }
 
 export async function dispatchTotals(kilnId: string, days = 7) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since))).all();
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since)));
 
   return {
     days,
@@ -521,7 +556,7 @@ export async function dispatchTotals(kilnId: string, days = 7) {
 // now, which isn't what a season-year comparison needs (an absolute,
 // possibly-past window). Same shape otherwise.
 export async function dispatchTotalsForRange(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, from), lte(dispatches.dispatchedOn, to))).all();
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, from), lte(dispatches.dispatchedOn, to)));
   return {
     bricksCount: rows.reduce((sum, d) => sum + d.bricksCount, 0),
     amount: rows.reduce((sum, d) => sum + d.amount, 0),

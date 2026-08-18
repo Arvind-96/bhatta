@@ -31,7 +31,7 @@ export async function reconcileSoilToKiln(kilnId: string, days = 30) {
     totalMolded(kilnId, since),
     totalStacked(kilnId, since),
     totalWastage(kilnId, since, "KACCHI_BRICK"),
-    db.select().from(kilns).where(eq(kilns._id, kilnId)).get(),
+    db.select().from(kilns).where(eq(kilns._id, kilnId)).then((rows) => rows[0]),
   ]);
 
   const accountedFor = stacked.bricksCount + stacked.damageCount + wastage;

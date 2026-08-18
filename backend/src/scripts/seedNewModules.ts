@@ -58,9 +58,9 @@ async function paySalaryWithPartialSettlement(kilnId: string, personId: string, 
 }
 
 async function main() {
-  runMigrations();
+  await runMigrations();
 
-  const kiln = db.select().from(kilns).orderBy(asc(kilns.createdAt)).get();
+  const kiln = (await db.select().from(kilns).orderBy(asc(kilns.createdAt)))[0];
   if (!kiln) {
     console.error("No kiln found. Register an owner account through the app first, then re-run this script.");
     process.exit(1);
@@ -75,7 +75,7 @@ async function main() {
   }
 
   // ---------------- Bharai: stage-tagged contractors, laborers, vehicles ----------------
-  const hasStagedBharai = db.select({ c: count() }).from(people).where(and(eq(people.kilnId, kilnId), isNotNull(people.stackingStage))).get()!.c > 0;
+  const hasStagedBharai = (await db.select({ c: count() }).from(people).where(and(eq(people.kilnId, kilnId), isNotNull(people.stackingStage))))[0]!.c > 0;
   if (hasStagedBharai) {
     console.log("Bharai stage/contractor data already present — skipping.");
   } else {
@@ -206,7 +206,7 @@ async function main() {
   }
 
   // ---------------- Nikasi: contractor, laborers, entries ----------------
-  const hasNikasi = db.select({ c: count() }).from(nikasiEntries).where(eq(nikasiEntries.kilnId, kilnId)).get()!.c > 0;
+  const hasNikasi = (await db.select({ c: count() }).from(nikasiEntries).where(eq(nikasiEntries.kilnId, kilnId)))[0]!.c > 0;
   if (hasNikasi) {
     console.log("Nikasi data already present — skipping.");
   } else {
@@ -264,13 +264,13 @@ async function main() {
   }
 
   // ---------------- Firing: 6-person shift-rotation team ----------------
-  const hasRotation = db.select({ c: count() }).from(people).where(and(eq(people.kilnId, kilnId), isNotNull(people.firingShiftAnchorDate))).get()!.c > 0;
+  const hasRotation = (await db.select({ c: count() }).from(people).where(and(eq(people.kilnId, kilnId), isNotNull(people.firingShiftAnchorDate))))[0]!.c > 0;
   if (hasRotation) {
     console.log("Firing shift-rotation data already present — skipping.");
   } else {
     console.log("Seeding the 6-person firing rotation team...");
 
-    const existingFitters = db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "FITTER"))).orderBy(asc(people.name)).all();
+    const existingFitters = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "FITTER"))).orderBy(asc(people.name));
     const namesNeeded = 6 - existingFitters.length;
     const extraNames = ["Jagdish Fitter", "Mahesh Ostad"].slice(0, Math.max(0, namesNeeded));
     const newFitters = await Promise.all(
@@ -285,26 +285,25 @@ async function main() {
       const anchorType = i % 2 === 0 ? "DAY" : "NIGHT";
       const anchorDate = dateAtOffset(randInt(0, 5));
       anchorDate.setHours(0, 0, 0, 0);
-      db.update(people)
+      await db.update(people)
         .set({
           monthlySalary: fitter.monthlySalary ?? randInt(14000, 20000),
           firingShiftAnchorDate: anchorDate,
           firingShiftAnchorType: anchorType,
         })
-        .where(eq(people._id, fitter._id))
-        .run();
+        .where(eq(people._id, fitter._id));
       await paySalaryWithPartialSettlement(kilnId, fitter._id, fitter.monthlySalary ?? randInt(14000, 20000));
     }
   }
 
   // ---------------- Brick Loading: driver trips + tips ----------------
-  const hasBrickLoading = db.select({ c: count() }).from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId)).get()!.c > 0;
+  const hasBrickLoading = (await db.select({ c: count() }).from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId)))[0]!.c > 0;
   if (hasBrickLoading) {
     console.log("Brick loading data already present — skipping.");
   } else {
     console.log("Seeding brick loading trips...");
 
-    let drivers = db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "DRIVER"))).all();
+    let drivers = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "DRIVER")));
     if (drivers.length === 0) {
       drivers = await Promise.all(
         ["Naveen Driver", "Rakesh Driver"].map((name) =>
@@ -319,7 +318,7 @@ async function main() {
       );
     }
 
-    const recentDispatches = db.select().from(dispatches).where(eq(dispatches.kilnId, kilnId)).orderBy(desc(dispatches.dispatchedOn)).limit(20).all();
+    const recentDispatches = await db.select().from(dispatches).where(eq(dispatches.kilnId, kilnId)).orderBy(desc(dispatches.dispatchedOn)).limit(20);
 
     for (let d = 14; d >= 0; d--) {
       if (Math.random() < 0.55) continue;
@@ -339,7 +338,7 @@ async function main() {
   }
 
   // ---------------- Staff: Munim, Chowkidar, office Helper/Driver ----------------
-  const hasStaff = db.select({ c: count() }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "MUNIM"))).get()!.c > 0;
+  const hasStaff = (await db.select({ c: count() }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "MUNIM"))))[0]!.c > 0;
   if (hasStaff) {
     console.log("Staff roster already present — skipping.");
   } else {

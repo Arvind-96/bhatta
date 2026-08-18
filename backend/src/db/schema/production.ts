@@ -1,29 +1,29 @@
-import { integer, real, sqliteTable, text, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex, index, boolean } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
 import { STACKING_STAGES } from "./people";
 
 export const GHER_STATUSES = ["EMPTY", "STACKING", "FIRING", "READY"] as const;
 
-export const ghers = sqliteTable("ghers", {
+export const ghers = mysqlTable("ghers", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  number: integer("number").notNull(),
-  status: text("status", { enum: GHER_STATUSES }).default("EMPTY"),
-  cycleStartedAt: integer("cycleStartedAt", { mode: "timestamp_ms" }),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  number: int("number").notNull(),
+  status: varchar("status", { length: 50, enum: GHER_STATUSES }).default("EMPTY"),
+  cycleStartedAt: datetime("cycleStartedAt", { mode: "date" }),
+  updatedAt: datetime("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),
 }, (t) => ({
   kilnNumberUnique: uniqueIndex("gher_kiln_number_unique").on(t.kilnId, t.number),
 }));
 
-export const moldingEntries = sqliteTable("molding_entries", {
+export const moldingEntries = mysqlTable("molding_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  workerId: text("workerId").notNull(),
-  bricksCount: integer("bricksCount").notNull(),
-  ratePerThousand: real("ratePerThousand").notNull(),
-  damagedCount: integer("damagedCount").default(0),
+  workerId: varchar("workerId", { length: 64 }).notNull(),
+  bricksCount: int("bricksCount").notNull(),
+  ratePerThousand: double("ratePerThousand").notNull(),
+  damagedCount: int("damagedCount").default(0),
   date: dateColumn(),
-  washedOut: integer("washedOut", { mode: "boolean" }).default(false),
+  washedOut: boolean("washedOut").default(false),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("molding_kiln_date_idx").on(t.kilnId, t.date) }));
@@ -31,19 +31,19 @@ export const moldingEntries = sqliteTable("molding_entries", {
 export const STACKING_MODES = ["BUGGI", "TRACTOR"] as const;
 export const STACKING_QUALITY = ["GOOD", "AVERAGE", "POOR"] as const;
 
-export const stackingEntries = sqliteTable("stacking_entries", {
+export const stackingEntries = mysqlTable("stacking_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  gherId: text("gherId").notNull(),
-  gangId: text("gangId").notNull(),
-  stage: text("stage", { enum: STACKING_STAGES }),
-  bricksCount: integer("bricksCount").notNull(),
-  damageCount: integer("damageCount").default(0),
-  ratePerThousand: real("ratePerThousand"),
-  qualityRating: text("qualityRating", { enum: STACKING_QUALITY }).default("GOOD"),
-  mode: text("mode", { enum: STACKING_MODES }),
-  tractorNumber: text("tractorNumber"),
-  buggiCount: integer("buggiCount"),
+  gherId: varchar("gherId", { length: 64 }).notNull(),
+  gangId: varchar("gangId", { length: 64 }).notNull(),
+  stage: varchar("stage", { length: 50, enum: STACKING_STAGES }),
+  bricksCount: int("bricksCount").notNull(),
+  damageCount: int("damageCount").default(0),
+  ratePerThousand: double("ratePerThousand"),
+  qualityRating: varchar("qualityRating", { length: 50, enum: STACKING_QUALITY }).default("GOOD"),
+  mode: varchar("mode", { length: 50, enum: STACKING_MODES }),
+  tractorNumber: varchar("tractorNumber", { length: 255 }),
+  buggiCount: int("buggiCount"),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
@@ -52,28 +52,28 @@ export const stackingEntries = sqliteTable("stacking_entries", {
 export const STACKING_VEHICLE_TYPES = ["TRACTOR", "BUGGI"] as const;
 export const STACKING_VEHICLE_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 
-export const stackingVehicles = sqliteTable("stacking_vehicles", {
+export const stackingVehicles = mysqlTable("stacking_vehicles", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  contractorId: text("contractorId").notNull(),
-  vehicleType: text("vehicleType", { enum: STACKING_VEHICLE_TYPES }).notNull(),
-  vehicleNumber: text("vehicleNumber"),
-  buggiCount: integer("buggiCount"),
-  driverName: text("driverName"),
-  status: text("status", { enum: STACKING_VEHICLE_STATUSES }).default("ACTIVE"),
+  contractorId: varchar("contractorId", { length: 64 }).notNull(),
+  vehicleType: varchar("vehicleType", { length: 50, enum: STACKING_VEHICLE_TYPES }).notNull(),
+  vehicleNumber: varchar("vehicleNumber", { length: 255 }),
+  buggiCount: int("buggiCount"),
+  driverName: varchar("driverName", { length: 255 }),
+  status: varchar("status", { length: 50, enum: STACKING_VEHICLE_STATUSES }).default("ACTIVE"),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnContractorIdx: index("stackveh_kiln_contractor_idx").on(t.kilnId, t.contractorId) }));
 
-export const chamberGradings = sqliteTable("chamber_gradings", {
+export const chamberGradings = mysqlTable("chamber_gradings", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  gherId: text("gherId").notNull(),
-  a1Count: integer("a1Count").notNull().default(0),
-  jhamaCount: integer("jhamaCount").notNull().default(0),
-  pelaCount: integer("pelaCount").notNull().default(0),
-  rodaCount: integer("rodaCount").notNull().default(0),
-  stackedCount: integer("stackedCount"),
+  gherId: varchar("gherId", { length: 64 }).notNull(),
+  a1Count: int("a1Count").notNull().default(0),
+  jhamaCount: int("jhamaCount").notNull().default(0),
+  pelaCount: int("pelaCount").notNull().default(0),
+  rodaCount: int("rodaCount").notNull().default(0),
+  stackedCount: int("stackedCount"),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
@@ -81,62 +81,62 @@ export const chamberGradings = sqliteTable("chamber_gradings", {
 
 export const SHIFT_TYPES = ["DAY", "NIGHT"] as const;
 
-export const firingShifts = sqliteTable("firing_shifts", {
+export const firingShifts = mysqlTable("firing_shifts", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  fitterId: text("fitterId").notNull(),
-  gherId: text("gherId"),
-  shiftType: text("shiftType", { enum: SHIFT_TYPES }).notNull(),
+  fitterId: varchar("fitterId", { length: 64 }).notNull(),
+  gherId: varchar("gherId", { length: 64 }),
+  shiftType: varchar("shiftType", { length: 50, enum: SHIFT_TYPES }).notNull(),
   handoverNotes: text("handoverNotes"),
-  overtimeHours: real("overtimeHours").default(0),
-  overtimeRate: real("overtimeRate"),
-  bonusAmount: real("bonusAmount").default(0),
+  overtimeHours: double("overtimeHours").default(0),
+  overtimeRate: double("overtimeRate"),
+  bonusAmount: double("bonusAmount").default(0),
   date: dateColumn(),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("firingshift_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const fireMovementLogs = sqliteTable("fire_movement_logs", {
+export const fireMovementLogs = mysqlTable("fire_movement_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  gherId: text("gherId").notNull(),
-  gherNumber: integer("gherNumber").notNull(),
-  startedAt: integer("startedAt", { mode: "timestamp_ms" }).$defaultFn(() => new Date()),
+  gherId: varchar("gherId", { length: 64 }).notNull(),
+  gherNumber: int("gherNumber").notNull(),
+  startedAt: datetime("startedAt", { mode: "date" }).$defaultFn(() => new Date()),
 }, (t) => ({ kilnStartedIdx: index("firemove_kiln_started_idx").on(t.kilnId, t.startedAt) }));
 
 export const INCIDENT_TYPES = ["CRACK_LEAKAGE", "WEATHER_FLOODING", "ELECTRICAL_FAILURE", "OTHER"] as const;
 
-export const kilnIncidents = sqliteTable("kiln_incidents", {
+export const kilnIncidents = mysqlTable("kiln_incidents", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  gherId: text("gherId"),
-  type: text("type", { enum: INCIDENT_TYPES }).notNull(),
+  gherId: varchar("gherId", { length: 64 }),
+  type: varchar("type", { length: 50, enum: INCIDENT_TYPES }).notNull(),
   description: text("description").notNull(),
-  repairCost: real("repairCost").default(0),
-  bricksLost: integer("bricksLost").default(0),
+  repairCost: double("repairCost").default(0),
+  bricksLost: int("bricksLost").default(0),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("incident_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const nikasiEntries = sqliteTable("nikasi_entries", {
+export const nikasiEntries = mysqlTable("nikasi_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  gherId: text("gherId").notNull(),
-  gangId: text("gangId").notNull(),
-  bricksCount: integer("bricksCount").notNull(),
-  damagedCount: integer("damagedCount").default(0),
+  gherId: varchar("gherId", { length: 64 }).notNull(),
+  gangId: varchar("gangId", { length: 64 }).notNull(),
+  bricksCount: int("bricksCount").notNull(),
+  damagedCount: int("damagedCount").default(0),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("nikasi_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const loadingEntries = sqliteTable("loading_entries", {
+export const loadingEntries = mysqlTable("loading_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  dispatchId: text("dispatchId"),
-  palledarId: text("palledarId").notNull(),
-  bricksCount: integer("bricksCount").notNull(),
-  ratePerThousand: real("ratePerThousand").notNull(),
+  dispatchId: varchar("dispatchId", { length: 64 }),
+  palledarId: varchar("palledarId", { length: 64 }).notNull(),
+  bricksCount: int("bricksCount").notNull(),
+  ratePerThousand: double("ratePerThousand").notNull(),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
@@ -144,20 +144,20 @@ export const loadingEntries = sqliteTable("loading_entries", {
 
 export const BRICK_VEHICLE_TYPES = ["TRUCK", "TRACTOR"] as const;
 
-export const brickLoadingEntries = sqliteTable("brick_loading_entries", {
+export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  vehicleType: text("vehicleType", { enum: BRICK_VEHICLE_TYPES }).notNull(),
-  vehicleNumber: text("vehicleNumber").notNull(),
-  driverId: text("driverId").notNull(),
-  bricksCount: integer("bricksCount").notNull(),
-  tipAmount: real("tipAmount").default(0),
-  loadingCharge: real("loadingCharge"),
+  vehicleType: varchar("vehicleType", { length: 50, enum: BRICK_VEHICLE_TYPES }).notNull(),
+  vehicleNumber: varchar("vehicleNumber", { length: 255 }).notNull(),
+  driverId: varchar("driverId", { length: 64 }).notNull(),
+  bricksCount: int("bricksCount").notNull(),
+  tipAmount: double("tipAmount").default(0),
+  loadingCharge: double("loadingCharge"),
   // Which brick category was loaded — drives the auto-created Dispatch's
   // amount (bricksCount * that category's pricePerBrick). See
   // brickLoading.service.ts.
-  categoryId: text("categoryId"),
-  dispatchId: text("dispatchId"),
+  categoryId: varchar("categoryId", { length: 64 }),
+  dispatchId: varchar("dispatchId", { length: 64 }),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
@@ -166,40 +166,40 @@ export const brickLoadingEntries = sqliteTable("brick_loading_entries", {
 // Free-form, admin-defined — not a fixed vocabulary. The kiln can name
 // categories however it wants; the only constraint is no duplicate name
 // within one kiln (see the unique index below).
-export const brickCategories = sqliteTable("brick_categories", {
+export const brickCategories = mysqlTable("brick_categories", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  category: text("category").notNull(),
+  category: varchar("category", { length: 255 }).notNull(),
   // Free-form too, same philosophy as `category` itself — e.g. "A1",
   // "Second Class", or whatever this kiln calls its own grades. Shown
   // alongside the category name everywhere a category is displayed
   // (Stock, Brick Loading, Dispatch, Gate Pass/Challan).
-  grade: text("grade"),
-  quantity: integer("quantity").default(0),
-  pricePerBrick: real("pricePerBrick").default(0),
+  grade: varchar("grade", { length: 255 }),
+  quantity: int("quantity").default(0),
+  pricePerBrick: double("pricePerBrick").default(0),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnCategoryUnique: uniqueIndex("brickcat_kiln_category_unique").on(t.kilnId, t.category) }));
 
-export const brickProductionEntries = sqliteTable("brick_production_entries", {
+export const brickProductionEntries = mysqlTable("brick_production_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  categoryId: text("categoryId").notNull(),
-  bricksCount: integer("bricksCount").notNull(),
+  categoryId: varchar("categoryId", { length: 64 }).notNull(),
+  bricksCount: int("bricksCount").notNull(),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("brickprod_kiln_date_idx").on(t.kilnId, t.date) }));
 
-export const productionLogs = sqliteTable("production_logs", {
+export const productionLogs = mysqlTable("production_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  batchNumber: text("batchNumber").notNull(),
-  bricksCount: integer("bricksCount").notNull(),
-  qualityGrade: text("qualityGrade").default("A"),
+  batchNumber: varchar("batchNumber", { length: 255 }).notNull(),
+  bricksCount: int("bricksCount").notNull(),
+  qualityGrade: varchar("qualityGrade", { length: 50 }).default("A"),
   producedOn: dateColumn("producedOn"),
-  thekedarId: text("thekedarId"),
-  localId: text("localId"),
-  version: integer("version").default(1),
+  thekedarId: varchar("thekedarId", { length: 64 }),
+  localId: varchar("localId", { length: 64 }),
+  version: int("version").default(1),
   createdAt: createdAtColumn(),
 }, (t) => ({
   localIdUnique: uniqueIndex("productionlog_localid_unique").on(t.localId),
@@ -209,13 +209,13 @@ export const productionLogs = sqliteTable("production_logs", {
 export const WASTAGE_TYPES = ["SOIL", "KACCHI_BRICK"] as const;
 export const WASTAGE_CAUSES = ["RAIN", "TRANSPORT", "OTHER"] as const;
 
-export const wastageLogs = sqliteTable("wastage_logs", {
+export const wastageLogs = mysqlTable("wastage_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  type: text("type", { enum: WASTAGE_TYPES }).notNull(),
-  cause: text("cause", { enum: WASTAGE_CAUSES }).notNull(),
-  quantity: real("quantity").notNull(),
-  unit: text("unit").default("trolley"),
+  type: varchar("type", { length: 50, enum: WASTAGE_TYPES }).notNull(),
+  cause: varchar("cause", { length: 50, enum: WASTAGE_CAUSES }).notNull(),
+  quantity: double("quantity").notNull(),
+  unit: varchar("unit", { length: 50 }).default("trolley"),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),

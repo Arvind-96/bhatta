@@ -133,8 +133,8 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
   const [year, monthNum] = month.split("-").map(Number);
 
   const [kiln, person] = await Promise.all([
-    Promise.resolve(db.select().from(kilns).where(eq(kilns._id, kilnId)).get()),
-    Promise.resolve(db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))).get()),
+    db.select().from(kilns).where(eq(kilns._id, kilnId)).then((r) => r[0]),
+    db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))).then((r) => r[0]),
   ]);
   if (!kiln) throw new Error("Kiln not found");
   if (!person) throw new Error("Person not found in this kiln");
@@ -161,11 +161,12 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
   };
   await Promise.all([renderPdf(slipData, pdfPathEn, "en"), renderPdf(slipData, pdfPathHi, "hi")]);
 
-  const existing = db
-    .select()
-    .from(salarySlips)
-    .where(and(eq(salarySlips.personId, personId), eq(salarySlips.month, month)))
-    .get();
+  const existing = (
+    await db
+      .select()
+      .from(salarySlips)
+      .where(and(eq(salarySlips.personId, personId), eq(salarySlips.month, month)))
+  )[0];
 
   const values = {
     kilnId,
@@ -183,12 +184,12 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
   };
 
   if (existing) {
-    db.update(salarySlips).set(values).where(eq(salarySlips._id, existing._id)).run();
+    await db.update(salarySlips).set(values).where(eq(salarySlips._id, existing._id));
   } else {
-    db.insert(salarySlips).values({ _id: randomUUID(), ...values }).run();
+    await db.insert(salarySlips).values({ _id: randomUUID(), ...values });
   }
 
-  const slip = db.select().from(salarySlips).where(and(eq(salarySlips.personId, personId), eq(salarySlips.month, month))).get()!;
+  const slip = (await db.select().from(salarySlips).where(and(eq(salarySlips.personId, personId), eq(salarySlips.month, month))))[0]!;
   emitToKiln(kilnId, "salary:update", slip);
   return slip;
 }
@@ -202,8 +203,7 @@ export async function runMonthlySalaryGeneration(month?: string) {
   const salariedPeople = await db
     .select({ _id: people._id, kilnId: people.kilnId })
     .from(people)
-    .where(and(isNotNull(people.monthlySalary), eq(people.active, true)))
-    .all();
+    .where(and(isNotNull(people.monthlySalary), eq(people.active, true)));
 
   const results: { personId: string; ok: boolean; error?: string }[] = [];
   for (const p of salariedPeople) {
@@ -224,8 +224,7 @@ export async function generateForKiln(kilnId: string, month?: string) {
   const salariedPeople = await db
     .select({ _id: people._id })
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), isNotNull(people.monthlySalary), eq(people.active, true)))
-    .all();
+    .where(and(eq(people.kilnId, kilnId), isNotNull(people.monthlySalary), eq(people.active, true)));
 
   const results: { personId: string; ok: boolean; error?: string }[] = [];
   for (const p of salariedPeople) {
@@ -255,16 +254,14 @@ export async function listSalaryStatus(kilnId: string, month: string) {
   const salariedPeople = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), isNotNull(people.monthlySalary), eq(people.active, true)))
-    .all();
+    .where(and(eq(people.kilnId, kilnId), isNotNull(people.monthlySalary), eq(people.active, true)));
   if (salariedPeople.length === 0) return [];
 
   const personIds = salariedPeople.map((p) => p._id);
   const slips = await db
     .select()
     .from(salarySlips)
-    .where(and(inArray(salarySlips.personId, personIds), eq(salarySlips.month, month)))
-    .all();
+    .where(and(inArray(salarySlips.personId, personIds), eq(salarySlips.month, month)));
   const slipByPerson = new Map(slips.map((s) => [s.personId, s]));
 
   return salariedPeople.map((p) => ({
@@ -274,16 +271,15 @@ export async function listSalaryStatus(kilnId: string, month: string) {
 }
 
 export async function listSlipsForPerson(kilnId: string, personId: string) {
-  return db
+  return await db
     .select()
     .from(salarySlips)
     .where(and(eq(salarySlips.kilnId, kilnId), eq(salarySlips.personId, personId)))
-    .orderBy(desc(salarySlips.month))
-    .all();
+    .orderBy(desc(salarySlips.month));
 }
 
 export async function getSlipFile(kilnId: string, slipId: string, lang: "en" | "hi") {
-  const slip = db.select().from(salarySlips).where(and(eq(salarySlips._id, slipId), eq(salarySlips.kilnId, kilnId))).get();
+  const slip = (await db.select().from(salarySlips).where(and(eq(salarySlips._id, slipId), eq(salarySlips.kilnId, kilnId))))[0];
   if (!slip) throw new Error("Salary slip not found");
   return lang === "hi" ? slip.pdfPathHi : slip.pdfPathEn;
 }

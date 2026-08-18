@@ -21,7 +21,7 @@ export interface MarkAttendanceInput {
 // Salary module needs attendance for exactly that same "has monthlySalary"
 // population.
 async function assertAttendanceEligible(kilnId: string, personId: string) {
-  const person = db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))).get();
+  const person = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!person) throw new Error("Person not found in this kiln");
   const eligible = person.type === "WORKER" || person.type === "HELPER" || person.monthlySalary != null;
   if (!eligible) throw new Error("This person isn't eligible for attendance tracking (no monthly salary, not a worker/helper)");
@@ -38,19 +38,19 @@ export async function markAttendance(input: MarkAttendanceInput) {
   await assertAttendanceEligible(input.kilnId, input.personId);
   const day = startOfDay(input.date);
 
-  const existing = db
-    .select()
-    .from(attendances)
-    .where(and(eq(attendances.personId, input.personId), eq(attendances.date, day)))
-    .get();
+  const existing = (
+    await db
+      .select()
+      .from(attendances)
+      .where(and(eq(attendances.personId, input.personId), eq(attendances.date, day)))
+  )[0];
 
   if (existing) {
-    db.update(attendances)
+    await db.update(attendances)
       .set({ kilnId: input.kilnId, status: input.status, wageAmount: input.wageAmount })
-      .where(eq(attendances._id, existing._id))
-      .run();
+      .where(eq(attendances._id, existing._id));
   } else {
-    db.insert(attendances)
+    await db.insert(attendances)
       .values({
         _id: randomUUID(),
         kilnId: input.kilnId,
@@ -58,25 +58,25 @@ export async function markAttendance(input: MarkAttendanceInput) {
         date: day,
         status: input.status,
         wageAmount: input.wageAmount,
-      })
-      .run();
+      });
   }
 
-  const record = db
-    .select()
-    .from(attendances)
-    .where(and(eq(attendances.personId, input.personId), eq(attendances.date, day)))
-    .get()!;
+  const record = (
+    await db
+      .select()
+      .from(attendances)
+      .where(and(eq(attendances.personId, input.personId), eq(attendances.date, day)))
+  )[0]!;
   emitToKiln(input.kilnId, "attendance:update", record);
   return record;
 }
 
 export async function listAttendanceForDay(kilnId: string, date: Date) {
   const day = startOfDay(date);
-  const rows = await db.select().from(attendances).where(and(eq(attendances.kilnId, kilnId), eq(attendances.date, day))).all();
+  const rows = await db.select().from(attendances).where(and(eq(attendances.kilnId, kilnId), eq(attendances.date, day)));
   const personIds = [...new Set(rows.map((r) => r.personId))];
   if (personIds.length === 0) return rows;
-  const peopleRows = await db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, personIds)).all();
+  const peopleRows = await db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, personIds));
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
   return rows.map((r) => ({ ...r, personId: personById.get(r.personId) ?? r.personId }));
 }
@@ -86,7 +86,7 @@ export async function listAttendanceForDay(kilnId: string, date: Date) {
 // this only returns exception rows (absent/half-day/late); days with no
 // row are implicitly PRESENT (see the attendances table's schema comment).
 export async function listAttendanceForPerson(kilnId: string, personId: string) {
-  return db.select().from(attendances).where(and(eq(attendances.kilnId, kilnId), eq(attendances.personId, personId))).orderBy(attendances.date).all();
+  return await db.select().from(attendances).where(and(eq(attendances.kilnId, kilnId), eq(attendances.personId, personId))).orderBy(attendances.date);
 }
 
 export interface DayAttendance {
@@ -113,8 +113,7 @@ export async function attendanceForPersonMonth(
   const rows = await db
     .select()
     .from(attendances)
-    .where(and(eq(attendances.kilnId, kilnId), eq(attendances.personId, personId), gte(attendances.date, start), lte(attendances.date, end)))
-    .all();
+    .where(and(eq(attendances.kilnId, kilnId), eq(attendances.personId, personId), gte(attendances.date, start), lte(attendances.date, end)));
   const rowByDay = new Map(rows.map((r) => [startOfDay(r.date).getTime(), r]));
 
   const days: DayAttendance[] = [];
@@ -182,8 +181,7 @@ export async function listAttendanceRoster(kilnId: string, date: Date): Promise<
   const eligiblePeople = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), eq(people.active, true)))
-    .all();
+    .where(and(eq(people.kilnId, kilnId), eq(people.active, true)));
   const rosterPeople = eligiblePeople.filter(
     (p) => p.type === "MUNIM" || p.type === "CHOWKIDAR" || ((p.type === "HELPER" || p.type === "DRIVER") && p.isOfficeStaff)
   );
@@ -192,8 +190,7 @@ export async function listAttendanceRoster(kilnId: string, date: Date): Promise<
   const rows = await db
     .select()
     .from(attendances)
-    .where(and(eq(attendances.kilnId, kilnId), eq(attendances.date, day), inArray(attendances.personId, rosterPeople.map((p) => p._id))))
-    .all();
+    .where(and(eq(attendances.kilnId, kilnId), eq(attendances.date, day), inArray(attendances.personId, rosterPeople.map((p) => p._id))));
   const rowByPerson = new Map(rows.map((r) => [r.personId, r]));
 
   return rosterPeople

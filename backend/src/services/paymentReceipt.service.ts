@@ -12,12 +12,13 @@ function generateReceiptNumber() {
   return `RCPT-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
-function withPerson(receipt: typeof paymentReceipts.$inferSelect) {
-  const person = db
-    .select({ _id: people._id, name: people.name, type: people.type, phone: people.phone })
-    .from(people)
-    .where(eq(people._id, receipt.personId))
-    .get();
+async function withPerson(receipt: typeof paymentReceipts.$inferSelect) {
+  const person = (
+    await db
+      .select({ _id: people._id, name: people.name, type: people.type, phone: people.phone })
+      .from(people)
+      .where(eq(people._id, receipt.personId))
+  )[0];
   return { ...receipt, personId: person ?? receipt.personId };
 }
 
@@ -39,7 +40,7 @@ export interface CreatePaymentReceiptInput {
 // reprint shows exactly what was true when the recipient signed — not
 // whatever the balance happens to be by the time someone reprints it.
 export async function createPaymentReceipt(input: CreatePaymentReceiptInput) {
-  const person = db.select().from(people).where(and(eq(people._id, input.personId), eq(people.kilnId, input.kilnId))).get();
+  const person = (await db.select().from(people).where(and(eq(people._id, input.personId), eq(people.kilnId, input.kilnId))))[0];
   if (!person) throw new Error("Person not found in this kiln");
 
   const balanceBefore = await getBalance(input.kilnId, input.personId);
@@ -60,7 +61,7 @@ export async function createPaymentReceipt(input: CreatePaymentReceiptInput) {
   const balanceAfter = balanceBefore - input.amountPaid;
 
   const _id = randomUUID();
-  db.insert(paymentReceipts)
+  await db.insert(paymentReceipts)
     .values({
       _id,
       kilnId: input.kilnId,
@@ -75,10 +76,9 @@ export async function createPaymentReceipt(input: CreatePaymentReceiptInput) {
       onlineAmount: input.onlineAmount,
       notes: input.notes,
       date: input.date,
-    })
-    .run();
+    });
 
-  const receipt = withPerson(db.select().from(paymentReceipts).where(eq(paymentReceipts._id, _id)).get()!);
+  const receipt = await withPerson((await db.select().from(paymentReceipts).where(eq(paymentReceipts._id, _id)))[0]!);
   emitToKiln(input.kilnId, "paymentReceipt:update", receipt);
   emitToKiln(input.kilnId, "ledger:update", receipt);
   return receipt;
@@ -87,12 +87,12 @@ export async function createPaymentReceipt(input: CreatePaymentReceiptInput) {
 export async function listPaymentReceipts(kilnId: string, personId?: string) {
   const conditions = [eq(paymentReceipts.kilnId, kilnId)];
   if (personId) conditions.push(eq(paymentReceipts.personId, personId));
-  const rows = await db.select().from(paymentReceipts).where(and(...conditions)).orderBy(desc(paymentReceipts.date)).all();
-  return rows.map(withPerson);
+  const rows = await db.select().from(paymentReceipts).where(and(...conditions)).orderBy(desc(paymentReceipts.date));
+  return Promise.all(rows.map(withPerson));
 }
 
 export async function getPaymentReceipt(kilnId: string, receiptId: string) {
-  const receipt = db.select().from(paymentReceipts).where(and(eq(paymentReceipts._id, receiptId), eq(paymentReceipts.kilnId, kilnId))).get();
+  const receipt = (await db.select().from(paymentReceipts).where(and(eq(paymentReceipts._id, receiptId), eq(paymentReceipts.kilnId, kilnId))))[0];
   if (!receipt) throw new Error("Payment receipt not found in this kiln");
   return withPerson(receipt);
 }
@@ -114,7 +114,7 @@ export interface UpdatePaymentReceiptInput {
 // consistent before/after. totalAgreedAmount/paymentMode/notes/date are
 // receipt-only fields with no ledger effect, so they're just overwritten.
 export async function updatePaymentReceipt(kilnId: string, receiptId: string, input: UpdatePaymentReceiptInput) {
-  const existing = db.select().from(paymentReceipts).where(and(eq(paymentReceipts._id, receiptId), eq(paymentReceipts.kilnId, kilnId))).get();
+  const existing = (await db.select().from(paymentReceipts).where(and(eq(paymentReceipts._id, receiptId), eq(paymentReceipts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Payment receipt not found in this kiln");
 
   const patch: Record<string, unknown> = {};
@@ -152,10 +152,10 @@ export async function updatePaymentReceipt(kilnId: string, receiptId: string, in
   if (input.date !== undefined) patch.date = input.date;
 
   if (Object.keys(patch).length > 0) {
-    db.update(paymentReceipts).set(patch).where(eq(paymentReceipts._id, receiptId)).run();
+    await db.update(paymentReceipts).set(patch).where(eq(paymentReceipts._id, receiptId));
   }
 
-  const populated = withPerson(db.select().from(paymentReceipts).where(eq(paymentReceipts._id, receiptId)).get()!);
+  const populated = await withPerson((await db.select().from(paymentReceipts).where(eq(paymentReceipts._id, receiptId)))[0]!);
   emitToKiln(kilnId, "paymentReceipt:update", populated);
   emitToKiln(kilnId, "ledger:update", populated);
   return populated;
@@ -166,7 +166,7 @@ export async function updatePaymentReceipt(kilnId: string, receiptId: string, in
 // original entry, keeping the ledger an honest append-only trail — then
 // removes the receipt document itself so it stops appearing/printing.
 export async function deletePaymentReceipt(kilnId: string, receiptId: string) {
-  const existing = db.select().from(paymentReceipts).where(and(eq(paymentReceipts._id, receiptId), eq(paymentReceipts.kilnId, kilnId))).get();
+  const existing = (await db.select().from(paymentReceipts).where(and(eq(paymentReceipts._id, receiptId), eq(paymentReceipts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Payment receipt not found in this kiln");
 
   await addLedgerEntry({
@@ -178,7 +178,7 @@ export async function deletePaymentReceipt(kilnId: string, receiptId: string) {
     paymentMode: existing.paymentMode ?? undefined,
   });
 
-  db.delete(paymentReceipts).where(and(eq(paymentReceipts._id, receiptId), eq(paymentReceipts.kilnId, kilnId))).run();
+  await db.delete(paymentReceipts).where(and(eq(paymentReceipts._id, receiptId), eq(paymentReceipts.kilnId, kilnId)));
   emitToKiln(kilnId, "paymentReceipt:update", { _id: receiptId, deleted: true });
   emitToKiln(kilnId, "ledger:update", { _id: receiptId, deleted: true });
 }

@@ -15,7 +15,7 @@ export async function ensureGherCount(kilnId: string, count: number) {
 
   for (let n = 1; n <= count; n++) {
     if (!existingNumbers.has(n)) {
-      db.insert(ghers).values({ _id: randomUUID(), kilnId, number: n }).run();
+      await db.insert(ghers).values({ _id: randomUUID(), kilnId, number: n });
     }
   }
 
@@ -33,14 +33,14 @@ export async function updateGherStatus(kilnId: string, gherId: string, status: G
   // this cycle" instead of summing every stacking entry ever logged here.
   if (status === "STACKING") update.cycleStartedAt = new Date();
 
-  const existing = db.select().from(ghers).where(and(eq(ghers._id, gherId), eq(ghers.kilnId, kilnId))).get();
+  const existing = (await db.select().from(ghers).where(and(eq(ghers._id, gherId), eq(ghers.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Chamber not found in this kiln");
 
-  db.update(ghers).set(update).where(eq(ghers._id, gherId)).run();
-  const gher = db.select().from(ghers).where(eq(ghers._id, gherId)).get()!;
+  await db.update(ghers).set(update).where(eq(ghers._id, gherId));
+  const gher = (await db.select().from(ghers).where(eq(ghers._id, gherId)))[0]!;
 
   if (status === "FIRING") {
-    db.insert(fireMovementLogs).values({ _id: randomUUID(), kilnId, gherId: gher._id, gherNumber: gher.number }).run();
+    await db.insert(fireMovementLogs).values({ _id: randomUUID(), kilnId, gherId: gher._id, gherNumber: gher.number });
   }
 
   emitToKiln(kilnId, "gher:update", gher);
@@ -48,7 +48,7 @@ export async function updateGherStatus(kilnId: string, gherId: string, status: G
 }
 
 export async function assertGherInKiln(kilnId: string, gherId: string) {
-  const gher = db.select().from(ghers).where(and(eq(ghers._id, gherId), eq(ghers.kilnId, kilnId))).get();
+  const gher = (await db.select().from(ghers).where(and(eq(ghers._id, gherId), eq(ghers.kilnId, kilnId))))[0];
   if (!gher) throw new Error("Referenced chamber not found in this kiln");
   return gher;
 }
@@ -60,10 +60,11 @@ export async function fireRoundSpeed(kilnId: string, days = 14) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const [movements, current] = await Promise.all([
-    db.select().from(fireMovementLogs).where(and(eq(fireMovementLogs.kilnId, kilnId), gte(fireMovementLogs.startedAt, since))).orderBy(desc(fireMovementLogs.startedAt)).all(),
-    db.select().from(ghers).where(and(eq(ghers.kilnId, kilnId), eq(ghers.status, "FIRING"))).orderBy(desc(ghers.updatedAt)).get(),
+  const [movements, currentRows] = await Promise.all([
+    db.select().from(fireMovementLogs).where(and(eq(fireMovementLogs.kilnId, kilnId), gte(fireMovementLogs.startedAt, since))).orderBy(desc(fireMovementLogs.startedAt)),
+    db.select().from(ghers).where(and(eq(ghers.kilnId, kilnId), eq(ghers.status, "FIRING"))).orderBy(desc(ghers.updatedAt)),
   ]);
+  const current = currentRows[0];
 
   return {
     days,

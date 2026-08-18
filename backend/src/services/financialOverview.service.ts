@@ -52,12 +52,12 @@ async function flowForRange(kilnId: string, since: Date, until?: Date) {
   const dateRange = (col: any) => (until ? and(gte(col, since), lte(col, until)) : gte(col, since));
 
   const [dispatchRows, expenseRows, fuelPurchaseRows, dieselRows, paidEntries, customers] = await Promise.all([
-    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), dateRange(dispatches.dispatchedOn))).all(),
-    db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), dateRange(expenses.date))).all(),
-    db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), dateRange(fuelPurchases.date))).all(),
-    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), dateRange(vehicleDieselEntries.date))).all(),
-    db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), dateRange(ledgerEntries.date), eq(ledgerEntries.direction, "PAID"))).all(),
-    db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))).all(),
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), dateRange(dispatches.dispatchedOn))),
+    db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), dateRange(expenses.date))),
+    db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), dateRange(fuelPurchases.date))),
+    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), dateRange(vehicleDieselEntries.date))),
+    db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), dateRange(ledgerEntries.date), eq(ledgerEntries.direction, "PAID"))),
+    db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))),
   ]);
 
   const customerIds = new Set(customers.map((c) => c._id));

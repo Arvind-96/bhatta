@@ -42,15 +42,14 @@ export async function applySyncPush({ kilnId, changes }: SyncPushInput) {
       results.push({ localId: change.localId, cloudId: entry._id, status: "applied" });
     }
 
-    db.insert(syncLogs)
+    await db.insert(syncLogs)
       .values({
         _id: randomUUID(),
         kilnId,
         entityType: change.entityType,
         entityId: change.localId,
         action: "PUSH",
-      })
-      .run();
+      });
   }
 
   return results;

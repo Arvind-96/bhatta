@@ -43,8 +43,8 @@ export async function createWorkEntry(input: CreateWorkEntryInput) {
   await assertPersonOfType(input.kilnId, input.personId, ["WORKER", "HELPER"]);
 
   const _id = randomUUID();
-  db.insert(workEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(workEntries).where(eq(workEntries._id, _id)).get()!;
+  await db.insert(workEntries).values({ ...input, _id });
+  const entry = (await db.select().from(workEntries).where(eq(workEntries._id, _id)))[0]!;
 
   await addLedgerEntry({
     kilnId: input.kilnId,
@@ -72,13 +72,13 @@ export interface UpdateWorkEntryInput {
 // instead (DUE if the corrected wage is higher, PAID if lower), same
 // convention used everywhere else a piece-rate amount can be corrected.
 export async function updateWorkEntry(kilnId: string, entryId: string, input: UpdateWorkEntryInput) {
-  const existing = db.select().from(workEntries).where(and(eq(workEntries._id, entryId), eq(workEntries.kilnId, kilnId))).get();
+  const existing = (await db.select().from(workEntries).where(and(eq(workEntries._id, entryId), eq(workEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Work entry not found in this kiln");
 
   const oldWage = wageFor(existing.quantity, existing.ratePerThousand);
 
-  db.update(workEntries).set(input).where(eq(workEntries._id, entryId)).run();
-  const updated = db.select().from(workEntries).where(eq(workEntries._id, entryId)).get()!;
+  await db.update(workEntries).set(input).where(eq(workEntries._id, entryId));
+  const updated = (await db.select().from(workEntries).where(eq(workEntries._id, entryId)))[0]!;
 
   if (input.quantity !== undefined || input.ratePerThousand !== undefined) {
     const newWage = wageFor(updated.quantity, updated.ratePerThousand);
@@ -119,14 +119,13 @@ export async function listWorkEntries(kilnId: string, filter: ListWorkEntryFilte
   if (filter.personId) conditions.push(eq(workEntries.personId, filter.personId));
   if (filter.workType) conditions.push(eq(workEntries.workType, filter.workType));
 
-  const rows = await db.select().from(workEntries).where(and(...conditions)).orderBy(desc(workEntries.date)).all();
+  const rows = await db.select().from(workEntries).where(and(...conditions)).orderBy(desc(workEntries.date));
   const personIds = [...new Set(rows.map((r) => r.personId))];
   if (personIds.length === 0) return rows;
   const peopleRows = await db
     .select({ _id: people._id, name: people.name, type: people.type, contractorId: people.contractorId })
     .from(people)
-    .where(inArray(people._id, personIds))
-    .all();
+    .where(inArray(people._id, personIds));
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
   return rows.map((r) => ({ ...r, personId: personById.get(r.personId) ?? r.personId }));
 }

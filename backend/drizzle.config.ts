@@ -1,10 +1,15 @@
+import "dotenv/config";
 import type { Config } from "drizzle-kit";
 
 export default {
   schema: "./src/db/schema/index.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "mysql",
   dbCredentials: {
-    url: process.env.SQLITE_PATH ?? "./data/bhatta.db",
+    host: process.env.DB_HOST ?? "localhost",
+    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+    user: process.env.DB_USER ?? "root",
+    password: process.env.DB_PASSWORD ?? "",
+    database: process.env.DB_NAME ?? "bhatta_cloud",
   },
 } satisfies Config;

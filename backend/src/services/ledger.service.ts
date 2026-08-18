@@ -27,30 +27,28 @@ export interface AddLedgerEntryInput {
 // wrong record (or one that isn't there), and nobody would notice until
 // the money didn't add up.
 export async function addLedgerEntry(input: AddLedgerEntryInput) {
-  const person = db.select({ _id: people._id }).from(people).where(and(eq(people._id, input.personId), eq(people.kilnId, input.kilnId))).get();
+  const person = (await db.select({ _id: people._id }).from(people).where(and(eq(people._id, input.personId), eq(people.kilnId, input.kilnId))))[0];
   if (!person) throw new Error("Referenced person not found in this kiln");
 
   const _id = randomUUID();
-  db.insert(ledgerEntries).values({ ...input, _id }).run();
-  const entry = db.select().from(ledgerEntries).where(eq(ledgerEntries._id, _id)).get()!;
+  await db.insert(ledgerEntries).values({ ...input, _id });
+  const entry = (await db.select().from(ledgerEntries).where(eq(ledgerEntries._id, _id)))[0]!;
   emitToKiln(input.kilnId, "ledger:update", entry);
   return entry;
 }
 
 export async function listLedgerForPerson(kilnId: string, personId: string) {
-  return db
+  return await db
     .select()
     .from(ledgerEntries)
     .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, personId)))
-    .orderBy(desc(ledgerEntries.date))
-    .all();
+    .orderBy(desc(ledgerEntries.date));
 }
 
 export async function contractLedgerBalance(kilnId: string, contractId: string) {
   const entries = await db
     .select()
     .from(ledgerEntries)
-    .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.contractId, contractId)))
-    .all();
-  return entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0);
+    .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.contractId, contractId)));
+  return entries.reduce((sum: number, e: typeof ledgerEntries.$inferSelect) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0);
 }

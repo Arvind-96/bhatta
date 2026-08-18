@@ -72,13 +72,12 @@ function computeTotalContractValue(input: {
   return input.contractedQuantity * input.ratePerTrolley;
 }
 
-function withLandownerAndLand(contract: typeof soilContracts.$inferSelect) {
-  const owner = db.select({ _id: people._id, name: people.name, phone: people.phone, agreedDepthFeet: people.agreedDepthFeet }).from(people).where(eq(people._id, contract.landownerId)).get();
-  const land = db
+async function withLandownerAndLand(contract: typeof soilContracts.$inferSelect) {
+  const owner = (await db.select({ _id: people._id, name: people.name, phone: people.phone, agreedDepthFeet: people.agreedDepthFeet }).from(people).where(eq(people._id, contract.landownerId)))[0];
+  const land = (await db
     .select({ _id: lands._id, name: lands.name, village: lands.village, tehsil: lands.tehsil, district: lands.district, state: lands.state, khasraNumber: lands.khasraNumber, khataNumber: lands.khataNumber, latitude: lands.latitude, longitude: lands.longitude, area: lands.area, areaUnit: lands.areaUnit })
     .from(lands)
-    .where(eq(lands._id, contract.landId))
-    .get();
+    .where(eq(lands._id, contract.landId)))[0];
   return { ...contract, landownerId: owner ?? contract.landownerId, landId: land ?? contract.landId };
 }
 
@@ -103,8 +102,8 @@ export async function createSoilContract(input: CreateSoilContractInput) {
   const totalContractValue = computeTotalContractValue(input);
 
   const _id = randomUUID();
-  db.insert(soilContracts).values({ ...input, _id, rateType, contractNumber, totalContractValue }).run();
-  const contract = db.select().from(soilContracts).where(eq(soilContracts._id, _id)).get()!;
+  await db.insert(soilContracts).values({ ...input, _id, rateType, contractNumber, totalContractValue });
+  const contract = (await db.select().from(soilContracts).where(eq(soilContracts._id, _id)))[0]!;
 
   if (input.advanceAmount && input.advanceAmount > 0) {
     await addLedgerEntry({
@@ -149,8 +148,8 @@ export async function listSoilContracts(kilnId: string, filter: ListSoilContract
   if (filter.landId) conditions.push(eq(soilContracts.landId, filter.landId));
   if (filter.status) conditions.push(eq(soilContracts.status, filter.status));
 
-  const rows = await db.select().from(soilContracts).where(and(...conditions)).orderBy(desc(soilContracts.createdAt)).all();
-  return rows.map(withLandownerAndLand);
+  const rows = await db.select().from(soilContracts).where(and(...conditions)).orderBy(desc(soilContracts.createdAt));
+  return Promise.all(rows.map(withLandownerAndLand));
 }
 
 // Excavated quantity rolls up both sources that can carry a contractId:
@@ -160,8 +159,8 @@ export async function listSoilContracts(kilnId: string, filter: ListSoilContract
 // either from the Soil page or straight from the field owner's profile.
 async function excavatedQuantityForContract(kilnId: string, contractId: string) {
   const [trips, arrivals] = await Promise.all([
-    db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.contractId, contractId))).all(),
-    db.select().from(soilArrivals).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.contractId, contractId))).all(),
+    db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.contractId, contractId))),
+    db.select().from(soilArrivals).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.contractId, contractId))),
   ]);
   const tripTotal = trips.reduce((sum, t) => sum + (t.trolleyCount ?? 0), 0);
   const arrivalTotal = arrivals.reduce((sum, a) => sum + a.trolleyCount, 0);
@@ -175,8 +174,8 @@ async function excavatedQuantityForContract(kilnId: string, contractId: string) 
 // soilTrip but rolled up to contract level.
 async function depthUsedForContract(kilnId: string, contractId: string) {
   const [trips, arrivals] = await Promise.all([
-    db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.contractId, contractId), isNotNull(soilTrips.depthFeet))).all(),
-    db.select().from(soilArrivals).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.contractId, contractId), isNotNull(soilArrivals.depthFeet))).all(),
+    db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.contractId, contractId), isNotNull(soilTrips.depthFeet))),
+    db.select().from(soilArrivals).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.contractId, contractId), isNotNull(soilArrivals.depthFeet))),
   ]);
   const tripMax = trips.reduce((max, t) => Math.max(max, t.depthFeet ?? 0), 0);
   const arrivalMax = arrivals.reduce((max, a) => Math.max(max, a.depthFeet ?? 0), 0);
@@ -186,9 +185,9 @@ async function depthUsedForContract(kilnId: string, contractId: string) {
 // Fully computed, nothing stored redundantly — same shape as
 // reconciliation.service.ts's reconcileSoilToKiln.
 export async function getContractSummary(kilnId: string, contractId: string) {
-  const row = db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))).get();
+  const row = (await db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))))[0];
   if (!row) throw new Error("Contract not found in this kiln");
-  const contract = withLandownerAndLand(row);
+  const contract = await withLandownerAndLand(row);
 
   const [excavatedQuantity, ledgerBalance, depthUsedFeet] = await Promise.all([
     excavatedQuantityForContract(kilnId, contractId),
@@ -261,8 +260,8 @@ export async function getContractSummary(kilnId: string, contractId: string) {
 // and (if separately counted) received quantity for that day.
 export async function contractDailyMovement(kilnId: string, contractId: string) {
   const [trips, arrivals] = await Promise.all([
-    db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.contractId, contractId))).orderBy(soilTrips.date).all(),
-    db.select().from(soilArrivals).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.contractId, contractId))).orderBy(soilArrivals.date).all(),
+    db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.contractId, contractId))).orderBy(soilTrips.date),
+    db.select().from(soilArrivals).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.contractId, contractId))).orderBy(soilArrivals.date),
   ]);
 
   const driverIds = [...new Set(trips.map((t) => t.driverId).filter((v): v is string => !!v))];
@@ -270,7 +269,7 @@ export async function contractDailyMovement(kilnId: string, contractId: string) 
     ...new Set([...arrivals.map((a) => a.jcbDriverId), ...arrivals.map((a) => a.tractorDriverId)].filter((v): v is string => !!v)),
   ];
   const allDriverIds = [...new Set([...driverIds, ...arrivalDriverIds])];
-  const driverRows = allDriverIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, allDriverIds)).all() : [];
+  const driverRows = allDriverIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, allDriverIds)) : [];
   const driverById = new Map(driverRows.map((d) => [d._id, d]));
 
   const byDay = new Map<
@@ -377,7 +376,7 @@ export interface UpdateSoilContractInput {
 // have been logged against it would silently misattribute their excavated
 // quantity.
 export async function updateSoilContract(kilnId: string, contractId: string, input: UpdateSoilContractInput) {
-  const existing = db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))).get();
+  const existing = (await db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Soil contract not found in this kiln");
 
   const rateType = input.rateType ?? existing.rateType!;
@@ -407,8 +406,8 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
   const oldAdvance = existing.advanceAmount ?? 0;
   const newAdvance = input.advanceAmount ?? oldAdvance;
 
-  db.update(soilContracts).set({ ...input, rateType, totalContractValue: newTotalValue }).where(eq(soilContracts._id, contractId)).run();
-  const updated = withLandownerAndLand(db.select().from(soilContracts).where(eq(soilContracts._id, contractId)).get()!);
+  await db.update(soilContracts).set({ ...input, rateType, totalContractValue: newTotalValue }).where(eq(soilContracts._id, contractId));
+  const updated = await withLandownerAndLand((await db.select().from(soilContracts).where(eq(soilContracts._id, contractId)))[0]!);
 
   if (rateType !== "PER_TROLLEY") {
     const valueDelta = Math.round((newTotalValue - existing.totalContractValue) * 100) / 100;
@@ -464,18 +463,18 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
 // deletion of the parent" convention used for admin-managed brick/fuel
 // types elsewhere in this app.
 export async function deleteSoilContract(kilnId: string, contractId: string) {
-  const existing = db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))).get();
+  const existing = (await db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Soil contract not found in this kiln");
-  db.delete(soilContracts).where(eq(soilContracts._id, contractId)).run();
+  await db.delete(soilContracts).where(eq(soilContracts._id, contractId));
   emitToKiln(kilnId, "soilContract:update", { _id: contractId, deleted: true });
   return existing;
 }
 
 export async function updateContractStatus(kilnId: string, contractId: string, status: SoilContractStatus) {
-  const existing = db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))).get();
+  const existing = (await db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Contract not found in this kiln");
-  db.update(soilContracts).set({ status }).where(eq(soilContracts._id, contractId)).run();
-  const contract = db.select().from(soilContracts).where(eq(soilContracts._id, contractId)).get()!;
+  await db.update(soilContracts).set({ status }).where(eq(soilContracts._id, contractId));
+  const contract = (await db.select().from(soilContracts).where(eq(soilContracts._id, contractId)))[0]!;
   emitToKiln(kilnId, "soilContract:update", contract);
   return contract;
 }
@@ -486,10 +485,10 @@ export async function updateContractStatus(kilnId: string, contractId: string, s
 // is stored beyond flipping status to COMPLETED.
 export async function settleContract(kilnId: string, contractId: string) {
   const summary = await getContractSummary(kilnId, contractId);
-  const existing = db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))).get();
+  const existing = (await db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Contract not found in this kiln");
-  db.update(soilContracts).set({ status: "COMPLETED" }).where(eq(soilContracts._id, contractId)).run();
-  const contract = db.select().from(soilContracts).where(eq(soilContracts._id, contractId)).get()!;
+  await db.update(soilContracts).set({ status: "COMPLETED" }).where(eq(soilContracts._id, contractId));
+  const contract = (await db.select().from(soilContracts).where(eq(soilContracts._id, contractId)))[0]!;
 
   emitToKiln(kilnId, "soilContract:update", contract);
   return { ...summary, contract };
@@ -503,8 +502,7 @@ export async function contractsExpiringSoon(kilnId: string, withinDays = EXPIRY_
     .select()
     .from(soilContracts)
     .where(and(eq(soilContracts.kilnId, kilnId), eq(soilContracts.status, "ACTIVE"), lte(soilContracts.endDate, cutoff)))
-    .orderBy(soilContracts.endDate)
-    .all();
+    .orderBy(soilContracts.endDate);
 
   return contracts.map((c) => ({ ...c, expired: !!c.endDate && c.endDate.getTime() < Date.now() }));
 }
@@ -517,7 +515,7 @@ export async function contractsExpiringSoon(kilnId: string, withinDays = EXPIRY_
 // doesn't assume a conversion ratio between them (see Land.areaUnit) — so
 // it's grouped by unit instead of silently summed across units.
 export async function soilContractDashboard(kilnId: string) {
-  const contracts = await db.select().from(soilContracts).where(eq(soilContracts.kilnId, kilnId)).all();
+  const contracts = await db.select().from(soilContracts).where(eq(soilContracts.kilnId, kilnId));
 
   const statusCounts: Record<SoilContractStatus, number> = {
     DRAFT: 0,
@@ -559,7 +557,7 @@ export async function soilContractDashboard(kilnId: string) {
   }
 
   const contractedLandIds = [...new Set(contracts.filter((c) => c.status !== "CANCELLED").map((c) => c.landId))];
-  const landRows = contractedLandIds.length ? await db.select().from(lands).where(inArray(lands._id, contractedLandIds)).all() : [];
+  const landRows = contractedLandIds.length ? await db.select().from(lands).where(inArray(lands._id, contractedLandIds)) : [];
   const landAreaByUnit = new Map<string, number>();
   for (const l of landRows) {
     if (!l.area) continue;

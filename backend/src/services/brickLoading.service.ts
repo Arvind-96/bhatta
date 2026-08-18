@@ -36,7 +36,7 @@ export interface CreateBrickLoadingInput {
 export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   await assertPersonOfType(input.kilnId, input.driverId, ["DRIVER"]);
   if (input.dispatchId) {
-    const dispatch = db.select({ _id: dispatches._id }).from(dispatches).where(and(eq(dispatches._id, input.dispatchId), eq(dispatches.kilnId, input.kilnId))).get();
+    const dispatch = (await db.select({ _id: dispatches._id }).from(dispatches).where(and(eq(dispatches._id, input.dispatchId), eq(dispatches.kilnId, input.kilnId))))[0];
     if (!dispatch) throw new Error("Referenced dispatch not found in this kiln");
   }
 
@@ -45,8 +45,8 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   const { discountAmount, ...entryInput } = input;
 
   const _id = randomUUID();
-  db.insert(brickLoadingEntries).values({ ...entryInput, _id }).run();
-  let entry = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)).get()!;
+  await db.insert(brickLoadingEntries).values({ ...entryInput, _id });
+  let entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)))[0]!;
 
   if (input.tipAmount && input.tipAmount > 0) {
     await addLedgerEntry({
@@ -61,7 +61,7 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   }
 
   if (input.categoryId) {
-    const category = db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))).get();
+    const category = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))))[0];
 
     if (category) {
       // The bricks physically left the yard on this trip — deduct from
@@ -69,11 +69,10 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
       // "loading out" flow does (createStockLoadingEntry), just without a
       // separate stockLoadingEntries row, since this brickLoadingEntries
       // row is already the audit trail for the same physical movement.
-      db.update(brickCategories)
+      await db.update(brickCategories)
         .set({ quantity: sql`${brickCategories.quantity} - ${input.bricksCount}` })
-        .where(eq(brickCategories._id, input.categoryId))
-        .run();
-      emitToKiln(input.kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)).get());
+        .where(eq(brickCategories._id, input.categoryId));
+      emitToKiln(input.kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0]);
 
       // Auto-create a matching Dispatch so this trip shows up on the
       // Dispatch page without a manual step — only when the admin hasn't
@@ -101,8 +100,8 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
             driverTipAmount: input.tipAmount,
             dispatchedOn: input.date,
           });
-          db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, _id)).run();
-          entry = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)).get()!;
+          await db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, _id));
+          entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)))[0]!;
         } catch (err) {
           console.error("[brickLoading] auto-dispatch creation failed, loading entry still saved:", err);
         }
@@ -129,13 +128,13 @@ export interface UpdateBrickLoadingInput {
 // every other correctable amount in this app (see stacking.service.ts's
 // original wage-delta pattern).
 export async function updateBrickLoadingEntry(kilnId: string, entryId: string, input: UpdateBrickLoadingInput) {
-  const existing = db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))).get();
+  const existing = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick loading entry not found in this kiln");
 
   const oldTip = existing.tipAmount ?? 0;
 
-  db.update(brickLoadingEntries).set(input).where(eq(brickLoadingEntries._id, entryId)).run();
-  const updated = db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId)).get()!;
+  await db.update(brickLoadingEntries).set(input).where(eq(brickLoadingEntries._id, entryId));
+  const updated = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId)))[0]!;
 
   // A changed bricksCount means the original stock deduction (see
   // createBrickLoadingEntry) is now off by the difference — correct the
@@ -144,11 +143,10 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
   if (input.bricksCount !== undefined && existing.categoryId) {
     const delta = input.bricksCount - existing.bricksCount;
     if (delta !== 0) {
-      db.update(brickCategories)
+      await db.update(brickCategories)
         .set({ quantity: sql`${brickCategories.quantity} - ${delta}` })
-        .where(eq(brickCategories._id, existing.categoryId))
-        .run();
-      emitToKiln(kilnId, "brickCategory:update", db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)).get());
+        .where(eq(brickCategories._id, existing.categoryId));
+      emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)))[0]);
     }
   }
 
@@ -193,14 +191,14 @@ export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickL
     conditions.push(gte(brickLoadingEntries.date, since));
   }
 
-  const rows = await db.select().from(brickLoadingEntries).where(and(...conditions)).orderBy(desc(brickLoadingEntries.date)).all();
+  const rows = await db.select().from(brickLoadingEntries).where(and(...conditions)).orderBy(desc(brickLoadingEntries.date));
   const driverIds = [...new Set(rows.map((r) => r.driverId))];
   const dispatchIds = [...new Set(rows.map((r) => r.dispatchId).filter((v): v is string => !!v))];
   const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
   const [driverRows, dispatchRows, categoryRows] = await Promise.all([
-    driverIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, driverIds)).all() : [],
-    dispatchIds.length ? db.select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName }).from(dispatches).where(inArray(dispatches._id, dispatchIds)).all() : [],
-    categoryIds.length ? db.select({ _id: brickCategories._id, category: brickCategories.category }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)).all() : [],
+    driverIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, driverIds)) : [],
+    dispatchIds.length ? db.select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName }).from(dispatches).where(inArray(dispatches._id, dispatchIds)) : [],
+    categoryIds.length ? db.select({ _id: brickCategories._id, category: brickCategories.category }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)) : [],
   ]);
   const driverById = new Map(driverRows.map((d) => [d._id, d]));
   const dispatchById = new Map(dispatchRows.map((d) => [d._id, d]));
@@ -224,9 +222,9 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // so an owner can see "who's driving the most, and what have I tipped them"
 // at a glance.
 export async function brickLoadingDriverSummary(kilnId: string) {
-  const drivers = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "DRIVER"), eq(people.active, true))).orderBy(asc(people.name)).all();
+  const drivers = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "DRIVER"), eq(people.active, true))).orderBy(asc(people.name));
 
-  const allEntries = await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId)).all();
+  const allEntries = await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId));
   const entriesByDriver = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
     const id = e.driverId;
@@ -239,7 +237,7 @@ export async function brickLoadingDriverSummary(kilnId: string) {
     const driverEntries = entriesByDriver.get(driver._id) ?? [];
     if (driverEntries.length === 0) continue;
 
-    const driverLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, driver._id))).all();
+    const driverLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, driver._id)));
     const { due, paid, balance } = sumByDirection(driverLedgerEntries);
 
     results.push({

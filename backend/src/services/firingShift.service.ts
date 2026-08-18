@@ -26,8 +26,8 @@ export async function createFiringShift(input: CreateShiftInput) {
   await assertPersonOfType(input.kilnId, input.fitterId, ["FITTER"]);
 
   const _id = randomUUID();
-  db.insert(firingShifts).values({ ...input, _id }).run();
-  const shift = db.select().from(firingShifts).where(eq(firingShifts._id, _id)).get()!;
+  await db.insert(firingShifts).values({ ...input, _id });
+  const shift = (await db.select().from(firingShifts).where(eq(firingShifts._id, _id)))[0]!;
 
   const otAmount = (input.overtimeHours ?? 0) * (input.overtimeRate ?? 0);
   const totalDue = otAmount + (input.bonusAmount ?? 0);
@@ -58,12 +58,12 @@ export async function listFiringShifts(kilnId: string, filter: ListFiringShiftFi
   const conditions = [eq(firingShifts.kilnId, kilnId), gte(firingShifts.date, since)];
   if (filter.fitterId) conditions.push(eq(firingShifts.fitterId, filter.fitterId));
 
-  const rows = await db.select().from(firingShifts).where(and(...conditions)).orderBy(desc(firingShifts.date)).all();
+  const rows = await db.select().from(firingShifts).where(and(...conditions)).orderBy(desc(firingShifts.date));
   const fitterIds = [...new Set(rows.map((r) => r.fitterId))];
   const gherIds = [...new Set(rows.map((r) => r.gherId).filter((v): v is string => !!v))];
   const [fitterRows, gherRows] = await Promise.all([
-    fitterIds.length ? db.select({ _id: people._id, name: people.name }).from(people).where(and(eq(people.kilnId, kilnId))).all() : [],
-    gherIds.length ? db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(eq(ghers.kilnId, kilnId)).all() : [],
+    fitterIds.length ? db.select({ _id: people._id, name: people.name }).from(people).where(and(eq(people.kilnId, kilnId))) : [],
+    gherIds.length ? db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(eq(ghers.kilnId, kilnId)) : [],
   ]);
   const fitterById = new Map(fitterRows.filter((f) => fitterIds.includes(f._id)).map((f) => [f._id, f]));
   const gherById = new Map(gherRows.filter((g) => gherIds.includes(g._id)).map((g) => [g._id, g]));
@@ -123,13 +123,13 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // else in this app).
 export async function fitterRosterSummary(kilnId: string, forDate?: Date) {
   const date = forDate ?? new Date();
-  const fitters = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "FITTER"), eq(people.active, true))).orderBy(asc(people.name)).all();
+  const fitters = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "FITTER"), eq(people.active, true))).orderBy(asc(people.name));
 
   const results = await Promise.all(
     fitters.map(async (fitter) => {
       const [shifts, fitterLedgerEntries] = await Promise.all([
-        db.select().from(firingShifts).where(and(eq(firingShifts.kilnId, kilnId), eq(firingShifts.fitterId, fitter._id))).orderBy(desc(firingShifts.date)).all(),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, fitter._id))).all(),
+        db.select().from(firingShifts).where(and(eq(firingShifts.kilnId, kilnId), eq(firingShifts.fitterId, fitter._id))).orderBy(desc(firingShifts.date)),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, fitter._id))),
       ]);
       const { due, paid, balance } = sumByDirection(fitterLedgerEntries);
 

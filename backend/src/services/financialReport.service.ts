@@ -14,10 +14,10 @@ export async function seasonFinancialSummary(kilnId: string, days = 30) {
   since.setDate(since.getDate() - days);
 
   const [dispatchRows, expenseRows, dueEntries, customers] = await Promise.all([
-    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since))).all(),
-    db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since))).all(),
-    db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), gte(ledgerEntries.date, since), eq(ledgerEntries.direction, "DUE"))).all(),
-    db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))).all(),
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since))),
+    db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since))),
+    db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), gte(ledgerEntries.date, since), eq(ledgerEntries.direction, "DUE"))),
+    db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))),
   ]);
 
   const customerIds = new Set(customers.map((c) => c._id));
@@ -46,15 +46,15 @@ export async function seasonFinancialSummary(kilnId: string, days = 30) {
 // without a much bigger cost-accounting model, so it's left out rather
 // than guessed at.
 export async function chamberCostReport(kilnId: string, gherId: string) {
-  const gher = db.select().from(ghers).where(and(eq(ghers._id, gherId), eq(ghers.kilnId, kilnId))).get();
+  const gher = (await db.select().from(ghers).where(and(eq(ghers._id, gherId), eq(ghers.kilnId, kilnId))))[0];
   if (!gher) throw new Error("Referenced chamber not found in this kiln");
 
   const since = gher.cycleStartedAt ?? new Date(0);
 
   const [fuelLogRows, stackingEntryRows, fuelPurchaseRows] = await Promise.all([
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.gherId, gherId), gte(fuelLogs.date, since))).all(),
-    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.gherId, gherId), gte(stackingEntries.date, since))).all(),
-    db.select().from(fuelPurchases).where(eq(fuelPurchases.kilnId, kilnId)).all(),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.gherId, gherId), gte(fuelLogs.date, since))),
+    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.gherId, gherId), gte(stackingEntries.date, since))),
+    db.select().from(fuelPurchases).where(eq(fuelPurchases.kilnId, kilnId)),
   ]);
 
   const fuelTotals = new Map<string, { amount: number; weight: number }>();

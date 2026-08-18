@@ -22,17 +22,17 @@ export interface CreateExpenseInput {
 
 export async function createExpense(input: CreateExpenseInput) {
   if (input.soilTripId) {
-    const trip = db.select({ _id: soilTrips._id }).from(soilTrips).where(and(eq(soilTrips._id, input.soilTripId), eq(soilTrips.kilnId, input.kilnId))).get();
+    const trip = (await db.select({ _id: soilTrips._id }).from(soilTrips).where(and(eq(soilTrips._id, input.soilTripId), eq(soilTrips.kilnId, input.kilnId))))[0];
     if (!trip) throw new Error("Referenced soil trip not found in this kiln");
   }
   if (input.dispatchId) {
-    const dispatch = db.select({ _id: dispatches._id }).from(dispatches).where(and(eq(dispatches._id, input.dispatchId), eq(dispatches.kilnId, input.kilnId))).get();
+    const dispatch = (await db.select({ _id: dispatches._id }).from(dispatches).where(and(eq(dispatches._id, input.dispatchId), eq(dispatches.kilnId, input.kilnId))))[0];
     if (!dispatch) throw new Error("Referenced dispatch not found in this kiln");
   }
 
   const _id = randomUUID();
-  db.insert(expenses).values({ ...input, _id }).run();
-  const expense = db.select().from(expenses).where(eq(expenses._id, _id)).get()!;
+  await db.insert(expenses).values({ ...input, _id });
+  const expense = (await db.select().from(expenses).where(eq(expenses._id, _id)))[0]!;
   emitToKiln(input.kilnId, "expense:update", expense);
   return expense;
 }
@@ -48,13 +48,13 @@ export async function listExpenses(kilnId: string, filter: ListExpensesFilter = 
   if (filter.category) conditions.push(eq(expenses.category, filter.category));
   if (filter.from) conditions.push(gte(expenses.date, filter.from));
   if (filter.to) conditions.push(lte(expenses.date, filter.to));
-  return db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.date)).all();
+  return await db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.date));
 }
 
 export async function expenseTotalsByCategory(kilnId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since))).all();
+  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since)));
 
   const totals = new Map<ExpenseCategory, number>();
   for (const e of rows) {
@@ -65,6 +65,6 @@ export async function expenseTotalsByCategory(kilnId: string, days = 30) {
 }
 
 export async function totalExpensesSince(kilnId: string, since: Date) {
-  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since))).all();
+  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since)));
   return rows.reduce((sum, e) => sum + e.amount, 0);
 }

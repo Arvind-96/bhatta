@@ -17,18 +17,18 @@ export interface CreateMachineInput {
 
 export async function createMachine(input: CreateMachineInput) {
   const _id = randomUUID();
-  db.insert(machines).values({ ...input, _id }).run();
-  const machine = db.select().from(machines).where(eq(machines._id, _id)).get()!;
+  await db.insert(machines).values({ ...input, _id });
+  const machine = (await db.select().from(machines).where(eq(machines._id, _id)))[0]!;
   emitToKiln(input.kilnId, "machine:update", machine);
   return machine;
 }
 
 export async function listMachines(kilnId: string) {
-  return db.select().from(machines).where(and(eq(machines.kilnId, kilnId), eq(machines.active, true))).orderBy(asc(machines.name)).all();
+  return await db.select().from(machines).where(and(eq(machines.kilnId, kilnId), eq(machines.active, true))).orderBy(asc(machines.name));
 }
 
 async function assertMachineInKiln(kilnId: string, machineId: string) {
-  const machine = db.select().from(machines).where(and(eq(machines._id, machineId), eq(machines.kilnId, kilnId))).get();
+  const machine = (await db.select().from(machines).where(and(eq(machines._id, machineId), eq(machines.kilnId, kilnId))))[0];
   if (!machine) throw new Error("Referenced machine not found in this kiln");
   return machine;
 }
@@ -64,8 +64,7 @@ export async function createMachineFuelLog(input: CreateFuelLogInput) {
     const history = await db
       .select()
       .from(machineFuelLogs)
-      .where(and(eq(machineFuelLogs.kilnId, input.kilnId), eq(machineFuelLogs.machineId, input.machineId), gte(machineFuelLogs.date, since), gt(machineFuelLogs.hoursRun, 0)))
-      .all();
+      .where(and(eq(machineFuelLogs.kilnId, input.kilnId), eq(machineFuelLogs.machineId, input.machineId), gte(machineFuelLogs.date, since), gt(machineFuelLogs.hoursRun, 0)));
 
     if (history.length >= 3) {
       const totalQty = history.reduce((sum, h) => sum + h.quantity, 0);
@@ -76,8 +75,8 @@ export async function createMachineFuelLog(input: CreateFuelLogInput) {
   }
 
   const _id = randomUUID();
-  db.insert(machineFuelLogs).values({ ...input, _id }).run();
-  const log = db.select().from(machineFuelLogs).where(eq(machineFuelLogs._id, _id)).get()!;
+  await db.insert(machineFuelLogs).values({ ...input, _id });
+  const log = (await db.select().from(machineFuelLogs).where(eq(machineFuelLogs._id, _id)))[0]!;
   emitToKiln(input.kilnId, "machineFuel:update", {
     ...log,
     ratePerHour,
@@ -90,13 +89,13 @@ export async function createMachineFuelLog(input: CreateFuelLogInput) {
 export async function listMachineFuelLogs(kilnId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(machineFuelLogs).where(and(eq(machineFuelLogs.kilnId, kilnId), gte(machineFuelLogs.date, since))).orderBy(desc(machineFuelLogs.date)).all();
+  const rows = await db.select().from(machineFuelLogs).where(and(eq(machineFuelLogs.kilnId, kilnId), gte(machineFuelLogs.date, since))).orderBy(desc(machineFuelLogs.date));
   return withMachine(rows);
 }
 
 async function withMachine<T extends { machineId: string }>(rows: T[]) {
   const machineIds = [...new Set(rows.map((r) => r.machineId))];
-  const machineRows = machineIds.length ? await db.select({ _id: machines._id, name: machines.name, type: machines.type }).from(machines).where(inArray(machines._id, machineIds)).all() : [];
+  const machineRows = machineIds.length ? await db.select({ _id: machines._id, name: machines.name, type: machines.type }).from(machines).where(inArray(machines._id, machineIds)) : [];
   const machineById = new Map(machineRows.map((m) => [m._id, m]));
   return rows.map((r) => ({ ...r, machineId: machineById.get(r.machineId) ?? r.machineId }));
 }
@@ -114,8 +113,8 @@ export interface CreateMaintenanceInput {
 export async function createMaintenanceLog(input: CreateMaintenanceInput) {
   await assertMachineInKiln(input.kilnId, input.machineId);
   const _id = randomUUID();
-  db.insert(machineMaintenanceLogs).values({ ...input, _id }).run();
-  const log = db.select().from(machineMaintenanceLogs).where(eq(machineMaintenanceLogs._id, _id)).get()!;
+  await db.insert(machineMaintenanceLogs).values({ ...input, _id });
+  const log = (await db.select().from(machineMaintenanceLogs).where(eq(machineMaintenanceLogs._id, _id)))[0]!;
 
   if (input.cost && input.cost > 0) {
     await createExpense({
@@ -134,6 +133,6 @@ export async function createMaintenanceLog(input: CreateMaintenanceInput) {
 export async function listMaintenanceLogs(kilnId: string, days = 90) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(machineMaintenanceLogs).where(and(eq(machineMaintenanceLogs.kilnId, kilnId), gte(machineMaintenanceLogs.date, since))).orderBy(desc(machineMaintenanceLogs.date)).all();
+  const rows = await db.select().from(machineMaintenanceLogs).where(and(eq(machineMaintenanceLogs.kilnId, kilnId), gte(machineMaintenanceLogs.date, since))).orderBy(desc(machineMaintenanceLogs.date));
   return withMachine(rows);
 }

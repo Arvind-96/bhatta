@@ -48,7 +48,7 @@ async function compareBricks(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareMolding(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, from), lte(moldingEntries.date, to))).all();
+  const rows = await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, from), lte(moldingEntries.date, to)));
   return {
     bricksMolded: rows.filter((e) => !e.washedOut).reduce((sum, e) => sum + e.bricksCount, 0),
     damagedCount: rows.reduce((sum, e) => sum + (e.damagedCount ?? 0), 0),
@@ -63,7 +63,7 @@ async function compareStacking(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareNikasi(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, from), lte(nikasiEntries.date, to))).all();
+  const rows = await db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, from), lte(nikasiEntries.date, to)));
   return {
     bricksUnloaded: rows.reduce((sum, e) => sum + e.bricksCount, 0),
     damagedCount: rows.reduce((sum, e) => sum + (e.damagedCount ?? 0), 0),
@@ -72,7 +72,7 @@ async function compareNikasi(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareFiring(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(firingShifts).where(and(eq(firingShifts.kilnId, kilnId), gte(firingShifts.date, from), lte(firingShifts.date, to))).all();
+  const rows = await db.select().from(firingShifts).where(and(eq(firingShifts.kilnId, kilnId), gte(firingShifts.date, from), lte(firingShifts.date, to)));
   return {
     shiftCount: rows.length,
     totalOvertimeHours: rows.reduce((sum, s) => sum + (s.overtimeHours ?? 0), 0),
@@ -81,7 +81,7 @@ async function compareFiring(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareBrickLoading(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), gte(brickLoadingEntries.date, from), lte(brickLoadingEntries.date, to))).all();
+  const rows = await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), gte(brickLoadingEntries.date, from), lte(brickLoadingEntries.date, to)));
   return {
     bricksLoaded: rows.reduce((sum, e) => sum + e.bricksCount, 0),
     totalTips: rows.reduce((sum, e) => sum + (e.tipAmount ?? 0), 0),
@@ -90,7 +90,7 @@ async function compareBrickLoading(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareSoil(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), gte(soilTrips.date, from), lte(soilTrips.date, to))).all();
+  const rows = await db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), gte(soilTrips.date, from), lte(soilTrips.date, to)));
   return {
     trolleyCount: rows.reduce((sum, t) => sum + (t.trolleyCount ?? 0), 0),
     tripCount: rows.length,
@@ -99,7 +99,7 @@ async function compareSoil(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareDiesel(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), gte(vehicleDieselEntries.date, from), lte(vehicleDieselEntries.date, to))).all();
+  const rows = await db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), gte(vehicleDieselEntries.date, from), lte(vehicleDieselEntries.date, to)));
   return {
     quantityLiters: rows.reduce((sum, e) => sum + e.quantityLiters, 0),
     totalCost: rows.reduce((sum, e) => sum + (e.costAmount ?? 0), 0),
@@ -108,7 +108,7 @@ async function compareDiesel(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareFuel(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), gte(fuelPurchases.date, from), lte(fuelPurchases.date, to))).all();
+  const rows = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), gte(fuelPurchases.date, from), lte(fuelPurchases.date, to)));
   return {
     totalWeightKg: rows.reduce((sum, r) => sum + r.actualWeightKg, 0),
     totalAmount: rows.reduce((sum, r) => sum + r.amount, 0),
@@ -117,7 +117,7 @@ async function compareFuel(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareExpense(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, from), lte(expenses.date, to))).all();
+  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, from), lte(expenses.date, to)));
   const byCategory = new Map<string, number>();
   for (const r of rows) byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + r.amount);
   return {
@@ -131,8 +131,8 @@ async function compareExpense(kilnId: string, from: Date, to: Date) {
 // removed, the two flows that change finished-goods stock day to day.
 async function compareStock(kilnId: string, from: Date, to: Date) {
   const [produced, loadedOut] = await Promise.all([
-    db.select().from(brickProductionEntries).where(and(eq(brickProductionEntries.kilnId, kilnId), gte(brickProductionEntries.date, from), lte(brickProductionEntries.date, to))).all(),
-    db.select().from(stockLoadingEntries).where(and(eq(stockLoadingEntries.kilnId, kilnId), gte(stockLoadingEntries.date, from), lte(stockLoadingEntries.date, to))).all(),
+    db.select().from(brickProductionEntries).where(and(eq(brickProductionEntries.kilnId, kilnId), gte(brickProductionEntries.date, from), lte(brickProductionEntries.date, to))),
+    db.select().from(stockLoadingEntries).where(and(eq(stockLoadingEntries.kilnId, kilnId), gte(stockLoadingEntries.date, from), lte(stockLoadingEntries.date, to))),
   ]);
   const bricksProduced = produced.reduce((sum, e) => sum + e.bricksCount, 0);
   const bricksLoadedOut = loadedOut.reduce((sum, e) => sum + e.bricksCount, 0);
@@ -140,7 +140,7 @@ async function compareStock(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareAttendance(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(attendances).where(and(eq(attendances.kilnId, kilnId), gte(attendances.date, from), lte(attendances.date, to))).all();
+  const rows = await db.select().from(attendances).where(and(eq(attendances.kilnId, kilnId), gte(attendances.date, from), lte(attendances.date, to)));
   return {
     daysAbsent: rows.filter((r) => r.status === "ABSENT").length,
     daysHalfDay: rows.filter((r) => r.status === "HALF_DAY").length,
@@ -151,7 +151,7 @@ async function compareAttendance(kilnId: string, from: Date, to: Date) {
 
 async function compareSalary(kilnId: string, from: Date, to: Date) {
   const months = monthStringsInRange(from, to);
-  const rows = await db.select().from(salarySlips).where(and(eq(salarySlips.kilnId, kilnId), inArray(salarySlips.month, months))).all();
+  const rows = await db.select().from(salarySlips).where(and(eq(salarySlips.kilnId, kilnId), inArray(salarySlips.month, months)));
   return {
     totalGrossSalary: rows.reduce((sum, s) => sum + s.grossSalary, 0),
     totalDeductions: rows.reduce((sum, s) => sum + s.deductions, 0),
@@ -165,7 +165,7 @@ async function compareSalary(kilnId: string, from: Date, to: Date) {
 // direction within the season window. ledgerEntries has no kiln-wide
 // date-scoped rollup anywhere else in the app, so this is genuinely new.
 async function compareLabor(kilnId: string, from: Date, to: Date) {
-  const nonCustomerIds = await db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), ne(people.type, "CUSTOMER"))).all();
+  const nonCustomerIds = await db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), ne(people.type, "CUSTOMER")));
   const ids = nonCustomerIds.map((p) => p._id);
   if (ids.length === 0) {
     return { totalWagesDue: 0, totalPaidOut: 0, netOutstandingChange: 0, activePersonCount: 0 };
@@ -173,8 +173,7 @@ async function compareLabor(kilnId: string, from: Date, to: Date) {
   const rows = await db
     .select()
     .from(ledgerEntries)
-    .where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, ids), gte(ledgerEntries.date, from), lte(ledgerEntries.date, to)))
-    .all();
+    .where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, ids), gte(ledgerEntries.date, from), lte(ledgerEntries.date, to)));
   const totalWagesDue = rows.filter((r) => r.direction === "DUE").reduce((sum, r) => sum + r.amount, 0);
   const totalPaidOut = rows.filter((r) => r.direction === "PAID").reduce((sum, r) => sum + r.amount, 0);
   return {
