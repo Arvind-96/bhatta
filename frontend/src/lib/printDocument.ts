@@ -51,20 +51,34 @@ function categoryGradeLabel(dispatch: Dispatch) {
   return GRADE_LABELS[dispatch.grade] ?? dispatch.grade;
 }
 
-function customerAddress(ref: Dispatch["customerId"]) {
-  return ref && typeof ref === "object" ? ref.address : undefined;
+// Prefer the snapshot taken at sale time (works for walk-in clients with no
+// linked customerId, and stays correct even if the linked Person's own
+// record is edited later); fall back to the populated customerId object for
+// dispatches created before these snapshot columns existed.
+function customerAddress(dispatch: Dispatch) {
+  const ref = dispatch.customerId;
+  return dispatch.customerAddress || (ref && typeof ref === "object" ? ref.address : undefined);
 }
 
-function customerPhone(ref: Dispatch["customerId"]) {
-  return ref && typeof ref === "object" ? ref.phone : undefined;
+function customerPhone(dispatch: Dispatch) {
+  const ref = dispatch.customerId;
+  return dispatch.customerPhone || (ref && typeof ref === "object" ? ref.phone : undefined);
 }
 
 function customerGstNumber(ref: Dispatch["customerId"]) {
   return ref && typeof ref === "object" ? ref.gstNumber : undefined;
 }
 
-function driverPhone(ref: Dispatch["driverId"]) {
-  return ref && typeof ref === "object" ? ref.phone : undefined;
+// Same fallback: the Log Dispatch form now captures driver name/phone as
+// plain text (no Person linkage) — prefer that, fall back to the populated
+// driverId object for legacy rows.
+function driverName(dispatch: Dispatch) {
+  return dispatch.driverName || personName(dispatch.driverId);
+}
+
+function driverPhone(dispatch: Dispatch) {
+  const ref = dispatch.driverId;
+  return dispatch.driverPhone || (ref && typeof ref === "object" ? ref.phone : undefined);
 }
 
 function kilnLogoLetter(kilnName: string) {
@@ -172,10 +186,10 @@ ${bodyHtml}
 // (never conditionally hidden) since a gate guard needs one consistent
 // checklist regardless of which fields happen to be filled in.
 export function printGatePass(dispatch: Dispatch, kiln: KilnPrintInfo) {
-  const driver = personName(dispatch.driverId);
-  const driverPh = driverPhone(dispatch.driverId);
-  const clientAddress = customerAddress(dispatch.customerId);
-  const clientPhone = customerPhone(dispatch.customerId);
+  const driver = driverName(dispatch);
+  const driverPh = driverPhone(dispatch);
+  const clientAddress = customerAddress(dispatch);
+  const clientPhone = customerPhone(dispatch);
   const logoLetter = kilnLogoLetter(kiln.name);
 
   const body = `
@@ -248,13 +262,13 @@ export function printInvoice(dispatch: Dispatch, kiln: KilnPrintInfo, accountBal
   const netAmount = dispatch.amount;
   const grossAmount = netAmount + discount;
   const rate = dispatch.bricksCount > 0 ? grossAmount / dispatch.bricksCount : 0;
-  const clientAddress = customerAddress(dispatch.customerId);
-  const clientPhone = customerPhone(dispatch.customerId);
+  const clientAddress = customerAddress(dispatch);
+  const clientPhone = customerPhone(dispatch);
   const clientGst = customerGstNumber(dispatch.customerId);
   const isFullyPaid = accountBalance != null && accountBalance <= 0;
   const logoLetter = kilnLogoLetter(kiln.name);
-  const driver = personName(dispatch.driverId);
-  const driverPh = driverPhone(dispatch.driverId);
+  const driver = driverName(dispatch);
+  const driverPh = driverPhone(dispatch);
 
   const itemRows = `
     <tr>

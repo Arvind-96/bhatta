@@ -4,17 +4,20 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pagination, usePagination } from "@/components/ui/pagination";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
+import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
-import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, FinishedGoodsReconciliation, PaymentMode, Person } from "@/types";
+import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
+
+const PAGE_SIZE = 10;
 
 function categoryGradeLabel(c: BrickCategory) {
   return c.grade ? `${c.category} (${c.grade})` : c.category;
@@ -31,39 +34,55 @@ function dispatchCategoryGradeLabel(d: DispatchEntry, gradeLabels: Record<string
   return gradeLabels[d.grade] ?? d.grade;
 }
 
+function tripLabel(t: BrickLoadingEntry) {
+  const category = typeof t.categoryId === "object" ? t.categoryId : null;
+  const parts = [
+    t.tripNumber ? `#${t.tripNumber}` : null,
+    t.vehicleNumber,
+    `${t.bricksCount.toLocaleString("en-IN")} bricks`,
+    category ? (category.grade ? `${category.category} (${category.grade})` : category.category) : null,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
+const emptyForm = {
+  loadingEntryId: "",
+  customerId: "",
+  customerName: "",
+  customerAddress: "",
+  customerPhone: "",
+  vehicleNumber: "",
+  vehicleType: "" as "" | BrickVehicleType,
+  driverName: "",
+  driverPhone: "",
+  driverTipAmount: "",
+  bricksCount: "",
+  amount: "",
+  discountAmount: "",
+  categoryId: "",
+  notes: "",
+  transportCost: "",
+};
+
 export function Dispatch() {
   const [dispatches, setDispatches] = useState<DispatchEntry[]>([]);
   const [customers, setCustomers] = useState<Person[]>([]);
-  const [drivers, setDrivers] = useState<Person[]>([]);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
+  const [loadingTrips, setLoadingTrips] = useState<BrickLoadingEntry[]>([]);
   const [reconciliation, setReconciliation] = useState<FinishedGoodsReconciliation | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({ breakageCount: "", returnedCount: "", returnReason: "" });
   const [editingDispatch, setEditingDispatch] = useState<DispatchEntry | null>(null);
-  const [form, setForm] = useState({
-    customerId: "",
-    customerName: "",
-    grade: "A1" as BrickGrade,
-    categoryId: "",
-    bricksCount: "",
-    amount: "",
-    discountAmount: "",
-    driverId: "",
-    vehicleNumber: "",
-    vehicleType: "",
-    driverTipAmount: "",
-    transportCost: "",
-    transportPaidBy: "OWNER" as "OWNER" | "CUSTOMER",
-    paymentMode: "CASH" as PaymentMode,
-    cashAmount: "",
-    onlineAmount: "",
-  });
+  const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const highlightTarget = useUiStore((s) => s.highlightTarget);
+  const clearHighlightTarget = useUiStore((s) => s.clearHighlightTarget);
   const { t } = useTranslation();
-  const { page, setPage, pageCount, pageItems: pagedDispatches, total } = usePagination(dispatches, 10);
+  const { page, setPage, pageCount, pageItems: pagedDispatches, total } = usePagination(dispatches, PAGE_SIZE);
   const GRADE_LABELS: Record<string, string> = {
     A1: t("dispatch.gradeA1"),
     JHAMA: t("dispatch.gradeJhama"),
@@ -71,18 +90,18 @@ export function Dispatch() {
   };
 
   async function refresh() {
-    const [dispatchData, customerData, driverData, recon, categoryData] = await Promise.all([
+    const [dispatchData, customerData, recon, categoryData, tripData] = await Promise.all([
       api.dispatch.list(),
       api.people.list("CUSTOMER"),
-      api.people.list("DRIVER"),
       api.finishedGoodsReconciliation(),
       api.brickCategories.list(),
+      api.brickLoading.list(),
     ]);
     setDispatches(dispatchData);
     setCustomers(customerData);
-    setDrivers(driverData);
     setReconciliation(recon);
     setCategories(categoryData);
+    setLoadingTrips(tripData);
   }
 
   useEffect(() => {
@@ -92,22 +111,72 @@ export function Dispatch() {
 
   useKilnEvent("dispatch:update", () => refresh());
   useKilnEvent("grading:update", () => refresh());
+  useKilnEvent("brickLoading:update", () => refresh());
+
+  // A trip linked to some OTHER dispatch already can't be selected here
+  // (createDispatch rejects it server-side too) — so it's excluded from the
+  // picker entirely rather than shown and then failing on submit. Already
+  // sorted latest-first by the backend (listBrickLoadingEntries orders
+  // desc(date)).
+  const unlinkedTrips = loadingTrips.filter((t) => !t.dispatchId);
+  const selectedTrip = unlinkedTrips.find((t) => t._id === form.loadingEntryId);
+  const tripLocked = !!form.loadingEntryId;
+
+  useEffect(() => {
+    if (!highlightTarget || highlightTarget.view !== "dispatch" || dispatches.length === 0) return;
+    const idx = dispatches.findIndex((d) => d._id === highlightTarget.id);
+    clearHighlightTarget();
+    if (idx === -1) return;
+    setPage(Math.floor(idx / PAGE_SIZE) + 1);
+    setHighlightedId(highlightTarget.id);
+    const scrollTimer = setTimeout(() => {
+      document.getElementById(`dispatch-row-${highlightTarget.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    const clearTimer = setTimeout(() => setHighlightedId(null), 2500);
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(clearTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightTarget, dispatches]);
 
   function handleCustomerSelect(id: string) {
     const customer = customers.find((c) => c._id === id);
-    setForm((f) => ({ ...f, customerId: id, customerName: customer?.name ?? f.customerName }));
+    setForm((f) => ({
+      ...f,
+      customerId: id,
+      customerName: customer?.name ?? f.customerName,
+      customerAddress: customer?.address ?? f.customerAddress,
+      customerPhone: customer?.phone ?? f.customerPhone,
+    }));
+  }
+
+  function handleTripSelect(id: string) {
+    if (!id) {
+      setForm((f) => ({ ...f, loadingEntryId: "", vehicleNumber: "", vehicleType: "", bricksCount: "", amount: "", discountAmount: "", categoryId: "" }));
+      return;
+    }
+    const trip = unlinkedTrips.find((t) => t._id === id);
+    if (!trip) return;
+    const categoryId = typeof trip.categoryId === "object" ? trip.categoryId?._id ?? "" : trip.categoryId ?? "";
+    setForm((f) => ({
+      ...f,
+      loadingEntryId: id,
+      vehicleNumber: trip.vehicleNumber,
+      vehicleType: trip.vehicleType,
+      bricksCount: String(trip.bricksCount),
+      amount: trip.amount != null ? String(trip.amount) : "",
+      discountAmount: trip.discountAmount != null ? String(trip.discountAmount) : "",
+      categoryId,
+    }));
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.customerName || !form.bricksCount || !form.amount) return;
-    const netAmount = Number(form.amount) - (Number(form.discountAmount) || 0);
-    if (Number(form.discountAmount) > Number(form.amount)) {
+    if (!form.customerName) return;
+    if (!tripLocked && (!form.bricksCount || !form.amount)) return;
+    if (!tripLocked && Number(form.discountAmount) > Number(form.amount)) {
       setFormError(t("dispatch.discountExceedsAmount"));
-      return;
-    }
-    if (isPaymentSplitMismatched(form.paymentMode, netAmount, form.cashAmount, form.onlineAmount)) {
-      setFormError(t("payment.splitMismatch", { total: netAmount.toLocaleString("en-IN") }));
       return;
     }
     setFormError("");
@@ -116,39 +185,22 @@ export function Dispatch() {
       await api.dispatch.create({
         customerName: form.customerName,
         customerId: form.customerId || undefined,
-        grade: form.grade,
-        categoryId: form.categoryId || undefined,
-        bricksCount: Number(form.bricksCount),
-        amount: Number(form.amount),
+        customerAddress: form.customerAddress || undefined,
+        customerPhone: form.customerPhone || undefined,
+        loadingEntryId: form.loadingEntryId || undefined,
+        bricksCount: form.bricksCount ? Number(form.bricksCount) : undefined,
+        amount: form.amount ? Number(form.amount) : undefined,
         discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
-        driverId: form.driverId || undefined,
+        categoryId: form.categoryId || undefined,
         vehicleNumber: form.vehicleNumber || undefined,
         vehicleType: form.vehicleType || undefined,
+        driverName: form.driverName || undefined,
+        driverPhone: form.driverPhone || undefined,
         driverTipAmount: form.driverTipAmount ? Number(form.driverTipAmount) : undefined,
         transportCost: form.transportCost ? Number(form.transportCost) : undefined,
-        transportPaidBy: form.transportCost ? form.transportPaidBy : undefined,
-        paymentMode: form.paymentMode,
-        cashAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.cashAmount) : undefined,
-        onlineAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.onlineAmount) : undefined,
+        notes: form.notes || undefined,
       });
-      setForm({
-        customerId: "",
-        customerName: "",
-        grade: "A1",
-        categoryId: "",
-        bricksCount: "",
-        amount: "",
-        discountAmount: "",
-        driverId: "",
-        vehicleNumber: "",
-        vehicleType: "",
-        driverTipAmount: "",
-        transportCost: "",
-        transportPaidBy: "OWNER",
-        paymentMode: "CASH",
-        cashAmount: "",
-        onlineAmount: "",
-      });
+      setForm(emptyForm);
       setShowForm(false);
       await refresh();
     } catch (err) {
@@ -174,6 +226,8 @@ export function Dispatch() {
     await api.dispatch.remove(d._id);
     await refresh();
   }
+
+  const totalAmountPreview = (Number(form.amount) || 0) + (Number(form.transportCost) || 0);
 
   return (
     <div className="space-y-4">
@@ -204,7 +258,18 @@ export function Dispatch() {
 
       {showForm && (
         <Card>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-ink-muted">{t("dispatch.linkedLoadingTrip")}</label>
+              <SearchableSelect
+                options={unlinkedTrips.map((tr) => ({ value: tr._id, label: tripLabel(tr) }))}
+                value={form.loadingEntryId}
+                onChange={handleTripSelect}
+                placeholder={t("dispatch.linkedLoadingTripPlaceholder")}
+                emptyMessage={t("dispatch.noUnlinkedTrips")}
+              />
+            </div>
+
             <select value={form.customerId} onChange={(e) => handleCustomerSelect(e.target.value)} className={inputClass}>
               <option value="">{t("dispatch.walkInCustomer")}</option>
               {customers.map((c) => (
@@ -213,135 +278,142 @@ export function Dispatch() {
                 </option>
               ))}
             </select>
-            <input
-              required
-              placeholder={t("dispatch.customerNamePlaceholder")}
-              value={form.customerName}
-              onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value, customerId: "" }))}
-              className={inputClass}
-            />
-            <select value={form.grade} onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value as BrickGrade }))} className={inputClass}>
-              <option value="A1">{t("dispatch.gradeA1")}</option>
-              <option value="JHAMA">{t("dispatch.gradeJhama")}</option>
-              <option value="PELA">{t("dispatch.gradePela")}</option>
-            </select>
-            <select
-              value={form.categoryId}
-              onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-              className={inputClass}
-            >
-              <option value="">{t("dispatch.categoryPlaceholder")}</option>
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {categoryGradeLabel(c)}
-                </option>
-              ))}
-            </select>
-            <select
-              value={form.paymentMode}
-              onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value as PaymentMode }))}
-              className={inputClass}
-            >
-              <option value="CASH">{t("dispatch.paymentCash")}</option>
-              <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
-              <option value="UPI">{t("dispatch.paymentUpi")}</option>
-              <option value="GST_INVOICE">{t("dispatch.paymentGstInvoice")}</option>
-              <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
-            </select>
-            {form.paymentMode === "CASH_AND_ONLINE" && (
-              <PaymentSplitFields
-                totalAmount={Math.max(0, (Number(form.amount) || 0) - (Number(form.discountAmount) || 0))}
-                cashAmount={form.cashAmount}
-                onlineAmount={form.onlineAmount}
-                onCashAmountChange={(v) => setForm((f) => ({ ...f, cashAmount: v }))}
-                onOnlineAmountChange={(v) => setForm((f) => ({ ...f, onlineAmount: v }))}
-                inputClassName={inputClass}
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                required
+                placeholder={t("dispatch.customerNamePlaceholder")}
+                value={form.customerName}
+                onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value, customerId: "" }))}
+                className={inputClass}
               />
-            )}
+              <input
+                placeholder={t("dispatch.clientPhonePlaceholder")}
+                value={form.customerPhone}
+                onChange={(e) => setForm((f) => ({ ...f, customerPhone: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
             <input
-              required
-              type="number"
-              placeholder={t("dispatch.bricksDispatchedPlaceholder")}
-              value={form.bricksCount}
-              onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
+              placeholder={t("dispatch.clientAddressPlaceholder")}
+              value={form.customerAddress}
+              onChange={(e) => setForm((f) => ({ ...f, customerAddress: e.target.value }))}
               className={inputClass}
             />
-            <input
-              required
-              type="number"
-              placeholder={t("dispatch.amountPlaceholder")}
-              value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              placeholder={t("dispatch.discountPlaceholder")}
-              value={form.discountAmount}
-              onChange={(e) => setForm((f) => ({ ...f, discountAmount: e.target.value }))}
-              className={inputClass}
-            />
-            {form.discountAmount && Number(form.discountAmount) > 0 && form.amount && (
-              <p className="col-span-2 text-sm text-ink-secondary">
-                {t("dispatch.netAmountPreview")}:{" "}
-                <span className="font-semibold text-ink-primary">
-                  ₹{formatINR(Math.max(0, Number(form.amount) - Number(form.discountAmount)))}
-                </span>
-              </p>
-            )}
-            <select
-              value={form.driverId}
-              onChange={(e) => setForm((f) => ({ ...f, driverId: e.target.value }))}
-              className={inputClass}
-            >
-              <option value="">{t("dispatch.driverOptional")}</option>
-              {drivers.map((d) => (
-                <option key={d._id} value={d._id}>
-                  {d.name} {d.vehicleNumber ? `— ${d.vehicleNumber}` : ""}
-                </option>
-              ))}
-            </select>
-            <input
-              placeholder={t("dispatch.driverTipPlaceholder")}
-              type="number"
-              value={form.driverTipAmount}
-              onChange={(e) => setForm((f) => ({ ...f, driverTipAmount: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              placeholder={t("dispatch.vehicleNumberPlaceholder")}
-              value={form.vehicleNumber}
-              onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
-              className={inputClass}
-            />
-            <select
-              value={form.vehicleType}
-              onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value }))}
-              className={inputClass}
-            >
-              <option value="">{t("dispatch.vehicleTypePlaceholder")}</option>
-              <option value="TRUCK">{t("brickLoading.truck")}</option>
-              <option value="TRACTOR">{t("brickLoading.tractor")}</option>
-            </select>
-            <input
-              type="number"
-              placeholder={t("dispatch.transportCostPlaceholder")}
-              value={form.transportCost}
-              onChange={(e) => setForm((f) => ({ ...f, transportCost: e.target.value }))}
-              className={inputClass}
-            />
-            {form.transportCost && (
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                placeholder={t("dispatch.vehicleNumberPlaceholder")}
+                value={form.vehicleNumber}
+                onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
+                disabled={tripLocked}
+                className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
+              />
               <select
-                value={form.transportPaidBy}
-                onChange={(e) => setForm((f) => ({ ...f, transportPaidBy: e.target.value as "OWNER" | "CUSTOMER" }))}
-                className={cn(inputClass, "col-span-2")}
+                value={form.vehicleType}
+                onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value as "" | BrickVehicleType }))}
+                disabled={tripLocked}
+                className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
               >
-                <option value="OWNER">{t("dispatch.transportPaidByOwner")}</option>
-                <option value="CUSTOMER">{t("dispatch.transportPaidByCustomer")}</option>
+                <option value="">{t("dispatch.vehicleTypePlaceholder")}</option>
+                <option value="TRUCK">{t("brickLoading.truck")}</option>
+                <option value="TRACTOR">{t("brickLoading.tractor")}</option>
               </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                placeholder={t("dispatch.driverNamePlaceholder")}
+                value={form.driverName}
+                onChange={(e) => setForm((f) => ({ ...f, driverName: e.target.value }))}
+                className={inputClass}
+              />
+              <input
+                placeholder={t("dispatch.driverPhonePlaceholder")}
+                value={form.driverPhone}
+                onChange={(e) => setForm((f) => ({ ...f, driverPhone: e.target.value }))}
+                className={inputClass}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                placeholder={t("dispatch.driverTipPlaceholder")}
+                value={form.driverTipAmount}
+                onChange={(e) => setForm((f) => ({ ...f, driverTipAmount: e.target.value }))}
+                className={inputClass}
+              />
+              <select
+                value={form.categoryId}
+                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                disabled={tripLocked}
+                className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
+              >
+                <option value="">{t("dispatch.categoryPlaceholder")}</option>
+                {categories.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {categoryGradeLabel(c)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                required={!tripLocked}
+                type="number"
+                placeholder={t("dispatch.bricksDispatchedPlaceholder")}
+                value={form.bricksCount}
+                onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
+                disabled={tripLocked}
+                className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
+              />
+              <input
+                type="number"
+                placeholder={t("dispatch.discountPlaceholder")}
+                value={form.discountAmount}
+                onChange={(e) => setForm((f) => ({ ...f, discountAmount: e.target.value }))}
+                disabled={tripLocked}
+                className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
+              />
+              <input
+                required={!tripLocked}
+                type="number"
+                placeholder={t("dispatch.amountPlaceholder")}
+                value={form.amount}
+                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                disabled={tripLocked}
+                className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
+              />
+            </div>
+
+            <input
+              placeholder={t("dispatch.notesPlaceholder")}
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              className={inputClass}
+            />
+
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                placeholder={t("dispatch.transportCostPlaceholder")}
+                value={form.transportCost}
+                onChange={(e) => setForm((f) => ({ ...f, transportCost: e.target.value }))}
+                className={inputClass}
+              />
+              <div className="flex items-center justify-between rounded-xl border border-series-1/30 bg-series-1/5 px-4">
+                <span className="text-sm font-medium text-ink-secondary">{t("dispatch.totalAmountLabel")}</span>
+                <span className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(Math.max(0, totalAmountPreview))}</span>
+              </div>
+            </div>
+
+            {selectedTrip && (
+              <p className="text-xs text-ink-muted">{t("dispatch.tripLockedHint")}</p>
             )}
-            {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
-            <Button type="submit" disabled={loading} className="col-span-2">
+            {formError && <p className="text-sm text-status-critical">{formError}</p>}
+            <Button type="submit" disabled={loading}>
               {t("dispatch.saveDispatch")}
             </Button>
           </form>
@@ -368,7 +440,10 @@ export function Dispatch() {
               <tbody>
                 {pagedDispatches.map((d) => (
                   <Fragment key={d._id}>
-                    <tr className="border-b border-border/60 last:border-0">
+                    <tr
+                      id={`dispatch-row-${d._id}`}
+                      className={cn("border-b border-border/60 last:border-0 transition-colors", highlightedId === d._id && "bg-series-1/10")}
+                    >
                       <td className="py-3 text-sm text-ink-muted">{d.slipNumber}</td>
                       <td className="py-3 text-ink-primary">{d.customerName}</td>
                       <td className="py-3">
@@ -440,7 +515,7 @@ export function Dispatch() {
                 ))}
               </tbody>
             </table>
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={PAGE_SIZE} />
           </div>
         )}
       </Card>

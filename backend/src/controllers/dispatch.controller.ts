@@ -9,10 +9,17 @@ const createSchema = z
   .object({
     customerName: z.string(),
     customerId: z.string().optional(),
+    customerAddress: z.string().optional(),
+    customerPhone: z.string().optional(),
     grade: z.enum(BRICK_GRADES).optional(),
-    bricksCount: z.number().int().positive(),
-    amount: z.number().positive(),
+    // Required only when NOT linking an existing Loading Trip — when
+    // `loadingEntryId` is set, createDispatch overrides both fields
+    // authoritatively from that trip row and ignores whatever's sent here.
+    bricksCount: z.number().int().min(0).optional(),
+    amount: z.number().min(0).optional(),
     driverId: z.string().optional(),
+    driverName: z.string().optional(),
+    driverPhone: z.string().optional(),
     transportCost: z.number().min(0).optional(),
     transportPaidBy: z.enum(["OWNER", "CUSTOMER"]).optional(),
     paymentMode: z.enum(PAYMENT_MODES).optional(),
@@ -23,18 +30,36 @@ const createSchema = z
     vehicleType: z.string().optional(),
     driverTipAmount: z.number().min(0).optional(),
     discountAmount: z.number().min(0).optional(),
+    notes: z.string().optional(),
     dispatchedOn: z.string().optional(),
+    loadingEntryId: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.loadingEntryId) return;
+    if (!data.bricksCount || data.bricksCount <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "bricksCount is required", path: ["bricksCount"] });
+    }
+    if (!data.amount || data.amount <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "amount is required", path: ["amount"] });
+    }
   })
   // Cash/online must sum to what the customer actually owes — the NET
-  // amount after any discount, not the pre-discount gross.
-  .superRefine((data, ctx) => validateCashOnlineSplit(data, data.amount - (data.discountAmount ?? 0), ctx))
+  // amount after any discount, not the pre-discount gross. Skipped for a
+  // linked-trip dispatch — the real amount isn't known until createDispatch
+  // resolves it from the trip, so there's nothing meaningful to validate
+  // against here.
+  .superRefine((data, ctx) => {
+    if (data.loadingEntryId) return;
+    validateCashOnlineSplit(data, (data.amount ?? 0) - (data.discountAmount ?? 0), ctx);
+  })
   // A discount bigger than the bill itself would net to a negative
   // `amount` — createDispatch has no floor on this, so it must be rejected
   // here before it ever reaches a negative-revenue row that corrupts every
   // downstream total (dispatchTotals, Financial Overview, the customer's
   // ledger DUE entry).
   .superRefine((data, ctx) => {
-    if (data.discountAmount != null && data.discountAmount > data.amount) {
+    if (data.loadingEntryId) return;
+    if (data.discountAmount != null && data.amount != null && data.discountAmount > data.amount) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "discountAmount cannot exceed amount",
@@ -93,6 +118,10 @@ export async function create(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);
   const dispatch = await createDispatch({
     ...input,
+    // Placeholders when linking a trip — createDispatch overrides both
+    // from the trip row before either value is ever used.
+    bricksCount: input.bricksCount ?? 0,
+    amount: input.amount ?? 0,
     kilnId: req.kiln!.id,
     dispatchedOn: input.dispatchedOn ? new Date(input.dispatchedOn) : undefined,
   });

@@ -10,6 +10,7 @@ import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
+import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, BrickVehicleType, Person } from "@/types";
 
@@ -119,6 +120,7 @@ export function BrickLoading() {
   const [syncWarning, setSyncWarning] = useState(false);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const navigateAndHighlight = useUiStore((s) => s.navigateAndHighlight);
   const { t } = useTranslation();
   const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(entries, 10);
 
@@ -314,6 +316,7 @@ export function BrickLoading() {
               <tbody>
                 {pagedEntries.map((entry) => {
                   const category = typeof entry.categoryId === "object" ? entry.categoryId : null;
+                  const linkedDispatch = typeof entry.dispatchId === "object" ? entry.dispatchId : null;
                   return (
                   <tr key={entry._id} className="border-b border-border/60 last:border-0">
                     <td className="py-3 text-ink-primary">{entry.tripNumber ? `#${entry.tripNumber}` : "—"}</td>
@@ -327,7 +330,17 @@ export function BrickLoading() {
                     <td className="py-3 tabular-nums text-ink-secondary">{entry.bricksCount.toLocaleString("en-IN")}</td>
                     <td className="py-3 tabular-nums text-ink-secondary">{entry.amount ? `₹${formatINR(entry.amount)}` : "—"}</td>
                     <td className="py-3 text-ink-secondary">
-                      {typeof entry.dispatchId === "object" && entry.dispatchId ? entry.dispatchId.slipNumber : "—"}
+                      {linkedDispatch ? (
+                        <button
+                          type="button"
+                          onClick={() => navigateAndHighlight("dispatch", linkedDispatch._id)}
+                          className="text-series-1 hover:underline"
+                        >
+                          {linkedDispatch.slipNumber}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="py-3 text-right">
                       <div className="flex justify-end gap-3">

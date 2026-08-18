@@ -25,10 +25,14 @@ export interface Dispatch {
   _id: string;
   customerName: string;
   customerId?: { _id: string; name: string; phone?: string; address?: string; gstNumber?: string } | string;
+  customerAddress?: string;
+  customerPhone?: string;
   grade: BrickGrade;
   bricksCount: number;
   amount: number;
   driverId?: { _id: string; name: string; phone?: string } | string;
+  driverName?: string;
+  driverPhone?: string;
   slipNumber: string;
   invoiceNumber?: string;
   transportCost?: number;
@@ -44,6 +48,7 @@ export interface Dispatch {
   vehicleType?: string;
   driverTipAmount?: number;
   discountAmount?: number;
+  notes?: string;
   dispatchedOn: string;
 }
 

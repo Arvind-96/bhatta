@@ -93,7 +93,9 @@ export function GatePass() {
                     <td className="py-3 text-ink-primary">{d.slipNumber}</td>
                     <td className="py-3 text-ink-secondary">{new Date(d.dispatchedOn).toLocaleDateString("en-IN")}</td>
                     <td className="py-3 text-ink-secondary">{d.customerName}</td>
-                    <td className="py-3 text-ink-secondary">{typeof d.driverId === "object" ? d.driverId?.name ?? "—" : "—"}</td>
+                    <td className="py-3 text-ink-secondary">
+                      {d.driverName || (typeof d.driverId === "object" ? d.driverId?.name : undefined) || "—"}
+                    </td>
                     <td className="py-3">
                       <Badge variant="neutral">{categoryGradeLabel(d)}</Badge>
                     </td>

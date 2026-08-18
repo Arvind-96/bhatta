@@ -98,10 +98,14 @@ export interface CreateDispatchInput {
   kilnId: string;
   customerName: string;
   customerId?: string;
+  customerAddress?: string;
+  customerPhone?: string;
   grade?: BrickGrade;
   bricksCount: number;
   amount: number;
   driverId?: string;
+  driverName?: string;
+  driverPhone?: string;
   transportCost?: number;
   transportPaidBy?: "OWNER" | "CUSTOMER";
   paymentMode?: PaymentMode;
@@ -117,7 +121,16 @@ export interface CreateDispatchInput {
   // this. Manual dispatch creation may also pass this for display, in
   // which case the same netting applies.
   discountAmount?: number;
+  notes?: string;
   dispatchedOn?: Date;
+  // When given, this dispatch is created FROM an existing, not-yet-linked
+  // Brick Loading trip — the Log Dispatch form's "Linked Loading Trip"
+  // picker (the reverse direction of createBrickLoadingEntry's own
+  // auto-dispatch step). bricksCount/categoryId/vehicleNumber/vehicleType/
+  // discountAmount/amount are all pulled authoritatively from that trip
+  // row, overriding whatever the client sent for them, so the two records
+  // can never drift out of sync with each other.
+  loadingEntryId?: string;
 }
 
 export const MAX_NUMBER_GENERATION_ATTEMPTS = 5;
@@ -129,12 +142,52 @@ export const MAX_NUMBER_GENERATION_ATTEMPTS = 5;
 // (customerId given, no full payment recorded elsewhere), the sale posts
 // as a DUE against the customer — see Person.ts for why DUE/PAID mean the
 // opposite of what they mean for a worker.
-export async function createDispatch(input: CreateDispatchInput) {
-  if (input.driverId) {
-    await assertPersonOfType(input.kilnId, input.driverId, ["DRIVER"]);
+export async function createDispatch(rawInput: CreateDispatchInput) {
+  if (rawInput.driverId) {
+    await assertPersonOfType(rawInput.kilnId, rawInput.driverId, ["DRIVER"]);
   }
-  if (input.customerId) {
-    await assertPersonOfType(input.kilnId, input.customerId, ["CUSTOMER"]);
+  if (rawInput.customerId) {
+    await assertPersonOfType(rawInput.kilnId, rawInput.customerId, ["CUSTOMER"]);
+  }
+
+  // The Log Dispatch form's "Linked Loading Trip" picker — bricksCount/
+  // categoryId/vehicleNumber/vehicleType/discountAmount/amount are pulled
+  // authoritatively from the trip row itself (never trusted from the
+  // client) so the two records can't drift out of sync. Mirrors, in
+  // reverse, what createBrickLoadingEntry's own auto-dispatch step does.
+  let input = rawInput;
+  let loadingEntry: typeof brickLoadingEntries.$inferSelect | undefined;
+  if (rawInput.loadingEntryId) {
+    loadingEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, rawInput.loadingEntryId), eq(brickLoadingEntries.kilnId, rawInput.kilnId))))[0];
+    if (!loadingEntry) throw new Error("Linked loading trip not found in this kiln");
+    if (loadingEntry.dispatchId) throw new Error("This loading trip is already linked to a dispatch");
+    input = {
+      ...rawInput,
+      bricksCount: loadingEntry.bricksCount,
+      categoryId: loadingEntry.categoryId ?? undefined,
+      vehicleNumber: loadingEntry.vehicleNumber,
+      vehicleType: loadingEntry.vehicleType,
+      discountAmount: loadingEntry.discountAmount ?? undefined,
+      // The entry's own `amount` is already fully net (category price ×
+      // bricks − discount + loading/unloading charges) — reconstructing a
+      // "gross" as amount+discount and passing discountAmount separately
+      // lets the netting below reproduce exactly that figure, the same
+      // pattern brickLoading.service.ts's own auto-dispatch call uses.
+      amount: (loadingEntry.amount ?? 0) + (loadingEntry.discountAmount ?? 0),
+    };
+  }
+
+  // Stock deduction is keyed by `grade`, an older fixed A1/JHAMA/PELA
+  // classification independent of the free-form `categoryId`. The Log
+  // Dispatch form no longer asks for grade at all — when omitted, derive
+  // it from the chosen category's own optional `.grade` tag (falling back
+  // to "A1") so stock still comes out of the bucket that actually matches
+  // what was sold, instead of always defaulting to A1 regardless of
+  // category.
+  let grade = input.grade;
+  if (!grade && input.categoryId) {
+    const category = (await db.select({ grade: brickCategories.grade }).from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0];
+    grade = (category?.grade as BrickGrade | undefined) ?? "A1";
   }
 
   // `amount` is always the net, billed figure everywhere downstream
@@ -162,8 +215,9 @@ export async function createDispatch(input: CreateDispatchInput) {
     const slipNumber = await generateSlipNumber(input.kilnId, dispatchedOn);
     const invoiceNumber = await generateInvoiceNumber(input.kilnId);
     const _id = randomUUID();
+    const { loadingEntryId: _loadingEntryId, ...insertableInput } = input;
     try {
-      await db.insert(dispatches).values({ ...input, amount: netAmount, dispatchedOn, _id, slipNumber, invoiceNumber });
+      await db.insert(dispatches).values({ ...insertableInput, grade, amount: netAmount, dispatchedOn, _id, slipNumber, invoiceNumber });
       dispatch = (await db.select().from(dispatches).where(eq(dispatches._id, _id)))[0];
       break;
     } catch (err) {
@@ -175,6 +229,11 @@ export async function createDispatch(input: CreateDispatchInput) {
   }
   if (!dispatch) {
     throw lastError instanceof Error ? lastError : new Error("Failed to create dispatch: could not allocate a unique slip/invoice number");
+  }
+
+  if (loadingEntry) {
+    await db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, loadingEntry._id));
+    emitToKiln(input.kilnId, "brickLoading:update", (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, loadingEntry._id)))[0]);
   }
 
   if (input.customerId) {
@@ -196,7 +255,7 @@ export async function createDispatch(input: CreateDispatchInput) {
   await recordStockEntry({
     kilnId: input.kilnId,
     type: "FINISHED_GOODS",
-    itemName: GRADE_STOCK_ITEM[(input.grade ?? "A1") as BrickGrade],
+    itemName: GRADE_STOCK_ITEM[(grade ?? "A1") as BrickGrade],
     quantity: -input.bricksCount,
   });
 

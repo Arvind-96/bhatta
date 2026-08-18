@@ -189,20 +189,20 @@ export const api = {
     create: (input: {
       customerName: string;
       customerId?: string;
-      grade?: BrickGrade;
-      bricksCount: number;
-      amount: number;
-      driverId?: string;
+      customerAddress?: string;
+      customerPhone?: string;
+      bricksCount?: number;
+      amount?: number;
+      driverName?: string;
+      driverPhone?: string;
       transportCost?: number;
-      transportPaidBy?: "OWNER" | "CUSTOMER";
-      paymentMode?: PaymentMode;
-      cashAmount?: number;
-      onlineAmount?: number;
       categoryId?: string;
       vehicleNumber?: string;
       vehicleType?: string;
       driverTipAmount?: number;
       discountAmount?: number;
+      notes?: string;
+      loadingEntryId?: string;
     }) => post<Dispatch>("/dispatch", input, true),
     totals: (days = 7) => get<DispatchTotals>(`/dispatch/totals?days=${days}`, true),
     adjustment: (id: string, input: { breakageCount?: number; returnedCount?: number; returnReason?: string }) =>

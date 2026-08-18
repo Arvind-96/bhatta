@@ -10,10 +10,23 @@ export const dispatches = mysqlTable("dispatches", {
   kilnId: kilnIdColumn(),
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerId: varchar("customerId", { length: 64 }),
+  // Snapshot of the client's address/phone at sale time — printed on the
+  // Gate Pass/Challan even for a walk-in name with no linked customerId,
+  // and stays correct on old documents even if a linked customer's own
+  // Person record is edited later. Auto-filled (editable) from the picked
+  // customer on the Log Dispatch form; blank for legacy rows.
+  customerAddress: varchar("customerAddress", { length: 255 }),
+  customerPhone: varchar("customerPhone", { length: 255 }),
   grade: varchar("grade", { length: 50, enum: BRICK_GRADES }).default("A1"),
   bricksCount: int("bricksCount").notNull(),
   amount: double("amount").notNull(),
   driverId: varchar("driverId", { length: 64 }),
+  // Plain text driver identity — replaced driverId-Person-selection on the
+  // Log Dispatch form (driverId/driverTipAmount never had any ledger
+  // effect either way, see dispatch.service.ts). driverId itself stays
+  // nullable for legacy rows and Gate Pass fallback display.
+  driverName: varchar("driverName", { length: 255 }),
+  driverPhone: varchar("driverPhone", { length: 255 }),
   slipNumber: varchar("slipNumber", { length: 255 }).notNull(),
   invoiceNumber: varchar("invoiceNumber", { length: 255 }),
   transportCost: double("transportCost"),
@@ -41,6 +54,7 @@ export const dispatches = mysqlTable("dispatches", {
   // = net"); `amount` above is already the net, post-discount figure so
   // every downstream revenue total keeps working unchanged.
   discountAmount: double("discountAmount"),
+  notes: text("notes"),
   dispatchedOn: dateColumn("dispatchedOn"),
   localId: varchar("localId", { length: 64 }),
   createdAt: createdAtColumn(),
