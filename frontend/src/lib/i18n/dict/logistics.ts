@@ -49,10 +49,6 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
     en: "Delete this loading trip for {vehicleNumber}? Any linked dispatch and stock will be reversed.",
     hi: "{vehicleNumber} के लिए यह लदाई ट्रिप हटाएं? जुड़ा हुआ डिस्पैच और स्टॉक वापस कर दिया जाएगा।",
   },
-  "brickLoading.dispatchSyncFailedWarning": {
-    en: "The trip was saved, but the linked dispatch entry could not be created automatically. Please check the Dispatch page.",
-    hi: "ट्रिप सहेज ली गई, लेकिन जुड़ा डिस्पैच अपने आप नहीं बन सका। कृपया डिस्पैच पेज जांचें।",
-  },
 
   // Dispatch.tsx
   "dispatch.mismatchAlert": {

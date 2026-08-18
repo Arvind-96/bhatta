@@ -203,6 +203,9 @@ export const api = {
       discountAmount?: number;
       notes?: string;
       loadingEntryId?: string;
+      paymentMode?: PaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
     }) => post<Dispatch>("/dispatch", input, true),
     totals: (days = 7) => get<DispatchTotals>(`/dispatch/totals?days=${days}`, true),
     adjustment: (id: string, input: { breakageCount?: number; returnedCount?: number; returnReason?: string }) =>
@@ -610,7 +613,7 @@ export const api = {
       loadingCharge?: number;
       unloadingCharge?: number;
       discountAmount?: number;
-    }) => post<BrickLoadingEntry & { dispatchSyncFailed?: boolean }>("/brick-loading", input, true),
+    }) => post<BrickLoadingEntry>("/brick-loading", input, true),
     update: (
       id: string,
       input: Partial<{

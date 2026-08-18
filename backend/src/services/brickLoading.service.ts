@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
 import { addLedgerEntry } from "./ledger.service";
-import { createDispatch, deleteDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
+import { deleteDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
 import { emitToKiln } from "../config/socket";
 
 export type BrickVehicleType = (typeof BRICK_VEHICLE_TYPES)[number];
@@ -35,8 +35,10 @@ async function generateTripNumber(kilnId: string) {
 // LoadingEntry (the palledar's wage for the physical loading labor). Every
 // trip gets a unique sequential trip number and an auto-computed final
 // amount: (category price × bricksCount − discount) + loadingCharge +
-// unloadingCharge — that same figure also becomes the auto-created
-// Dispatch's billed amount below.
+// unloadingCharge. Does NOT create a Dispatch — that link is established
+// the other way round, from the Dispatch page's "Linked Loading Trip"
+// picker (see createDispatch's loadingEntryId handling in
+// dispatch.service.ts), which is also what sets this row's dispatchId.
 export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   const category = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))))[0];
   if (!category) throw new Error("Brick category not found in this kiln");
@@ -92,38 +94,6 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
     .set({ quantity: sql`${brickCategories.quantity} - ${input.bricksCount}` })
     .where(eq(brickCategories._id, input.categoryId));
   emitToKiln(input.kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0]);
-
-  // Auto-create a matching Dispatch so this trip shows up on the Dispatch
-  // page without a manual step — only when this category has a real price
-  // set and the computed amount is actually billable (dispatches require a
-  // positive amount). Never lets a dispatch failure undo the already-saved
-  // loading entry or the stock deduction above — worst case is just no
-  // auto-linked dispatch, not a lost trip.
-  if (category.pricePerBrick && category.pricePerBrick > 0 && finalAmount > 0) {
-    try {
-      const dispatch = await createDispatch({
-        kilnId: input.kilnId,
-        customerName: `Brick Loading — ${input.vehicleNumber}, ${(input.date ?? new Date()).toLocaleDateString("en-IN")}`,
-        bricksCount: input.bricksCount,
-        amount: grossAmount + (input.loadingCharge ?? 0) + (input.unloadingCharge ?? 0),
-        discountAmount: input.discountAmount,
-        categoryId: input.categoryId,
-        vehicleNumber: input.vehicleNumber,
-        vehicleType: input.vehicleType,
-        dispatchedOn: input.date,
-      });
-      await db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, entry._id));
-      entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entry._id)))[0]!;
-    } catch (err) {
-      console.error("[brickLoading] auto-dispatch creation failed, loading entry still saved:", err);
-      // Not persisted — just this one response — so the admin can see
-      // "trip saved, billing didn't auto-link" immediately instead of
-      // only finding out from a server log. The trip itself is still
-      // saved either way; this never blocks/undoes it.
-      emitToKiln(input.kilnId, "brickLoading:update", entry);
-      return { ...entry, dispatchSyncFailed: true };
-    }
-  }
 
   emitToKiln(input.kilnId, "brickLoading:update", entry);
   return entry;

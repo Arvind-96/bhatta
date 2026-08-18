@@ -117,7 +117,6 @@ export function BrickLoading() {
     unloadingCharge: "",
   });
   const [loading, setLoading] = useState(false);
-  const [syncWarning, setSyncWarning] = useState(false);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const navigateAndHighlight = useUiStore((s) => s.navigateAndHighlight);
@@ -160,7 +159,7 @@ export function BrickLoading() {
     if (!form.vehicleNumber || !form.categoryId || !form.bricksCount) return;
     setLoading(true);
     try {
-      const created = await api.brickLoading.create({
+      await api.brickLoading.create({
         vehicleType: form.vehicleType,
         vehicleNumber: form.vehicleNumber,
         bricksCount: Number(form.bricksCount),
@@ -169,7 +168,6 @@ export function BrickLoading() {
         loadingCharge: form.loadingCharge ? Number(form.loadingCharge) : undefined,
         unloadingCharge: form.unloadingCharge ? Number(form.unloadingCharge) : undefined,
       });
-      setSyncWarning(!!created.dispatchSyncFailed);
       setForm({ vehicleType: "TRUCK", vehicleNumber: "", bricksCount: "", categoryId: "", discountAmount: "", loadingCharge: "", unloadingCharge: "" });
       setShowForm(false);
       await refresh();
@@ -193,17 +191,6 @@ export function BrickLoading() {
   return (
     <div className="space-y-4">
       <DriverSummarySection summary={driverSummary} onOpenLedger={openLedgerFor} onAddDriver={() => setShowAddDriver(true)} />
-
-      {syncWarning && (
-        <Card className="border-status-warning/40 bg-status-warning/5">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm text-status-warning">{t("brickLoading.dispatchSyncFailedWarning")}</p>
-            <button onClick={() => setSyncWarning(false)} className="shrink-0 text-xs font-medium text-ink-muted hover:text-ink-primary">
-              {t("common.dismiss")}
-            </button>
-          </div>
-        </Card>
-      )}
 
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setShowForm((s) => !s)}>

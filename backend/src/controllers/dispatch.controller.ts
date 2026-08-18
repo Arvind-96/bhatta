@@ -43,14 +43,15 @@ const createSchema = z
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "amount is required", path: ["amount"] });
     }
   })
-  // Cash/online must sum to what the customer actually owes — the NET
-  // amount after any discount, not the pre-discount gross. Skipped for a
-  // linked-trip dispatch — the real amount isn't known until createDispatch
-  // resolves it from the trip, so there's nothing meaningful to validate
-  // against here.
+  // Cash/online must sum to what the customer actually owes. For a manual
+  // entry, `amount` is the pre-discount gross (createDispatch's own
+  // convention) so the discount is subtracted here; for a linked-trip
+  // dispatch, the client instead sends the trip's own already-net `amount`
+  // directly (see Dispatch.tsx's handleTripSelect) — subtracting
+  // discountAmount again there would double-count it.
   .superRefine((data, ctx) => {
-    if (data.loadingEntryId) return;
-    validateCashOnlineSplit(data, (data.amount ?? 0) - (data.discountAmount ?? 0), ctx);
+    const netAmount = data.loadingEntryId ? (data.amount ?? 0) : (data.amount ?? 0) - (data.discountAmount ?? 0);
+    validateCashOnlineSplit(data, netAmount, ctx);
   })
   // A discount bigger than the bill itself would net to a negative
   // `amount` — createDispatch has no floor on this, so it must be rejected
