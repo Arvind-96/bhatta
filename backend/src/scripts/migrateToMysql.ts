@@ -12,6 +12,7 @@
 // MySQL destination (same as the app's normal .env) and a fresh MySQL
 // schema already migrated there (`npx drizzle-kit migrate` first).
 
+import "dotenv/config";
 import Database from "better-sqlite3";
 import { db } from "../db/client";
 import * as schema from "../db/schema";
