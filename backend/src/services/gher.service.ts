@@ -10,7 +10,7 @@ export type GherStatus = (typeof GHER_STATUSES)[number];
 // their kiln has. Safe to call again with a larger count later (adds the
 // new ones only) — never shrinks or touches existing chambers' status.
 export async function ensureGherCount(kilnId: string, count: number) {
-  const existing = await db.select().from(ghers).where(eq(ghers.kilnId, kilnId)).orderBy(asc(ghers.number)).all();
+  const existing = await db.select().from(ghers).where(eq(ghers.kilnId, kilnId)).orderBy(asc(ghers.number));
   const existingNumbers = new Set(existing.map((g) => g.number));
 
   for (let n = 1; n <= count; n++) {
@@ -23,7 +23,7 @@ export async function ensureGherCount(kilnId: string, count: number) {
 }
 
 export async function listGhers(kilnId: string) {
-  return db.select().from(ghers).where(eq(ghers.kilnId, kilnId)).orderBy(asc(ghers.number)).all();
+  return db.select().from(ghers).where(eq(ghers.kilnId, kilnId)).orderBy(asc(ghers.number));
 }
 
 export async function updateGherStatus(kilnId: string, gherId: string, status: GherStatus) {
