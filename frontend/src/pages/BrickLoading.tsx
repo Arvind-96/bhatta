@@ -269,12 +269,16 @@ export function BrickLoading() {
               onChange={(e) => setForm((f) => ({ ...f, unloadingCharge: e.target.value }))}
               className={inputClass}
             />
+            <label className="col-span-2 flex flex-col gap-1">
+              <span className="text-xs text-ink-muted">{t("brickLoading.amountLabel")}</span>
+              <input
+                readOnly
+                disabled
+                value={`₹${formatINR(Math.max(0, computedAmount))}`}
+                className={`${inputClass} cursor-not-allowed font-semibold text-ink-primary`}
+              />
+            </label>
 
-            {selectedCategory && form.bricksCount && (
-              <p className="col-span-2 rounded-lg bg-ink-primary/5 px-3 py-2 text-sm text-ink-secondary">
-                {t("brickLoading.amountLabel")}: <span className="font-semibold text-ink-primary">₹{formatINR(Math.max(0, computedAmount))}</span>
-              </p>
-            )}
             {selectedCategory && form.bricksCount && netAfterDiscount <= 0 && discountForPreview > 0 && (
               <p className="col-span-2 text-sm text-status-warning">{t("brickLoading.discountExceedsGrossWarning")}</p>
             )}
