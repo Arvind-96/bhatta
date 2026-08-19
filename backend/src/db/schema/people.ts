@@ -58,6 +58,14 @@ export const people = mysqlTable("people", {
   khetAreaUnit: varchar("khetAreaUnit", { length: 50 }).default("bigha"),
   khetLocation: varchar("khetLocation", { length: 255 }),
   agreedDepthFeet: double("agreedDepthFeet"),
+  // Unit the admin actually entered agreedDepthFeet in — the column name
+  // is a historical holdover from before this existed; the figure itself
+  // may be in feet or meters depending on this field.
+  agreedDepthUnit: varchar("agreedDepthUnit", { length: 50 }).default("feet"),
+  // Sequential per-kiln display number for landowners only ("Landowner -
+  // N") — set once at creation (see person.service.ts's createPerson),
+  // never reassigned. Null for every other person type.
+  landownerSerial: int("landownerSerial"),
   creditLimit: double("creditLimit"),
   active: boolean("active").default(true),
   // What everyone actually calls this person day-to-day — distinct from

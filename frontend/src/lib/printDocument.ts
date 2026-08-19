@@ -448,29 +448,30 @@ function contractRateBasisText(contract: SoilContract) {
   return `${contract.contractedQuantity ?? "—"} trolleys`;
 }
 
-// The landowner contract "bill" — terms plus the full payment history log,
-// each row showing that entry's own amount, how it was paid (cash/online
-// breakdown spelled out via paymentModeLabel when split), and the running
-// paid-so-far/remaining-due after it — so the printed sheet reads the same
-// way the on-screen ledger table does, oldest entry first.
+// The landowner contract "bill" — terms plus the payment log. The log
+// intentionally shows only actual payments (direction PAID), not the
+// underlying Advance/Kharchi ledger framing — just when each payment was
+// made, how (payment mode), and the exact cash-vs-online breakdown when
+// split, since that's what a landowner wants to see reflected back to them
+// on a receipt-style printout, not internal ledger bookkeeping detail.
 export function printLandownerContract(contract: SoilContract, landownerName: string, kiln: KilnPrintInfo, ledgerEntries: LedgerEntry[]) {
   const logoLetter = kilnLogoLetter(kiln.name);
-  const chronological = [...ledgerEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const payments = [...ledgerEntries]
+    .filter((e) => e.direction === "PAID")
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  let runningPaid = 0;
-  let runningDue = 0;
-  const rows = chronological.map((entry) => {
-    if (entry.direction === "PAID") runningPaid += entry.amount;
-    else runningDue += entry.amount;
-    const remaining = runningDue - runningPaid;
+  const runningDue = ledgerEntries.filter((e) => e.direction === "DUE").reduce((sum, e) => sum + e.amount, 0);
+  const runningPaid = payments.reduce((sum, e) => sum + e.amount, 0);
+
+  const rows = payments.map((entry) => {
+    const isSplit = entry.paymentMode === "CASH_AND_ONLINE";
     return `
       <tr>
         <td>${new Date(entry.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
-        <td>${escapeHtml(entry.reason)}</td>
-        <td>${entry.paymentMode ? escapeHtml(paymentModeLabel(entry)) : "—"}</td>
-        <td class="num">${entry.direction === "DUE" ? "+" : "-"}₹${formatINR(entry.amount)}</td>
-        <td class="num">₹${formatINR(runningPaid)}</td>
-        <td class="num">₹${formatINR(Math.max(0, remaining))}</td>
+        <td>${entry.paymentMode ? escapeHtml(entry.paymentMode) : "—"}</td>
+        <td class="num">${isSplit ? `₹${formatINR(entry.cashAmount ?? 0)}` : entry.paymentMode === "CASH" ? `₹${formatINR(entry.amount)}` : "—"}</td>
+        <td class="num">${isSplit ? `₹${formatINR(entry.onlineAmount ?? 0)}` : entry.paymentMode && entry.paymentMode !== "CASH" ? `₹${formatINR(entry.amount)}` : "—"}</td>
+        <td class="num">₹${formatINR(entry.amount)}</td>
       </tr>`;
   });
 
@@ -516,10 +517,10 @@ export function printLandownerContract(contract: SoilContract, landownerName: st
 
     <table class="doc-items">
       <thead>
-        <tr><th>Date</th><th>Reason</th><th>Mode</th><th class="num">Amount</th><th class="num">Paid so far</th><th class="num">Remaining due</th></tr>
+        <tr><th>Payment date</th><th>Payment mode</th><th class="num">Cash</th><th class="num">Online</th><th class="num">Amount paid</th></tr>
       </thead>
       <tbody>
-        ${rows.join("") || `<tr><td colspan="6">No payment history yet.</td></tr>`}
+        ${rows.join("") || `<tr><td colspan="5">No payments recorded yet.</td></tr>`}
       </tbody>
     </table>
 

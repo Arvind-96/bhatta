@@ -65,6 +65,7 @@ const createSchema = z.object({
   khetAreaUnit: z.string().optional(),
   khetLocation: z.string().optional(),
   agreedDepthFeet: z.number().optional(),
+  agreedDepthUnit: z.string().optional(),
   creditLimit: z.number().optional(),
   nickname: z.string().optional(),
   joiningDate: z.string().optional(),

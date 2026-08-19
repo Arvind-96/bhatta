@@ -315,7 +315,12 @@ function LandownerTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
               <PersonCard
                 key={l._id}
                 person={l}
-                subtitle={l.khetLocation || (l.khetArea ? `${l.khetArea} ${l.khetAreaUnit ?? "bigha"}` : "—")}
+                subtitle={[
+                  l.landownerSerial ? `${t("people.landowner")} - ${l.landownerSerial}` : null,
+                  l.khetLocation || (l.khetArea ? `${l.khetArea} ${l.khetAreaUnit ?? "bigha"}` : null),
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "—"}
                 onOpen={() => onOpenLandowner(l._id)}
               />
             ))}

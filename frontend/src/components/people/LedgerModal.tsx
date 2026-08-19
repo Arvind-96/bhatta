@@ -44,6 +44,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
   const isCustomer = person.type === "CUSTOMER";
   const isPartner = person.type === "PARTNER";
   const isContractor = person.type === "LABOUR_CONTRACTOR";
+  const isLandowner = person.type === "LANDOWNER";
   const entityLabel = isContractor ? t("people.thekedarWord") : t("people.labourWord");
 
   async function refresh() {
@@ -202,19 +203,21 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                   >
                     {t("people.advancePeshgiTitle")}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      fillQuickAction({
-                        direction: "PAID",
-                        reason: isContractor ? t("people.reasonKharchiGivenToThekedar") : t("people.reasonKharchiWeeklyPettyCash"),
-                        category: "KHARCHI",
-                      })
-                    }
-                    className={quickButtonClass}
-                  >
-                    {t("people.kharchi")}
-                  </button>
+                  {!isLandowner && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        fillQuickAction({
+                          direction: "PAID",
+                          reason: isContractor ? t("people.reasonKharchiGivenToThekedar") : t("people.reasonKharchiWeeklyPettyCash"),
+                          category: "KHARCHI",
+                        })
+                      }
+                      className={quickButtonClass}
+                    >
+                      {t("people.kharchi")}
+                    </button>
+                  )}
                   {isContractor ? (
                     <button
                       type="button"
@@ -316,7 +319,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                   <option value="SALARY">{isContractor ? t("people.salaryCommissionOption") : t("people.salaryOption")}</option>
                   <option value="COMMISSION">{t("people.commissionOption")}</option>
                   <option value="ADVANCE">{t("people.advance")}</option>
-                  <option value="KHARCHI">{t("people.kharchi")}</option>
+                  {!isLandowner && <option value="KHARCHI">{t("people.kharchi")}</option>}
                   {!isContractor && <option value="MEDICAL">{t("people.medical")}</option>}
                   {!isContractor && <option value="FESTIVAL">{t("people.festival")}</option>}
                   <option value="OTHER">{t("people.other")}</option>

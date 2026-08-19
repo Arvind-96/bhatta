@@ -110,6 +110,7 @@ export const peopleDetailDict: Record<string, Record<Locale, string>> = {
   "people.pending": { en: "Pending", hi: "बकाया" },
   "people.remaining": { en: "Remaining", hi: "शेष" },
   "people.advanceKharchiHistory": { en: "Advance / Kharchi history", hi: "पेशगी / खर्ची इतिहास" },
+  "people.paymentHistory": { en: "Payment history", hi: "भुगतान इतिहास" },
   "people.noLedgerEntriesYet": { en: "No ledger entries yet.", hi: "अभी तक कोई खाता-बही एंट्री नहीं है।" },
   "people.reason": { en: "Reason", hi: "कारण" },
   "people.category": { en: "Category", hi: "श्रेणी" },

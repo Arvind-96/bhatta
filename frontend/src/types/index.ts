@@ -121,6 +121,8 @@ export interface Person {
   khetAreaUnit?: string;
   khetLocation?: string;
   agreedDepthFeet?: number;
+  agreedDepthUnit?: string;
+  landownerSerial?: number;
   creditLimit?: number;
   nickname?: string;
   joiningDate?: string;

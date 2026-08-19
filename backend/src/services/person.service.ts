@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import { and, asc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
 import { people, ledgerEntries, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
@@ -49,6 +49,7 @@ export interface CreatePersonInput {
   khetAreaUnit?: string;
   khetLocation?: string;
   agreedDepthFeet?: number;
+  agreedDepthUnit?: string;
   creditLimit?: number;
   nickname?: string;
   joiningDate?: Date;
@@ -90,8 +91,17 @@ export async function createPerson(input: CreatePersonInput) {
   if (input.nikasiContractorId) {
     await assertPersonOfType(input.kilnId, input.nikasiContractorId, ["LABOUR_CONTRACTOR"]);
   }
+  // "Landowner - N", a simple per-kiln count-based sequence — landowners
+  // are added one at a time by a single admin, not a high-concurrency
+  // flow like dispatch slip numbers, so this skips that flow's
+  // retry-on-collision machinery as unnecessary complexity here.
+  let landownerSerial: number | undefined;
+  if (input.type === "LANDOWNER") {
+    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "LANDOWNER"))))[0];
+    landownerSerial = (countRow?.count ?? 0) + 1;
+  }
   const _id = randomUUID();
-  await db.insert(people).values({ ...input, _id, stackingStage: deriveStackingStage(input) });
+  await db.insert(people).values({ ...input, _id, stackingStage: deriveStackingStage(input), landownerSerial });
   const person = (await db.select().from(people).where(eq(people._id, _id)))[0]!;
   emitToKiln(input.kilnId, "person:update", person);
   return person;

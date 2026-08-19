@@ -14,8 +14,8 @@ import { PersonAvatar } from "@/components/people/PersonAvatar";
 import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
 import { ProfileViewField } from "@/components/people/ProfileViewField";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { LedgerEntry, Person, SoilArrival, SoilContract } from "@/types";
-import { formatDateTime, formatINR } from "@/lib/utils";
+import type { DepthUnit, Land, LedgerEntry, Person, SoilArrival, SoilContract } from "@/types";
+import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { printLandownerContract } from "@/lib/printDocument";
 
 const inputClass =
@@ -43,6 +43,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   const [drivers, setDrivers] = useState<Person[]>([]);
   const [arrivals, setArrivals] = useState<SoilArrival[]>([]);
   const [contracts, setContracts] = useState<SoilContract[]>([]);
+  const [lands, setLands] = useState<Land[]>([]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -51,6 +52,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   const [khetAreaUnit, setKhetAreaUnit] = useState("bigha");
   const [khetLocation, setKhetLocation] = useState("");
   const [agreedDepthFeet, setAgreedDepthFeet] = useState("");
+  const [agreedDepthUnit, setAgreedDepthUnit] = useState<DepthUnit>("feet");
   const [nickname, setNickname] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -70,12 +72,13 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   };
 
   async function refresh() {
-    const [detail, ledger, driversData, arrivalsData, contractsData] = await Promise.all([
+    const [detail, ledger, driversData, arrivalsData, contractsData, landsData] = await Promise.all([
       api.people.get(landownerId),
       api.people.listLedger(landownerId),
       api.people.list("DRIVER"),
       api.soilArrivals.list({ landownerId }),
       api.soilContracts.list({ landownerId }),
+      api.lands.list(landownerId),
     ]);
     setLandowner(detail.person);
     setBalance(detail.balance);
@@ -83,6 +86,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     setDrivers(driversData);
     setArrivals(arrivalsData);
     setContracts(contractsData);
+    setLands(landsData);
     setName(detail.person.name);
     setPhone(detail.person.phone ?? "");
     setAddress(detail.person.address ?? "");
@@ -91,6 +95,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     setKhetAreaUnit(detail.person.khetAreaUnit ?? "bigha");
     setKhetLocation(detail.person.khetLocation ?? "");
     setAgreedDepthFeet(detail.person.agreedDepthFeet ? String(detail.person.agreedDepthFeet) : "");
+    setAgreedDepthUnit((detail.person.agreedDepthUnit as DepthUnit) ?? "feet");
     setNickname(detail.person.nickname ?? "");
     setJoiningDate(detail.person.joiningDate ? detail.person.joiningDate.slice(0, 10) : "");
   }
@@ -117,6 +122,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
         khetAreaUnit: khetAreaUnit || undefined,
         khetLocation: khetLocation || undefined,
         agreedDepthFeet: agreedDepthFeet ? Number(agreedDepthFeet) : undefined,
+        agreedDepthUnit: agreedDepthFeet ? agreedDepthUnit : undefined,
         nickname: nickname.trim() || undefined,
         joiningDate: joiningDate || undefined,
       });
@@ -137,6 +143,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
       setKhetAreaUnit(landowner.khetAreaUnit ?? "bigha");
       setKhetLocation(landowner.khetLocation ?? "");
       setAgreedDepthFeet(landowner.agreedDepthFeet ? String(landowner.agreedDepthFeet) : "");
+      setAgreedDepthUnit((landowner.agreedDepthUnit as DepthUnit) ?? "feet");
       setNickname(landowner.nickname ?? "");
       setJoiningDate(landowner.joiningDate ? landowner.joiningDate.slice(0, 10) : "");
     }
@@ -198,6 +205,20 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     );
   }
 
+  // Prefer the sum of this landowner's own `lands` rows (the per-field
+  // Khasra/area entries captured via AddLandownerModal) — that's always
+  // accurate for landowners added through the new flow, where the
+  // person-level `khetArea` is never set at all. Falls back to the legacy
+  // single khetArea field for landowners added before the Lands system
+  // existed, so "Field Area" doesn't go blank for them either.
+  const landsTotalArea = lands.reduce((sum, l) => sum + (l.area ?? 0), 0);
+  const fieldAreaDisplay =
+    landsTotalArea > 0
+      ? `${landsTotalArea} ${landowner.khetAreaUnit ?? "bigha"}`
+      : landowner.khetArea
+      ? `${landowner.khetArea} ${landowner.khetAreaUnit ?? "bigha"}`
+      : undefined;
+
   const totalTrolleys = arrivals.reduce((sum, a) => sum + a.trolleyCount, 0);
   const totalGiven = arrivals.reduce((sum, a) => sum + (a.paymentGiven ?? 0), 0);
   const totalPending = arrivals.reduce((sum, a) => sum + (a.paymentPending ?? 0), 0);
@@ -242,7 +263,10 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                 {landowner.name}
                 {landowner.nickname && <span className="ml-1.5 font-normal text-ink-muted">"{landowner.nickname}"</span>}
               </h3>
-              <p className="text-sm text-ink-muted">{t("people.fieldOwnerLabel")}{khetLocation ? ` · ${khetLocation}` : ""}</p>
+              <p className="text-sm text-ink-muted">
+                {landowner.landownerSerial ? `${t("people.landowner")} - ${landowner.landownerSerial}` : t("people.fieldOwnerLabel")}
+                {khetLocation ? ` · ${khetLocation}` : ""}
+              </p>
               {landowner.joiningDate && (
                 <p className="mt-0.5 text-sm text-ink-muted">
                   {t("people.joiningDate")}: {new Date(landowner.joiningDate).toLocaleDateString("en-IN")}
@@ -260,7 +284,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
               </button>
             )}
             <Button size="sm" onClick={() => setLedgerOpen(true)}>
-              {t("people.advanceKharchi")}
+              {t("people.advance")}
             </Button>
           </div>
         </div>
@@ -288,14 +312,20 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                 <input type="number" min={0} placeholder={t("people.khetArea")} value={khetArea} onChange={(e) => setKhetArea(e.target.value)} className={inputClass} />
                 <input placeholder={t("people.unitBigha")} value={khetAreaUnit} onChange={(e) => setKhetAreaUnit(e.target.value)} className={inputClass} />
               </div>
-              <input
-                type="number"
-                min={0}
-                placeholder={t("people.agreedDigDepth")}
-                value={agreedDepthFeet}
-                onChange={(e) => setAgreedDepthFeet(e.target.value)}
-                className={inputClass}
-              />
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder={t("people.agreedDigDepth")}
+                  value={agreedDepthFeet}
+                  onChange={(e) => setAgreedDepthFeet(e.target.value)}
+                  className={cn(inputClass, "flex-1")}
+                />
+                <select value={agreedDepthUnit} onChange={(e) => setAgreedDepthUnit(e.target.value as DepthUnit)} className={cn(inputClass, "w-24")}>
+                  <option value="feet">{t("soil.unitFeet")}</option>
+                  <option value="meter">{t("soil.unitMeter")}</option>
+                </select>
+              </div>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
                 <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
@@ -322,8 +352,11 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
               <ProfileViewField label={t("people.mobileNumber")} value={landowner.phone} />
               <ProfileViewField label={t("people.aadharIdNumber")} value={landowner.idNumber} />
               <ProfileViewField label={t("people.address")} value={landowner.address} />
-              <ProfileViewField label={t("people.khetArea")} value={landowner.khetArea ? `${landowner.khetArea} ${landowner.khetAreaUnit ?? "bigha"}` : undefined} />
-              <ProfileViewField label={t("people.agreedDigDepth")} value={landowner.agreedDepthFeet} />
+              <ProfileViewField label={t("people.khetArea")} value={fieldAreaDisplay} />
+              <ProfileViewField
+                label={t("people.agreedDigDepth")}
+                value={landowner.agreedDepthFeet ? `${landowner.agreedDepthFeet} ${landowner.agreedDepthUnit === "meter" ? t("soil.unitMeter") : t("soil.unitFeet")}` : undefined}
+              />
               <ProfileViewField
                 label={t("people.identityProof")}
                 value={
@@ -483,7 +516,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
         </Card>
 
         <Card className="lg:col-span-2">
-          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.advanceKharchiHistory")}</h4>
+          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.paymentHistory")}</h4>
           {ledgerEntries.length === 0 ? (
             <p className="py-6 text-center text-sm text-ink-muted">{t("people.noLedgerEntriesYet")}</p>
           ) : (
