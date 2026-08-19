@@ -3,6 +3,12 @@ import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { createSoilArrival, listSoilArrivals, updateSoilArrival } from "../services/soilArrival.service";
 
+const tractorEntrySchema = z.object({
+  driverName: z.string().optional(),
+  driverPhone: z.string().optional(),
+  tractorNumber: z.string().optional(),
+});
+
 const createSchema = z.object({
   landownerId: z.string(),
   contractId: z.string().optional(),
@@ -10,6 +16,7 @@ const createSchema = z.object({
   tractorUsed: z.boolean().optional(),
   jcbDriverId: z.string().optional(),
   tractorDriverId: z.string().optional(),
+  tractors: z.array(tractorEntrySchema).optional(),
   trolleyCount: z.number().positive(),
   depthFeet: z.number().positive().optional(),
   paymentGiven: z.number().min(0).optional(),
@@ -43,6 +50,7 @@ const updateSchema = z.object({
   tractorUsed: z.boolean().optional(),
   jcbDriverId: z.string().optional(),
   tractorDriverId: z.string().optional(),
+  tractors: z.array(tractorEntrySchema).optional(),
   trolleyCount: z.number().positive().optional(),
   depthFeet: z.number().positive().optional(),
   paymentGiven: z.number().min(0).optional(),

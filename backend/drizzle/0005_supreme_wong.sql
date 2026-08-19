@@ -1,0 +1,1 @@
+ALTER TABLE `soil_arrivals` ADD `tractors` json;

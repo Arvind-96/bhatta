@@ -138,16 +138,15 @@ export const soilDict: Record<string, Record<Locale, string>> = {
   "soil.selectJcbDriver": { en: "Select JCB driver…", hi: "JCB ड्राइवर चुनें…" },
   "soil.tractorDriver": { en: "Tractor driver", hi: "ट्रैक्टर ड्राइवर" },
   "soil.selectTractorDriver": { en: "Select tractor driver…", hi: "ट्रैक्टर ड्राइवर चुनें…" },
+  "soil.tractorEntryLabel": { en: "Tractor {index}", hi: "ट्रैक्टर {index}" },
+  "soil.tractorDriverName": { en: "Driver name", hi: "ड्राइवर का नाम" },
+  "soil.tractorDriverPhone": { en: "Driver phone number", hi: "ड्राइवर का फ़ोन नंबर" },
+  "soil.tractorNumberField": { en: "Tractor number", hi: "ट्रैक्टर नंबर" },
+  "soil.addAnotherTractor": { en: "+ Add another tractor", hi: "+ एक और ट्रैक्टर जोड़ें" },
   "soil.trolleysArrived": { en: "Trolleys arrived", hi: "आई ट्रॉलियां" },
   "soil.egFive": { en: "e.g. 5", hi: "जैसे 5" },
-  "soil.depthReachedSoFar": { en: "Depth reached so far ({unit})", hi: "अभी तक पहुंची गहराई ({unit})" },
-  "soil.egTwelve": { en: "e.g. 12", hi: "जैसे 12" },
   "soil.paymentGivenSoFar": { en: "Payment given so far (₹)", hi: "अभी तक दिया गया भुगतान (₹)" },
   "soil.paymentPendingStill": { en: "Payment still pending (₹)", hi: "अभी भी बकाया भुगतान (₹)" },
-  "soil.soilStillLeftToArrive": {
-    en: "Soil still left to arrive (trolleys, estimate)",
-    hi: "अभी और कितनी मिट्टी आनी बाकी है (ट्रॉली, अनुमान)",
-  },
   "soil.saveArrival": { en: "Save arrival", hi: "आवक सहेजें" },
 
   // ContractDetailPage.tsx

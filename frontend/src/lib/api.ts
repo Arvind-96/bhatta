@@ -102,6 +102,7 @@ import type {
   WorkEntry,
   WorkType,
   SoilArrival,
+  SoilArrivalTractorEntry,
 } from "@/types";
 import { useAuthStore, type AuthUser, type UserKiln } from "@/store/auth.store";
 
@@ -670,6 +671,7 @@ export const api = {
       tractorUsed?: boolean;
       jcbDriverId?: string;
       tractorDriverId?: string;
+      tractors?: SoilArrivalTractorEntry[];
       trolleyCount: number;
       depthFeet?: number;
       paymentGiven?: number;
@@ -685,6 +687,7 @@ export const api = {
         tractorUsed: boolean;
         jcbDriverId: string;
         tractorDriverId: string;
+        tractors: SoilArrivalTractorEntry[];
         trolleyCount: number;
         depthFeet: number;
         paymentGiven: number;

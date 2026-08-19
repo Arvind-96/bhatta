@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
-import { soilArrivals, soilContracts, people } from "../db/schema";
+import { soilArrivals, soilContracts, people, SoilArrivalTractorEntry } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
@@ -14,6 +14,7 @@ export interface CreateSoilArrivalInput {
   tractorUsed?: boolean;
   jcbDriverId?: string;
   tractorDriverId?: string;
+  tractors?: SoilArrivalTractorEntry[];
   trolleyCount: number;
   depthFeet?: number;
   paymentGiven?: number;
@@ -101,6 +102,7 @@ export interface UpdateSoilArrivalInput {
   tractorUsed?: boolean;
   jcbDriverId?: string;
   tractorDriverId?: string;
+  tractors?: SoilArrivalTractorEntry[];
   contractId?: string;
   trolleyCount?: number;
   depthFeet?: number;

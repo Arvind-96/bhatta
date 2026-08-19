@@ -1,4 +1,4 @@
-import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex, index, boolean } from "drizzle-orm/mysql-core";
+import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex, index, boolean, json } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
 
 export const LAND_STATUSES = [
@@ -81,6 +81,12 @@ export const soilContracts = mysqlTable("soil_contracts", {
   kilnOwnerIdx: index("contract_kiln_owner_idx").on(t.kilnId, t.landownerId),
 }));
 
+export interface SoilArrivalTractorEntry {
+  driverName?: string;
+  driverPhone?: string;
+  tractorNumber?: string;
+}
+
 export const soilArrivals = mysqlTable("soil_arrivals", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
@@ -90,6 +96,11 @@ export const soilArrivals = mysqlTable("soil_arrivals", {
   tractorUsed: boolean("tractorUsed").default(false),
   jcbDriverId: varchar("jcbDriverId", { length: 64 }),
   tractorDriverId: varchar("tractorDriverId", { length: 64 }),
+  // Multiple tractors can run the same arrival simultaneously, each with
+  // its own driver/vehicle — free text, not a Person reference, since
+  // these are often casual/day-hire drivers never entered as a Driver
+  // profile. tractorDriverId above stays for older single-tractor rows.
+  tractors: json("tractors").$type<SoilArrivalTractorEntry[]>(),
   trolleyCount: int("trolleyCount").notNull(),
   depthFeet: double("depthFeet"),
   paymentGiven: double("paymentGiven").default(0),

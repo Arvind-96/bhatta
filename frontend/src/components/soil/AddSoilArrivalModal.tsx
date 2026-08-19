@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { rateBasisLabel } from "@/components/soil/ContractDetailPage";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { Person, SoilContract } from "@/types";
-import { formatINR } from "@/lib/utils";
+import type { Person, SoilArrivalTractorEntry, SoilContract } from "@/types";
+import { cn, formatINR } from "@/lib/utils";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-border bg-ink-primary/5 px-3.5 text-sm text-ink-primary outline-none transition-shadow focus:ring-2 focus:ring-series-1";
@@ -103,14 +103,33 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
   const [jcbUsed, setJcbUsed] = useState(false);
   const [tractorUsed, setTractorUsed] = useState(false);
   const [jcbDriverId, setJcbDriverId] = useState("");
-  const [tractorDriverId, setTractorDriverId] = useState("");
+  const [tractors, setTractors] = useState<SoilArrivalTractorEntry[]>([]);
   const [trolleyCount, setTrolleyCount] = useState("");
-  const [depthFeet, setDepthFeet] = useState("");
   const [paymentGiven, setPaymentGiven] = useState("");
   const [paymentPending, setPaymentPending] = useState("");
-  const [soilRemaining, setSoilRemaining] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Each tractor gets its own driver name/phone/tractor number — free text,
+  // not a Person picker, since day-hire tractor drivers are rarely entered
+  // as a Driver profile. Multiple tractors can run the same arrival at
+  // once, so this is a growable list, not a single set of fields.
+  function toggleTractorUsed(checked: boolean) {
+    setTractorUsed(checked);
+    setTractors(checked ? [{ driverName: "", driverPhone: "", tractorNumber: "" }] : []);
+  }
+
+  function updateTractor(index: number, field: keyof SoilArrivalTractorEntry, value: string) {
+    setTractors((list) => list.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry)));
+  }
+
+  function addTractor() {
+    setTractors((list) => [...list, { driverName: "", driverPhone: "", tractorNumber: "" }]);
+  }
+
+  function removeTractor(index: number) {
+    setTractors((list) => list.filter((_, i) => i !== index));
+  }
 
   useEffect(() => {
     api.soilContracts.list({ status: "ACTIVE" }).then(setActiveContracts).catch(console.error);
@@ -134,7 +153,6 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
   }, [selectedLandownerId, activeContracts, presetContractId]);
 
   const selectedContract = activeContracts.find((c) => c._id === contractId);
-  const tracksDepth = selectedContract?.rateType === "PER_DEPTH" || selectedContract?.rateType === "PER_BIGHA";
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -147,12 +165,12 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
         jcbUsed,
         tractorUsed,
         jcbDriverId: jcbUsed && jcbDriverId ? jcbDriverId : undefined,
-        tractorDriverId: tractorUsed && tractorDriverId ? tractorDriverId : undefined,
+        tractors: tractorUsed
+          ? tractors.filter((entry) => entry.driverName || entry.driverPhone || entry.tractorNumber)
+          : undefined,
         trolleyCount: Number(trolleyCount),
-        depthFeet: depthFeet ? Number(depthFeet) : undefined,
         paymentGiven: paymentGiven ? Number(paymentGiven) : undefined,
         paymentPending: paymentPending ? Number(paymentPending) : undefined,
-        soilRemaining: soilRemaining ? Number(soilRemaining) : undefined,
         notes: notes || undefined,
       });
       onCreated();
@@ -164,8 +182,8 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
-      <Card className="w-full max-w-lg hover:translate-y-0">
-        <div className="mb-5 flex items-center justify-between">
+      <Card className="flex w-full max-w-lg flex-col hover:translate-y-0" style={{ maxHeight: "90vh" }}>
+        <div className="mb-5 flex shrink-0 items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="gradient-brand flex h-9 w-9 items-center justify-center rounded-xl shadow-glow-1">
               <Truck className="h-4 w-4 text-white" />
@@ -180,7 +198,7 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1">
           {!landownerId && landowners && (
             <Field label={t("soil.fieldOwnerKhetKaMalik")}>
               <select
@@ -232,7 +250,7 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
               {t("soil.jcbUsed")}
             </label>
             <label className="flex items-center gap-2 rounded-xl border border-border bg-ink-primary/5 px-3.5 py-3 text-sm text-ink-primary">
-              <input type="checkbox" checked={tractorUsed} onChange={(e) => setTractorUsed(e.target.checked)} />
+              <input type="checkbox" checked={tractorUsed} onChange={(e) => toggleTractorUsed(e.target.checked)} />
               {t("soil.tractorUsed")}
             </label>
           </div>
@@ -250,34 +268,58 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
             </Field>
           )}
           {tractorUsed && (
-            <Field label={t("soil.tractorDriver")}>
-              <select value={tractorDriverId} onChange={(e) => setTractorDriverId(e.target.value)} className={inputClass}>
-                <option value="">{t("soil.selectTractorDriver")}</option>
-                {drivers.map((d) => (
-                  <option key={d._id} value={d._id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <div className="flex flex-col gap-2">
+              {tractors.map((entry, index) => (
+                <div key={index} className="flex flex-col gap-2 rounded-xl border border-border bg-ink-primary/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                      {t("soil.tractorEntryLabel", { index: index + 1 })}
+                    </p>
+                    {tractors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeTractor(index)}
+                        className="text-xs font-medium text-status-critical hover:underline"
+                      >
+                        {t("common.remove")}
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      placeholder={t("soil.tractorDriverName")}
+                      value={entry.driverName ?? ""}
+                      onChange={(e) => updateTractor(index, "driverName", e.target.value)}
+                      className={cn(inputClass, "h-10")}
+                    />
+                    <input
+                      placeholder={t("soil.tractorDriverPhone")}
+                      value={entry.driverPhone ?? ""}
+                      onChange={(e) => updateTractor(index, "driverPhone", e.target.value)}
+                      className={cn(inputClass, "h-10")}
+                    />
+                  </div>
+                  <input
+                    placeholder={t("soil.tractorNumberField")}
+                    value={entry.tractorNumber ?? ""}
+                    onChange={(e) => updateTractor(index, "tractorNumber", e.target.value)}
+                    className={cn(inputClass, "h-10")}
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addTractor}
+                className="self-start text-xs font-medium text-series-1 hover:underline"
+              >
+                {t("soil.addAnotherTractor")}
+              </button>
+            </div>
           )}
 
           <Field label={t("soil.trolleysArrived")}>
             <input required type="number" min={0} placeholder={t("soil.egFive")} value={trolleyCount} onChange={(e) => setTrolleyCount(e.target.value)} className={inputClass} />
           </Field>
-
-          {tracksDepth && (
-            <Field label={t("soil.depthReachedSoFar", { unit: selectedContract?.depthUnit ?? "feet" })}>
-              <input
-                type="number"
-                min={0}
-                placeholder={t("soil.egTwelve")}
-                value={depthFeet}
-                onChange={(e) => setDepthFeet(e.target.value)}
-                className={inputClass}
-              />
-            </Field>
-          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("soil.paymentGivenSoFar")}>
@@ -287,10 +329,6 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
               <input type="number" min={0} placeholder="0" value={paymentPending} onChange={(e) => setPaymentPending(e.target.value)} className={inputClass} />
             </Field>
           </div>
-
-          <Field label={t("soil.soilStillLeftToArrive")}>
-            <input type="number" min={0} placeholder={t("common.optional")} value={soilRemaining} onChange={(e) => setSoilRemaining(e.target.value)} className={inputClass} />
-          </Field>
 
           <Field label={t("common.notesOptional")}>
             <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />

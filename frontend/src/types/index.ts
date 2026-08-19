@@ -814,6 +814,12 @@ export interface WorkEntry {
   notes?: string;
 }
 
+export interface SoilArrivalTractorEntry {
+  driverName?: string;
+  driverPhone?: string;
+  tractorNumber?: string;
+}
+
 export interface SoilArrival {
   _id: string;
   landownerId: { _id: string; name: string; phone?: string } | string;
@@ -822,6 +828,7 @@ export interface SoilArrival {
   tractorUsed: boolean;
   jcbDriverId?: { _id: string; name: string } | string;
   tractorDriverId?: { _id: string; name: string } | string;
+  tractors?: SoilArrivalTractorEntry[];
   trolleyCount: number;
   depthFeet?: number;
   paymentGiven: number;

@@ -172,6 +172,17 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     }
   }
 
+  // Soft delete — active:false immediately drops them from every people
+  // list app-wide (see person.service.ts's listPeople), but their existing
+  // contracts, lands, arrivals, and ledger history stay intact, same as the
+  // Labour/Thekedar profile delete.
+  async function deleteProfile() {
+    if (!landowner) return;
+    if (!confirm(t("people.confirmDeleteLandownerProfile", { name: landowner.name }))) return;
+    await api.people.update(landownerId, { active: false });
+    onBack();
+  }
+
   async function deleteContract(contract: SoilContract) {
     if (!confirm(t("people.confirmDeleteContract", { contractNumber: contract.contractNumber }))) return;
     await api.soilContracts.remove(contract._id);
@@ -283,6 +294,12 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                 <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
               </button>
             )}
+            <button
+              onClick={deleteProfile}
+              className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+            </button>
             <Button size="sm" onClick={() => setLedgerOpen(true)}>
               {t("people.advance")}
             </Button>

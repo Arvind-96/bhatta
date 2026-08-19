@@ -183,6 +183,7 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
   const [statusFilter, setStatusFilter] = useState<SoilContractStatus | "ALL">("ALL");
   const [rateTypeFilter, setRateTypeFilter] = useState<SoilContractRateType | "ALL">("ALL");
   const [form, setForm] = useState({
+    landownerId: "",
     landId: "",
     rateType: "PER_TROLLEY" as SoilContractRateType,
     contractedQuantity: "",
@@ -202,6 +203,7 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   const emptyContractForm = {
+    landownerId: "",
     landId: "",
     rateType: "PER_TROLLEY" as SoilContractRateType,
     contractedQuantity: "",
@@ -217,6 +219,26 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
     paymentTerms: "",
     notes: "",
   };
+
+  // Selecting a landowner is the only thing the admin should have to do —
+  // their existing land (khasra/area) and agreed dig-depth already live on
+  // the Landowner profile (AddLandownerModal/LandownerDetailPage), so pull
+  // those straight into the form. Every value landed here stays a plain
+  // editable input afterwards, exactly like a manually typed one.
+  function applyLandowner(landownerId: string) {
+    const landowner = landowners.find((l) => l._id === landownerId);
+    const ownerLands = lands.filter((l) => (typeof l.landownerId === "object" ? l.landownerId._id : l.landownerId) === landownerId);
+    const primaryLand = ownerLands[0];
+    setForm((f) => ({
+      ...f,
+      landownerId,
+      landId: primaryLand?._id ?? "",
+      contractedAreaBigha:
+        primaryLand?.area != null ? String(primaryLand.area) : landowner?.khetArea != null ? String(landowner.khetArea) : f.contractedAreaBigha,
+      contractedDepth: landowner?.agreedDepthFeet != null ? String(landowner.agreedDepthFeet) : f.contractedDepth,
+      depthUnit: (landowner?.agreedDepthUnit as DepthUnit) ?? f.depthUnit,
+    }));
+  }
 
   async function refresh() {
     const [contractsData, landsData, landownersData, dashboardData] = await Promise.all([
@@ -254,7 +276,7 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
         areaUnit: quickLand.areaUnit || undefined,
       });
       await refresh();
-      setForm((f) => ({ ...f, landId: land._id }));
+      setForm((f) => ({ ...f, landownerId: quickLand.landownerId, landId: land._id }));
       setQuickLand({ landownerId: "", name: "", khasraNumber: "", area: "", areaUnit: "bigha" });
       setShowQuickAddLand(false);
     } finally {
@@ -435,6 +457,20 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
       {showForm && (
         <Card>
           <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+            <select
+              required
+              value={form.landownerId}
+              onChange={(e) => applyLandowner(e.target.value)}
+              className={cn(inputClass, "col-span-2")}
+            >
+              <option value="">{t("soil.selectFieldOwner")}</option>
+              {landowners.map((l) => (
+                <option key={l._id} value={l._id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+
             <div className="col-span-2 flex gap-2">
               <select
                 required
@@ -443,11 +479,15 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
                 className={cn(inputClass, "flex-1")}
               >
                 <option value="">{t("soil.selectLand")}</option>
-                {lands.map((l) => (
-                  <option key={l._id} value={l._id}>
-                    {l.name} — {typeof l.landownerId === "object" ? l.landownerId.name : ""}
-                  </option>
-                ))}
+                {lands
+                  .filter(
+                    (l) => !form.landownerId || (typeof l.landownerId === "object" ? l.landownerId._id : l.landownerId) === form.landownerId
+                  )
+                  .map((l) => (
+                    <option key={l._id} value={l._id}>
+                      {l.name} — {typeof l.landownerId === "object" ? l.landownerId.name : ""}
+                    </option>
+                  ))}
               </select>
               <button
                 type="button"

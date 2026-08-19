@@ -50,6 +50,10 @@ export const peopleDetailDict: Record<string, Record<Locale, string>> = {
     en: "Delete {name}'s profile? Their past work/ledger records are kept, but they'll no longer appear in any list.",
     hi: "{name} की प्रोफ़ाइल हटाएं? उनके पुराने काम और खाता-बही रिकॉर्ड सुरक्षित रहेंगे, लेकिन वे अब किसी सूची में नहीं दिखेंगे।",
   },
+  "people.confirmDeleteLandownerProfile": {
+    en: "Delete {name}'s profile? Their contracts, land, and payment records are kept, but they'll no longer appear in any list.",
+    hi: "{name} की प्रोफ़ाइल हटाएं? उनके अनुबंध, खेत और भुगतान रिकॉर्ड सुरक्षित रहेंगे, लेकिन वे अब किसी सूची में नहीं दिखेंगे।",
+  },
   "people.labourType": { en: "Labour ({type})", hi: "मज़दूर ({type})" },
   "people.underThekedar": { en: " · under ", hi: " · ठेकेदार: " },
   "people.noThekedarAssigned": { en: " · no thekedar assigned", hi: " · कोई ठेकेदार नियुक्त नहीं" },
