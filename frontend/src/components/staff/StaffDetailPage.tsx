@@ -1,17 +1,20 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Pencil, Trash2, X } from "lucide-react";
+import { ArrowLeft, Pencil, Printer, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
+import { useAuthStore } from "@/store/auth.store";
 import { LedgerModal } from "@/components/people/LedgerModal";
+import { EditLedgerEntryModal } from "@/components/people/EditLedgerEntryModal";
 import { PersonAvatar } from "@/components/people/PersonAvatar";
 import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
 import { ProfileViewField } from "@/components/people/ProfileViewField";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { LedgerEntry, Person } from "@/types";
-import { formatINR } from "@/lib/utils";
+import { formatDateTime, formatINR } from "@/lib/utils";
+import { printLedgerEntry } from "@/lib/printDocument";
 import { usePersonTypeMeta } from "@/components/people/personTypes";
 import { AttendanceCalendar } from "./AttendanceCalendar";
 import { SalarySlipHistory } from "./SalarySlipHistory";
@@ -56,6 +59,15 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
+  const [editingLedgerEntry, setEditingLedgerEntry] = useState<LedgerEntry | null>(null);
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const kilnInfo = {
+    name: activeKiln?.name ?? "Bhatta Cloud",
+    location: activeKiln?.location,
+    phone: activeKiln?.phone,
+  };
 
   async function refresh() {
     const [detail, ledger] = await Promise.all([api.people.get(staffId), api.people.listLedger(staffId)]);
@@ -156,6 +168,11 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
     onBack();
   }
 
+  function printEntry(entry: LedgerEntry) {
+    if (!staff) return;
+    printLedgerEntry(entry, staff.name, kilnInfo);
+  }
+
   const backButton = (
     <button onClick={onBack} className="mb-3 flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink-primary">
       <ArrowLeft className="h-4 w-4" /> {t("staff.backToStaff")}
@@ -184,6 +201,20 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
     advancesByCategory.set(key, (advancesByCategory.get(key) ?? 0) + e.amount);
   }
   const totalAdvancesGiven = Array.from(advancesByCategory.values()).reduce((sum, v) => sum + v, 0);
+
+  // ledgerEntries comes back newest-first — the running paid-so-far/
+  // remaining-due shown alongside each row still needs to build up
+  // chronologically, same computation LandownerDetailPage uses.
+  const runningTotalsById = new Map<string, { paidSoFar: number; remainingDue: number }>();
+  {
+    let paid = 0;
+    let due = 0;
+    for (const entry of [...ledgerEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {
+      if (entry.direction === "PAID") paid += entry.amount;
+      else due += entry.amount;
+      runningTotalsById.set(entry._id, { paidSoFar: paid, remainingDue: Math.max(0, due - paid) });
+    }
+  }
 
   return (
     <div>
@@ -361,6 +392,74 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
             </div>
           )}
         </Card>
+
+        <Card className="lg:col-span-2">
+          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("staff.paymentHistory")}</h4>
+          {ledgerEntries.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink-muted">{t("people.noLedgerEntriesYet")}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-sm text-ink-muted">
+                    <th className="pb-2 font-medium">{t("common.transactionDate")}</th>
+                    <th className="pb-2 font-medium">{t("common.entryDateTime")}</th>
+                    <th className="pb-2 font-medium">{t("people.reason")}</th>
+                    <th className="pb-2 font-medium">{t("people.category")}</th>
+                    <th className="pb-2 font-medium">{t("people.mode")}</th>
+                    <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
+                    <th className="pb-2 font-medium text-right">{t("staff.paidSoFar")}</th>
+                    <th className="pb-2 font-medium text-right">{t("staff.remainingDue")}</th>
+                    <th className="pb-2 font-medium" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledgerEntries.map((entry) => {
+                    const running = runningTotalsById.get(entry._id)!;
+                    return (
+                      <tr key={entry._id} className="border-b border-border/60 last:border-0">
+                        <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
+                        <td className="py-3 text-xs text-ink-muted">{formatDateTime(entry.createdAt)}</td>
+                        <td className="py-3 text-ink-primary">{entry.reason}</td>
+                        <td className="py-3 text-ink-secondary">{entry.category ?? "—"}</td>
+                        <td className="py-3 text-ink-secondary">
+                          {entry.paymentMode === "CASH_AND_ONLINE"
+                            ? `${t("payment.cashAmount")} ₹${formatINR(entry.cashAmount ?? 0)} + ${t("payment.onlineAmount")} ₹${formatINR(entry.onlineAmount ?? 0)}`
+                            : entry.paymentMode ?? "—"}
+                        </td>
+                        <td className={`py-3 text-right tabular-nums font-medium ${entry.direction === "DUE" ? "text-status-critical" : "text-status-good"}`}>
+                          {entry.direction === "DUE" ? "+" : "-"}₹{formatINR(entry.amount)}
+                        </td>
+                        <td className="py-3 text-right tabular-nums text-status-good">₹{formatINR(running.paidSoFar)}</td>
+                        <td className="py-3 pr-2 text-right tabular-nums text-status-critical">₹{formatINR(running.remainingDue)}</td>
+                        <td className="py-3 pl-3 text-right">
+                          <div className="flex items-center justify-end gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => printEntry(entry)}
+                              className="text-ink-muted hover:text-ink-primary"
+                              aria-label={t("common.print")}
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingLedgerEntry(entry)}
+                              className="text-ink-muted hover:text-ink-primary"
+                              aria-label={t("people.editLedgerEntry")}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -369,6 +468,15 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
       </div>
 
       {ledgerOpen && <LedgerModal person={staff} onClose={() => setLedgerOpen(false)} />}
+      {editingLedgerEntry && (
+        <EditLedgerEntryModal
+          entry={editingLedgerEntry}
+          onClose={() => {
+            setEditingLedgerEntry(null);
+            refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

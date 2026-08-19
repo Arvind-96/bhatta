@@ -45,6 +45,9 @@ export const staffDict: Record<string, Record<Locale, string>> = {
   "staff.advancesKharchiExpenses": { en: "advances/kharchi/expenses", hi: "एडवांस/खर्ची/खर्च" },
   "staff.netDue": { en: "net due", hi: "कुल बकाया" },
   "staff.advanceOutstanding": { en: "advance outstanding", hi: "बकाया एडवांस" },
+  "staff.paymentHistory": { en: "Payment history", hi: "भुगतान इतिहास" },
+  "staff.paidSoFar": { en: "Paid so far", hi: "अब तक भुगतान" },
+  "staff.remainingDue": { en: "Remaining due", hi: "शेष बकाया" },
 
   // --- pages/Attendance.tsx ---
   "attendance.title": { en: "Attendance", hi: "हाज़िरी" },

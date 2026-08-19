@@ -48,6 +48,16 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
   const isPartner = person.type === "PARTNER";
   const isContractor = person.type === "LABOUR_CONTRACTOR";
   const isLandowner = person.type === "LANDOWNER";
+  // Permanent bhatta admin/support staff (Main Munim, office Helpers,
+  // Chowkidar, office Drivers — see Staff.tsx's roster) get their own
+  // salary via the dedicated attendance-based Salary Slip system, not this
+  // ledger's generic Salary quick action — and have no medical/festival/
+  // settlement concept — so their popup narrows to just the two things an
+  // admin actually posts against them day to day: Advance and Kharchi.
+  const isStaff =
+    person.type === "MUNIM" ||
+    person.type === "CHOWKIDAR" ||
+    ((person.type === "HELPER" || person.type === "DRIVER") && person.isOfficeStaff === true);
   const entityLabel = isContractor ? t("people.thekedarWord") : t("people.labourWord");
 
   async function refresh() {
@@ -175,6 +185,23 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                 >
                   {t("people.recordPartnerWithdrawal")}
                 </button>
+              ) : isStaff ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fillQuickAction({ direction: "PAID", reason: t("people.reasonAdvancePeshgi"), category: "ADVANCE" })}
+                    className={quickButtonClass}
+                  >
+                    {t("people.advancePeshgiTitle")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillQuickAction({ direction: "PAID", reason: t("people.reasonKharchiWeeklyPettyCash"), category: "KHARCHI" })}
+                    className={quickButtonClass}
+                  >
+                    {t("people.kharchi")}
+                  </button>
+                </>
               ) : (
                 <>
                   {person.monthlySalary != null && (
@@ -318,13 +345,22 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                   className="h-11 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
                 >
                   <option value="">{t("people.categoryOptional")}</option>
-                  <option value="SALARY">{isContractor ? t("people.salaryCommissionOption") : t("people.salaryOption")}</option>
-                  <option value="COMMISSION">{t("people.commissionOption")}</option>
-                  <option value="ADVANCE">{t("people.advance")}</option>
-                  {!isLandowner && <option value="KHARCHI">{t("people.kharchi")}</option>}
-                  {!isContractor && <option value="MEDICAL">{t("people.medical")}</option>}
-                  {!isContractor && <option value="FESTIVAL">{t("people.festival")}</option>}
-                  <option value="OTHER">{t("people.other")}</option>
+                  {isStaff ? (
+                    <>
+                      <option value="ADVANCE">{t("people.advance")}</option>
+                      <option value="KHARCHI">{t("people.kharchi")}</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="SALARY">{isContractor ? t("people.salaryCommissionOption") : t("people.salaryOption")}</option>
+                      <option value="COMMISSION">{t("people.commissionOption")}</option>
+                      <option value="ADVANCE">{t("people.advance")}</option>
+                      {!isLandowner && <option value="KHARCHI">{t("people.kharchi")}</option>}
+                      {!isContractor && <option value="MEDICAL">{t("people.medical")}</option>}
+                      {!isContractor && <option value="FESTIVAL">{t("people.festival")}</option>}
+                      <option value="OTHER">{t("people.other")}</option>
+                    </>
+                  )}
                 </select>
               )}
               <input

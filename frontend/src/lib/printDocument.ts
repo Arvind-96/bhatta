@@ -435,6 +435,81 @@ export function printPaymentReceipt(receipt: PaymentReceipt, recipientName: stri
   openPrintWindow(`Payment Receipt ${receipt.receiptNumber}`, body, RECEIPT_ACCENT);
 }
 
+const LEDGER_CATEGORY_LABELS: Record<string, string> = {
+  WAGE: "Wage",
+  COMMISSION: "Commission",
+  SALARY: "Salary",
+  TIP: "Tip",
+  ADVANCE: "Advance",
+  KHARCHI: "Kharchi",
+  MEDICAL: "Medical",
+  FESTIVAL: "Festival",
+  SALE: "Sale",
+  SOIL: "Soil",
+  SAND: "Sand",
+  FUEL: "Fuel",
+  FARE: "Fare (Bhada)",
+  OTHER: "Other",
+};
+
+// A single ledger row's own printout — for any person type, any category,
+// either direction — unlike printPaymentReceipt (tied to the dedicated
+// PaymentReceipt/Billing entity) this reads straight off the LedgerEntry
+// every person's profile already lists, so any Advance/Kharchi/Salary/Wage
+// line item on a Staff, Labour, Thekedar, etc. profile can be handed to the
+// recipient as a paper slip. Same shared visual language as the other print
+// documents in this file.
+export function printLedgerEntry(entry: LedgerEntry, recipientName: string, kiln: KilnPrintInfo) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const isPaid = entry.direction === "PAID";
+  const categoryLabel = entry.category ? LEDGER_CATEGORY_LABELS[entry.category] ?? entry.category : "—";
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">${isPaid ? "Payment Slip" : "Due Entry"}</span>
+        <p class="doc-date">${new Date(entry.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">${isPaid ? "Paid to" : "Due from / to"}</p>
+        <p class="doc-box-name">${escapeHtml(recipientName)}</p>
+        ${entry.paymentMode ? `<p class="doc-box-detail">${escapeHtml(paymentModeLabel(entry))}</p>` : ""}
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">${isPaid ? "Amount paid" : "Amount due"}</p>
+        <p class="doc-total-amount">₹${formatINR(entry.amount)}</p>
+        <p class="doc-amount-words">${escapeHtml(amountInWords(entry.amount))}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      <tr><td class="doc-table-label">Category</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>
+      <tr><td class="doc-table-label">Reason</td><td class="doc-table-value">${escapeHtml(entry.reason)}</td></tr>
+      <tr><td class="doc-table-label">Entered on</td><td class="doc-table-value">${new Date(entry.createdAt).toLocaleString("en-IN")}</td></tr>
+    </table>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED SLIP ~</p>
+    <div class="doc-sign-row">
+      <div class="doc-sign-box">Bhatta owner / Munim<br />(Stamp &amp; Signature)</div>
+      <div class="doc-sign-box">Recipient signature</div>
+    </div>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`${isPaid ? "Payment Slip" : "Due Entry"} — ${recipientName}`, body, RECEIPT_ACCENT);
+}
+
 function contractRateBasisText(contract: SoilContract) {
   if (contract.rateType === "BOTH") {
     return `${contract.contractedAreaBigha ?? "—"} bigha + ${contract.contractedDepth ?? "—"} ${contract.depthUnit ?? "feet"}`;
