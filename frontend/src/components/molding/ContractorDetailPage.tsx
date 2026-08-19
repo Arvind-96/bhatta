@@ -98,11 +98,9 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
     }
   }
 
-  // What THIS submission would post — laborer count × rate, reset to 0 once
-  // actually submitted. Used for the payment split validation and as the
-  // ledger entry amount; the cumulative Total Fare/Advance shown to the
-  // admin (totalFareDisplay/totalAdvanceDisplay below) is this plus
-  // whatever's already been given historically.
+  // What THIS submission would post — laborer count × rate. Shown directly
+  // as Total Fare/Total Advance (0 until the admin enters something) and
+  // used as the ledger entry amount; resets to 0 once actually submitted.
   const pendingFare = (Number(laborerCount) || 0) * (Number(perLaborFareAmount) || 0);
   const pendingAdvance = (Number(laborerCount) || 0) * (Number(perLaborAdvanceAmount) || 0);
 
@@ -186,24 +184,12 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   }
 
   const balance = entry?.balance ?? 0;
-  // Total Fare / Total Advance are running totals: every individual Labor
-  // Fare (Bhada) or Fixed Advance payment ever given adds into them
-  // (fareGivenToContractor/advanceGivenToContractor, tracked backend-side),
-  // plus whatever's sitting in the calculator right now, not yet submitted.
-  // Once actually submitted, the calculator field resets to 0 and the same
-  // amount has already landed in the historical total, so these totals
-  // never jump on submit.
-  const totalFareDisplay = (entry?.fareGivenToContractor ?? 0) + pendingFare;
-  const totalAdvanceDisplay = (entry?.advanceGivenToContractor ?? 0) + pendingAdvance;
-  // Remaining Pool = (Total Fare + Total Advance) - (Deducted + Advance
-  // Given). Advance Given is the same historical total folded into Total
-  // Advance, so once an advance is actually posted it nets to zero net
-  // effect here — the pool only keeps growing from Fare (which has no
-  // matching subtraction) and from advance still sitting pending, not yet
-  // given.
+  // Total Fare / Total Advance show 0 until the admin types something in —
+  // just this session's laborer count × rate, not a running historical
+  // total (that's what Advance Given below already tracks separately).
   const remainingPool =
-    totalFareDisplay +
-    totalAdvanceDisplay -
+    pendingFare +
+    pendingAdvance -
     ((entry?.advanceDeductedForWorkers ?? 0) + (entry?.advanceGivenToContractor ?? 0));
 
   return (
@@ -333,7 +319,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                   />
                 )}
                 <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
-                  <span className="text-sm text-ink-muted">{t("molding.thisPaymentLabel")}</span>
+                  <span className="text-sm text-ink-muted">{t("molding.totalFareLabel")}</span>
                   <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingFare)}</span>
                 </div>
               </div>
@@ -365,7 +351,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                   />
                 )}
                 <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
-                  <span className="text-sm text-ink-muted">{t("molding.thisPaymentLabel")}</span>
+                  <span className="text-sm text-ink-muted">{t("molding.totalAdvanceLabel")}</span>
                   <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingAdvance)}</span>
                 </div>
               </div>
@@ -384,11 +370,11 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
             <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
-              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalFareDisplay)}</p>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingFare)}</p>
               <p className="text-sm text-ink-muted">{t("molding.totalFareLabel")}</p>
             </div>
             <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
-              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAdvanceDisplay)}</p>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingAdvance)}</p>
               <p className="text-sm text-ink-muted">{t("molding.totalAdvanceLabel")}</p>
             </div>
             <div className="rounded-xl bg-series-1 p-3 text-center">
