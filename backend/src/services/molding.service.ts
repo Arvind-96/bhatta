@@ -326,6 +326,27 @@ export async function moldingContractorSummary(kilnId: string) {
       }
       const { due, paid, balance } = sumByDirection(gangLedgerEntries);
 
+      // The Bhada/advance "pool" — money the kiln has handed this
+      // contractor (category ADVANCE, e.g. from the Labor Fare & Advance
+      // section below) minus whatever's since been paid out to their own
+      // gang workers as Kharchi/Advance/Medical/Festival. Kept separate
+      // from the generic due/paid/balance above (which also includes
+      // commission and any other category) so "how much of the advance the
+      // contractor is still holding" reads as its own number, continuously
+      // up to date as new worker payments post — no separate reset/session
+      // bookkeeping needed.
+      const advanceGivenToContractor = gangLedgerEntries
+        .filter((e) => e.personId === contractor._id && e.direction === "PAID" && e.category === "ADVANCE")
+        .reduce((sum, e) => sum + e.amount, 0);
+      const advanceDeductedForWorkers = gangLedgerEntries
+        .filter(
+          (e) =>
+            e.personId !== contractor._id &&
+            e.direction === "PAID" &&
+            (e.category === "KHARCHI" || e.category === "ADVANCE" || e.category === "MEDICAL" || e.category === "FESTIVAL")
+        )
+        .reduce((sum, e) => sum + e.amount, 0);
+
       return {
         contractor: {
           id: contractor._id,
@@ -344,6 +365,9 @@ export async function moldingContractorSummary(kilnId: string) {
         totalDue: due,
         totalPaid: paid,
         balance,
+        advanceGivenToContractor,
+        advanceDeductedForWorkers,
+        remainingAdvancePool: advanceGivenToContractor - advanceDeductedForWorkers,
       };
     })
   );

@@ -248,6 +248,7 @@ export type LedgerCategory =
   | "SOIL"
   | "SAND"
   | "FUEL"
+  | "FARE"
   | "OTHER";
 
 export interface LedgerEntry {
@@ -574,6 +575,9 @@ export interface MoldingContractorEntry {
   totalDue: number;
   totalPaid: number;
   balance: number;
+  advanceGivenToContractor: number;
+  advanceDeductedForWorkers: number;
+  remainingAdvancePool: number;
 }
 
 export interface MoldingContractorSummary {

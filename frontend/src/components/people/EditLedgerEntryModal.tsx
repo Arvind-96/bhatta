@@ -30,6 +30,7 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   SOIL: "Soil",
   SAND: "Sand",
   FUEL: "Fuel",
+  FARE: "Fare (Bhada)",
   OTHER: "Other",
 };
 

@@ -107,7 +107,7 @@ export const familyMembers = mysqlTable("family_members", {
 
 export const LEDGER_CATEGORIES = [
   "WAGE", "COMMISSION", "SALARY", "TIP", "ADVANCE", "KHARCHI", "MEDICAL",
-  "FESTIVAL", "SALE", "SOIL", "SAND", "FUEL", "OTHER",
+  "FESTIVAL", "SALE", "SOIL", "SAND", "FUEL", "FARE", "OTHER",
 ] as const;
 export const LEDGER_PAYMENT_MODES = ["CASH", "BANK", "UPI", "CASH_AND_ONLINE"] as const;
 

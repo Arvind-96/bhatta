@@ -9,8 +9,9 @@ import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { LaborDetailPage } from "./LaborDetailPage";
-import type { LedgerEntry, MoldingContractorEntry, Person } from "@/types";
+import type { LedgerEntry, LedgerPaymentMode, MoldingContractorEntry, Person } from "@/types";
 import { formatINR } from "@/lib/utils";
+import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -43,6 +44,20 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
   const [showAddLabor, setShowAddLabor] = useState(false);
   const [openWorkerId, setOpenWorkerId] = useState<string | null>(null);
+  const [laborerCount, setLaborerCount] = useState("");
+  const [laborerCountTouched, setLaborerCountTouched] = useState(false);
+  const [perLaborFareAmount, setPerLaborFareAmount] = useState("");
+  const [fareMode, setFareMode] = useState<LedgerPaymentMode>("CASH");
+  const [fareCashAmount, setFareCashAmount] = useState("");
+  const [fareOnlineAmount, setFareOnlineAmount] = useState("");
+  const [payingFare, setPayingFare] = useState(false);
+  const [fareError, setFareError] = useState("");
+  const [perLaborAdvanceAmount, setPerLaborAdvanceAmount] = useState("");
+  const [advanceMode, setAdvanceMode] = useState<LedgerPaymentMode>("CASH");
+  const [advanceCashAmount, setAdvanceCashAmount] = useState("");
+  const [advanceOnlineAmount, setAdvanceOnlineAmount] = useState("");
+  const [givingAdvance, setGivingAdvance] = useState(false);
+  const [advanceError, setAdvanceError] = useState("");
 
   async function refresh() {
     const [personDetail, summary, allWorkers, ledger] = await Promise.all([
@@ -54,8 +69,14 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
     setContractor(personDetail.person);
     setCommissionInput(personDetail.person.commissionPerThousand ? String(personDetail.person.commissionPerThousand) : "");
     setEntry(summary.contractors.find((c) => c.contractor.id === contractorId) ?? null);
-    setWorkers(allWorkers.filter((w) => w.contractorId === contractorId));
+    const gangWorkers = allWorkers.filter((w) => w.contractorId === contractorId);
+    setWorkers(gangWorkers);
     setLedgerEntries(ledger);
+    // Defaults to the gang's current headcount so the admin doesn't have to
+    // retype a number already visible in the table below — only until they
+    // type their own value for this session (e.g. fewer laborers turned up
+    // today than are on file).
+    if (!laborerCountTouched) setLaborerCount(gangWorkers.length ? String(gangWorkers.length) : "");
   }
 
   useEffect(() => {
@@ -76,6 +97,75 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
       await refresh();
     } finally {
       setSavingRate(false);
+    }
+  }
+
+  const totalFare = (Number(laborerCount) || 0) * (Number(perLaborFareAmount) || 0);
+  const totalAdvance = (Number(laborerCount) || 0) * (Number(perLaborAdvanceAmount) || 0);
+
+  // Bhada (labor fare) — a one-off payment the kiln hands the contractor
+  // once per session to cover the gang's travel. Just a plain PAID ledger
+  // entry against the contractor; unlike the advance below, nothing draws
+  // down against it afterward.
+  async function payFare(e: FormEvent) {
+    e.preventDefault();
+    if (!laborerCount || !perLaborFareAmount) return;
+    if (isPaymentSplitMismatched(fareMode, totalFare, fareCashAmount, fareOnlineAmount)) {
+      setFareError(t("payment.splitMismatch", { total: totalFare.toLocaleString("en-IN") }));
+      return;
+    }
+    setFareError("");
+    setPayingFare(true);
+    try {
+      await api.people.addLedger(contractorId, {
+        direction: "PAID",
+        amount: totalFare,
+        reason: t("molding.fareReason", { count: laborerCount, rate: perLaborFareAmount }),
+        category: "FARE",
+        paymentMode: fareMode,
+        cashAmount: fareMode === "CASH_AND_ONLINE" ? Number(fareCashAmount) : undefined,
+        onlineAmount: fareMode === "CASH_AND_ONLINE" ? Number(fareOnlineAmount) : undefined,
+      });
+      setPerLaborFareAmount("");
+      setFareCashAmount("");
+      setFareOnlineAmount("");
+      await refresh();
+    } finally {
+      setPayingFare(false);
+    }
+  }
+
+  // The fixed advance pool — money handed to the contractor to redistribute
+  // to their own gang. Posted as a PAID/ADVANCE entry against the
+  // contractor; moldingContractorSummary then continuously nets this
+  // against every Kharchi/Advance/Medical/Festival payment the contractor's
+  // workers receive, so "remaining pool" always reflects what's actually
+  // left without any manual reset between sessions.
+  async function giveAdvance(e: FormEvent) {
+    e.preventDefault();
+    if (!laborerCount || !perLaborAdvanceAmount) return;
+    if (isPaymentSplitMismatched(advanceMode, totalAdvance, advanceCashAmount, advanceOnlineAmount)) {
+      setAdvanceError(t("payment.splitMismatch", { total: totalAdvance.toLocaleString("en-IN") }));
+      return;
+    }
+    setAdvanceError("");
+    setGivingAdvance(true);
+    try {
+      await api.people.addLedger(contractorId, {
+        direction: "PAID",
+        amount: totalAdvance,
+        reason: t("molding.advanceReason", { count: laborerCount, rate: perLaborAdvanceAmount }),
+        category: "ADVANCE",
+        paymentMode: advanceMode,
+        cashAmount: advanceMode === "CASH_AND_ONLINE" ? Number(advanceCashAmount) : undefined,
+        onlineAmount: advanceMode === "CASH_AND_ONLINE" ? Number(advanceOnlineAmount) : undefined,
+      });
+      setPerLaborAdvanceAmount("");
+      setAdvanceCashAmount("");
+      setAdvanceOnlineAmount("");
+      await refresh();
+    } finally {
+      setGivingAdvance(false);
     }
   }
 
@@ -178,6 +268,114 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                 ₹{formatINR(Math.abs(balance))}
               </p>
               <p className="text-sm text-ink-muted">{balance >= 0 ? t("molding.remainingDueLabel") : t("molding.advanceOutstandingLabel")}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("molding.fareAdvanceTitle")}</h4>
+          <p className="mb-3 text-sm text-ink-muted">{t("molding.fareAdvanceHint")}</p>
+
+          <label className="mb-3 flex max-w-xs flex-col gap-1">
+            <span className="text-sm text-ink-muted">{t("molding.numberOfLaborers")}</span>
+            <input
+              type="number"
+              min={0}
+              value={laborerCount}
+              onChange={(e) => {
+                setLaborerCount(e.target.value);
+                setLaborerCountTouched(true);
+              }}
+              className={inputClass}
+            />
+          </label>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <form onSubmit={payFare} className="flex flex-col gap-2 rounded-xl border border-border p-3">
+              <p className="text-sm font-medium text-ink-primary">{t("molding.laborFareBhada")}</p>
+              <input
+                type="number"
+                min={0}
+                placeholder={t("molding.perLaborFareAmount")}
+                value={perLaborFareAmount}
+                onChange={(e) => setPerLaborFareAmount(e.target.value)}
+                className={inputClass}
+              />
+              <select value={fareMode} onChange={(e) => setFareMode(e.target.value as LedgerPaymentMode)} className={inputClass}>
+                <option value="CASH">{t("dispatch.paymentCash")}</option>
+                <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
+                <option value="UPI">{t("dispatch.paymentUpi")}</option>
+                <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
+              </select>
+              {fareMode === "CASH_AND_ONLINE" && (
+                <PaymentSplitFields
+                  totalAmount={totalFare}
+                  cashAmount={fareCashAmount}
+                  onlineAmount={fareOnlineAmount}
+                  onCashAmountChange={setFareCashAmount}
+                  onOnlineAmountChange={setFareOnlineAmount}
+                  inputClassName={inputClass}
+                />
+              )}
+              <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
+                <span className="text-sm text-ink-muted">{t("molding.totalFareLabel")}</span>
+                <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalFare)}</span>
+              </div>
+              {fareError && <p className="text-sm text-status-critical">{fareError}</p>}
+              <Button type="submit" size="sm" disabled={payingFare || !laborerCount || !perLaborFareAmount}>
+                {t("molding.payFareButton")}
+              </Button>
+            </form>
+
+            <form onSubmit={giveAdvance} className="flex flex-col gap-2 rounded-xl border border-border p-3">
+              <p className="text-sm font-medium text-ink-primary">{t("molding.fixedAdvance")}</p>
+              <input
+                type="number"
+                min={0}
+                placeholder={t("molding.perLaborAdvanceAmount")}
+                value={perLaborAdvanceAmount}
+                onChange={(e) => setPerLaborAdvanceAmount(e.target.value)}
+                className={inputClass}
+              />
+              <select value={advanceMode} onChange={(e) => setAdvanceMode(e.target.value as LedgerPaymentMode)} className={inputClass}>
+                <option value="CASH">{t("dispatch.paymentCash")}</option>
+                <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
+                <option value="UPI">{t("dispatch.paymentUpi")}</option>
+                <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
+              </select>
+              {advanceMode === "CASH_AND_ONLINE" && (
+                <PaymentSplitFields
+                  totalAmount={totalAdvance}
+                  cashAmount={advanceCashAmount}
+                  onlineAmount={advanceOnlineAmount}
+                  onCashAmountChange={setAdvanceCashAmount}
+                  onOnlineAmountChange={setAdvanceOnlineAmount}
+                  inputClassName={inputClass}
+                />
+              )}
+              <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
+                <span className="text-sm text-ink-muted">{t("molding.totalAdvanceLabel")}</span>
+                <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAdvance)}</span>
+              </div>
+              {advanceError && <p className="text-sm text-status-critical">{advanceError}</p>}
+              <Button type="submit" size="sm" disabled={givingAdvance || !laborerCount || !perLaborAdvanceAmount}>
+                {t("molding.giveAdvanceButton")}
+              </Button>
+            </form>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl border border-series-1/30 bg-series-1/5 p-3 text-center">
+            <div>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(entry?.advanceGivenToContractor ?? 0)}</p>
+              <p className="text-sm text-ink-muted">{t("molding.advanceGivenLabel")}</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold tabular-nums text-status-warning">₹{formatINR(entry?.advanceDeductedForWorkers ?? 0)}</p>
+              <p className="text-sm text-ink-muted">{t("molding.advanceDeductedLabel")}</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold tabular-nums text-status-good">₹{formatINR(entry?.remainingAdvancePool ?? 0)}</p>
+              <p className="text-sm text-ink-muted">{t("molding.advanceRemainingLabel")}</p>
             </div>
           </div>
         </Card>
