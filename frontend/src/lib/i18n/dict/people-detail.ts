@@ -93,10 +93,6 @@ export const peopleDetailDict: Record<string, Record<Locale, string>> = {
   "people.khetLocation": { en: "Khet location", hi: "खेत का स्थान" },
   "people.khetArea": { en: "Khet area", hi: "खेत का क्षेत्रफल" },
   "people.unitBigha": { en: "Unit (bigha)", hi: "इकाई (बीघा)" },
-  "people.khetAreaFromLandsHint": {
-    en: "Field area ({area}) is calculated from this owner's individual fields, not edited here.",
-    hi: "क्षेत्रफल ({area}) इस मालिक के अलग-अलग खेतों से गणना किया जाता है, यहाँ संपादित नहीं होता।",
-  },
   "people.agreedDigDepth": { en: "Agreed dig depth (feet)", hi: "तय खुदाई गहराई (फ़ीट)" },
   "people.soilSummaryAutoSynced": { en: "Soil summary (auto-synced)", hi: "मिट्टी सारांश (स्वतः सिंक)" },
   "people.totalTrolleysArrived": { en: "total trolleys arrived", hi: "कुल ट्रॉली आईं" },

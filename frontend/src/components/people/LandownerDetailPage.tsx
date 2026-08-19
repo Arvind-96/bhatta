@@ -33,6 +33,12 @@ function driverName(p: SoilArrival["jcbDriverId"]) {
   return typeof p === "string" ? p : p.name;
 }
 
+interface LandDraft {
+  _id?: string;
+  khasraNumber: string;
+  area: string;
+}
+
 // The field owner (Khet ka malik) profile — personal details plus the
 // full soil-arrival history logged against them, auto-synced from the
 // Soil page's arrivals log (or entered directly here), same pattern as
@@ -55,6 +61,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   const [khetLocation, setKhetLocation] = useState("");
   const [agreedDepthFeet, setAgreedDepthFeet] = useState("");
   const [agreedDepthUnit, setAgreedDepthUnit] = useState<DepthUnit>("feet");
+  const [landDrafts, setLandDrafts] = useState<LandDraft[]>([]);
   const [nickname, setNickname] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -90,6 +97,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     setArrivals(arrivalsData);
     setContracts(contractsData);
     setLands(landsData);
+    setLandDrafts(landsData.map((l) => ({ _id: l._id, khasraNumber: l.khasraNumber ?? "", area: l.area != null ? String(l.area) : "" })));
     setName(detail.person.name);
     setPhone(detail.person.phone ?? "");
     setAddress(detail.person.address ?? "");
@@ -129,11 +137,37 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
         nickname: nickname.trim() || undefined,
         joiningDate: joiningDate || undefined,
       });
+      await Promise.all(
+        landDrafts.map((draft) =>
+          draft._id
+            ? api.lands.update(draft._id, {
+                khasraNumber: draft.khasraNumber || undefined,
+                area: draft.area ? Number(draft.area) : undefined,
+              })
+            : draft.khasraNumber || draft.area
+            ? api.lands.create({
+                landownerId,
+                name: `${t("people.fieldLabel")} ${landDrafts.indexOf(draft) + 1}`,
+                khasraNumber: draft.khasraNumber || undefined,
+                area: draft.area ? Number(draft.area) : undefined,
+                areaUnit: "bigha",
+              })
+            : Promise.resolve()
+        )
+      );
       await refresh();
       setIsEditing(false);
     } finally {
       setSavingProfile(false);
     }
+  }
+
+  function updateLandDraft(index: number, patch: Partial<LandDraft>) {
+    setLandDrafts((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
+  function addLandDraft() {
+    setLandDrafts((rows) => [...rows, { khasraNumber: "", area: "" }]);
   }
 
   function cancelEditing() {
@@ -150,6 +184,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
       setNickname(landowner.nickname ?? "");
       setJoiningDate(landowner.joiningDate ? landowner.joiningDate.slice(0, 10) : "");
     }
+    setLandDrafts(lands.map((l) => ({ _id: l._id, khasraNumber: l.khasraNumber ?? "", area: l.area != null ? String(l.area) : "" })));
     setIsEditing(false);
   }
 
@@ -328,10 +363,37 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
               <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
               <input placeholder={t("people.aadharIdNumber")} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className={inputClass} />
               <input placeholder={t("people.khetLocation")} value={khetLocation} onChange={(e) => setKhetLocation(e.target.value)} className={inputClass} />
-              {lands.length > 0 ? (
-                <p className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-sm text-ink-muted">
-                  {t("people.khetAreaFromLandsHint", { area: fieldAreaDisplay ?? "—" })}
-                </p>
+              {landDrafts.length > 0 ? (
+                <div className="flex flex-col gap-2 rounded-xl border border-border p-2.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.landHoldings")}</p>
+                  {landDrafts.map((draft, i) => (
+                    <div key={draft._id ?? `new-${i}`} className="grid grid-cols-[3.5rem_1fr_8rem] items-center gap-2">
+                      <span className="text-xs text-ink-muted">
+                        {t("people.fieldLabel")} {i + 1}
+                      </span>
+                      <input
+                        placeholder={t("people.khasraNumber")}
+                        value={draft.khasraNumber}
+                        onChange={(e) => updateLandDraft(i, { khasraNumber: e.target.value })}
+                        className={inputClass}
+                      />
+                      <input
+                        type="number"
+                        placeholder={t("people.fieldAreaBigha")}
+                        value={draft.area}
+                        onChange={(e) => updateLandDraft(i, { area: e.target.value })}
+                        className={inputClass}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addLandDraft}
+                    className="flex w-fit items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> {t("people.addAnotherField")}
+                  </button>
+                </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   <input type="number" min={0} placeholder={t("people.khetArea")} value={khetArea} onChange={(e) => setKhetArea(e.target.value)} className={inputClass} />

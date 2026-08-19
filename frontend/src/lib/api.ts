@@ -425,7 +425,17 @@ export const api = {
     }) => post<Land>("/lands", input, true),
     update: (
       id: string,
-      input: Partial<{ name: string; status: Land["status"]; notes: string; latitude: number; longitude: number }>
+      input: Partial<{
+        name: string;
+        village: string;
+        khasraNumber: string;
+        area: number;
+        areaUnit: string;
+        status: Land["status"];
+        notes: string;
+        latitude: number;
+        longitude: number;
+      }>
     ) => patch<Land>(`/lands/${id}`, input, true),
   },
 
