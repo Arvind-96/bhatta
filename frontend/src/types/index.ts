@@ -440,6 +440,7 @@ export interface SandContract {
   sandContractorId: { _id: string; name: string; phone?: string } | string;
   rateType: SandContractRateType;
   contractedTrolleys?: number;
+  contractPrice?: number;
   totalContractValue: number;
   advanceAmount: number;
   startDate?: string;

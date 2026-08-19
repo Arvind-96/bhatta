@@ -147,6 +147,7 @@ function SandContractsTab() {
     sandContractorId: "",
     rateType: "PER_TROLLEY" as SandContractRateType,
     contractedTrolleys: "",
+    contractPrice: "",
     totalContractValue: "",
     advanceAmount: "",
     paymentMode: "CASH" as LedgerPaymentMode,
@@ -163,6 +164,7 @@ function SandContractsTab() {
     sandContractorId: "",
     rateType: "PER_TROLLEY" as SandContractRateType,
     contractedTrolleys: "",
+    contractPrice: "",
     totalContractValue: "",
     advanceAmount: "",
     paymentMode: "CASH" as LedgerPaymentMode,
@@ -207,6 +209,7 @@ function SandContractsTab() {
         sandContractorId: form.sandContractorId,
         rateType: form.rateType,
         contractedTrolleys: form.rateType === "PER_TROLLEY" ? Number(form.contractedTrolleys) : undefined,
+        contractPrice: form.contractPrice ? Number(form.contractPrice) : undefined,
         totalContractValue: Number(form.totalContractValue),
         advanceAmount: form.advanceAmount ? Number(form.advanceAmount) : undefined,
         paymentMode: form.advanceAmount ? form.paymentMode : undefined,
@@ -343,9 +346,16 @@ function SandContractsTab() {
                 placeholder={t("sand.numberOfTrolleysContract")}
                 value={form.contractedTrolleys}
                 onChange={(e) => setForm((f) => ({ ...f, contractedTrolleys: e.target.value }))}
-                className={cn(inputClass, "col-span-2")}
+                className={inputClass}
               />
             )}
+            <input
+              type="number"
+              placeholder={form.rateType === "PER_TROLLEY" ? t("sand.pricePerTrolley") : t("sand.pricePerThousandBricks")}
+              value={form.contractPrice}
+              onChange={(e) => setForm((f) => ({ ...f, contractPrice: e.target.value }))}
+              className={cn(inputClass, form.rateType === "PER_THOUSAND_BRICKS" && "col-span-2")}
+            />
 
             <input
               required
@@ -426,9 +436,9 @@ function SandContractsTab() {
                     <td className="py-3 text-ink-primary">{c.contractNumber}</td>
                     <td className="py-3 text-ink-secondary">{typeof c.sandContractorId === "object" ? c.sandContractorId.name : "—"}</td>
                     <td className="py-3 text-ink-secondary">
-                      {c.rateType === "PER_THOUSAND_BRICKS"
-                        ? t("sand.perThousandBricks")
-                        : `${t("sand.perTrolley")}${c.contractedTrolleys != null ? ` · ${c.contractedTrolleys.toLocaleString("en-IN")}` : ""}`}
+                      {c.rateType === "PER_THOUSAND_BRICKS" ? t("sand.perThousandBricks") : t("sand.perTrolley")}
+                      {c.contractedTrolleys != null ? ` · ${c.contractedTrolleys.toLocaleString("en-IN")}` : ""}
+                      {c.contractPrice != null ? ` · ₹${formatINR(c.contractPrice)}` : ""}
                     </td>
                     <td className="py-3 tabular-nums text-ink-secondary">₹{formatINR(c.totalContractValue)}</td>
                     <td className="py-3 text-right">

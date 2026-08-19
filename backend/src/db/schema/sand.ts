@@ -19,6 +19,11 @@ export const sandContracts = mysqlTable("sand_contracts", {
   // covers. PER_THOUSAND_BRICKS is a lump-sum agreement with no physical
   // quantity cap to track here.
   contractedTrolleys: double("contractedTrolleys"),
+  // The agreed rate per unit (per trolley, or per 1000 bricks, depending
+  // on rateType) — shown back on the contractor's profile alongside the
+  // lump-sum totalContractValue below, which stays independently
+  // admin-entered rather than derived from this rate.
+  contractPrice: double("contractPrice"),
   totalContractValue: double("totalContractValue").notNull(),
   advanceAmount: double("advanceAmount").default(0),
   startDate: datetime("startDate", { mode: "date" }),

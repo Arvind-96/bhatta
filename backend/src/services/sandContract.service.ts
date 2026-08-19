@@ -19,6 +19,7 @@ export interface CreateSandContractInput {
   sandContractorId: string;
   rateType?: SandContractRateType;
   contractedTrolleys?: number; // only meaningful for PER_TROLLEY
+  contractPrice?: number; // agreed rate per trolley or per 1000 bricks, shown on the profile
   totalContractValue: number; // always the admin-entered lump sum, no per-unit rate math
   advanceAmount?: number;
   paymentMode?: LedgerPaymentMode;
@@ -99,6 +100,7 @@ export async function listSandContracts(kilnId: string, filter: ListSandContract
 export interface UpdateSandContractInput {
   rateType?: SandContractRateType;
   contractedTrolleys?: number;
+  contractPrice?: number;
   totalContractValue?: number;
   advanceAmount?: number;
   startDate?: Date;

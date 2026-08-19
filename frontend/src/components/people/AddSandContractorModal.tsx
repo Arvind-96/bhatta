@@ -35,6 +35,7 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
   const [photo, setPhoto] = useState<File | Blob | null>(null);
   const [rateType, setRateType] = useState<SandContractRateType>("PER_TROLLEY");
   const [contractedTrolleys, setContractedTrolleys] = useState("");
+  const [contractPrice, setContractPrice] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState("");
@@ -83,6 +84,7 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
           sandContractorId: person._id,
           rateType,
           contractedTrolleys: rateType === "PER_TROLLEY" ? Number(contractedTrolleys) : undefined,
+          contractPrice: contractPrice ? Number(contractPrice) : undefined,
           totalContractValue: Number(totalContractValue),
           advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
           paymentMode: advanceAmount ? paymentMode : undefined,
@@ -152,15 +154,24 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
               ))}
             </div>
 
-            {rateType === "PER_TROLLEY" && (
+            <div className="grid grid-cols-2 gap-2">
+              {rateType === "PER_TROLLEY" && (
+                <input
+                  type="number"
+                  placeholder={t("sand.numberOfTrolleysContract")}
+                  value={contractedTrolleys}
+                  onChange={(e) => setContractedTrolleys(e.target.value)}
+                  className={inputClass}
+                />
+              )}
               <input
                 type="number"
-                placeholder={t("sand.numberOfTrolleysContract")}
-                value={contractedTrolleys}
-                onChange={(e) => setContractedTrolleys(e.target.value)}
-                className={inputClass}
+                placeholder={rateType === "PER_TROLLEY" ? t("sand.pricePerTrolley") : t("sand.pricePerThousandBricks")}
+                value={contractPrice}
+                onChange={(e) => setContractPrice(e.target.value)}
+                className={cn(inputClass, rateType === "PER_THOUSAND_BRICKS" && "col-span-2")}
               />
-            )}
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">

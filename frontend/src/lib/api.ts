@@ -496,6 +496,7 @@ export const api = {
       sandContractorId: string;
       rateType?: SandContractRateType;
       contractedTrolleys?: number;
+      contractPrice?: number;
       totalContractValue: number;
       advanceAmount?: number;
       paymentMode?: LedgerPaymentMode;
@@ -509,6 +510,7 @@ export const api = {
       input: Partial<{
         rateType: SandContractRateType;
         contractedTrolleys: number;
+        contractPrice: number;
         totalContractValue: number;
         advanceAmount: number;
         startDate: string;

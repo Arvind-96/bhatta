@@ -10,6 +10,7 @@ const createSchema = z
     sandContractorId: z.string(),
     rateType: z.enum(SAND_CONTRACT_RATE_TYPES).optional(),
     contractedTrolleys: z.number().positive().optional(),
+    contractPrice: z.number().positive().optional(),
     totalContractValue: z.number().positive(),
     advanceAmount: z.number().nonnegative().optional(),
     paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
@@ -41,6 +42,7 @@ export async function list(req: AuthedRequest, res: Response) {
 const updateSchema = z.object({
   rateType: z.enum(SAND_CONTRACT_RATE_TYPES).optional(),
   contractedTrolleys: z.number().positive().optional(),
+  contractPrice: z.number().positive().optional(),
   totalContractValue: z.number().positive().optional(),
   advanceAmount: z.number().nonnegative().optional(),
   startDate: z.string().optional(),

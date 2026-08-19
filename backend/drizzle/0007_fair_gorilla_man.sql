@@ -1,0 +1,1 @@
+ALTER TABLE `sand_contracts` ADD `contractPrice` double;

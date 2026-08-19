@@ -33,8 +33,21 @@ function tractorSummary(entry: SandDelivery, t: (key: string) => string) {
 }
 
 function rateBasisText(contract: SandContract, t: (key: string) => string) {
-  if (contract.rateType === "PER_THOUSAND_BRICKS") return t("sand.perThousandBricks");
-  return contract.contractedTrolleys != null ? `${contract.contractedTrolleys} · ${t("sand.perTrolley")}` : t("sand.perTrolley");
+  const parts = [
+    contract.rateType === "PER_THOUSAND_BRICKS"
+      ? t("sand.perThousandBricks")
+      : contract.contractedTrolleys != null
+      ? `${contract.contractedTrolleys} · ${t("sand.perTrolley")}`
+      : t("sand.perTrolley"),
+  ];
+  if (contract.contractPrice != null) {
+    parts.push(
+      `${t("sand.contractPrice")}: ₹${formatINR(contract.contractPrice)}${
+        contract.rateType === "PER_THOUSAND_BRICKS" ? "/1000" : "/trolley"
+      }`
+    );
+  }
+  return parts.join(" · ");
 }
 
 // The sand contractor profile — personal details plus their contracts and

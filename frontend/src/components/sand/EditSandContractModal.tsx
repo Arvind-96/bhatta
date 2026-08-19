@@ -28,6 +28,7 @@ export function EditSandContractModal({ contract, onClose, onSaved }: EditSandCo
   const [contractedTrolleys, setContractedTrolleys] = useState(
     contract.contractedTrolleys != null ? String(contract.contractedTrolleys) : ""
   );
+  const [contractPrice, setContractPrice] = useState(contract.contractPrice != null ? String(contract.contractPrice) : "");
   const [totalContractValue, setTotalContractValue] = useState(String(contract.totalContractValue));
   const [advanceAmount, setAdvanceAmount] = useState(String(contract.advanceAmount ?? 0));
   const [startDate, setStartDate] = useState(contract.startDate ? contract.startDate.slice(0, 10) : "");
@@ -43,6 +44,7 @@ export function EditSandContractModal({ contract, onClose, onSaved }: EditSandCo
       await api.sandContracts.update(contract._id, {
         rateType,
         contractedTrolleys: rateType === "PER_TROLLEY" && contractedTrolleys ? Number(contractedTrolleys) : undefined,
+        contractPrice: contractPrice ? Number(contractPrice) : undefined,
         totalContractValue: Number(totalContractValue),
         advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
         startDate: startDate || undefined,
@@ -107,9 +109,16 @@ export function EditSandContractModal({ contract, onClose, onSaved }: EditSandCo
               placeholder={t("sand.numberOfTrolleysContract")}
               value={contractedTrolleys}
               onChange={(e) => setContractedTrolleys(e.target.value)}
-              className={cn(inputClass, "col-span-2")}
+              className={inputClass}
             />
           )}
+          <input
+            type="number"
+            placeholder={rateType === "PER_TROLLEY" ? t("sand.pricePerTrolley") : t("sand.pricePerThousandBricks")}
+            value={contractPrice}
+            onChange={(e) => setContractPrice(e.target.value)}
+            className={cn(inputClass, rateType === "PER_THOUSAND_BRICKS" && "col-span-2")}
+          />
 
           <input
             required
