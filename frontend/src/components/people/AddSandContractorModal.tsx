@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,22 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [uploadWarning, setUploadWarning] = useState("");
+
+  // Auto-populate Total Contract Amount from trolleys × price per trolley,
+  // same formula/guard as AddLandownerModal's equivalent effect — only
+  // while both sides of the rate are actually filled in, so a manually-
+  // typed lump sum is never overwritten, and only for PER_TROLLEY (the only
+  // rate type with a known quantity up front; PER_THOUSAND_BRICKS is a
+  // pure running rate with no fixed total to compute).
+  useEffect(() => {
+    if (rateType !== "PER_TROLLEY") return;
+    const trolleys = Number(contractedTrolleys) || 0;
+    const price = Number(contractPrice) || 0;
+    if (trolleys && price) {
+      setTotalContractValue(String(trolleys * price));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rateType, contractedTrolleys, contractPrice]);
 
   const wantsContract = totalContractValue.trim() !== "";
   const dueAmount = wantsContract ? Math.max(0, (Number(totalContractValue) || 0) - (Number(advanceAmount) || 0)) : 0;

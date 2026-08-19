@@ -16,7 +16,6 @@ import { ContractDetailPage, contractStatusLabel, rateBasisLabel } from "@/compo
 import { AddSoilArrivalModal } from "@/components/soil/AddSoilArrivalModal";
 import { EditSoilArrivalModal } from "@/components/soil/EditSoilArrivalModal";
 import { EditSoilContractModal } from "@/components/soil/EditSoilContractModal";
-import { AddLandownerModal } from "@/components/people/AddLandownerModal";
 import { LandownerDetailPage } from "@/components/people/LandownerDetailPage";
 import type {
   DepthUnit,
@@ -49,7 +48,6 @@ function ArrivalsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => voi
   const [landowners, setLandowners] = useState<Person[]>([]);
   const [drivers, setDrivers] = useState<Person[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [showAddLandowner, setShowAddLandowner] = useState(false);
   const [editingArrival, setEditingArrival] = useState<SoilArrival | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -94,10 +92,7 @@ function ArrivalsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => voi
         </Card>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="outline" onClick={() => setShowAddLandowner(true)}>
-          <Plus className="h-4 w-4" /> {t("people.addLandowner")}
-        </Button>
+      <div className="flex justify-end">
         <Button size="sm" onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4" /> {t("soil.logSoilArrival")}
         </Button>
@@ -166,7 +161,6 @@ function ArrivalsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => voi
       {editingArrival && (
         <EditSoilArrivalModal entry={editingArrival} drivers={drivers} onClose={() => setEditingArrival(null)} onSaved={refresh} />
       )}
-      {showAddLandowner && <AddLandownerModal onClose={() => setShowAddLandowner(false)} onCreated={refresh} />}
     </div>
   );
 }

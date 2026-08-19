@@ -14,7 +14,6 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { AddSandDeliveryModal } from "@/components/sand/AddSandDeliveryModal";
 import { EditSandDeliveryModal } from "@/components/sand/EditSandDeliveryModal";
 import { EditSandContractModal } from "@/components/sand/EditSandContractModal";
-import { AddSandContractorModal } from "@/components/people/AddSandContractorModal";
 import { SandContractorDetailPage } from "@/components/people/SandContractorDetailPage";
 import { printSandContract } from "@/lib/printDocument";
 import type { LedgerPaymentMode, Person, SandContract, SandContractRateType, SandDelivery } from "@/types";
@@ -38,7 +37,6 @@ function SandArrivalsTab({ onOpenContractor }: { onOpenContractor: (id: string) 
   const [deliveries, setDeliveries] = useState<SandDelivery[]>([]);
   const [contractors, setContractors] = useState<Person[]>([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [showAddContractor, setShowAddContractor] = useState(false);
   const [editingDelivery, setEditingDelivery] = useState<SandDelivery | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -82,10 +80,7 @@ function SandArrivalsTab({ onOpenContractor }: { onOpenContractor: (id: string) 
         </Card>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="outline" onClick={() => setShowAddContractor(true)}>
-          <Plus className="h-4 w-4" /> {t("people.addSandContractor")}
-        </Button>
+      <div className="flex justify-end">
         <Button size="sm" onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4" /> {t("sand.logSandDelivery")}
         </Button>
@@ -144,7 +139,6 @@ function SandArrivalsTab({ onOpenContractor }: { onOpenContractor: (id: string) 
 
       {showAdd && <AddSandDeliveryModal sandContractors={contractors} onClose={() => setShowAdd(false)} onCreated={refresh} />}
       {editingDelivery && <EditSandDeliveryModal entry={editingDelivery} onClose={() => setEditingDelivery(null)} onSaved={refresh} />}
-      {showAddContractor && <AddSandContractorModal onClose={() => setShowAddContractor(false)} onCreated={refresh} />}
     </div>
   );
 }
