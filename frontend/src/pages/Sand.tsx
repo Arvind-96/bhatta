@@ -1,9 +1,8 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Printer, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/filter-chips";
-import { DateInput } from "@/components/ui/date-input";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { cn, formatINR } from "@/lib/utils";
@@ -16,8 +15,7 @@ import { EditSandDeliveryModal } from "@/components/sand/EditSandDeliveryModal";
 import { EditSandContractModal } from "@/components/sand/EditSandContractModal";
 import { SandContractorDetailPage } from "@/components/people/SandContractorDetailPage";
 import { printSandContract } from "@/lib/printDocument";
-import type { LedgerPaymentMode, Person, SandContract, SandContractRateType, SandDelivery } from "@/types";
-import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import type { Person, SandContract, SandContractRateType, SandDelivery } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -152,49 +150,17 @@ const CONTRACT_RATE_TYPE_FILTERS: { value: SandContractRateType | "ALL"; labelKe
 function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string) => void }) {
   const { t } = useTranslation();
   const [contracts, setContracts] = useState<SandContract[]>([]);
-  const [contractors, setContractors] = useState<Person[]>([]);
-  const [showForm, setShowForm] = useState(false);
   const [editingContract, setEditingContract] = useState<SandContract | null>(null);
   const [search, setSearch] = useState("");
   const [rateTypeFilter, setRateTypeFilter] = useState<SandContractRateType | "ALL">("ALL");
-  const [form, setForm] = useState({
-    sandContractorId: "",
-    rateType: "PER_TROLLEY" as SandContractRateType,
-    contractedTrolleys: "",
-    contractPrice: "",
-    totalContractValue: "",
-    advanceAmount: "",
-    paymentMode: "CASH" as LedgerPaymentMode,
-    cashAmount: "",
-    onlineAmount: "",
-    startDate: "",
-    endDate: "",
-  });
-  const [formError, setFormError] = useState("");
-  const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
-  const emptyContractForm = {
-    sandContractorId: "",
-    rateType: "PER_TROLLEY" as SandContractRateType,
-    contractedTrolleys: "",
-    contractPrice: "",
-    totalContractValue: "",
-    advanceAmount: "",
-    paymentMode: "CASH" as LedgerPaymentMode,
-    cashAmount: "",
-    onlineAmount: "",
-    startDate: "",
-    endDate: "",
-  };
-
+  // Contracts are only ever created via the People page's Add Sand
+  // Contractor flow now (its embedded, optional Contract Details section)
+  // — this tab is a read-only listing of whatever contracts already exist
+  // there, so it has no creation form of its own.
   async function refresh() {
-    const [contractsData, contractorsData] = await Promise.all([
-      api.sandContracts.list(),
-      api.people.list("SAND_CONTRACTOR"),
-    ]);
-    setContracts(contractsData);
-    setContractors(contractorsData);
+    setContracts(await api.sandContracts.list());
   }
 
   useEffect(() => {
@@ -205,41 +171,6 @@ function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string)
   useKilnEvent("sandContract:update", () => refresh());
   useKilnEvent("sandDelivery:update", () => refresh());
   useKilnEvent("person:update", () => refresh());
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!form.sandContractorId || !form.totalContractValue) return;
-    if (form.rateType === "PER_TROLLEY" && !form.contractedTrolleys) {
-      setFormError(t("sand.contractFieldsRequiredError"));
-      return;
-    }
-    if (isPaymentSplitMismatched(form.paymentMode, Number(form.advanceAmount) || 0, form.cashAmount, form.onlineAmount)) {
-      setFormError(t("payment.splitMismatch", { total: (Number(form.advanceAmount) || 0).toLocaleString("en-IN") }));
-      return;
-    }
-    setFormError("");
-    setLoading(true);
-    try {
-      await api.sandContracts.create({
-        sandContractorId: form.sandContractorId,
-        rateType: form.rateType,
-        contractedTrolleys: form.rateType === "PER_TROLLEY" ? Number(form.contractedTrolleys) : undefined,
-        contractPrice: form.contractPrice ? Number(form.contractPrice) : undefined,
-        totalContractValue: Number(form.totalContractValue),
-        advanceAmount: form.advanceAmount ? Number(form.advanceAmount) : undefined,
-        paymentMode: form.advanceAmount ? form.paymentMode : undefined,
-        cashAmount: form.advanceAmount && form.paymentMode === "CASH_AND_ONLINE" ? Number(form.cashAmount) : undefined,
-        onlineAmount: form.advanceAmount && form.paymentMode === "CASH_AND_ONLINE" ? Number(form.onlineAmount) : undefined,
-        startDate: form.startDate || undefined,
-        endDate: form.endDate || undefined,
-      });
-      setForm(emptyContractForm);
-      setShowForm(false);
-      await refresh();
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function remove(contract: SandContract) {
     if (!confirm(t("sand.confirmDeleteContract", { contractNumber: contract.contractNumber }))) return;
@@ -300,9 +231,6 @@ function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string)
             className={cn(inputClass, "w-72 pl-9")}
           />
         </div>
-        <Button size="sm" onClick={() => setShowForm((s) => !s)}>
-          <Plus className="h-4 w-4" /> {t("soil.newContract")}
-        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-ink-primary/10 bg-surface/60 px-3 py-2.5 shadow-sm">
@@ -313,119 +241,6 @@ function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string)
           onChange={setRateTypeFilter}
         />
       </div>
-
-      {showForm && (
-        <Card>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-            <select
-              required
-              value={form.sandContractorId}
-              onChange={(e) => setForm((f) => ({ ...f, sandContractorId: e.target.value }))}
-              className={cn(inputClass, "col-span-2")}
-            >
-              <option value="">{t("sand.selectSandContractor")}</option>
-              {contractors.map((c) => (
-                <option key={c._id} value={c._id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-
-            <div className="col-span-2 flex gap-1">
-              {(
-                [
-                  { value: "PER_TROLLEY", label: t("sand.perTrolley") },
-                  { value: "PER_THOUSAND_BRICKS", label: t("sand.perThousandBricks") },
-                ] as { value: SandContractRateType; label: string }[]
-              ).map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setForm((f) => ({ ...f, rateType: opt.value }))}
-                  className={cn(
-                    "flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-colors",
-                    form.rateType === opt.value
-                      ? "border-series-1 bg-series-1/10 text-series-1"
-                      : "border-ink-primary/20 bg-surface text-ink-secondary hover:bg-ink-primary/10"
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            {form.rateType === "PER_TROLLEY" && (
-              <input
-                required
-                type="number"
-                placeholder={t("sand.numberOfTrolleysContract")}
-                value={form.contractedTrolleys}
-                onChange={(e) => setForm((f) => ({ ...f, contractedTrolleys: e.target.value }))}
-                className={inputClass}
-              />
-            )}
-            <input
-              type="number"
-              placeholder={form.rateType === "PER_TROLLEY" ? t("sand.pricePerTrolley") : t("sand.pricePerThousandBricks")}
-              value={form.contractPrice}
-              onChange={(e) => setForm((f) => ({ ...f, contractPrice: e.target.value }))}
-              className={cn(inputClass, form.rateType === "PER_THOUSAND_BRICKS" && "col-span-2")}
-            />
-
-            <input
-              required
-              type="number"
-              placeholder={t("sand.totalContractAmount")}
-              value={form.totalContractValue}
-              onChange={(e) => setForm((f) => ({ ...f, totalContractValue: e.target.value }))}
-              className={cn(inputClass, "col-span-2")}
-            />
-            <input
-              type="number"
-              placeholder={t("sand.advanceAmountPaid")}
-              value={form.advanceAmount}
-              onChange={(e) => setForm((f) => ({ ...f, advanceAmount: e.target.value }))}
-              className={inputClass}
-            />
-            {form.advanceAmount && (
-              <select
-                value={form.paymentMode}
-                onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value as LedgerPaymentMode }))}
-                className={inputClass}
-              >
-                <option value="CASH">{t("dispatch.paymentCash")}</option>
-                <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
-                <option value="UPI">{t("dispatch.paymentUpi")}</option>
-                <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
-              </select>
-            )}
-            {form.advanceAmount && form.paymentMode === "CASH_AND_ONLINE" && (
-              <div className="col-span-2">
-                <PaymentSplitFields
-                  totalAmount={Number(form.advanceAmount) || 0}
-                  cashAmount={form.cashAmount}
-                  onlineAmount={form.onlineAmount}
-                  onCashAmountChange={(v) => setForm((f) => ({ ...f, cashAmount: v }))}
-                  onOnlineAmountChange={(v) => setForm((f) => ({ ...f, onlineAmount: v }))}
-                  inputClassName={inputClass}
-                />
-              </div>
-            )}
-            <DateInput
-              value={form.startDate}
-              onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-              className={inputClass}
-            />
-            <DateInput value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} className={inputClass} />
-
-            {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
-
-            <Button type="submit" disabled={loading} className="col-span-2">
-              {t("soil.saveContract")}
-            </Button>
-          </form>
-        </Card>
-      )}
 
       <Card>
         {filteredContracts.length === 0 ? (
@@ -448,17 +263,13 @@ function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string)
                 {pagedContracts.map((c) => {
                   const contractor = typeof c.sandContractorId === "object" ? c.sandContractorId : null;
                   return (
-                  <tr key={c._id} className="border-b border-border/60 last:border-0">
+                  <tr
+                    key={c._id}
+                    onClick={() => contractor && onOpenContractor(contractor._id)}
+                    className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5"
+                  >
                     <td className="py-3 text-ink-primary">{c.contractNumber}</td>
-                    <td className="py-3 text-ink-secondary">
-                      {contractor ? (
-                        <button onClick={() => onOpenContractor(contractor._id)} className="hover:underline">
-                          {contractor.name}
-                        </button>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
+                    <td className="py-3 text-ink-secondary">{contractor ? contractor.name : "—"}</td>
                     <td className="py-3 text-ink-secondary">
                       {c.rateType === "PER_THOUSAND_BRICKS" ? t("sand.perThousandBricks") : t("sand.perTrolley")}
                       {c.contractedTrolleys != null ? ` · ${c.contractedTrolleys.toLocaleString("en-IN")}` : ""}
@@ -467,13 +278,31 @@ function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string)
                     <td className="py-3 tabular-nums text-ink-secondary">₹{formatINR(c.totalContractValue)}</td>
                     <td className="py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
-                        <button onClick={() => printContract(c)} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            printContract(c);
+                          }}
+                          className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+                        >
                           <Printer className="h-3.5 w-3.5" /> {t("common.print")}
                         </button>
-                        <button onClick={() => setEditingContract(c)} className="text-xs font-medium text-series-1 hover:underline">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingContract(c);
+                          }}
+                          className="text-xs font-medium text-series-1 hover:underline"
+                        >
                           {t("common.edit")}
                         </button>
-                        <button onClick={() => remove(c)} className="text-xs font-medium text-status-critical hover:underline">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            remove(c);
+                          }}
+                          className="text-xs font-medium text-status-critical hover:underline"
+                        >
                           {t("common.delete")}
                         </button>
                       </div>
