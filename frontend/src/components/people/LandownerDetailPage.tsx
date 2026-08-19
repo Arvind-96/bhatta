@@ -436,7 +436,10 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                     <p className="truncate text-xs text-ink-muted">
                       {rateBasisLabel(c, t)} · {contractStatusLabel(c.status, t)} · ₹{formatINR(c.totalContractValue)}
                     </p>
-                    <p className="truncate text-xs text-ink-muted/70">{t("common.entryDateTime")}: {formatDateTime(c.createdAt)}</p>
+                    <p className="truncate text-xs text-ink-muted/70">
+                      {c.startDate && `${t("common.transactionDate")}: ${new Date(c.startDate).toLocaleDateString("en-IN")} · `}
+                      {t("common.entryDateTime")}: {formatDateTime(c.createdAt)}
+                    </p>
                   </div>
                   <div className="flex shrink-0 gap-3">
                     <button
