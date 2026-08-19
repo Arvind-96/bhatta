@@ -327,17 +327,27 @@ export async function moldingContractorSummary(kilnId: string) {
         bricksByWorker.set(id, (bricksByWorker.get(id) ?? 0) + e.bricksCount);
         totalBricksProduced += e.bricksCount;
       }
-      const { due, paid, balance } = sumByDirection(gangLedgerEntries);
+      // The contractor's own Fare/Advance pool postings are bookkeeping for
+      // the Labor Fare & Advance pool below, not production/commission
+      // accounting — left inside the generic due/paid/balance they used to
+      // swamp it (a single ₹3,60,000 advance made an otherwise-healthy
+      // commission balance read as a ₹3,60,900 due). Excluded here so Gang
+      // Summary reflects only commission and worker wages/payments; still
+      // fully accounted for separately via advanceGivenToContractor below.
+      const commissionLedgerEntries = gangLedgerEntries.filter(
+        (e) => !(e.personId === contractor._id && (e.category === "ADVANCE" || e.category === "FARE"))
+      );
+      const { due, paid, balance } = sumByDirection(commissionLedgerEntries);
 
-      // The Bhada/advance "pool" — money the kiln has handed this
-      // contractor (category ADVANCE, e.g. from the Labor Fare & Advance
+      // Money the kiln has handed this contractor for their Bhada/advance
+      // pool (category ADVANCE, posted from the Labor Fare & Advance
       // section below) minus whatever's since been paid out to their own
-      // gang workers as Kharchi/Advance/Medical/Festival. Kept separate
-      // from the generic due/paid/balance above (which also includes
-      // commission and any other category) so "how much of the advance the
-      // contractor is still holding" reads as its own number, continuously
-      // up to date as new worker payments post — no separate reset/session
-      // bookkeeping needed.
+      // gang workers as Kharchi/Advance/Medical/Festival — continuously up
+      // to date as new worker payments post, no separate reset/session
+      // bookkeeping needed. The pool total itself (which also folds in the
+      // live, not-yet-posted Fare/Advance calculator values) is computed
+      // client-side in ContractorDetailPage, since only the browser knows
+      // what's currently typed into those fields.
       const advanceGivenToContractor = gangLedgerEntries
         .filter((e) => e.personId === contractor._id && e.direction === "PAID" && e.category === "ADVANCE")
         .reduce((sum, e) => sum + e.amount, 0);
@@ -370,7 +380,6 @@ export async function moldingContractorSummary(kilnId: string) {
         balance,
         advanceGivenToContractor,
         advanceDeductedForWorkers,
-        remainingAdvancePool: advanceGivenToContractor - advanceDeductedForWorkers,
       };
     })
   );
