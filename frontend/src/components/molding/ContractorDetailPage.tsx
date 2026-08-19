@@ -98,8 +98,13 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
     }
   }
 
-  const totalFare = (Number(laborerCount) || 0) * (Number(perLaborFareAmount) || 0);
-  const totalAdvance = (Number(laborerCount) || 0) * (Number(perLaborAdvanceAmount) || 0);
+  // What THIS submission would post — laborer count × rate, reset to 0 once
+  // actually submitted. Used for the payment split validation and as the
+  // ledger entry amount; the cumulative Total Fare/Advance shown to the
+  // admin (totalFareDisplay/totalAdvanceDisplay below) is this plus
+  // whatever's already been given historically.
+  const pendingFare = (Number(laborerCount) || 0) * (Number(perLaborFareAmount) || 0);
+  const pendingAdvance = (Number(laborerCount) || 0) * (Number(perLaborAdvanceAmount) || 0);
 
   // Bhada (labor fare) is a one-off payment the kiln hands the contractor
   // once per session to cover the gang's travel; the fixed advance is money
@@ -114,12 +119,12 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
     const hasFare = !!laborerCount && !!perLaborFareAmount;
     const hasAdvance = !!laborerCount && !!perLaborAdvanceAmount;
     if (!hasFare && !hasAdvance) return;
-    if (hasFare && isPaymentSplitMismatched(fareMode, totalFare, fareCashAmount, fareOnlineAmount)) {
-      setPoolError(t("payment.splitMismatch", { total: totalFare.toLocaleString("en-IN") }));
+    if (hasFare && isPaymentSplitMismatched(fareMode, pendingFare, fareCashAmount, fareOnlineAmount)) {
+      setPoolError(t("payment.splitMismatch", { total: pendingFare.toLocaleString("en-IN") }));
       return;
     }
-    if (hasAdvance && isPaymentSplitMismatched(advanceMode, totalAdvance, advanceCashAmount, advanceOnlineAmount)) {
-      setPoolError(t("payment.splitMismatch", { total: totalAdvance.toLocaleString("en-IN") }));
+    if (hasAdvance && isPaymentSplitMismatched(advanceMode, pendingAdvance, advanceCashAmount, advanceOnlineAmount)) {
+      setPoolError(t("payment.splitMismatch", { total: pendingAdvance.toLocaleString("en-IN") }));
       return;
     }
     setPoolError("");
@@ -128,7 +133,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
       if (hasFare) {
         await api.people.addLedger(contractorId, {
           direction: "PAID",
-          amount: totalFare,
+          amount: pendingFare,
           reason: t("molding.fareReason", { count: laborerCount, rate: perLaborFareAmount }),
           category: "FARE",
           paymentMode: fareMode,
@@ -142,7 +147,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
       if (hasAdvance) {
         await api.people.addLedger(contractorId, {
           direction: "PAID",
-          amount: totalAdvance,
+          amount: pendingAdvance,
           reason: t("molding.advanceReason", { count: laborerCount, rate: perLaborAdvanceAmount }),
           category: "ADVANCE",
           paymentMode: advanceMode,
@@ -181,24 +186,25 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   }
 
   const balance = entry?.balance ?? 0;
-  // Remaining Pool is what the contractor is currently holding, unspent:
-  // everything ever paid to them for Bhada/advance (fareGivenToContractor +
-  // advanceGivenToContractor, which only ever grow when money actually goes
-  // out to the contractor) plus whatever's sitting in the calculator right
-  // now, about to be added — minus what's since been deducted via their
-  // gang's Kharchi/Advance/Medical/Festival payments. Money paid to the
-  // contractor must always ADD to this, never subtract — subtracting it
-  // would mean "give an advance" perversely shrinks the pool instead of
-  // feeding it, which is what broke this figure before. Once Fare/Advance
-  // are actually submitted, their calculator fields reset to 0 and the same
-  // amount lands in fareGivenToContractor/advanceGivenToContractor instead,
-  // so the total never jumps — it just moves from "pending" to "posted."
+  // Total Fare / Total Advance are running totals: every individual Labor
+  // Fare (Bhada) or Fixed Advance payment ever given adds into them
+  // (fareGivenToContractor/advanceGivenToContractor, tracked backend-side),
+  // plus whatever's sitting in the calculator right now, not yet submitted.
+  // Once actually submitted, the calculator field resets to 0 and the same
+  // amount has already landed in the historical total, so these totals
+  // never jump on submit.
+  const totalFareDisplay = (entry?.fareGivenToContractor ?? 0) + pendingFare;
+  const totalAdvanceDisplay = (entry?.advanceGivenToContractor ?? 0) + pendingAdvance;
+  // Remaining Pool = (Total Fare + Total Advance) - (Deducted + Advance
+  // Given). Advance Given is the same historical total folded into Total
+  // Advance, so once an advance is actually posted it nets to zero net
+  // effect here — the pool only keeps growing from Fare (which has no
+  // matching subtraction) and from advance still sitting pending, not yet
+  // given.
   const remainingPool =
-    totalFare +
-    totalAdvance +
-    (entry?.fareGivenToContractor ?? 0) +
-    (entry?.advanceGivenToContractor ?? 0) -
-    (entry?.advanceDeductedForWorkers ?? 0);
+    totalFareDisplay +
+    totalAdvanceDisplay -
+    ((entry?.advanceDeductedForWorkers ?? 0) + (entry?.advanceGivenToContractor ?? 0));
 
   return (
     <div>
@@ -318,7 +324,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                 </select>
                 {fareMode === "CASH_AND_ONLINE" && (
                   <PaymentSplitFields
-                    totalAmount={totalFare}
+                    totalAmount={pendingFare}
                     cashAmount={fareCashAmount}
                     onlineAmount={fareOnlineAmount}
                     onCashAmountChange={setFareCashAmount}
@@ -327,8 +333,8 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                   />
                 )}
                 <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
-                  <span className="text-sm text-ink-muted">{t("molding.totalFareLabel")}</span>
-                  <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalFare)}</span>
+                  <span className="text-sm text-ink-muted">{t("molding.thisPaymentLabel")}</span>
+                  <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingFare)}</span>
                 </div>
               </div>
 
@@ -350,7 +356,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                 </select>
                 {advanceMode === "CASH_AND_ONLINE" && (
                   <PaymentSplitFields
-                    totalAmount={totalAdvance}
+                    totalAmount={pendingAdvance}
                     cashAmount={advanceCashAmount}
                     onlineAmount={advanceOnlineAmount}
                     onCashAmountChange={setAdvanceCashAmount}
@@ -359,8 +365,8 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                   />
                 )}
                 <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
-                  <span className="text-sm text-ink-muted">{t("molding.totalAdvanceLabel")}</span>
-                  <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAdvance)}</span>
+                  <span className="text-sm text-ink-muted">{t("molding.thisPaymentLabel")}</span>
+                  <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingAdvance)}</span>
                 </div>
               </div>
             </div>
@@ -378,11 +384,11 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
             <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
-              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalFare)}</p>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalFareDisplay)}</p>
               <p className="text-sm text-ink-muted">{t("molding.totalFareLabel")}</p>
             </div>
             <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
-              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAdvance)}</p>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAdvanceDisplay)}</p>
               <p className="text-sm text-ink-muted">{t("molding.totalAdvanceLabel")}</p>
             </div>
             <div className="rounded-xl bg-series-1 p-3 text-center">

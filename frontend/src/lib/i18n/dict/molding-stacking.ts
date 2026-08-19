@@ -106,6 +106,7 @@ export const moldingStackingDict: Record<string, Record<Locale, string>> = {
   "molding.fixedAdvance": { en: "Fixed advance", hi: "निश्चित पेशगी" },
   "molding.perLaborAdvanceAmount": { en: "Advance per laborer (₹)", hi: "प्रति मज़दूर पेशगी (₹)" },
   "molding.totalAdvanceLabel": { en: "Total advance", hi: "कुल पेशगी" },
+  "molding.thisPaymentLabel": { en: "This payment", hi: "यह भुगतान" },
   "molding.addToPoolButton": { en: "Add to Remaining Pool", hi: "शेष पूल में जोड़ें" },
   "molding.advanceGivenLabel": { en: "Advance given", hi: "दी गई पेशगी" },
   "molding.advanceDeductedLabel": { en: "Deducted (gang payments)", hi: "कटौती (गैंग भुगतान)" },
