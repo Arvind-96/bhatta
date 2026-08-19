@@ -282,6 +282,13 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   // the Advance/Kharchi history below already show.
   const totalContractPayment = contracts.reduce((sum, c) => sum + c.totalContractValue, 0);
   const totalPaidSoFar = ledgerEntries.filter((e) => e.direction === "PAID").reduce((sum, e) => sum + e.amount, 0);
+  // Remaining against the agreed contract total specifically -- NOT the raw
+  // ledger `balance` below, which (for PER_TROLLEY contracts especially)
+  // only reflects DUE entries actually posted so far per arrival, not the
+  // full agreed totalContractValue. Pairing that raw balance next to
+  // "Total contract payment"/"Paid so far" made a partial advance against
+  // the contract read as "advance outstanding" instead of "remaining due".
+  const contractBalance = totalContractPayment - totalPaidSoFar;
 
   // ledgerEntries comes back newest-first (see person.service.ts's
   // listLedgerForPerson) — the running paid-so-far/remaining-due shown
@@ -506,10 +513,10 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
               <p className="text-sm text-ink-muted">{t("people.paidSoFar")}</p>
             </div>
             <div>
-              <p className={`text-xl font-semibold tabular-nums ${balance > 0 ? "text-status-critical" : balance < 0 ? "text-status-warning" : "text-status-good"}`}>
-                ₹{formatINR(Math.abs(balance))}
+              <p className={`text-xl font-semibold tabular-nums ${contractBalance > 0 ? "text-status-critical" : contractBalance < 0 ? "text-status-warning" : "text-status-good"}`}>
+                ₹{formatINR(Math.abs(contractBalance))}
               </p>
-              <p className="text-sm text-ink-muted">{balance >= 0 ? t("people.remainingDue") : t("people.advanceOutstanding")}</p>
+              <p className="text-sm text-ink-muted">{contractBalance >= 0 ? t("people.remainingDue") : t("people.advanceOutstanding")}</p>
             </div>
           </div>
           {contracts.length > 0 && (

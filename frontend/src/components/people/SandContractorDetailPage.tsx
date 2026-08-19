@@ -185,6 +185,14 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
 
   const totalContractPayment = contracts.reduce((sum, c) => sum + c.totalContractValue, 0);
   const totalPaidSoFar = ledgerEntries.filter((e) => e.direction === "PAID").reduce((sum, e) => sum + e.amount, 0);
+  // Remaining against the agreed contract total specifically -- NOT the raw
+  // ledger `balance` above, which (for PER_TROLLEY contracts especially)
+  // only reflects DUE entries actually posted so far per delivery, not the
+  // full agreed totalContractValue. Pairing that raw balance next to
+  // "Total contract payment"/"Paid so far" here made a ₹500 advance against
+  // a ₹1,200 contract read as "₹500 advance outstanding" instead of the
+  // correct "₹700 remaining due".
+  const contractBalance = totalContractPayment - totalPaidSoFar;
 
   // ledgerEntries comes back newest-first — the running paid-so-far/
   // remaining-due shown alongside each row still needs to build up
@@ -306,10 +314,10 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
               <p className="text-sm text-ink-muted">{t("sand.paidSoFar")}</p>
             </div>
             <div>
-              <p className={`text-xl font-semibold tabular-nums ${balance > 0 ? "text-status-critical" : balance < 0 ? "text-status-warning" : "text-status-good"}`}>
-                ₹{formatINR(Math.abs(balance))}
+              <p className={`text-xl font-semibold tabular-nums ${contractBalance > 0 ? "text-status-critical" : contractBalance < 0 ? "text-status-warning" : "text-status-good"}`}>
+                ₹{formatINR(Math.abs(contractBalance))}
               </p>
-              <p className="text-sm text-ink-muted">{balance >= 0 ? t("sand.remainingDue") : t("sand.advanceOutstanding")}</p>
+              <p className="text-sm text-ink-muted">{contractBalance >= 0 ? t("sand.remainingDue") : t("sand.advanceOutstanding")}</p>
             </div>
           </div>
           {contracts.length > 0 && (
