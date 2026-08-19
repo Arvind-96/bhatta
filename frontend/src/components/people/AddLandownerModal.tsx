@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,9 +48,12 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
   const [fields, setFields] = useState<FieldRow[]>([{ khasraNumber: "", area: "" }]);
   const [rateType, setRateType] = useState<SoilContractRateType>("PER_TROLLEY");
   const [contractedAreaBigha, setContractedAreaBigha] = useState("");
+  const [ratePerBigha, setRatePerBigha] = useState("");
   const [contractedDepth, setContractedDepth] = useState("");
   const [depthUnit, setDepthUnit] = useState<DepthUnit>("feet");
+  const [ratePerDepthUnit, setRatePerDepthUnit] = useState("");
   const [contractedQuantity, setContractedQuantity] = useState("");
+  const [ratePerTrolley, setRatePerTrolley] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [advanceAmount, setAdvanceAmount] = useState("");
@@ -80,6 +83,32 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
     setFields((prev) => prev.filter((_, i) => i !== index));
     setNumberOfFields((n) => String(Math.max(0, (Number(n) || 0) - 1)));
   }
+
+  // Auto-populate Total Contract Amount from quantity × price per unit,
+  // same formula as computeTotalContractValue in soilContract.service.ts —
+  // only while both sides of the relevant rate are actually filled in, so a
+  // manually-typed lump sum (no rate entered at all) is never overwritten.
+  // Only reacts to the quantity/rate inputs, not totalContractValue itself,
+  // so the admin can still override the computed number afterward — it
+  // just gets recalculated again the next time a quantity or rate changes.
+  useEffect(() => {
+    const area = Number(contractedAreaBigha) || 0;
+    const bighaRate = Number(ratePerBigha) || 0;
+    const depth = Number(contractedDepth) || 0;
+    const depthRate = Number(ratePerDepthUnit) || 0;
+    const quantity = Number(contractedQuantity) || 0;
+    const trolleyRate = Number(ratePerTrolley) || 0;
+    if (rateType === "PER_BIGHA" && area && bighaRate) {
+      setTotalContractValue(String(area * bighaRate));
+    } else if (rateType === "PER_DEPTH" && depth && depthRate) {
+      setTotalContractValue(String(depth * depthRate));
+    } else if (rateType === "BOTH" && (area || depth) && (bighaRate || depthRate)) {
+      setTotalContractValue(String(area * bighaRate + depth * depthRate));
+    } else if (rateType === "PER_TROLLEY" && quantity && trolleyRate) {
+      setTotalContractValue(String(quantity * trolleyRate));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rateType, contractedAreaBigha, ratePerBigha, contractedDepth, ratePerDepthUnit, contractedQuantity, ratePerTrolley]);
 
   const wantsContract = totalContractValue.trim() !== "";
   const dueAmount = wantsContract ? Math.max(0, (Number(totalContractValue) || 0) - (Number(advanceAmount) || 0)) : 0;
@@ -148,9 +177,12 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
           landownerId: person._id,
           rateType,
           contractedAreaBigha: rateType === "PER_BIGHA" || rateType === "BOTH" ? Number(contractedAreaBigha) : undefined,
+          ratePerBigha: (rateType === "PER_BIGHA" || rateType === "BOTH") && ratePerBigha ? Number(ratePerBigha) : undefined,
           contractedDepth: rateType === "PER_DEPTH" || rateType === "BOTH" ? Number(contractedDepth) : undefined,
           depthUnit: rateType === "PER_DEPTH" || rateType === "BOTH" ? depthUnit : undefined,
+          ratePerDepthUnit: (rateType === "PER_DEPTH" || rateType === "BOTH") && ratePerDepthUnit ? Number(ratePerDepthUnit) : undefined,
           contractedQuantity: rateType === "PER_TROLLEY" ? Number(contractedQuantity) : undefined,
+          ratePerTrolley: rateType === "PER_TROLLEY" && ratePerTrolley ? Number(ratePerTrolley) : undefined,
           totalContractValue: Number(totalContractValue),
           advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
           paymentMode: advanceAmount ? paymentMode : undefined,
@@ -281,37 +313,64 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
 
             <div className="grid grid-cols-2 gap-2">
               {(rateType === "PER_BIGHA" || rateType === "BOTH") && (
-                <input
-                  type="number"
-                  placeholder={t("people.numberOfBighas")}
-                  value={contractedAreaBigha}
-                  onChange={(e) => setContractedAreaBigha(e.target.value)}
-                  className={inputClass}
-                />
-              )}
-              {(rateType === "PER_DEPTH" || rateType === "BOTH") && (
-                <div className="flex gap-2">
+                <>
                   <input
                     type="number"
-                    placeholder={t("people.depth")}
-                    value={contractedDepth}
-                    onChange={(e) => setContractedDepth(e.target.value)}
-                    className={cn(inputClass, "flex-1")}
+                    placeholder={t("people.numberOfBighas")}
+                    value={contractedAreaBigha}
+                    onChange={(e) => setContractedAreaBigha(e.target.value)}
+                    className={inputClass}
                   />
-                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as DepthUnit)} className={cn(inputClass, "w-24")}>
-                    <option value="feet">{t("soil.unitFeet")}</option>
-                    <option value="meter">{t("soil.unitMeter")}</option>
-                  </select>
-                </div>
+                  <input
+                    type="number"
+                    placeholder={t("soil.ratePerBighaRupees")}
+                    value={ratePerBigha}
+                    onChange={(e) => setRatePerBigha(e.target.value)}
+                    className={inputClass}
+                  />
+                </>
+              )}
+              {(rateType === "PER_DEPTH" || rateType === "BOTH") && (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder={t("people.depth")}
+                      value={contractedDepth}
+                      onChange={(e) => setContractedDepth(e.target.value)}
+                      className={cn(inputClass, "flex-1")}
+                    />
+                    <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as DepthUnit)} className={cn(inputClass, "w-24")}>
+                      <option value="feet">{t("soil.unitFeet")}</option>
+                      <option value="meter">{t("soil.unitMeter")}</option>
+                    </select>
+                  </div>
+                  <input
+                    type="number"
+                    placeholder={t("soil.ratePerFeetRupees")}
+                    value={ratePerDepthUnit}
+                    onChange={(e) => setRatePerDepthUnit(e.target.value)}
+                    className={inputClass}
+                  />
+                </>
               )}
               {rateType === "PER_TROLLEY" && (
-                <input
-                  type="number"
-                  placeholder={t("people.numberOfTrolleys")}
-                  value={contractedQuantity}
-                  onChange={(e) => setContractedQuantity(e.target.value)}
-                  className={inputClass}
-                />
+                <>
+                  <input
+                    type="number"
+                    placeholder={t("people.numberOfTrolleys")}
+                    value={contractedQuantity}
+                    onChange={(e) => setContractedQuantity(e.target.value)}
+                    className={inputClass}
+                  />
+                  <input
+                    type="number"
+                    placeholder={t("soil.ratePerTrolleyRupees")}
+                    value={ratePerTrolley}
+                    onChange={(e) => setRatePerTrolley(e.target.value)}
+                    className={inputClass}
+                  />
+                </>
               )}
             </div>
 
