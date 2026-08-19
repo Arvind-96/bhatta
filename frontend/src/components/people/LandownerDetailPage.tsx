@@ -575,8 +575,8 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                           {entry.direction === "DUE" ? "+" : "-"}₹{formatINR(entry.amount)}
                         </td>
                         <td className="py-3 text-right tabular-nums text-status-good">₹{formatINR(running.paidSoFar)}</td>
-                        <td className="py-3 text-right tabular-nums text-status-critical">₹{formatINR(running.remainingDue)}</td>
-                        <td className="py-3 text-right">
+                        <td className="py-3 pr-2 text-right tabular-nums text-status-critical">₹{formatINR(running.remainingDue)}</td>
+                        <td className="py-3 pl-3 text-right">
                           <button
                             type="button"
                             onClick={() => setEditingLedgerEntry(entry)}

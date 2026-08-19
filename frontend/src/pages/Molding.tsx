@@ -397,7 +397,7 @@ export function Molding() {
                       <td className="py-3">
                         {entry.washedOut ? <Badge variant="critical">{t("molding.washedOutBadge")}</Badge> : <Badge variant="good">{t("molding.paidEntryBadge")}</Badge>}
                       </td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 pl-3 text-right">
                         <button
                           type="button"
                           onClick={() => setEditingEntry(entry)}

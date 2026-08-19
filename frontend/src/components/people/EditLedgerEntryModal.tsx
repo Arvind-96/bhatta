@@ -105,7 +105,7 @@ export function EditLedgerEntryModal({ entry, onClose }: EditLedgerEntryModalPro
   // hover transform otherwise.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
-      <Card className="w-full max-w-sm hover:translate-y-0">
+      <Card className="w-full max-w-md hover:translate-y-0">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink-primary">{t("people.editLedgerEntry")}</h3>
           <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
@@ -142,7 +142,7 @@ export function EditLedgerEntryModal({ entry, onClose }: EditLedgerEntryModalPro
               aria-label={t("common.transactionDate")}
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className={inputClass}
+              className={cn(inputClass, "w-[9.5rem] shrink-0")}
             />
           </div>
           {usingSplit && (
@@ -170,7 +170,7 @@ export function EditLedgerEntryModal({ entry, onClose }: EditLedgerEntryModalPro
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="flex items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
             >
               <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
             </button>

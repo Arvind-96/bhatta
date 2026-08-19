@@ -88,7 +88,7 @@ export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntr
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="flex items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
             >
               <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
             </button>

@@ -335,7 +335,7 @@ function EditFuelPurchaseModal({
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="flex items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
             >
               <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
             </button>
@@ -578,10 +578,10 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                           <span className="text-sm text-ink-muted">—</span>
                         )}
                       </td>
-                      <td className="py-3 text-right tabular-nums font-medium text-ink-primary">
+                      <td className="py-3 pr-2 text-right tabular-nums font-medium text-ink-primary">
                         ₹{formatINR(p.amount)}
                       </td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 pl-3 text-right">
                         <button
                           type="button"
                           onClick={() => setEditingPurchase(p)}
@@ -693,7 +693,7 @@ function EditFuelLogModal({
               type="button"
               onClick={handleDelete}
               disabled={deleting}
-              className="flex items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
             >
               <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
             </button>

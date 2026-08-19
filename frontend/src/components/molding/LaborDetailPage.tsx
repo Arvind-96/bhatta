@@ -339,7 +339,7 @@ export function LaborDetailPage({ workerId, onBack }: LaborDetailPageProps) {
                           <Badge variant="good">{t("molding.paidEntryBadge")}</Badge>
                         )}
                       </td>
-                      <td className="py-3 text-right">
+                      <td className="py-3 pl-3 text-right">
                         <button
                           type="button"
                           onClick={() => setEditingEntry(entry)}

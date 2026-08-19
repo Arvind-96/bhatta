@@ -48,10 +48,10 @@ function PaginatedLedgerSection({ titleKey, entries }: { titleKey: string; entri
                     <td className="py-3 text-ink-primary">{entry.reason}</td>
                     <td className="py-3 text-ink-secondary">{entry.paymentMode ?? "—"}</td>
                     <td className="py-3 text-xs text-ink-muted">{formatDateTime(entry.createdAt)}</td>
-                    <td className="py-3 text-right tabular-nums font-medium text-ink-primary">
+                    <td className="py-3 pr-2 text-right tabular-nums font-medium text-ink-primary">
                       ₹{formatINR(entry.amount)}
                     </td>
-                    <td className="py-3 text-right">
+                    <td className="py-3 pl-3 text-right">
                       <button
                         type="button"
                         onClick={() => setEditingEntry(entry)}
