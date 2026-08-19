@@ -275,16 +275,21 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // PAID, and net balance, all computed live from MoldingEntry/LedgerEntry,
 // nothing stored redundantly.
 //
-// Scoped to Pathai — only contractors and workers whose own profile is
-// tagged workType "PATHAI" appear here, so a thekedar/labourer who
-// actually works Bharai/Pakayi/etc. (or hasn't been tagged yet) doesn't
-// show up under Molding just because they happen to have a molding entry
-// on file. Doesn't affect the whole-kiln totals above (moldingPeriodTotals),
-// which stay unfiltered.
+// Scoped to Pathai contractors (workType "PATHAI" on the thekedar's own
+// profile) — but NOT further filtered by each worker's own workType. A
+// worker's workType is their general classification (often Beldar/Rawas/
+// etc. even for someone who's actually assigned to a Pathai gang and
+// regularly gets molding entries logged against them), so requiring it to
+// equal "PATHAI" here silently dropped real gang members — and their real
+// production/earnings — out of this whole summary despite their molding
+// entries and wages having posted correctly. Membership in a contractor's
+// gang is decided by Person.contractorId alone, matching how
+// createMoldingEntry and LaborDetailPage already treat it. Doesn't affect
+// the whole-kiln totals above (moldingPeriodTotals), which stay unfiltered.
 export async function moldingContractorSummary(kilnId: string) {
   const [contractors, workers] = await Promise.all([
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true), eq(people.workType, "PATHAI"))).orderBy(asc(people.name)),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"), eq(people.active, true), eq(people.workType, "PATHAI"))),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"), eq(people.active, true))),
   ]);
 
   const contractorResults = await Promise.all(

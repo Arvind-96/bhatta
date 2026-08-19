@@ -138,14 +138,19 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // anyone mapped under a nikasi contractor is folded into that contractor's
 // card rather than listed separately here.
 //
-// Scoped to Nikasi — only operators whose own profile is tagged workType
-// "NIKASI" appear here, same "only show who's actually assigned to this
-// module" rule molding.service.ts's contractor summary uses for Pathai.
+// Not filtered by the operator's own workType tag — that's their general
+// classification and often doesn't match "NIKASI" even for someone who
+// regularly gets nikasi entries logged against them, which silently
+// dropped real operators (and their real unloading/earnings) out of this
+// summary despite their entries and wages having posted correctly (same
+// bug fixed in molding.service.ts's moldingContractorSummary). The
+// `continue` below already excludes anyone with zero entries, so nothing
+// irrelevant leaks in from removing the workType filter.
 export async function nikasiOperatorSummary(kilnId: string) {
   const operators = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.nikasiContractorId), eq(people.workType, "NIKASI"), eq(people.active, true)))
+    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.nikasiContractorId), eq(people.active, true)))
     .orderBy(asc(people.name));
 
   const allEntries = await db.select().from(nikasiEntries).where(eq(nikasiEntries.kilnId, kilnId));
@@ -195,13 +200,17 @@ export async function nikasiOperatorSummary(kilnId: string) {
 // stacking.service.ts's stackingContractorSummary, minus the vehicle
 // roster (nikasi has no equipment-tracking requirement).
 //
-// Scoped to Nikasi — only contractors and laborers whose own profile is
-// tagged workType "NIKASI" appear here (see molding.service.ts's
-// contractor summary for the same rule applied to Pathai).
+// Scoped to Nikasi contractors (workType "NIKASI" on the thekedar's own
+// profile) — but not further filtered by each laborer's own workType,
+// since that's their general classification and often doesn't match
+// "NIKASI" even for someone actually assigned to this gang. Membership is
+// decided by Person.nikasiContractorId alone (see molding.service.ts's
+// moldingContractorSummary for the identical fix/reasoning on the Pathai
+// side).
 export async function nikasiContractorSummary(kilnId: string) {
   const [contractors, laborers] = await Promise.all([
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true), eq(people.workType, "NIKASI"))).orderBy(asc(people.name)),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true), eq(people.workType, "NIKASI"))),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
   ]);
 
   const contractorResults = await Promise.all(
