@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,7 +91,15 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
     }
   }
 
-  return (
+  // Portalled straight to <body> — this modal is opened from buttons that
+  // live inside a profile header Card, and that Card lifts on hover
+  // (hover:-translate-y-0.5). A CSS `transform` on any ancestor turns it
+  // into the containing block for `position: fixed` descendants, so
+  // without the portal this modal would render pinned to that Card's own
+  // box instead of the viewport whenever the cursor was still over the
+  // card that was just clicked — exactly the clipped/misplaced popup this
+  // fixes. See QuickLedgerModal usage from LedgerQuickActions.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
       <Card className="w-full max-w-sm hover:translate-y-0">
         <div className="mb-4 flex items-center justify-between">
@@ -136,6 +145,7 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
           </Button>
         </form>
       </Card>
-    </div>
+    </div>,
+    document.body
   );
 }

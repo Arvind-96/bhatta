@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Handshake, Plus, UserPlus, Users } from "lucide-react";
+import { Handshake, MapPinned, Plus, UserPlus, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { usePersonTypeMeta, PERSON_TYPES } from "@/components/people/personTypes
 import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { AddThekedarModal } from "@/components/people/AddThekedarModal";
 import { AddLabourModal } from "@/components/people/AddLabourModal";
+import { AddLandownerModal } from "@/components/people/AddLandownerModal";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { LabourDetailPage } from "@/components/people/LabourDetailPage";
 import { ThekedarDetailPage } from "@/components/people/ThekedarDetailPage";
@@ -25,14 +26,14 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 
-// Types with their own dedicated Labour/Thekedar/Staff treatment below —
-// excluded from the "Other" tab's chip filter so the same person isn't
-// reachable two different ways.
+// Types with their own dedicated Labour/Thekedar/Staff/Landowner treatment
+// below — excluded from the "Other" tab's chip filter so the same person
+// isn't reachable two different ways.
 const OTHER_TAB_TYPES = PERSON_TYPES.filter(
-  (t) => !["WORKER", "HELPER", "LABOUR_CONTRACTOR", "MUNIM", "CHOWKIDAR"].includes(t)
+  (t) => !["WORKER", "HELPER", "LABOUR_CONTRACTOR", "MUNIM", "CHOWKIDAR", "LANDOWNER"].includes(t)
 );
 
-type PeopleTab = "labour" | "thekedar" | "staff" | "other";
+type PeopleTab = "labour" | "thekedar" | "staff" | "landowner" | "other";
 
 function PersonCard({
   person,
@@ -269,7 +270,65 @@ function ThekedarTab({ onOpenThekedar }: { onOpenThekedar: (id: string) => void 
   );
 }
 
-function OtherTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }) {
+function LandownerTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }) {
+  const [landowners, setLandowners] = useState<Person[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const { t } = useTranslation();
+
+  async function refresh() {
+    setLandowners(await api.people.list("LANDOWNER"));
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    refresh().catch(console.error);
+  }, [activeKilnId]);
+
+  useKilnEvent("person:update", () => refresh());
+
+  const { page, setPage, pageCount, pageItems: pagedLandowners, total } = usePagination(landowners, 12);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-series-3/15 text-series-3">
+            <MapPinned className="h-4 w-4" />
+          </span>
+          <h3 className="font-display text-base font-bold text-ink-primary">{t("people.landowner")}</h3>
+          <Badge variant="neutral">{landowners.length}</Badge>
+        </div>
+        <Button size="sm" onClick={() => setShowAdd(true)}>
+          <Plus className="h-4 w-4" /> {t("people.addLandowner")}
+        </Button>
+      </div>
+
+      {landowners.length === 0 ? (
+        <Card>
+          <EmptyState icon={MapPinned} title={t("people.noLandownersYet")} />
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-3 md:grid-cols-3">
+            {pagedLandowners.map((l) => (
+              <PersonCard
+                key={l._id}
+                person={l}
+                subtitle={l.khetLocation || (l.khetArea ? `${l.khetArea} ${l.khetAreaUnit ?? "bigha"}` : "—")}
+                onOpen={() => onOpenLandowner(l._id)}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={12} />
+        </>
+      )}
+      {showAdd && <AddLandownerModal onClose={() => setShowAdd(false)} onCreated={refresh} />}
+    </div>
+  );
+}
+
+function OtherTab() {
   const [filter, setFilter] = useState<PersonType | "ALL">("ALL");
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -337,15 +396,7 @@ function OtherTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }
               <tbody>
                 {pagedPeople.map((p) => (
                   <tr key={p._id} className="border-b border-border/60 last:border-0">
-                    <td className="py-3 font-medium text-ink-primary">
-                      {p.type === "LANDOWNER" ? (
-                        <button onClick={() => onOpenLandowner(p._id)} className="hover:underline">
-                          {p.name}
-                        </button>
-                      ) : (
-                        p.name
-                      )}
-                    </td>
+                    <td className="py-3 font-medium text-ink-primary">{p.name}</td>
                     <td className="py-3">
                       <Badge variant="neutral">{personTypeMeta[p.type].label}</Badge>
                     </td>
@@ -353,11 +404,9 @@ function OtherTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }
                     <td className="py-3 text-ink-secondary">
                       {p.type === "DRIVER" && (p.vehicleNumber ?? "—")}
                       {p.type === "PARTNER" && (p.profitSharePercent ? tr("people.profitShare", { percent: p.profitSharePercent }) : "—")}
-                      {p.type === "LANDOWNER" &&
-                        (p.khetArea ? `${p.khetArea} ${p.khetAreaUnit ?? "bigha"}` : p.khetLocation ?? "—")}
                       {p.type === "CUSTOMER" && (p.creditLimit ? tr("people.creditLimit", { amount: p.creditLimit.toLocaleString("en-IN") }) : tr("people.noLimitSet"))}
                       {p.type === "FITTER" && (p.monthlySalary ? tr("people.ratePerMonth", { amount: p.monthlySalary.toLocaleString("en-IN") }) : "—")}
-                      {!["DRIVER", "PARTNER", "LANDOWNER", "CUSTOMER", "FITTER"].includes(p.type) && "—"}
+                      {!["DRIVER", "PARTNER", "CUSTOMER", "FITTER"].includes(p.type) && "—"}
                     </td>
                     <td className="py-3 text-right">
                       <button onClick={() => setLedgerFor(p)} className="text-xs font-medium text-series-1 hover:underline">
@@ -427,6 +476,7 @@ export function People() {
     { value: "labour", label: t("people.labour") },
     { value: "thekedar", label: t("people.thekedarTabLabel") },
     { value: "staff", label: t("nav.staff") },
+    { value: "landowner", label: t("people.landowner") },
     { value: "other", label: t("people.other") },
   ];
 
@@ -437,7 +487,8 @@ export function People() {
       {tab === "labour" && <LabourTab onOpenLabour={setOpenLabourId} />}
       {tab === "thekedar" && <ThekedarTab onOpenThekedar={setOpenThekedarId} />}
       {tab === "staff" && <Staff />}
-      {tab === "other" && <OtherTab onOpenLandowner={setOpenLandownerId} />}
+      {tab === "landowner" && <LandownerTab onOpenLandowner={setOpenLandownerId} />}
+      {tab === "other" && <OtherTab />}
     </div>
   );
 }

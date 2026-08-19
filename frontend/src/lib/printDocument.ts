@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { Dispatch, PaymentReceipt } from "@/types";
+import type { Dispatch, LedgerEntry, PaymentReceipt, SoilContract } from "@/types";
 
 // Gate Pass, Challan, and Payment Receipt all share one visual language
 // (red accent bars, a logo mark, a colored "who this is for" box, a
@@ -152,6 +152,7 @@ const DOCUMENT_STYLES = `
 const GATE_PASS_ACCENT = `:root { --doc-accent: #b8541f; --doc-accent-soft: #e08a3e; --doc-accent-tint: #fdf3ea; }`;
 const CHALLAN_ACCENT = `:root { --doc-accent: #c0392b; --doc-accent-soft: #e0705f; --doc-accent-tint: #fdf6ee; }`;
 const RECEIPT_ACCENT = `:root { --doc-accent: #1f7a4d; --doc-accent-soft: #4fae7c; --doc-accent-tint: #f0f8f3; }`;
+const CONTRACT_ACCENT = `:root { --doc-accent: #8a5a2b; --doc-accent-soft: #c08a4f; --doc-accent-tint: #f8f2e9; }`;
 
 function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
   const html = `<!doctype html>
@@ -432,4 +433,107 @@ export function printPaymentReceipt(receipt: PaymentReceipt, recipientName: stri
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`Payment Receipt ${receipt.receiptNumber}`, body, RECEIPT_ACCENT);
+}
+
+function contractRateBasisText(contract: SoilContract) {
+  if (contract.rateType === "BOTH") {
+    return `${contract.contractedAreaBigha ?? "—"} bigha + ${contract.contractedDepth ?? "—"} ${contract.depthUnit ?? "feet"}`;
+  }
+  if (contract.rateType === "PER_BIGHA") {
+    return `${contract.contractedAreaBigha ?? "—"} bigha`;
+  }
+  if (contract.rateType === "PER_DEPTH") {
+    return `${contract.contractedDepth ?? "—"} ${contract.depthUnit ?? "feet"}`;
+  }
+  return `${contract.contractedQuantity ?? "—"} trolleys`;
+}
+
+// The landowner contract "bill" — terms plus the full payment history log,
+// each row showing that entry's own amount, how it was paid (cash/online
+// breakdown spelled out via paymentModeLabel when split), and the running
+// paid-so-far/remaining-due after it — so the printed sheet reads the same
+// way the on-screen ledger table does, oldest entry first.
+export function printLandownerContract(contract: SoilContract, landownerName: string, kiln: KilnPrintInfo, ledgerEntries: LedgerEntry[]) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const chronological = [...ledgerEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  let runningPaid = 0;
+  let runningDue = 0;
+  const rows = chronological.map((entry) => {
+    if (entry.direction === "PAID") runningPaid += entry.amount;
+    else runningDue += entry.amount;
+    const remaining = runningDue - runningPaid;
+    return `
+      <tr>
+        <td>${new Date(entry.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+        <td>${escapeHtml(entry.reason)}</td>
+        <td>${entry.paymentMode ? escapeHtml(paymentModeLabel(entry)) : "—"}</td>
+        <td class="num">${entry.direction === "DUE" ? "+" : "-"}₹${formatINR(entry.amount)}</td>
+        <td class="num">₹${formatINR(runningPaid)}</td>
+        <td class="num">₹${formatINR(Math.max(0, remaining))}</td>
+      </tr>`;
+  });
+
+  const finalRemaining = Math.max(0, runningDue - runningPaid);
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Land Contract</span>
+        <p class="doc-number">${escapeHtml(contract.contractNumber)}</p>
+        <p class="doc-date">Created: ${new Date(contract.startDate ?? Date.now()).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Landowner</p>
+        <p class="doc-box-name">${escapeHtml(landownerName)}</p>
+        <p class="doc-box-detail">${escapeHtml(contractRateBasisText(contract))}</p>
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Total contract amount</p>
+        <p class="doc-total-amount">₹${formatINR(contract.totalContractValue)}</p>
+        <p class="doc-amount-words">${escapeHtml(amountInWords(contract.totalContractValue))}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      <tr><td class="doc-table-label">Contract period</td><td class="doc-table-value">${contract.startDate ? new Date(contract.startDate).toLocaleDateString("en-IN") : "—"} to ${contract.endDate ? new Date(contract.endDate).toLocaleDateString("en-IN") : "—"}</td></tr>
+      <tr><td class="doc-table-label">Advance paid</td><td class="doc-table-value">₹${formatINR(contract.advanceAmount ?? 0)}</td></tr>
+      <tr><td class="doc-table-label">Remaining / due</td><td class="doc-table-value">₹${formatINR(finalRemaining)}</td></tr>
+      <tr><td class="doc-table-label">Status</td><td class="doc-table-value">${escapeHtml(contract.status)}</td></tr>
+    </table>
+
+    <table class="doc-items">
+      <thead>
+        <tr><th>Date</th><th>Reason</th><th>Mode</th><th class="num">Amount</th><th class="num">Paid so far</th><th class="num">Remaining due</th></tr>
+      </thead>
+      <tbody>
+        ${rows.join("") || `<tr><td colspan="6">No payment history yet.</td></tr>`}
+      </tbody>
+    </table>
+
+    <div class="doc-footer-total">
+      <span>Remaining due</span>
+      <span class="big">₹${formatINR(finalRemaining)}</span>
+    </div>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED CONTRACT STATEMENT ~</p>
+    <div class="doc-sign-row">
+      <div class="doc-sign-box">Bhatta owner / Munim<br />(Stamp &amp; Signature)</div>
+      <div class="doc-sign-box">Landowner signature</div>
+    </div>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`Land Contract ${contract.contractNumber}`, body, CONTRACT_ACCENT);
 }

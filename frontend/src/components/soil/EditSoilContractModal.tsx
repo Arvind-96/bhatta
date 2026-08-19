@@ -49,18 +49,19 @@ export function EditSoilContractModal({ contract, onClose, onSaved }: EditSoilCo
     if (rateType === "PER_TROLLEY" && (!contractedQuantity || !ratePerTrolley)) return;
     if (rateType === "PER_BIGHA" && (!contractedAreaBigha || !ratePerBigha)) return;
     if (rateType === "PER_DEPTH" && (!contractedDepth || !ratePerDepthUnit)) return;
+    if (rateType === "BOTH" && (!contractedAreaBigha || !ratePerBigha || !contractedDepth || !ratePerDepthUnit)) return;
     setSaving(true);
     try {
       await api.soilContracts.update(contract._id, {
         rateType,
         contractedQuantity: contractedQuantity ? Number(contractedQuantity) : undefined,
         ratePerTrolley: rateType === "PER_TROLLEY" ? Number(ratePerTrolley) : undefined,
-        contractedAreaBigha: rateType === "PER_BIGHA" ? Number(contractedAreaBigha) : undefined,
-        ratePerBigha: rateType === "PER_BIGHA" ? Number(ratePerBigha) : undefined,
+        contractedAreaBigha: rateType === "PER_BIGHA" || rateType === "BOTH" ? Number(contractedAreaBigha) : undefined,
+        ratePerBigha: rateType === "PER_BIGHA" || rateType === "BOTH" ? Number(ratePerBigha) : undefined,
         contractedDepth:
-          (rateType === "PER_DEPTH" || rateType === "PER_BIGHA") && contractedDepth ? Number(contractedDepth) : undefined,
-        depthUnit: (rateType === "PER_DEPTH" || rateType === "PER_BIGHA") && contractedDepth ? depthUnit : undefined,
-        ratePerDepthUnit: rateType === "PER_DEPTH" ? Number(ratePerDepthUnit) : undefined,
+          (rateType === "PER_DEPTH" || rateType === "PER_BIGHA" || rateType === "BOTH") && contractedDepth ? Number(contractedDepth) : undefined,
+        depthUnit: (rateType === "PER_DEPTH" || rateType === "PER_BIGHA" || rateType === "BOTH") && contractedDepth ? depthUnit : undefined,
+        ratePerDepthUnit: rateType === "PER_DEPTH" || rateType === "BOTH" ? Number(ratePerDepthUnit) : undefined,
         advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
@@ -91,6 +92,7 @@ export function EditSoilContractModal({ contract, onClose, onSaved }: EditSoilCo
                 { value: "PER_TROLLEY", label: t("soil.perTrolley") },
                 { value: "PER_BIGHA", label: t("soil.fixedPerBigha") },
                 { value: "PER_DEPTH", label: t("soil.fixedPerDepth") },
+                { value: "BOTH", label: t("soil.bothBighaAndDepth") },
               ] as { value: SoilContractRateType; label: string }[]
             ).map((opt) => (
               <button
@@ -188,6 +190,43 @@ export function EditSoilContractModal({ contract, onClose, onSaved }: EditSoilCo
                 placeholder={t("soil.trolleyCapOptional")}
                 value={contractedQuantity}
                 onChange={(e) => setContractedQuantity(e.target.value)}
+                className={inputClass}
+              />
+            </>
+          )}
+
+          {rateType === "BOTH" && (
+            <>
+              <input
+                required
+                type="number"
+                placeholder={t("soil.areaBigha")}
+                value={contractedAreaBigha}
+                onChange={(e) => setContractedAreaBigha(e.target.value)}
+                className={inputClass}
+              />
+              <input
+                required
+                type="number"
+                placeholder={t("soil.ratePerBighaRupees")}
+                value={ratePerBigha}
+                onChange={(e) => setRatePerBigha(e.target.value)}
+                className={inputClass}
+              />
+              <input
+                required
+                type="number"
+                placeholder={t("soil.depthFeetPlaceholder")}
+                value={contractedDepth}
+                onChange={(e) => setContractedDepth(e.target.value)}
+                className={inputClass}
+              />
+              <input
+                required
+                type="number"
+                placeholder={t("soil.ratePerFeetRupees")}
+                value={ratePerDepthUnit}
+                onChange={(e) => setRatePerDepthUnit(e.target.value)}
                 className={inputClass}
               />
             </>

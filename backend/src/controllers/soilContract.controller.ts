@@ -13,7 +13,8 @@ import {
   updateContractStatus,
   updateSoilContract,
 } from "../services/soilContract.service";
-import { DEPTH_UNITS, SOIL_CONTRACT_RATE_TYPES, SOIL_CONTRACT_STATUSES } from "../db/schema";
+import { DEPTH_UNITS, LEDGER_PAYMENT_MODES, SOIL_CONTRACT_RATE_TYPES, SOIL_CONTRACT_STATUSES } from "../db/schema";
+import { validateCashOnlineSplit } from "../utils/paymentSplit";
 
 // Per-rateType required-ness (contractedQuantity+ratePerTrolley for
 // PER_TROLLEY, contractedAreaBigha+ratePerBigha for PER_BIGHA, etc.) is
@@ -21,26 +22,34 @@ import { DEPTH_UNITS, SOIL_CONTRACT_RATE_TYPES, SOIL_CONTRACT_STATUSES } from ".
 // rather than duplicated here — everything rate-related is optional at the
 // schema level, and the service throws a clear error if what's needed for
 // the chosen rateType wasn't sent.
-const createSchema = z.object({
-  landId: z.string(),
-  landownerId: z.string(),
-  soilType: z.string().optional(),
-  rateType: z.enum(SOIL_CONTRACT_RATE_TYPES).optional(),
-  contractedQuantity: z.number().positive().optional(),
-  ratePerTrolley: z.number().positive().optional(),
-  contractedAreaBigha: z.number().positive().optional(),
-  ratePerBigha: z.number().positive().optional(),
-  contractedDepth: z.number().positive().optional(),
-  depthUnit: z.enum(DEPTH_UNITS).optional(),
-  ratePerDepthUnit: z.number().positive().optional(),
-  totalContractValue: z.number().positive().optional(),
-  advanceAmount: z.number().nonnegative().optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
-  agreedDepthFeet: z.number().positive().optional(),
-  paymentTerms: z.string().optional(),
-  notes: z.string().optional(),
-});
+const createSchema = z
+  .object({
+    landId: z.string(),
+    landownerId: z.string(),
+    soilType: z.string().optional(),
+    rateType: z.enum(SOIL_CONTRACT_RATE_TYPES).optional(),
+    contractedQuantity: z.number().positive().optional(),
+    ratePerTrolley: z.number().positive().optional(),
+    contractedAreaBigha: z.number().positive().optional(),
+    ratePerBigha: z.number().positive().optional(),
+    contractedDepth: z.number().positive().optional(),
+    depthUnit: z.enum(DEPTH_UNITS).optional(),
+    ratePerDepthUnit: z.number().positive().optional(),
+    totalContractValue: z.number().positive().optional(),
+    advanceAmount: z.number().nonnegative().optional(),
+    paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
+    cashAmount: z.number().min(0).optional(),
+    onlineAmount: z.number().min(0).optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    agreedDepthFeet: z.number().positive().optional(),
+    paymentTerms: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  // Cash/online must sum to the advance actually paid — the DUE side
+  // (totalContractValue) is a bill, not a payment, so it never carries a
+  // payment mode/split.
+  .superRefine((data, ctx) => validateCashOnlineSplit(data, data.advanceAmount ?? 0, ctx));
 
 export async function create(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);

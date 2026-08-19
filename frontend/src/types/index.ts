@@ -254,6 +254,7 @@ export interface LedgerEntry {
   paymentMode?: LedgerPaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
+  contractId?: string;
   date: string;
 }
 
@@ -349,7 +350,7 @@ export interface Land {
 }
 
 export type SoilContractStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "COMPLETED" | "CANCELLED";
-export type SoilContractRateType = "PER_TROLLEY" | "PER_BIGHA" | "PER_DEPTH";
+export type SoilContractRateType = "PER_TROLLEY" | "PER_BIGHA" | "PER_DEPTH" | "BOTH";
 export type DepthUnit = "feet" | "meter";
 
 interface PopulatedLandRef {

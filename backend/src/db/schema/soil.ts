@@ -48,7 +48,7 @@ export const soilTrips = mysqlTable("soil_trips", {
 }, (t) => ({ kilnDateIdx: index("soiltrip_kiln_date_idx").on(t.kilnId, t.date) }));
 
 export const SOIL_CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"] as const;
-export const SOIL_CONTRACT_RATE_TYPES = ["PER_TROLLEY", "PER_BIGHA", "PER_DEPTH"] as const;
+export const SOIL_CONTRACT_RATE_TYPES = ["PER_TROLLEY", "PER_BIGHA", "PER_DEPTH", "BOTH"] as const;
 export const DEPTH_UNITS = ["feet", "meter"] as const;
 
 export const soilContracts = mysqlTable("soil_contracts", {

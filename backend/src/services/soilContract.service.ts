@@ -4,7 +4,7 @@ import { db } from "../db/client";
 import { soilContracts, soilTrips, soilArrivals, lands, people, SOIL_CONTRACT_STATUSES, SOIL_CONTRACT_RATE_TYPES, DEPTH_UNITS } from "../db/schema";
 import { assertLandInKiln } from "./land.service";
 import { assertPersonOfType } from "./person.service";
-import { addLedgerEntry, contractLedgerBalance } from "./ledger.service";
+import { addLedgerEntry, contractLedgerBalance, LedgerPaymentMode } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
 
 export type SoilContractStatus = (typeof SOIL_CONTRACT_STATUSES)[number];
@@ -34,6 +34,12 @@ export interface CreateSoilContractInput {
   ratePerDepthUnit?: number; // required when rateType is PER_DEPTH
   totalContractValue?: number; // override for a fully custom lump-sum
   advanceAmount?: number;
+  // How the advance (if any) was actually paid — posted onto that one PAID
+  // ledger entry only; the totalContractValue DUE entry below is a bill,
+  // not a payment, so it never carries a payment mode.
+  paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   startDate?: Date;
   endDate?: Date;
   agreedDepthFeet?: number;
@@ -54,6 +60,12 @@ function computeTotalContractValue(input: {
   if (input.totalContractValue != null) return input.totalContractValue;
 
   const rateType = input.rateType ?? "PER_TROLLEY";
+  if (rateType === "BOTH") {
+    if (input.contractedAreaBigha == null || input.ratePerBigha == null || input.contractedDepth == null || input.ratePerDepthUnit == null) {
+      throw new Error("contractedAreaBigha, ratePerBigha, contractedDepth, and ratePerDepthUnit are all required for a BOTH contract");
+    }
+    return input.contractedAreaBigha * input.ratePerBigha + input.contractedDepth * input.ratePerDepthUnit;
+  }
   if (rateType === "PER_BIGHA") {
     if (input.contractedAreaBigha == null || input.ratePerBigha == null) {
       throw new Error("contractedAreaBigha and ratePerBigha are required for a PER_BIGHA contract");
@@ -101,8 +113,10 @@ export async function createSoilContract(input: CreateSoilContractInput) {
   const contractNumber = generateContractNumber();
   const totalContractValue = computeTotalContractValue(input);
 
+  const { paymentMode, cashAmount, onlineAmount, ...insertableInput } = input;
+
   const _id = randomUUID();
-  await db.insert(soilContracts).values({ ...input, _id, rateType, contractNumber, totalContractValue });
+  await db.insert(soilContracts).values({ ...insertableInput, _id, rateType, contractNumber, totalContractValue });
   const contract = (await db.select().from(soilContracts).where(eq(soilContracts._id, _id)))[0]!;
 
   if (input.advanceAmount && input.advanceAmount > 0) {
@@ -114,6 +128,9 @@ export async function createSoilContract(input: CreateSoilContractInput) {
       reason: `Advance for soil contract ${contractNumber}`,
       contractId: contract._id,
       date: input.startDate,
+      paymentMode,
+      cashAmount: paymentMode === "CASH_AND_ONLINE" ? cashAmount : undefined,
+      onlineAmount: paymentMode === "CASH_AND_ONLINE" ? onlineAmount : undefined,
     });
   }
 
@@ -124,7 +141,9 @@ export async function createSoilContract(input: CreateSoilContractInput) {
       direction: "DUE",
       amount: totalContractValue,
       reason:
-        rateType === "PER_BIGHA"
+        rateType === "BOTH"
+          ? `Soil contract ${contractNumber}: ${input.contractedAreaBigha} bigha + ${input.contractedDepth} ${input.depthUnit ?? "feet"}`
+          : rateType === "PER_BIGHA"
           ? `Soil contract ${contractNumber}: ${input.contractedAreaBigha} bigha @ ₹${input.ratePerBigha}/bigha`
           : `Soil contract ${contractNumber}: ${input.contractedDepth} ${input.depthUnit ?? "feet"} @ ₹${input.ratePerDepthUnit}/${input.depthUnit ?? "feet"}`,
       contractId: contract._id,

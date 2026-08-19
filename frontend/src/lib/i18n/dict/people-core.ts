@@ -24,6 +24,36 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   "people.photoUploadFailedAfterCreate": { en: "{name} was saved, but the photo didn't upload — try adding it again from their profile.", hi: "{name} सहेजा गया, लेकिन फ़ोटो अपलोड नहीं हुआ — कृपया उनकी प्रोफ़ाइल से फिर से जोड़ने का प्रयास करें।" },
   "people.identityProofUploadFailedAfterCreate": { en: "{name} was saved, but the ID document didn't upload — try adding it again from their profile.", hi: "{name} सहेजा गया, लेकिन पहचान दस्तावेज़ अपलोड नहीं हुआ — कृपया उनकी प्रोफ़ाइल से फिर से जोड़ने का प्रयास करें।" },
 
+  // --- AddLandownerModal ---
+  "people.landowner": { en: "Landowner", hi: "खेत मालिक" },
+  "people.addLandowner": { en: "Add landowner", hi: "खेत मालिक जोड़ें" },
+  "people.addLandownerModalTitle": { en: "Add Landowner", hi: "खेत मालिक जोड़ें" },
+  "people.noLandownersYet": { en: "No landowners added yet.", hi: "अभी तक कोई खेत मालिक नहीं जोड़ा गया।" },
+  "people.numberOfFields": { en: "Number of fields / farms", hi: "खेतों/फार्मों की संख्या" },
+  "people.fieldLabel": { en: "Field", hi: "खेत" },
+  "people.khasraNumber": { en: "Khasra number", hi: "खसरा नंबर" },
+  "people.fieldAreaBigha": { en: "Area (bigha)", hi: "क्षेत्रफल (बीघा)" },
+  "people.addAnotherField": { en: "Add another field", hi: "एक और खेत जोड़ें" },
+  "people.contractDetailsOptional": { en: "Contract details (optional)", hi: "अनुबंध विवरण (वैकल्पिक)" },
+  "people.numberOfBighas": { en: "Number of bighas", hi: "बीघों की संख्या" },
+  "people.depth": { en: "Depth", hi: "गहराई" },
+  "people.numberOfTrolleys": { en: "Total number of trolleys", hi: "कुल ट्रॉलियों की संख्या" },
+  "people.advanceAmountPaid": { en: "Advance amount paid (₹)", hi: "दिया गया अग्रिम (₹)" },
+  "people.totalContractAmount": { en: "Total contract amount (₹)", hi: "कुल अनुबंध राशि (₹)" },
+  "people.remainingDueAmount": { en: "Remaining / due amount", hi: "शेष / बकाया राशि" },
+  "people.landownerContractNeedsFieldError": {
+    en: "Add at least one field (with a Khasra number) before entering contract details.",
+    hi: "अनुबंध विवरण भरने से पहले कम से कम एक खेत (खसरा नंबर सहित) जोड़ें।",
+  },
+  "people.landownerContractFieldsRequiredError": {
+    en: "Fill in the fields required for the selected contract type.",
+    hi: "चुने गए अनुबंध प्रकार के लिए आवश्यक फ़ील्ड भरें।",
+  },
+  "people.confirmDeleteContract": {
+    en: "Delete contract {contractNumber}? This can't be undone; its payment history stays on record.",
+    hi: "अनुबंध {contractNumber} हटाएं? यह पूर्ववत नहीं हो सकता; इसका भुगतान इतिहास रिकॉर्ड में रहेगा।",
+  },
+
   // --- pages/People.tsx ---
   "people.absconded": { en: "Absconded", hi: "फरार" },
   "people.ratePerThousandBricks": { en: "₹{amount}/1000 bricks", hi: "₹{amount}/1000 ईंट" },

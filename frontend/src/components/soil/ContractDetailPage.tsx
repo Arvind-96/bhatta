@@ -73,6 +73,10 @@ function Field({ label, value }: { label: string; value: string | number | undef
 // depth. See SoilContract.ts for why these are three distinct fields
 // rather than one generic "rate".
 export function rateBasisLabel(contract: SoilContractSummary["contract"], t: TFunc) {
+  if (contract.rateType === "BOTH") {
+    const unit = depthUnitLabel(contract.depthUnit, t);
+    return `${t("soil.rateBighaFormula", { rate: (contract.ratePerBigha ?? 0).toLocaleString("en-IN"), area: contract.contractedAreaBigha ?? "" })} + ${t("soil.rateDepthFormula", { rate: (contract.ratePerDepthUnit ?? 0).toLocaleString("en-IN"), unit, depth: contract.contractedDepth ?? "" })}`;
+  }
   if (contract.rateType === "PER_BIGHA") {
     return t("soil.rateBighaFormula", {
       rate: (contract.ratePerBigha ?? 0).toLocaleString("en-IN"),

@@ -1,19 +1,22 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Pencil, Plus, X } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
+import { useAuthStore } from "@/store/auth.store";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddSoilArrivalModal } from "@/components/soil/AddSoilArrivalModal";
 import { EditSoilArrivalModal } from "@/components/soil/EditSoilArrivalModal";
-import { rateBasisLabel } from "@/components/soil/ContractDetailPage";
+import { EditSoilContractModal } from "@/components/soil/EditSoilContractModal";
+import { rateBasisLabel, contractStatusLabel } from "@/components/soil/ContractDetailPage";
 import { PersonAvatar } from "@/components/people/PersonAvatar";
 import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
 import { ProfileViewField } from "@/components/people/ProfileViewField";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { LedgerEntry, Person, SoilArrival, SoilContract } from "@/types";
 import { formatINR } from "@/lib/utils";
+import { printLandownerContract } from "@/lib/printDocument";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -56,6 +59,15 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [showAddArrival, setShowAddArrival] = useState(false);
   const [editingArrival, setEditingArrival] = useState<SoilArrival | null>(null);
+  const [editingContract, setEditingContract] = useState<SoilContract | null>(null);
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const kilnInfo = {
+    name: activeKiln?.name ?? "Bhatta Cloud",
+    location: activeKiln?.location,
+    phone: activeKiln?.phone,
+  };
 
   async function refresh() {
     const [detail, ledger, driversData, arrivalsData, contractsData] = await Promise.all([
@@ -153,6 +165,22 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     }
   }
 
+  async function deleteContract(contract: SoilContract) {
+    if (!confirm(t("people.confirmDeleteContract", { contractNumber: contract.contractNumber }))) return;
+    await api.soilContracts.remove(contract._id);
+    await refresh();
+  }
+
+  function printContract(contract: SoilContract) {
+    if (!landowner) return;
+    // Payment history for a contract is every ledger entry tied to it via
+    // contractId — soilContract.service.ts posts the advance PAID and (for
+    // non-PER_TROLLEY types) the totalContractValue DUE there, plus any
+    // later revision corrections, all carrying this same contractId.
+    const contractEntries = ledgerEntries.filter((e) => e.contractId === contract._id);
+    printLandownerContract(contract, landowner.name, kilnInfo, contractEntries);
+  }
+
   const backButton = (
     <button onClick={onBack} className="mb-3 flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink-primary">
       <ArrowLeft className="h-4 w-4" /> {t("people.backToPeople")}
@@ -184,6 +212,22 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   // the Advance/Kharchi history below already show.
   const totalContractPayment = contracts.reduce((sum, c) => sum + c.totalContractValue, 0);
   const totalPaidSoFar = ledgerEntries.filter((e) => e.direction === "PAID").reduce((sum, e) => sum + e.amount, 0);
+
+  // ledgerEntries comes back newest-first (see person.service.ts's
+  // listLedgerForPerson) — the running paid-so-far/remaining-due shown
+  // alongside each row still needs to build up chronologically, so it's
+  // computed once here over a date-ascending copy and looked up by id
+  // while rendering in the existing newest-first order.
+  const runningTotalsById = new Map<string, { paidSoFar: number; remainingDue: number }>();
+  {
+    let paid = 0;
+    let due = 0;
+    for (const entry of [...ledgerEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {
+      if (entry.direction === "PAID") paid += entry.amount;
+      else due += entry.amount;
+      runningTotalsById.set(entry._id, { paidSoFar: paid, remainingDue: Math.max(0, due - paid) });
+    }
+  }
 
   return (
     <div>
@@ -348,11 +392,39 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
             </div>
           </div>
           {contracts.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-3">
+            <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
               {contracts.map((c) => (
-                <span key={c._id} className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary">
-                  {c.contractNumber} · {rateBasisLabel(c, t)} · {c.status}
-                </span>
+                <div
+                  key={c._id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink-primary">{c.contractNumber}</p>
+                    <p className="truncate text-xs text-ink-muted">
+                      {rateBasisLabel(c, t)} · {contractStatusLabel(c.status, t)} · ₹{formatINR(c.totalContractValue)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-3">
+                    <button
+                      onClick={() => printContract(c)}
+                      className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+                    >
+                      <Printer className="h-3.5 w-3.5" /> {t("common.print")}
+                    </button>
+                    <button
+                      onClick={() => setEditingContract(c)}
+                      className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+                    >
+                      <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                    </button>
+                    <button
+                      onClick={() => deleteContract(c)}
+                      className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -412,7 +484,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
             <p className="py-6 text-center text-sm text-ink-muted">{t("people.noLedgerEntriesYet")}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] text-sm">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-sm text-ink-muted">
                     <th className="pb-2 font-medium">{t("common.date")}</th>
@@ -420,20 +492,31 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                     <th className="pb-2 font-medium">{t("people.category")}</th>
                     <th className="pb-2 font-medium">{t("people.mode")}</th>
                     <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
+                    <th className="pb-2 font-medium text-right">{t("people.paidSoFar")}</th>
+                    <th className="pb-2 font-medium text-right">{t("people.remainingDue")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ledgerEntries.map((entry) => (
-                    <tr key={entry._id} className="border-b border-border/60 last:border-0">
-                      <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
-                      <td className="py-3 text-ink-primary">{entry.reason}</td>
-                      <td className="py-3 text-ink-secondary">{entry.category ?? "—"}</td>
-                      <td className="py-3 text-ink-secondary">{entry.paymentMode ?? "—"}</td>
-                      <td className={`py-3 text-right tabular-nums font-medium ${entry.direction === "DUE" ? "text-status-critical" : "text-status-good"}`}>
-                        {entry.direction === "DUE" ? "+" : "-"}₹{formatINR(entry.amount)}
-                      </td>
-                    </tr>
-                  ))}
+                  {ledgerEntries.map((entry) => {
+                    const running = runningTotalsById.get(entry._id)!;
+                    return (
+                      <tr key={entry._id} className="border-b border-border/60 last:border-0">
+                        <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
+                        <td className="py-3 text-ink-primary">{entry.reason}</td>
+                        <td className="py-3 text-ink-secondary">{entry.category ?? "—"}</td>
+                        <td className="py-3 text-ink-secondary">
+                          {entry.paymentMode === "CASH_AND_ONLINE"
+                            ? `${t("payment.cashAmount")} ₹${formatINR(entry.cashAmount ?? 0)} + ${t("payment.onlineAmount")} ₹${formatINR(entry.onlineAmount ?? 0)}`
+                            : entry.paymentMode ?? "—"}
+                        </td>
+                        <td className={`py-3 text-right tabular-nums font-medium ${entry.direction === "DUE" ? "text-status-critical" : "text-status-good"}`}>
+                          {entry.direction === "DUE" ? "+" : "-"}₹{formatINR(entry.amount)}
+                        </td>
+                        <td className="py-3 text-right tabular-nums text-status-good">₹{formatINR(running.paidSoFar)}</td>
+                        <td className="py-3 text-right tabular-nums text-status-critical">₹{formatINR(running.remainingDue)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -447,6 +530,9 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
       )}
       {editingArrival && (
         <EditSoilArrivalModal entry={editingArrival} drivers={drivers} onClose={() => setEditingArrival(null)} onSaved={refresh} />
+      )}
+      {editingContract && (
+        <EditSoilContractModal contract={editingContract} onClose={() => setEditingContract(null)} onSaved={refresh} />
       )}
     </div>
   );

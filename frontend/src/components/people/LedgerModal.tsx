@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Wallet, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,7 +108,12 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
     ? t("people.advanceOutstandingEntityOwes", { entity: entityLabel })
     : t("people.balanceDueYouOweEntity", { entity: entityLabel });
 
-  return (
+  // Portalled to <body> — opened from buttons inside a profile header Card
+  // that lifts on hover (hover:-translate-y-0.5), which becomes the
+  // containing block for a `position: fixed` descendant while hovered,
+  // pinning this modal to that Card's box instead of the viewport. See
+  // QuickLedgerModal for the fuller explanation of the same fix.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
       <Card className="w-full max-w-2xl hover:translate-y-0">
         <div className="mb-5 flex items-center justify-between">
@@ -332,6 +338,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
           </div>
         </div>
       </Card>
-    </div>
+    </div>,
+    document.body
   );
 }

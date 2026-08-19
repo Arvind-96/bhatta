@@ -427,7 +427,11 @@ export const api = {
       contractedDepth?: number;
       depthUnit?: DepthUnit;
       ratePerDepthUnit?: number;
+      totalContractValue?: number;
       advanceAmount?: number;
+      paymentMode?: LedgerPaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
       startDate?: string;
       endDate?: string;
       paymentTerms?: string;
