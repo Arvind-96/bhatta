@@ -328,10 +328,16 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
               <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
               <input placeholder={t("people.aadharIdNumber")} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className={inputClass} />
               <input placeholder={t("people.khetLocation")} value={khetLocation} onChange={(e) => setKhetLocation(e.target.value)} className={inputClass} />
-              <div className="grid grid-cols-2 gap-2">
-                <input type="number" min={0} placeholder={t("people.khetArea")} value={khetArea} onChange={(e) => setKhetArea(e.target.value)} className={inputClass} />
-                <input placeholder={t("people.unitBigha")} value={khetAreaUnit} onChange={(e) => setKhetAreaUnit(e.target.value)} className={inputClass} />
-              </div>
+              {lands.length > 0 ? (
+                <p className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-sm text-ink-muted">
+                  {t("people.khetAreaFromLandsHint", { area: fieldAreaDisplay ?? "—" })}
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" min={0} placeholder={t("people.khetArea")} value={khetArea} onChange={(e) => setKhetArea(e.target.value)} className={inputClass} />
+                  <input placeholder={t("people.unitBigha")} value={khetAreaUnit} onChange={(e) => setKhetAreaUnit(e.target.value)} className={inputClass} />
+                </div>
+              )}
               <div className="flex gap-2">
                 <input
                   type="number"

@@ -112,10 +112,28 @@ export async function createPerson(input: CreatePersonInput) {
   return person;
 }
 
+// Landowner "serial" numbers (Landowner - N) are derived live from each
+// active landowner's position in creation order, never read back from the
+// stored landownerSerial column — so deleting one automatically closes the
+// gap for everyone after it, with no renumbering step needed. The column
+// itself is still written at creation as a defensive fallback in case a
+// landowner is somehow missing from this computation.
+async function computeLandownerSerials(kilnId: string): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ _id: people._id })
+    .from(people)
+    .where(and(eq(people.kilnId, kilnId), eq(people.type, "LANDOWNER"), eq(people.active, true)))
+    .orderBy(asc(people.createdAt));
+  return new Map(rows.map((r, i) => [r._id, i + 1]));
+}
+
 export async function listPeople(kilnId: string, type?: PersonType) {
   const conditions = [eq(people.kilnId, kilnId), eq(people.active, true)];
   if (type) conditions.push(eq(people.type, type));
-  return await db.select().from(people).where(and(...conditions)).orderBy(asc(people.name));
+  const rows = await db.select().from(people).where(and(...conditions)).orderBy(asc(people.name));
+  if (type && type !== "LANDOWNER") return rows;
+  const serials = await computeLandownerSerials(kilnId);
+  return rows.map((r) => (r.type === "LANDOWNER" ? { ...r, landownerSerial: serials.get(r._id) ?? r.landownerSerial } : r));
 }
 
 export async function getBalance(kilnId: string, personId: string) {
@@ -135,6 +153,10 @@ export async function getPersonWithBalance(kilnId: string, personId: string) {
   const person = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!person) throw new Error("Person not found");
   const balance = await getBalance(kilnId, personId);
+  if (person.type === "LANDOWNER") {
+    const serials = await computeLandownerSerials(kilnId);
+    person.landownerSerial = serials.get(person._id) ?? person.landownerSerial;
+  }
   return { person, balance };
 }
 
