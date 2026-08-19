@@ -8,7 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useTranslation } from "@/hooks/useTranslation";
 import { AddSoilArrivalModal } from "@/components/soil/AddSoilArrivalModal";
 import type { ContractDailyMovement, DepthUnit, Person, SoilContractStatus, SoilContractSummary } from "@/types";
-import { formatINR } from "@/lib/utils";
+import { formatDateTime, formatINR } from "@/lib/utils";
 
 type TFunc = (key: string, params?: Record<string, string | number>) => string;
 
@@ -200,6 +200,7 @@ export function ContractDetailPage({ contractId, onBack }: ContractDetailPagePro
             />
             <Field label={t("soil.paymentTerms")} value={contract.paymentTerms} />
             <Field label={t("common.notes")} value={contract.notes} />
+            <Field label={t("common.entryDateTime")} value={formatDateTime(contract.createdAt)} />
           </div>
           {(summary.isExpired || summary.isExpiringSoon) && (
             <p

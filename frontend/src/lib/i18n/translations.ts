@@ -117,6 +117,8 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.phone": { en: "Phone", hi: "फ़ोन" },
   "common.type": { en: "Type", hi: "प्रकार" },
   "common.date": { en: "Date", hi: "तारीख" },
+  "common.transactionDate": { en: "Transaction date", hi: "लेन-देन की तारीख" },
+  "common.entryDateTime": { en: "Entered on", hi: "दर्ज किया गया" },
   "common.amount": { en: "Amount", hi: "राशि" },
   "common.all": { en: "All", hi: "सभी" },
   "common.edit": { en: "Edit", hi: "संपादित करें" },

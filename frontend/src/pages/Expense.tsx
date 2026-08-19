@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
-import { cn, formatINR } from "@/lib/utils";
+import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
@@ -96,7 +96,14 @@ export function Expense() {
   const PETTY_CASH_REASONS = buildPettyCashReasons(t);
   const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ category: "JCB_RENTAL" as ExpenseCategory, amount: "", paymentMode: "" as "" | SimplePaymentMode, hours: "", notes: "" });
+  const [form, setForm] = useState({
+    category: "JCB_RENTAL" as ExpenseCategory,
+    amount: "",
+    paymentMode: "" as "" | SimplePaymentMode,
+    hours: "",
+    notes: "",
+    date: new Date().toISOString().slice(0, 10),
+  });
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -124,8 +131,9 @@ export function Expense() {
         paymentMode: form.paymentMode || undefined,
         hours: form.hours ? Number(form.hours) : undefined,
         notes: form.notes || undefined,
+        date: form.date || undefined,
       });
-      setForm({ category: "JCB_RENTAL", amount: "", paymentMode: "", hours: "", notes: "" });
+      setForm({ category: "JCB_RENTAL", amount: "", paymentMode: "", hours: "", notes: "", date: new Date().toISOString().slice(0, 10) });
       setShowForm(false);
       await refresh();
     } finally {
@@ -175,6 +183,10 @@ export function Expense() {
               onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
               className={inputClass}
             />
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+              <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
+            </label>
             {HOURLY_CATEGORIES.includes(form.category) && (
               <input
                 type="number"
@@ -225,6 +237,7 @@ export function Expense() {
                     {e.hours ? ` · ${t("expense.hoursAtRate", { hours: e.hours, rate: Math.round(e.amount / e.hours) })}` : ""}
                     {e.notes ? ` · ${e.notes}` : ""}
                   </p>
+                  <p className="text-xs text-ink-muted/70">{t("common.entryDateTime")}: {formatDateTime(e.createdAt)}</p>
                 </div>
                 <span className="tabular-nums font-medium text-ink-primary">₹{formatINR(e.amount)}</span>
               </div>

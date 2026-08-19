@@ -53,6 +53,7 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
   const meta = CATEGORY_META[category];
   const title = t(meta.titleKey);
   const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [paymentMode, setPaymentMode] = useState<LedgerPaymentMode>("CASH");
   const [cashAmount, setCashAmount] = useState("");
   const [onlineAmount, setOnlineAmount] = useState("");
@@ -77,6 +78,7 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
         direction: "PAID",
         amount: Number(amount),
         reason: reason.trim() || title,
+        date: date || undefined,
         paymentMode,
         cashAmount: paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
         onlineAmount: paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
@@ -122,6 +124,10 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
             onChange={(e) => setAmount(e.target.value)}
             className={inputClass}
           />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+          </label>
           <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as LedgerPaymentMode)} className={inputClass}>
             <option value="CASH">{t("people.cash")}</option>
             <option value="BANK">{t("people.bank")}</option>

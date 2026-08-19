@@ -13,7 +13,7 @@ import { CreatePaymentReceiptModal } from "@/components/billing/CreatePaymentRec
 import { EditPaymentReceiptModal } from "@/components/billing/EditPaymentReceiptModal";
 import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import type { CustomerCreditAging, Dispatch as DispatchEntry, DispatchTotals, PaymentReceipt } from "@/types";
-import { formatINR } from "@/lib/utils";
+import { formatDateTime, formatINR } from "@/lib/utils";
 
 // Every bill this kiln issues is generated from a Dispatch record — the
 // same brick sale that already produced a gate pass. This screen is the
@@ -141,7 +141,8 @@ export function Billing() {
               <thead>
                 <tr className="border-b border-border text-left text-sm text-ink-muted">
                   <th className="pb-2 font-medium">{t("billing.invoiceHeader")}</th>
-                  <th className="pb-2 font-medium">{t("common.date")}</th>
+                  <th className="pb-2 font-medium">{t("common.transactionDate")}</th>
+                  <th className="pb-2 font-medium">{t("common.entryDateTime")}</th>
                   <th className="pb-2 font-medium">{t("billing.customerHeader")}</th>
                   <th className="pb-2 font-medium">{t("billing.gradeHeader")}</th>
                   <th className="pb-2 font-medium">{t("billing.bricksHeader")}</th>
@@ -155,6 +156,7 @@ export function Billing() {
                   <tr key={d._id} className="border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
                     <td className="py-3 text-ink-primary">{d.slipNumber}</td>
                     <td className="py-3 text-ink-secondary">{new Date(d.dispatchedOn).toLocaleDateString("en-IN")}</td>
+                    <td className="py-3 text-xs text-ink-muted">{formatDateTime(d.createdAt)}</td>
                     <td className="py-3 text-ink-secondary">{d.customerName}</td>
                     <td className="py-3">
                       <Badge variant="neutral">{categoryGradeLabel(d)}</Badge>
@@ -225,6 +227,7 @@ export function Billing() {
                     <p className="text-sm text-ink-muted">
                       {r.receiptNumber} · {new Date(r.date).toLocaleDateString("en-IN")}
                     </p>
+                    <p className="text-xs text-ink-muted/70">{t("common.entryDateTime")}: {formatDateTime(r.createdAt)}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="tabular-nums font-medium text-status-good">₹{formatINR(r.amountPaid)}</span>

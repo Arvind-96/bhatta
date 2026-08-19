@@ -206,6 +206,7 @@ export const api = {
       paymentMode?: PaymentMode;
       cashAmount?: number;
       onlineAmount?: number;
+      dispatchedOn?: string;
     }) => post<Dispatch>("/dispatch", input, true),
     totals: (days = 7) => get<DispatchTotals>(`/dispatch/totals?days=${days}`, true),
     adjustment: (id: string, input: { breakageCount?: number; returnedCount?: number; returnReason?: string }) =>
@@ -282,6 +283,7 @@ export const api = {
         cashAmount?: number;
         onlineAmount?: number;
         category?: LedgerCategory;
+        date?: string;
       }
     ) => post<LedgerEntry>(`/people/${id}/ledger`, input, true),
     listLedger: (id: string) => get<LedgerEntry[]>(`/people/${id}/ledger`, true),
@@ -495,6 +497,7 @@ export const api = {
       notes?: string;
       soilTripId?: string;
       dispatchId?: string;
+      date?: string;
     }) => post<Expense>("/expenses", input, true),
     totals: (days = 30) => get<{ category: ExpenseCategory; amount: number }[]>(`/expenses/totals?days=${days}`, true),
   },
@@ -617,6 +620,7 @@ export const api = {
       loadingCharge?: number;
       unloadingCharge?: number;
       discountAmount?: number;
+      date?: string;
     }) => post<BrickLoadingEntry>("/brick-loading", input, true),
     update: (
       id: string,

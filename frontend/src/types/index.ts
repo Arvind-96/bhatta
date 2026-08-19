@@ -50,6 +50,7 @@ export interface Dispatch {
   discountAmount?: number;
   notes?: string;
   dispatchedOn: string;
+  createdAt: string;
 }
 
 export interface DispatchTotals {
@@ -256,6 +257,7 @@ export interface LedgerEntry {
   onlineAmount?: number;
   contractId?: string;
   date: string;
+  createdAt: string;
 }
 
 export interface OutstandingAdvance {
@@ -282,6 +284,7 @@ export interface PaymentReceipt {
   onlineAmount?: number;
   notes?: string;
   date: string;
+  createdAt: string;
 }
 
 export interface CustomerCreditAging {
@@ -400,6 +403,7 @@ export interface SoilContract {
   paymentTerms?: string;
   status: SoilContractStatus;
   notes?: string;
+  createdAt: string;
   // Present on list/get responses — always computed, never stored.
   excavatedQuantity: number;
   remainingQuantity: number | null;
@@ -492,6 +496,7 @@ export interface Expense {
   paymentMode?: SimplePaymentMode;
   hours?: number;
   date: string;
+  createdAt: string;
   notes?: string;
   soilTripId?: string;
   dispatchId?: string;
@@ -773,6 +778,7 @@ export interface BrickLoadingEntry {
   categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
   dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
   date: string;
+  createdAt: string;
   notes?: string;
 }
 
@@ -820,6 +826,7 @@ export interface SoilArrival {
   paymentPending: number;
   soilRemaining?: number;
   date: string;
+  createdAt: string;
   notes?: string;
 }
 
@@ -881,6 +888,7 @@ export interface FuelPurchase {
   paidAmount?: number;
   paymentMode?: SimplePaymentMode;
   date: string;
+  createdAt: string;
   notes?: string;
   shortfallKg?: number;
   variancePercent?: number;
@@ -902,6 +910,7 @@ export interface FuelLog {
   fuelType: string;
   quantityKg: number;
   date: string;
+  createdAt: string;
   notes?: string;
 }
 

@@ -15,7 +15,7 @@ import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
 import { ProfileViewField } from "@/components/people/ProfileViewField";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { LedgerEntry, Person, SoilArrival, SoilContract } from "@/types";
-import { formatINR } from "@/lib/utils";
+import { formatDateTime, formatINR } from "@/lib/utils";
 import { printLandownerContract } from "@/lib/printDocument";
 
 const inputClass =
@@ -403,6 +403,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                     <p className="truncate text-xs text-ink-muted">
                       {rateBasisLabel(c, t)} · {contractStatusLabel(c.status, t)} · ₹{formatINR(c.totalContractValue)}
                     </p>
+                    <p className="truncate text-xs text-ink-muted/70">{t("common.entryDateTime")}: {formatDateTime(c.createdAt)}</p>
                   </div>
                   <div className="flex shrink-0 gap-3">
                     <button
@@ -458,7 +459,10 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                 <tbody>
                   {arrivals.map((a) => (
                     <tr key={a._id} className="border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                      <td className="py-3 text-ink-secondary">{new Date(a.date).toLocaleDateString("en-IN")}</td>
+                      <td className="py-3 text-ink-secondary">
+                        {new Date(a.date).toLocaleDateString("en-IN")}
+                        <p className="text-xs text-ink-muted/70">{formatDateTime(a.createdAt)}</p>
+                      </td>
                       <td className="py-3 text-ink-secondary">{a.jcbUsed ? driverName(a.jcbDriverId) || t("common.yes") : "—"}</td>
                       <td className="py-3 text-ink-secondary">{a.tractorUsed ? driverName(a.tractorDriverId) || t("common.yes") : "—"}</td>
                       <td className="py-3 tabular-nums text-ink-secondary">{a.trolleyCount.toLocaleString("en-IN")}</td>
@@ -484,10 +488,11 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
             <p className="py-6 text-center text-sm text-ink-muted">{t("people.noLedgerEntriesYet")}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-sm text-ink-muted">
-                    <th className="pb-2 font-medium">{t("common.date")}</th>
+                    <th className="pb-2 font-medium">{t("common.transactionDate")}</th>
+                    <th className="pb-2 font-medium">{t("common.entryDateTime")}</th>
                     <th className="pb-2 font-medium">{t("people.reason")}</th>
                     <th className="pb-2 font-medium">{t("people.category")}</th>
                     <th className="pb-2 font-medium">{t("people.mode")}</th>
@@ -502,6 +507,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                     return (
                       <tr key={entry._id} className="border-b border-border/60 last:border-0">
                         <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
+                        <td className="py-3 text-xs text-ink-muted">{formatDateTime(entry.createdAt)}</td>
                         <td className="py-3 text-ink-primary">{entry.reason}</td>
                         <td className="py-3 text-ink-secondary">{entry.category ?? "—"}</td>
                         <td className="py-3 text-ink-secondary">

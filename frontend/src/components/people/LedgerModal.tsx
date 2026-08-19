@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import type { LedgerCategory, LedgerEntry, LedgerPaymentMode, Person } from "@/types";
-import { formatINR } from "@/lib/utils";
+import { formatDateTime, formatINR } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 
@@ -31,6 +31,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
   const [form, setForm] = useState({
     direction: "DUE" as "DUE" | "PAID",
     amount: "",
+    date: new Date().toISOString().slice(0, 10),
     reason: "",
     paymentMode: "CASH" as LedgerPaymentMode,
     cashAmount: "",
@@ -86,12 +87,22 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
         direction: form.direction,
         amount: Number(form.amount),
         reason: form.reason,
+        date: form.date || undefined,
         paymentMode: form.direction === "PAID" ? form.paymentMode : undefined,
         cashAmount: usingSplit ? Number(form.cashAmount) : undefined,
         onlineAmount: usingSplit ? Number(form.onlineAmount) : undefined,
         category: form.category,
       });
-      setForm({ direction: "DUE", amount: "", reason: "", paymentMode: "CASH", cashAmount: "", onlineAmount: "", category: undefined });
+      setForm({
+        direction: "DUE",
+        amount: "",
+        date: new Date().toISOString().slice(0, 10),
+        reason: "",
+        paymentMode: "CASH",
+        cashAmount: "",
+        onlineAmount: "",
+        category: undefined,
+      });
       await refresh();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : t("people.failedToAddLedgerEntry"));
@@ -267,15 +278,24 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                   </select>
                 )}
               </div>
-              <input
-                ref={amountRef}
-                type="number"
-                min={0}
-                placeholder={t("people.amountRupees")}
-                value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                className="h-11 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
-              />
+              <div className="flex gap-2">
+                <input
+                  ref={amountRef}
+                  type="number"
+                  min={0}
+                  placeholder={t("people.amountRupees")}
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                  className="h-11 flex-1 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+                />
+                <input
+                  type="date"
+                  aria-label={t("common.transactionDate")}
+                  value={form.date}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                  className="h-11 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+                />
+              </div>
               {form.direction === "PAID" && !isCustomer && form.paymentMode === "CASH_AND_ONLINE" && (
                 <PaymentSplitFields
                   totalAmount={Number(form.amount) || 0}
@@ -327,6 +347,9 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                       {new Date(entry.date).toLocaleDateString("en-IN")}
                       {entry.category ? ` · ${entry.category}` : ""}
                       {entry.paymentMode ? ` · ${entry.paymentMode}` : ""}
+                    </p>
+                    <p className="text-xs text-ink-muted/70">
+                      {t("common.entryDateTime")}: {formatDateTime(entry.createdAt)}
                     </p>
                   </div>
                   <Badge variant={entry.direction === "DUE" ? "critical" : "good"}>

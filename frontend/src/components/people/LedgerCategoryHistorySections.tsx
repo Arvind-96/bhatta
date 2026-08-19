@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import type { LedgerCategory, LedgerEntry } from "@/types";
-import { formatINR } from "@/lib/utils";
+import { formatDateTime, formatINR } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const PAGE_SIZE = 10;
@@ -30,9 +30,10 @@ function PaginatedLedgerSection({ titleKey, entries }: { titleKey: string; entri
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-sm text-ink-muted">
-                  <th className="pb-2 font-medium">{t("common.date")}</th>
+                  <th className="pb-2 font-medium">{t("common.transactionDate")}</th>
                   <th className="pb-2 font-medium">{t("people.reason")}</th>
                   <th className="pb-2 font-medium">{t("people.mode")}</th>
+                  <th className="pb-2 font-medium">{t("common.entryDateTime")}</th>
                   <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
                 </tr>
               </thead>
@@ -42,6 +43,7 @@ function PaginatedLedgerSection({ titleKey, entries }: { titleKey: string; entri
                     <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
                     <td className="py-3 text-ink-primary">{entry.reason}</td>
                     <td className="py-3 text-ink-secondary">{entry.paymentMode ?? "—"}</td>
+                    <td className="py-3 text-xs text-ink-muted">{formatDateTime(entry.createdAt)}</td>
                     <td className="py-3 text-right tabular-nums font-medium text-ink-primary">
                       ₹{formatINR(entry.amount)}
                     </td>

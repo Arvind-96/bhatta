@@ -13,3 +13,16 @@ export function cn(...inputs: ClassValue[]) {
 export function formatINR(amount: number): string {
   return Math.round(amount).toLocaleString("en-IN");
 }
+
+// The "System Entry Date" shown next to a record's own (admin-editable)
+// transaction date — always includes the time, since it's meant to show
+// exactly when the entry was created, not just which day.
+export function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

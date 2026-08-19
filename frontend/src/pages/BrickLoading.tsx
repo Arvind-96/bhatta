@@ -3,7 +3,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
-import { formatINR } from "@/lib/utils";
+import { formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { EditBrickLoadingEntryModal } from "@/components/dispatch/EditBrickLoadingEntryModal";
 import { LedgerModal } from "@/components/people/LedgerModal";
@@ -115,6 +115,7 @@ export function BrickLoading() {
     discountAmount: "",
     loadingCharge: "",
     unloadingCharge: "",
+    date: new Date().toISOString().slice(0, 10),
   });
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
@@ -167,8 +168,18 @@ export function BrickLoading() {
         discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
         loadingCharge: form.loadingCharge ? Number(form.loadingCharge) : undefined,
         unloadingCharge: form.unloadingCharge ? Number(form.unloadingCharge) : undefined,
+        date: form.date || undefined,
       });
-      setForm({ vehicleType: "TRUCK", vehicleNumber: "", bricksCount: "", categoryId: "", discountAmount: "", loadingCharge: "", unloadingCharge: "" });
+      setForm({
+        vehicleType: "TRUCK",
+        vehicleNumber: "",
+        bricksCount: "",
+        categoryId: "",
+        discountAmount: "",
+        loadingCharge: "",
+        unloadingCharge: "",
+        date: new Date().toISOString().slice(0, 10),
+      });
       setShowForm(false);
       await refresh();
     } finally {
@@ -240,6 +251,11 @@ export function BrickLoading() {
               />
             </div>
 
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+              <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
+            </label>
+
             <div className="grid grid-cols-3 gap-2">
               <input
                 type="number"
@@ -291,7 +307,7 @@ export function BrickLoading() {
               <thead>
                 <tr className="border-b border-border text-left text-sm text-ink-muted">
                   <th className="pb-2 font-medium">{t("brickLoading.tripNumberHeader")}</th>
-                  <th className="pb-2 font-medium">{t("common.date")}</th>
+                  <th className="pb-2 font-medium">{t("common.transactionDate")}</th>
                   <th className="pb-2 font-medium">{t("common.vehicle")}</th>
                   <th className="pb-2 font-medium">{t("brickLoading.categoryHeader")}</th>
                   <th className="pb-2 font-medium">{t("brickLoading.bricksHeader")}</th>
@@ -307,7 +323,10 @@ export function BrickLoading() {
                   return (
                   <tr key={entry._id} className="border-b border-border/60 last:border-0">
                     <td className="py-3 text-ink-primary">{entry.tripNumber ? `#${entry.tripNumber}` : "—"}</td>
-                    <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
+                    <td className="py-3 text-ink-secondary">
+                      {new Date(entry.date).toLocaleDateString("en-IN")}
+                      <p className="text-xs text-ink-muted/70">{formatDateTime(entry.createdAt)}</p>
+                    </td>
                     <td className="py-3 text-ink-secondary">
                       {entry.vehicleType === "TRUCK" ? "🚚" : "🚜"} {entry.vehicleNumber}
                     </td>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { cn, formatINR } from "@/lib/utils";
+import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
@@ -46,27 +46,30 @@ function tripLabel(t: BrickLoadingEntry) {
   return parts.join(" · ");
 }
 
-const emptyForm = {
-  loadingEntryId: "",
-  customerId: "",
-  customerName: "",
-  customerAddress: "",
-  customerPhone: "",
-  vehicleNumber: "",
-  vehicleType: "" as "" | BrickVehicleType,
-  driverName: "",
-  driverPhone: "",
-  driverTipAmount: "",
-  bricksCount: "",
-  amount: "",
-  discountAmount: "",
-  categoryId: "",
-  notes: "",
-  transportCost: "",
-  paymentMode: "CASH" as PaymentMode,
-  cashAmount: "",
-  onlineAmount: "",
-};
+function emptyForm() {
+  return {
+    loadingEntryId: "",
+    customerId: "",
+    customerName: "",
+    customerAddress: "",
+    customerPhone: "",
+    vehicleNumber: "",
+    vehicleType: "" as "" | BrickVehicleType,
+    driverName: "",
+    driverPhone: "",
+    driverTipAmount: "",
+    bricksCount: "",
+    amount: "",
+    discountAmount: "",
+    categoryId: "",
+    notes: "",
+    transportCost: "",
+    paymentMode: "CASH" as PaymentMode,
+    cashAmount: "",
+    onlineAmount: "",
+    dispatchedOn: new Date().toISOString().slice(0, 10),
+  };
+}
 
 export function Dispatch() {
   const [dispatches, setDispatches] = useState<DispatchEntry[]>([]);
@@ -78,7 +81,7 @@ export function Dispatch() {
   const [adjustingId, setAdjustingId] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({ breakageCount: "", returnedCount: "", returnReason: "" });
   const [editingDispatch, setEditingDispatch] = useState<DispatchEntry | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(emptyForm());
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -214,8 +217,9 @@ export function Dispatch() {
         paymentMode: form.paymentMode,
         cashAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.cashAmount) : undefined,
         onlineAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.onlineAmount) : undefined,
+        dispatchedOn: form.dispatchedOn || undefined,
       });
-      setForm(emptyForm);
+      setForm(emptyForm());
       setShowForm(false);
       await refresh();
     } catch (err) {
@@ -425,12 +429,23 @@ export function Dispatch() {
               />
             )}
 
-            <input
-              placeholder={t("dispatch.notesPlaceholder")}
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              className={inputClass}
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                placeholder={t("dispatch.notesPlaceholder")}
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                className={inputClass}
+              />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+                <input
+                  type="date"
+                  value={form.dispatchedOn}
+                  onChange={(e) => setForm((f) => ({ ...f, dispatchedOn: e.target.value }))}
+                  className={inputClass}
+                />
+              </label>
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <input
@@ -466,6 +481,7 @@ export function Dispatch() {
               <thead>
                 <tr className="border-b border-border text-left text-sm text-ink-muted">
                   <th className="pb-2 font-medium">{t("dispatch.slipHeader")}</th>
+                  <th className="pb-2 font-medium">{t("common.transactionDate")}</th>
                   <th className="pb-2 font-medium">{t("dispatch.customerHeader")}</th>
                   <th className="pb-2 font-medium">{t("dispatch.gradeHeader")}</th>
                   <th className="pb-2 font-medium">{t("dispatch.bricksHeader")}</th>
@@ -482,6 +498,10 @@ export function Dispatch() {
                       className={cn("border-b border-border/60 last:border-0 transition-colors", highlightedId === d._id && "bg-series-1/10")}
                     >
                       <td className="py-3 text-sm text-ink-muted">{d.slipNumber}</td>
+                      <td className="py-3 text-ink-secondary">
+                        {new Date(d.dispatchedOn).toLocaleDateString("en-IN")}
+                        <p className="text-xs text-ink-muted/70">{formatDateTime(d.createdAt)}</p>
+                      </td>
                       <td className="py-3 text-ink-primary">{d.customerName}</td>
                       <td className="py-3">
                         <Badge variant="neutral">{dispatchCategoryGradeLabel(d, GRADE_LABELS)}</Badge>
@@ -519,7 +539,7 @@ export function Dispatch() {
                     </tr>
                     {adjustingId === d._id && (
                       <tr key={`${d._id}-adjust`}>
-                        <td colSpan={7} className="bg-ink-primary/5 p-3">
+                        <td colSpan={8} className="bg-ink-primary/5 p-3">
                           <div className="flex flex-wrap items-end gap-2">
                             <input
                               type="number"
