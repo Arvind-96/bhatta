@@ -275,22 +275,28 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // PAID, and net balance, all computed live from MoldingEntry/LedgerEntry,
 // nothing stored redundantly.
 //
-// Scoped to Pathai contractors (workType "PATHAI" on the thekedar's own
-// profile) — but NOT further filtered by each worker's own workType. A
-// worker's workType is their general classification (often Beldar/Rawas/
-// etc. even for someone who's actually assigned to a Pathai gang and
-// regularly gets molding entries logged against them), so requiring it to
-// equal "PATHAI" here silently dropped real gang members — and their real
-// production/earnings — out of this whole summary despite their molding
-// entries and wages having posted correctly. Membership in a contractor's
-// gang is decided by Person.contractorId alone, matching how
-// createMoldingEntry and LaborDetailPage already treat it. Doesn't affect
-// the whole-kiln totals above (moldingPeriodTotals), which stay unfiltered.
+// Neither the contractor's nor the workers' own workType tag is required
+// to equal "PATHAI" anymore — on real kilns a thekedar/gang is tagged with
+// its general trade (Beldar/Rawas/Tudi/etc.), not always "Pathai", even
+// when workers under them regularly get molding entries logged and paid.
+// Requiring that tag silently excluded real gangs — and all their real
+// production/earnings — from this whole summary despite their entries and
+// ledger postings being completely correct underneath. A contractor is
+// included if they're either explicitly tagged "PATHAI" themselves, or
+// actually have at least one worker assigned to them via
+// Person.contractorId (the same field createMoldingEntry and
+// LaborDetailPage already use to decide gang membership) — so a thekedar
+// with an unrelated trade tag doesn't clutter this view just for existing,
+// but one with real Pathai workers always shows up. Doesn't affect the
+// whole-kiln totals above (moldingPeriodTotals), which stay unfiltered.
 export async function moldingContractorSummary(kilnId: string) {
-  const [contractors, workers] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true), eq(people.workType, "PATHAI"))).orderBy(asc(people.name)),
+  const [allContractors, workers] = await Promise.all([
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"), eq(people.active, true))),
   ]);
+
+  const contractorIdsWithWorkers = new Set(workers.filter((w) => w.contractorId).map((w) => w.contractorId!));
+  const contractors = allContractors.filter((c) => c.workType === "PATHAI" || contractorIdsWithWorkers.has(c._id));
 
   const contractorResults = await Promise.all(
     contractors.map(async (contractor) => {

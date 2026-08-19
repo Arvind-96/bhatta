@@ -200,18 +200,22 @@ export async function nikasiOperatorSummary(kilnId: string) {
 // stacking.service.ts's stackingContractorSummary, minus the vehicle
 // roster (nikasi has no equipment-tracking requirement).
 //
-// Scoped to Nikasi contractors (workType "NIKASI" on the thekedar's own
-// profile) — but not further filtered by each laborer's own workType,
-// since that's their general classification and often doesn't match
-// "NIKASI" even for someone actually assigned to this gang. Membership is
-// decided by Person.nikasiContractorId alone (see molding.service.ts's
-// moldingContractorSummary for the identical fix/reasoning on the Pathai
-// side).
+// Neither the contractor's nor the laborers' own workType tag is required
+// to equal "NIKASI" anymore — a thekedar/gang is often tagged with its
+// general trade instead, even when laborers under them regularly get
+// nikasi entries logged and paid. A contractor is included if they're
+// either explicitly tagged "NIKASI" themselves, or actually have at least
+// one laborer assigned via Person.nikasiContractorId (see
+// molding.service.ts's moldingContractorSummary for the identical
+// fix/reasoning on the Pathai side).
 export async function nikasiContractorSummary(kilnId: string) {
-  const [contractors, laborers] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true), eq(people.workType, "NIKASI"))).orderBy(asc(people.name)),
+  const [allContractors, laborers] = await Promise.all([
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
     db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
   ]);
+
+  const contractorIdsWithLaborers = new Set(laborers.filter((w) => w.nikasiContractorId).map((w) => w.nikasiContractorId!));
+  const contractors = allContractors.filter((c) => c.workType === "NIKASI" || contractorIdsWithLaborers.has(c._id));
 
   const contractorResults = await Promise.all(
     contractors.map(async (contractor) => {
