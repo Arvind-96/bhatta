@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -195,8 +196,7 @@ export function FitterDetailPage({ fitterId, onBack }: FitterDetailPageProps) {
               className={inputClass}
             />
             <div className="flex gap-2">
-              <input
-                type="date"
+              <DateInput
                 value={anchorDateInput}
                 onChange={(e) => setAnchorDateInput(e.target.value)}
                 className={inputClass}

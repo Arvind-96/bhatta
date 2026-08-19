@@ -4,6 +4,7 @@ import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
+import { DateInput } from "@/components/ui/date-input";
 import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -166,7 +167,7 @@ function EditExpenseModal({
           <input required type="number" placeholder={t("expense.amountPlaceholder")} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputClass} />
           <label className="col-span-2 flex flex-col gap-1">
             <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+            <DateInput value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
           </label>
           {HOURLY_CATEGORIES.includes(category) && (
             <input
@@ -299,7 +300,7 @@ export function Expense() {
             />
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-              <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
+              <DateInput value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
             </label>
             {HOURLY_CATEGORIES.includes(form.category) && (
               <input

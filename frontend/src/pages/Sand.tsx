@@ -3,6 +3,7 @@ import { Plus, Printer, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FilterChips } from "@/components/ui/filter-chips";
+import { DateInput } from "@/components/ui/date-input";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { cn, formatINR } from "@/lib/utils";
@@ -396,13 +397,12 @@ function SandContractsTab() {
                 />
               </div>
             )}
-            <input
-              type="date"
+            <DateInput
               value={form.startDate}
               onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
               className={inputClass}
             />
-            <input type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} className={inputClass} />
+            <DateInput value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} className={inputClass} />
 
             {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
 

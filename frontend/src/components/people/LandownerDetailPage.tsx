@@ -3,6 +3,7 @@ import { ArrowLeft, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
 import { EditLedgerEntryModal } from "@/components/people/EditLedgerEntryModal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
@@ -347,7 +348,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
               </div>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
-                <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+                <DateInput value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
               </label>
               <Button type="submit" size="sm" disabled={savingProfile}>
                 {t("people.saveProfile")}

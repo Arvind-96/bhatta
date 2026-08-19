@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -84,8 +85,7 @@ export function Attendance() {
               {t("attendance.shiftLabel")}: {activeKiln.dayShiftStart}–{activeKiln.dayShiftEnd}
             </span>
           )}
-          <input
-            type="date"
+          <DateInput
             value={date}
             onChange={(e) => setDate(e.target.value)}
             className="h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"

@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -104,16 +105,14 @@ function RangePicker({ label, value, onChange }: { label: string; value: DateRan
         {label}
       </div>
       <div className="flex items-center gap-2">
-        <input
-          type="date"
+        <DateInput
           value={value.from}
           onChange={(e) => onChange({ ...value, from: e.target.value })}
           className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
           aria-label={t("compare.from")}
         />
         <span className="shrink-0 text-xs text-ink-muted">{t("compare.to")}</span>
-        <input
-          type="date"
+        <DateInput
           value={value.to}
           onChange={(e) => onChange({ ...value, to: e.target.value })}
           className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"

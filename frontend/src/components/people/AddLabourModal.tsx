@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { X, UserPlus, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import type { FamilyRelation, InventoryItem, PayType, Person, Sex, WorkType } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -278,7 +279,7 @@ export function AddLabourModal({ defaultContractorId, onClose, onCreated }: AddL
                 <input placeholder={t("people.nicknamePlaceholder")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
               </Field>
               <Field label={t("people.joiningDate")}>
-                <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+                <DateInput value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
               </Field>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-3">

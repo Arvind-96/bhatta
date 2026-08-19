@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import type { LedgerCategory, LedgerPaymentMode, Person } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -126,7 +127,7 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
           />
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+            <DateInput value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
           </label>
           <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as LedgerPaymentMode)} className={inputClass}>
             <option value="CASH">{t("people.cash")}</option>

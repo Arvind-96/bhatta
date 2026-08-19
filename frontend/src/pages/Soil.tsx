@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FilterChips, FilterDivider } from "@/components/ui/filter-chips";
+import { DateInput } from "@/components/ui/date-input";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { cn, formatINR } from "@/lib/utils";
@@ -662,14 +663,12 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
               onChange={(e) => setForm((f) => ({ ...f, advanceAmount: e.target.value }))}
               className={cn(inputClass, "col-span-2")}
             />
-            <input
-              type="date"
+            <DateInput
               value={form.startDate}
               onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
               className={inputClass}
             />
-            <input
-              type="date"
+            <DateInput
               value={form.endDate}
               onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
               className={inputClass}

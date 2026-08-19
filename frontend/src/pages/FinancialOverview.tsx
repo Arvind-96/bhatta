@@ -3,6 +3,7 @@ import { ArrowDownCircle, ArrowUpCircle, Boxes, Fuel, IndianRupee, PieChart, Sea
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PeriodStatCard } from "@/components/dashboard/PeriodStatCard";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -253,8 +254,7 @@ export function FinancialOverview() {
         <div className="flex flex-wrap items-end gap-2">
           <div>
             <label className="mb-1 block text-sm text-ink-muted">{t("financialOverview.from")}</label>
-            <input
-              type="date"
+            <DateInput
               value={range.from}
               onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
               className={inputClass}
@@ -262,8 +262,7 @@ export function FinancialOverview() {
           </div>
           <div>
             <label className="mb-1 block text-sm text-ink-muted">{t("financialOverview.to")}</label>
-            <input
-              type="date"
+            <DateInput
               value={range.to}
               onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
               className={inputClass}

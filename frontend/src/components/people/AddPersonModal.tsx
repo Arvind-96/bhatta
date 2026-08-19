@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import type { PayType, Person, PersonType, ShiftType, StackingStage, WorkType } from "@/types";
 import { usePersonTypeMeta, useWorkTypeLabels, PERSON_TYPES } from "./personTypes";
@@ -322,8 +323,7 @@ export function AddPersonModal({
                 {t("people.firingRotationHint")}
               </p>
               <div className="flex gap-2">
-                <input
-                  type="date"
+                <DateInput
                   value={firingShiftAnchorDate}
                   onChange={(e) => setFiringShiftAnchorDate(e.target.value)}
                   className={inputClass}
@@ -393,8 +393,7 @@ export function AddPersonModal({
           <div className="border-t border-border pt-3">
             <div className="flex gap-2">
               <input placeholder={t("people.nicknamePlaceholder")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
-              <input
-                type="date"
+              <DateInput
                 aria-label={t("people.joiningDate")}
                 value={joiningDate}
                 onChange={(e) => setJoiningDate(e.target.value)}

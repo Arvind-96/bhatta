@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { ArrowLeft, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
@@ -311,7 +312,7 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
               />
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
-                <input type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+                <DateInput value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
               </label>
               <select value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
                 <option value="">{t("people.thekedarWorkTypeNotSet")}</option>

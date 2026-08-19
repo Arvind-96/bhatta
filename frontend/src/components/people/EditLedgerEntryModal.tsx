@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import type { LedgerCategory, LedgerEntry, LedgerPaymentMode } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -139,8 +140,7 @@ export function EditLedgerEntryModal({ entry, onClose }: EditLedgerEntryModalPro
               onChange={(e) => setAmount(e.target.value)}
               className={cn(inputClass, "flex-1")}
             />
-            <input
-              type="date"
+            <DateInput
               aria-label={t("common.transactionDate")}
               value={date}
               onChange={(e) => setDate(e.target.value)}

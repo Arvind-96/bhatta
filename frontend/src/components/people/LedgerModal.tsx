@@ -4,6 +4,7 @@ import { Pencil, Wallet, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import type { LedgerCategory, LedgerEntry, LedgerPaymentMode, Person } from "@/types";
@@ -293,8 +294,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                   onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                   className="h-11 flex-1 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
                 />
-                <input
-                  type="date"
+                <DateInput
                   aria-label={t("common.transactionDate")}
                   value={form.date}
                   onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}

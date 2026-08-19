@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { DepthUnit, SoilContract, SoilContractRateType } from "@/types";
@@ -239,8 +240,8 @@ export function EditSoilContractModal({ contract, onClose, onSaved }: EditSoilCo
             onChange={(e) => setAdvanceAmount(e.target.value)}
             className={cn(inputClass, "col-span-2")}
           />
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
+          <DateInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
+          <DateInput value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
           <input
             placeholder={t("soil.paymentTerms")}
             value={paymentTerms}

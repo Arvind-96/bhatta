@@ -3,6 +3,7 @@ import { LocateFixed, Loader2, Plus } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
@@ -507,9 +508,8 @@ function ComplianceSettings() {
             onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
             className={inputClass}
           />
-          <input
+          <DateInput
             required
-            type="date"
             value={form.expiryDate}
             onChange={(e) => setForm((f) => ({ ...f, expiryDate: e.target.value }))}
             className={inputClass}

@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -107,9 +108,8 @@ export function EditPaymentReceiptModal({ receipt, personName, onClose, onSaved 
               <option value="UPI">{t("billing.paymentUpi")}</option>
               <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
             </select>
-            <input
+            <DateInput
               required
-              type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className={inputClass}

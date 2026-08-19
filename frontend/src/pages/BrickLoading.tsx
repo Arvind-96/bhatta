@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
+import { DateInput } from "@/components/ui/date-input";
 import { formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { EditBrickLoadingEntryModal } from "@/components/dispatch/EditBrickLoadingEntryModal";
@@ -253,7 +254,7 @@ export function BrickLoading() {
 
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-              <input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
+              <DateInput value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
             </label>
 
             <div className="grid grid-cols-3 gap-2">

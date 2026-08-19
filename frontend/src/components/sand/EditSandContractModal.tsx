@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { SandContract, SandContractRateType } from "@/types";
@@ -135,8 +136,8 @@ export function EditSandContractModal({ contract, onClose, onSaved }: EditSandCo
             onChange={(e) => setAdvanceAmount(e.target.value)}
             className={cn(inputClass, "col-span-2")}
           />
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
+          <DateInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
+          <DateInput value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
 
           <div className="col-span-2 flex gap-2">
             <button

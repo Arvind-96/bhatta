@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -317,11 +318,11 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
             <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("soil.contractStartDate")}</span>
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
+                <DateInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("soil.contractEndDate")}</span>
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
+                <DateInput value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
               </label>
             </div>
 

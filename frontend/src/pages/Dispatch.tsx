@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateInput } from "@/components/ui/date-input";
 import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -438,8 +439,7 @@ export function Dispatch() {
               />
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-                <input
-                  type="date"
+                <DateInput
                   value={form.dispatchedOn}
                   onChange={(e) => setForm((f) => ({ ...f, dispatchedOn: e.target.value }))}
                   className={inputClass}
