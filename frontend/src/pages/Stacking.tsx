@@ -487,6 +487,14 @@ export function Stacking() {
     }
   }
 
+  // usePagination must run on every render, before either early return
+  // below -- calling it after them meant it (and its internal hooks) got
+  // skipped entirely whenever openContractorId/openOperatorId was set,
+  // which is exactly what "Rendered fewer hooks than expected" (React
+  // error #300) means: React crashes the whole tree the moment a render
+  // calls fewer hooks than the previous one did.
+  const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(entries, 10);
+
   if (openContractorId) {
     return <StackingContractorDetailPage contractorId={openContractorId} onBack={() => setOpenContractorId(null)} />;
   }
@@ -496,7 +504,6 @@ export function Stacking() {
   }
 
   const unassigned = gangs.filter((g) => !g.stackingStage);
-  const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(entries, 10);
 
   return (
     <div className="space-y-4">
