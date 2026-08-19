@@ -14,6 +14,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { AddSandDeliveryModal } from "@/components/sand/AddSandDeliveryModal";
 import { EditSandDeliveryModal } from "@/components/sand/EditSandDeliveryModal";
 import { EditSandContractModal } from "@/components/sand/EditSandContractModal";
+import { AddSandContractorModal } from "@/components/people/AddSandContractorModal";
+import { SandContractorDetailPage } from "@/components/people/SandContractorDetailPage";
 import { printSandContract } from "@/lib/printDocument";
 import type { LedgerPaymentMode, Person, SandContract, SandContractRateType, SandDelivery } from "@/types";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
@@ -31,11 +33,12 @@ function tractorSummary(entry: SandDelivery, t: (key: string) => string) {
 // against a sand contractor, independent of the Contract apparatus below.
 // Same shape as Soil.tsx's ArrivalsTab (arrivals ↔ deliveries, field owner
 // ↔ sand contractor), minus JCB and depth tracking which don't apply here.
-function SandArrivalsTab() {
+function SandArrivalsTab({ onOpenContractor }: { onOpenContractor: (id: string) => void }) {
   const { t } = useTranslation();
   const [deliveries, setDeliveries] = useState<SandDelivery[]>([]);
   const [contractors, setContractors] = useState<Person[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [showAddContractor, setShowAddContractor] = useState(false);
   const [editingDelivery, setEditingDelivery] = useState<SandDelivery | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -54,6 +57,7 @@ function SandArrivalsTab() {
   }, [activeKilnId]);
 
   useKilnEvent("sandDelivery:update", () => refresh());
+  useKilnEvent("person:update", () => refresh());
 
   const { page, setPage, pageCount, pageItems: pagedDeliveries, total } = usePagination(deliveries, 10);
 
@@ -78,7 +82,10 @@ function SandArrivalsTab() {
         </Card>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setShowAddContractor(true)}>
+          <Plus className="h-4 w-4" /> {t("people.addSandContractor")}
+        </Button>
         <Button size="sm" onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4" /> {t("sand.logSandDelivery")}
         </Button>
@@ -102,10 +109,20 @@ function SandArrivalsTab() {
                 </tr>
               </thead>
               <tbody>
-                {pagedDeliveries.map((d) => (
+                {pagedDeliveries.map((d) => {
+                  const contractor = typeof d.sandContractorId === "object" ? d.sandContractorId : null;
+                  return (
                   <tr key={d._id} className="border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
                     <td className="py-3 text-ink-secondary">{new Date(d.date).toLocaleDateString("en-IN")}</td>
-                    <td className="py-3 text-ink-primary">{typeof d.sandContractorId === "object" ? d.sandContractorId.name : "—"}</td>
+                    <td className="py-3 text-ink-primary">
+                      {contractor ? (
+                        <button onClick={() => onOpenContractor(contractor._id)} className="hover:underline">
+                          {contractor.name}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="py-3 text-ink-secondary">{tractorSummary(d, t)}</td>
                     <td className="py-3 tabular-nums text-ink-secondary">{d.trolleyCount.toLocaleString("en-IN")}</td>
                     <td className="py-3 tabular-nums text-status-good">₹{formatINR(d.paymentGiven ?? 0)}</td>
@@ -116,7 +133,8 @@ function SandArrivalsTab() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
@@ -126,6 +144,7 @@ function SandArrivalsTab() {
 
       {showAdd && <AddSandDeliveryModal sandContractors={contractors} onClose={() => setShowAdd(false)} onCreated={refresh} />}
       {editingDelivery && <EditSandDeliveryModal entry={editingDelivery} onClose={() => setEditingDelivery(null)} onSaved={refresh} />}
+      {showAddContractor && <AddSandContractorModal onClose={() => setShowAddContractor(false)} onCreated={refresh} />}
     </div>
   );
 }
@@ -136,7 +155,7 @@ const CONTRACT_RATE_TYPE_FILTERS: { value: SandContractRateType | "ALL"; labelKe
   { value: "PER_THOUSAND_BRICKS", labelKey: "sand.perThousandBricks" },
 ];
 
-function SandContractsTab() {
+function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string) => void }) {
   const { t } = useTranslation();
   const [contracts, setContracts] = useState<SandContract[]>([]);
   const [contractors, setContractors] = useState<Person[]>([]);
@@ -191,6 +210,7 @@ function SandContractsTab() {
 
   useKilnEvent("sandContract:update", () => refresh());
   useKilnEvent("sandDelivery:update", () => refresh());
+  useKilnEvent("person:update", () => refresh());
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -431,10 +451,20 @@ function SandContractsTab() {
                 </tr>
               </thead>
               <tbody>
-                {pagedContracts.map((c) => (
+                {pagedContracts.map((c) => {
+                  const contractor = typeof c.sandContractorId === "object" ? c.sandContractorId : null;
+                  return (
                   <tr key={c._id} className="border-b border-border/60 last:border-0">
                     <td className="py-3 text-ink-primary">{c.contractNumber}</td>
-                    <td className="py-3 text-ink-secondary">{typeof c.sandContractorId === "object" ? c.sandContractorId.name : "—"}</td>
+                    <td className="py-3 text-ink-secondary">
+                      {contractor ? (
+                        <button onClick={() => onOpenContractor(contractor._id)} className="hover:underline">
+                          {contractor.name}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="py-3 text-ink-secondary">
                       {c.rateType === "PER_THOUSAND_BRICKS" ? t("sand.perThousandBricks") : t("sand.perTrolley")}
                       {c.contractedTrolleys != null ? ` · ${c.contractedTrolleys.toLocaleString("en-IN")}` : ""}
@@ -455,7 +485,8 @@ function SandContractsTab() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
@@ -478,6 +509,14 @@ const TAB_LABEL_KEYS = {
 export function Sand() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<keyof typeof TAB_LABEL_KEYS>("arrivals");
+  const [openContractorId, setOpenContractorId] = useState<string | null>(null);
+
+  // Same SandContractorDetailPage the People page's Sand Contractor tab
+  // opens, so the profile looks identical no matter which page it was
+  // opened from — mirrors Soil.tsx's landowner click-through.
+  if (openContractorId) {
+    return <SandContractorDetailPage sandContractorId={openContractorId} onBack={() => setOpenContractorId(null)} />;
+  }
 
   return (
     <div className="space-y-4">
@@ -487,8 +526,8 @@ export function Sand() {
         onChange={setTab}
       />
 
-      {tab === "arrivals" && <SandArrivalsTab />}
-      {tab === "contracts" && <SandContractsTab />}
+      {tab === "arrivals" && <SandArrivalsTab onOpenContractor={setOpenContractorId} />}
+      {tab === "contracts" && <SandContractsTab onOpenContractor={setOpenContractorId} />}
     </div>
   );
 }

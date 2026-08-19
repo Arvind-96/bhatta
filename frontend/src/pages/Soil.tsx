@@ -16,6 +16,8 @@ import { ContractDetailPage, contractStatusLabel, rateBasisLabel } from "@/compo
 import { AddSoilArrivalModal } from "@/components/soil/AddSoilArrivalModal";
 import { EditSoilArrivalModal } from "@/components/soil/EditSoilArrivalModal";
 import { EditSoilContractModal } from "@/components/soil/EditSoilContractModal";
+import { AddLandownerModal } from "@/components/people/AddLandownerModal";
+import { LandownerDetailPage } from "@/components/people/LandownerDetailPage";
 import type {
   DepthUnit,
   Land,
@@ -41,12 +43,13 @@ function driverName(p: SoilArrival["jcbDriverId"]) {
 // arrived and what's been paid, mirroring AddWorkEntryModal's role for
 // labour. The same modal is reused from the field owner's own profile
 // (LandownerDetailPage), so the two entry points stay identical.
-function ArrivalsTab() {
+function ArrivalsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => void }) {
   const { t } = useTranslation();
   const [arrivals, setArrivals] = useState<SoilArrival[]>([]);
   const [landowners, setLandowners] = useState<Person[]>([]);
   const [drivers, setDrivers] = useState<Person[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [showAddLandowner, setShowAddLandowner] = useState(false);
   const [editingArrival, setEditingArrival] = useState<SoilArrival | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -91,7 +94,10 @@ function ArrivalsTab() {
         </Card>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={() => setShowAddLandowner(true)}>
+          <Plus className="h-4 w-4" /> {t("people.addLandowner")}
+        </Button>
         <Button size="sm" onClick={() => setShowAdd(true)}>
           <Plus className="h-4 w-4" /> {t("soil.logSoilArrival")}
         </Button>
@@ -117,10 +123,20 @@ function ArrivalsTab() {
                 </tr>
               </thead>
               <tbody>
-                {pagedArrivals.map((a) => (
+                {pagedArrivals.map((a) => {
+                  const owner = typeof a.landownerId === "object" ? a.landownerId : null;
+                  return (
                   <tr key={a._id} className="border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
                     <td className="py-3 text-ink-secondary">{new Date(a.date).toLocaleDateString("en-IN")}</td>
-                    <td className="py-3 text-ink-primary">{typeof a.landownerId === "object" ? a.landownerId.name : "—"}</td>
+                    <td className="py-3 text-ink-primary">
+                      {owner ? (
+                        <button onClick={() => onOpenLandowner(owner._id)} className="hover:underline">
+                          {owner.name}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="py-3 text-ink-secondary">{a.jcbUsed ? driverName(a.jcbDriverId) || t("common.yes") : "—"}</td>
                     <td className="py-3 text-ink-secondary">{a.tractorUsed ? driverName(a.tractorDriverId) || t("common.yes") : "—"}</td>
                     <td className="py-3 tabular-nums text-ink-secondary">{a.trolleyCount.toLocaleString("en-IN")}</td>
@@ -135,7 +151,8 @@ function ArrivalsTab() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
@@ -149,6 +166,7 @@ function ArrivalsTab() {
       {editingArrival && (
         <EditSoilArrivalModal entry={editingArrival} drivers={drivers} onClose={() => setEditingArrival(null)} onSaved={refresh} />
       )}
+      {showAddLandowner && <AddLandownerModal onClose={() => setShowAddLandowner(false)} onCreated={refresh} />}
     </div>
   );
 }
@@ -169,7 +187,13 @@ const CONTRACT_RATE_TYPE_FILTERS: { value: SoilContractRateType | "ALL"; labelKe
   { value: "PER_DEPTH", labelKey: "soil.perDepth" },
 ];
 
-function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string) => void }) {
+function ContractsTab({
+  onOpenContract,
+  onOpenLandowner,
+}: {
+  onOpenContract: (contractId: string) => void;
+  onOpenLandowner: (id: string) => void;
+}) {
   const { t } = useTranslation();
   const [contracts, setContracts] = useState<SoilContract[]>([]);
   const [lands, setLands] = useState<Land[]>([]);
@@ -712,7 +736,9 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
                 </tr>
               </thead>
               <tbody>
-                {pagedContracts.map((c) => (
+                {pagedContracts.map((c) => {
+                  const owner = typeof c.landownerId === "object" ? c.landownerId : null;
+                  return (
                   <tr
                     key={c._id}
                     onClick={() => onOpenContract(c._id)}
@@ -721,7 +747,19 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
                     <td className="py-3 text-ink-primary">{c.contractNumber}</td>
                     <td className="py-3 text-ink-secondary">
                       {typeof c.landId === "object" ? c.landId.name : "—"} —{" "}
-                      {typeof c.landownerId === "object" ? c.landownerId.name : "—"}
+                      {owner ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenLandowner(owner._id);
+                          }}
+                          className="hover:underline"
+                        >
+                          {owner.name}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="py-3 text-ink-secondary">{rateBasisLabel(c, t)}</td>
                     <td className="py-3 tabular-nums">
@@ -759,7 +797,8 @@ function ContractsTab({ onOpenContract }: { onOpenContract: (contractId: string)
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
@@ -783,12 +822,18 @@ export function Soil() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<keyof typeof TAB_LABEL_KEYS>("arrivals");
   const [openContractId, setOpenContractId] = useState<string | null>(null);
+  const [openLandownerId, setOpenLandownerId] = useState<string | null>(null);
 
-  // A contract opened from the Contracts tab replaces the whole tab area
-  // with a full page (ContractDetailPage), not a popup — "Back to
-  // contracts" returns here without losing which tab was active.
+  // A contract or landowner opened from either tab replaces the whole tab
+  // area with a full page (ContractDetailPage / LandownerDetailPage), not a
+  // popup — "Back" returns here without losing which tab was active. Same
+  // LandownerDetailPage the People page's Landowner tab opens, so the
+  // profile looks identical no matter which page it was opened from.
   if (openContractId) {
     return <ContractDetailPage contractId={openContractId} onBack={() => setOpenContractId(null)} />;
+  }
+  if (openLandownerId) {
+    return <LandownerDetailPage landownerId={openLandownerId} onBack={() => setOpenLandownerId(null)} />;
   }
 
   return (
@@ -799,8 +844,8 @@ export function Soil() {
         onChange={setTab}
       />
 
-      {tab === "arrivals" && <ArrivalsTab />}
-      {tab === "contracts" && <ContractsTab onOpenContract={setOpenContractId} />}
+      {tab === "arrivals" && <ArrivalsTab onOpenLandowner={setOpenLandownerId} />}
+      {tab === "contracts" && <ContractsTab onOpenContract={setOpenContractId} onOpenLandowner={setOpenLandownerId} />}
     </div>
   );
 }
