@@ -126,6 +126,7 @@ export async function createSoilContract(input: CreateSoilContractInput) {
       direction: "PAID",
       amount: input.advanceAmount,
       reason: `Advance for soil contract ${contractNumber}`,
+      category: "ADVANCE",
       contractId: contract._id,
       date: input.startDate,
       paymentMode,
@@ -146,6 +147,7 @@ export async function createSoilContract(input: CreateSoilContractInput) {
           : rateType === "PER_BIGHA"
           ? `Soil contract ${contractNumber}: ${input.contractedAreaBigha} bigha @ ₹${input.ratePerBigha}/bigha`
           : `Soil contract ${contractNumber}: ${input.contractedDepth} ${input.depthUnit ?? "feet"} @ ₹${input.ratePerDepthUnit}/${input.depthUnit ?? "feet"}`,
+      category: "SOIL",
       contractId: contract._id,
       date: input.startDate,
     });
@@ -437,6 +439,7 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
         direction: "DUE",
         amount: valueDelta,
         reason: `Soil contract ${existing.contractNumber} correction: revised value to ₹${newTotalValue.toLocaleString("en-IN")}`,
+        category: "SOIL",
         contractId,
       });
     } else if (valueDelta < 0) {
@@ -446,6 +449,7 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
         direction: "PAID",
         amount: -valueDelta,
         reason: `Soil contract ${existing.contractNumber} correction: revised value to ₹${newTotalValue.toLocaleString("en-IN")}`,
+        category: "SOIL",
         contractId,
       });
     }
@@ -459,6 +463,7 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
       direction: "PAID",
       amount: advanceDelta,
       reason: `Soil contract ${existing.contractNumber}: additional advance`,
+      category: "ADVANCE",
       contractId,
     });
   } else if (advanceDelta < 0) {
@@ -468,6 +473,7 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
       direction: "DUE",
       amount: -advanceDelta,
       reason: `Soil contract ${existing.contractNumber}: advance revised down`,
+      category: "ADVANCE",
       contractId,
     });
   }

@@ -61,6 +61,7 @@ export async function createSandContract(input: CreateSandContractInput) {
       direction: "PAID",
       amount: input.advanceAmount,
       reason: `Advance for sand contract ${contractNumber}`,
+      category: "ADVANCE",
       contractId: contract._id,
       date: input.startDate,
       paymentMode,
@@ -76,6 +77,7 @@ export async function createSandContract(input: CreateSandContractInput) {
       direction: "DUE",
       amount: input.totalContractValue,
       reason: `Sand contract ${contractNumber}: agreed value`,
+      category: "SAND",
       contractId: contract._id,
       date: input.startDate,
     });
@@ -133,6 +135,7 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
         direction: "DUE",
         amount: valueDelta,
         reason: `Sand contract ${existing.contractNumber} correction: revised value to ₹${newTotalValue.toLocaleString("en-IN")}`,
+        category: "SAND",
         contractId,
       });
     } else if (valueDelta < 0) {
@@ -142,6 +145,7 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
         direction: "PAID",
         amount: -valueDelta,
         reason: `Sand contract ${existing.contractNumber} correction: revised value to ₹${newTotalValue.toLocaleString("en-IN")}`,
+        category: "SAND",
         contractId,
       });
     }
@@ -155,6 +159,7 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
       direction: "PAID",
       amount: advanceDelta,
       reason: `Sand contract ${existing.contractNumber}: additional advance`,
+      category: "ADVANCE",
       contractId,
     });
   } else if (advanceDelta < 0) {
@@ -164,6 +169,7 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
       direction: "DUE",
       amount: -advanceDelta,
       reason: `Sand contract ${existing.contractNumber}: advance revised down`,
+      category: "ADVANCE",
       contractId,
     });
   }
