@@ -103,6 +103,10 @@ import type {
   WorkType,
   SoilArrival,
   SoilArrivalTractorEntry,
+  SandContract,
+  SandContractRateType,
+  SandDelivery,
+  SandDeliveryTractorEntry,
 } from "@/types";
 import { useAuthStore, type AuthUser, type UserKiln } from "@/store/auth.store";
 
@@ -483,6 +487,69 @@ export const api = {
     remove: (id: string) => del(`/soil-contracts/${id}`, true),
     dashboard: () => get<SoilContractDashboard>("/soil-contracts/dashboard", true),
     dailyMovement: (id: string) => get<ContractDailyMovement[]>(`/soil-contracts/${id}/daily-movement`, true),
+  },
+
+  sandContracts: {
+    list: (filter: { sandContractorId?: string } = {}) =>
+      get<SandContract[]>(`/sand-contracts${filter.sandContractorId ? `?sandContractorId=${filter.sandContractorId}` : ""}`, true),
+    create: (input: {
+      sandContractorId: string;
+      rateType?: SandContractRateType;
+      contractedTrolleys?: number;
+      totalContractValue: number;
+      advanceAmount?: number;
+      paymentMode?: LedgerPaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
+      startDate?: string;
+      endDate?: string;
+    }) => post<SandContract>("/sand-contracts", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        rateType: SandContractRateType;
+        contractedTrolleys: number;
+        totalContractValue: number;
+        advanceAmount: number;
+        startDate: string;
+        endDate: string;
+      }>
+    ) => patch<SandContract>(`/sand-contracts/${id}`, input, true),
+    remove: (id: string) => del<void>(`/sand-contracts/${id}`, true),
+  },
+
+  sandDeliveries: {
+    list: (filter: { sandContractorId?: string; contractId?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (filter.sandContractorId) params.set("sandContractorId", filter.sandContractorId);
+      if (filter.contractId) params.set("contractId", filter.contractId);
+      const qs = params.toString();
+      return get<SandDelivery[]>(`/sand-deliveries${qs ? `?${qs}` : ""}`, true);
+    },
+    create: (input: {
+      sandContractorId: string;
+      contractId?: string;
+      tractorUsed?: boolean;
+      tractors?: SandDeliveryTractorEntry[];
+      trolleyCount: number;
+      paymentGiven?: number;
+      paymentPending?: number;
+      date?: string;
+      notes?: string;
+    }) => post<SandDelivery>("/sand-deliveries", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        contractId: string;
+        tractorUsed: boolean;
+        tractors: SandDeliveryTractorEntry[];
+        trolleyCount: number;
+        paymentGiven: number;
+        paymentPending: number;
+        notes: string;
+      }>
+    ) => patch<SandDelivery>(`/sand-deliveries/${id}`, input, true),
+    remove: (id: string) => del<void>(`/sand-deliveries/${id}`, true),
   },
 
   jcbWorkLogs: {

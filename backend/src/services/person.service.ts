@@ -91,17 +91,22 @@ export async function createPerson(input: CreatePersonInput) {
   if (input.nikasiContractorId) {
     await assertPersonOfType(input.kilnId, input.nikasiContractorId, ["LABOUR_CONTRACTOR"]);
   }
-  // "Landowner - N", a simple per-kiln count-based sequence — landowners
-  // are added one at a time by a single admin, not a high-concurrency
-  // flow like dispatch slip numbers, so this skips that flow's
-  // retry-on-collision machinery as unnecessary complexity here.
+  // "Landowner - N" / "Sand - N", simple per-kiln count-based sequences —
+  // both types are added one at a time by a single admin, not a
+  // high-concurrency flow like dispatch slip numbers, so this skips that
+  // flow's retry-on-collision machinery as unnecessary complexity here.
   let landownerSerial: number | undefined;
   if (input.type === "LANDOWNER") {
     const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "LANDOWNER"))))[0];
     landownerSerial = (countRow?.count ?? 0) + 1;
   }
+  let sandContractorSerial: number | undefined;
+  if (input.type === "SAND_CONTRACTOR") {
+    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "SAND_CONTRACTOR"))))[0];
+    sandContractorSerial = (countRow?.count ?? 0) + 1;
+  }
   const _id = randomUUID();
-  await db.insert(people).values({ ...input, _id, stackingStage: deriveStackingStage(input), landownerSerial });
+  await db.insert(people).values({ ...input, _id, stackingStage: deriveStackingStage(input), landownerSerial, sandContractorSerial });
   const person = (await db.select().from(people).where(eq(people._id, _id)))[0]!;
   emitToKiln(input.kilnId, "person:update", person);
   return person;

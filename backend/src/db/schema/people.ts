@@ -3,7 +3,7 @@ import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers"
 
 export const PERSON_TYPES = [
   "DRIVER", "LABOUR_CONTRACTOR", "SUPPLIER", "THEKEDAR", "PARTNER", "WORKER",
-  "HELPER", "LANDOWNER", "FITTER", "CUSTOMER", "MUNIM", "CHOWKIDAR",
+  "HELPER", "LANDOWNER", "FITTER", "CUSTOMER", "MUNIM", "CHOWKIDAR", "SAND_CONTRACTOR",
 ] as const;
 export const WORK_TYPES = [
   "PATHAI", "BHARAI_TRANSPORT", "PAKAYI", "NIKASI", "LOADING", "BHARAI_CHAMBER_STACKING",
@@ -66,6 +66,9 @@ export const people = mysqlTable("people", {
   // N") — set once at creation (see person.service.ts's createPerson),
   // never reassigned. Null for every other person type.
   landownerSerial: int("landownerSerial"),
+  // Same idea as landownerSerial above, but for sand contractors ("Sand -
+  // N") — independent counter, null for every other person type.
+  sandContractorSerial: int("sandContractorSerial"),
   creditLimit: double("creditLimit"),
   active: boolean("active").default(true),
   // What everyone actually calls this person day-to-day — distinct from
@@ -104,7 +107,7 @@ export const familyMembers = mysqlTable("family_members", {
 
 export const LEDGER_CATEGORIES = [
   "WAGE", "COMMISSION", "SALARY", "TIP", "ADVANCE", "KHARCHI", "MEDICAL",
-  "FESTIVAL", "SALE", "SOIL", "FUEL", "OTHER",
+  "FESTIVAL", "SALE", "SOIL", "SAND", "FUEL", "OTHER",
 ] as const;
 export const LEDGER_PAYMENT_MODES = ["CASH", "BANK", "UPI", "CASH_AND_ONLINE"] as const;
 

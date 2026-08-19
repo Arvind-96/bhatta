@@ -72,7 +72,8 @@ export type PersonType =
   | "FITTER"
   | "CUSTOMER"
   | "MUNIM"
-  | "CHOWKIDAR";
+  | "CHOWKIDAR"
+  | "SAND_CONTRACTOR";
 
 export type PersonStatus = "ACTIVE" | "ABSCONDED";
 export type PayType = "MONTHLY" | "PER_THOUSAND";
@@ -123,6 +124,7 @@ export interface Person {
   agreedDepthFeet?: number;
   agreedDepthUnit?: string;
   landownerSerial?: number;
+  sandContractorSerial?: number;
   creditLimit?: number;
   nickname?: string;
   joiningDate?: string;
@@ -244,6 +246,7 @@ export type LedgerCategory =
   | "FESTIVAL"
   | "SALE"
   | "SOIL"
+  | "SAND"
   | "FUEL"
   | "OTHER";
 
@@ -427,6 +430,41 @@ export interface SoilContract {
   contractedDepthRemaining: number | null;
   contractedDepthPercentUsed: number | null;
   contractedDepthOverrun: boolean;
+}
+
+export type SandContractRateType = "PER_TROLLEY" | "PER_THOUSAND_BRICKS";
+
+export interface SandContract {
+  _id: string;
+  contractNumber: string;
+  sandContractorId: { _id: string; name: string; phone?: string } | string;
+  rateType: SandContractRateType;
+  contractedTrolleys?: number;
+  totalContractValue: number;
+  advanceAmount: number;
+  startDate?: string;
+  endDate?: string;
+  createdAt: string;
+}
+
+export interface SandDeliveryTractorEntry {
+  driverName?: string;
+  driverPhone?: string;
+  tractorNumber?: string;
+}
+
+export interface SandDelivery {
+  _id: string;
+  sandContractorId: { _id: string; name: string; phone?: string } | string;
+  contractId?: string;
+  tractorUsed: boolean;
+  tractors?: SandDeliveryTractorEntry[];
+  trolleyCount: number;
+  paymentGiven: number;
+  paymentPending: number;
+  date: string;
+  createdAt: string;
+  notes?: string;
 }
 
 export interface SoilContractSummary {

@@ -20,6 +20,7 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 import { peopleCoreDict } from "./dict/people-core";
 import { peopleDetailDict } from "./dict/people-detail";
 import { soilDict } from "./dict/soil";
+import { sandDict } from "./dict/sand";
 import { moldingStackingDict } from "./dict/molding-stacking";
 import { firingNikasiDict } from "./dict/firing-nikasi";
 import { logisticsDict } from "./dict/logistics";
@@ -194,6 +195,7 @@ export const translations: Record<string, Record<Locale, string>> = {
   ...peopleCoreDict,
   ...peopleDetailDict,
   ...soilDict,
+  ...sandDict,
   ...moldingStackingDict,
   ...firingNikasiDict,
   ...logisticsDict,

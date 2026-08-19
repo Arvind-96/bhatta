@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { Dispatch, LedgerEntry, PaymentReceipt, SoilContract } from "@/types";
+import type { Dispatch, LedgerEntry, PaymentReceipt, SandContract, SoilContract } from "@/types";
 
 // Gate Pass, Challan, and Payment Receipt all share one visual language
 // (red accent bars, a logo mark, a colored "who this is for" box, a
@@ -537,4 +537,96 @@ export function printLandownerContract(contract: SoilContract, landownerName: st
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`Land Contract ${contract.contractNumber}`, body, CONTRACT_ACCENT);
+}
+
+function sandContractRateBasisText(contract: SandContract) {
+  if (contract.rateType === "PER_THOUSAND_BRICKS") return "Per 1000 bricks";
+  return contract.contractedTrolleys != null ? `${contract.contractedTrolleys} trolleys` : "Per trolley";
+}
+
+// The sand contractor "bill" — same shape/intent as printLandownerContract:
+// terms plus only the actual payment log (direction PAID), never the
+// underlying Advance/Kharchi ledger framing.
+export function printSandContract(contract: SandContract, contractorName: string, kiln: KilnPrintInfo, ledgerEntries: LedgerEntry[]) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const payments = [...ledgerEntries]
+    .filter((e) => e.direction === "PAID")
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const runningDue = ledgerEntries.filter((e) => e.direction === "DUE").reduce((sum, e) => sum + e.amount, 0);
+  const runningPaid = payments.reduce((sum, e) => sum + e.amount, 0);
+
+  const rows = payments.map((entry) => {
+    const isSplit = entry.paymentMode === "CASH_AND_ONLINE";
+    return `
+      <tr>
+        <td>${new Date(entry.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+        <td>${entry.paymentMode ? escapeHtml(entry.paymentMode) : "—"}</td>
+        <td class="num">${isSplit ? `₹${formatINR(entry.cashAmount ?? 0)}` : entry.paymentMode === "CASH" ? `₹${formatINR(entry.amount)}` : "—"}</td>
+        <td class="num">${isSplit ? `₹${formatINR(entry.onlineAmount ?? 0)}` : entry.paymentMode && entry.paymentMode !== "CASH" ? `₹${formatINR(entry.amount)}` : "—"}</td>
+        <td class="num">₹${formatINR(entry.amount)}</td>
+      </tr>`;
+  });
+
+  const finalRemaining = Math.max(0, runningDue - runningPaid);
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Sand Contract</span>
+        <p class="doc-number">${escapeHtml(contract.contractNumber)}</p>
+        <p class="doc-date">Created: ${new Date(contract.startDate ?? Date.now()).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Sand Contractor</p>
+        <p class="doc-box-name">${escapeHtml(contractorName)}</p>
+        <p class="doc-box-detail">${escapeHtml(sandContractRateBasisText(contract))}</p>
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Total contract amount</p>
+        <p class="doc-total-amount">₹${formatINR(contract.totalContractValue)}</p>
+        <p class="doc-amount-words">${escapeHtml(amountInWords(contract.totalContractValue))}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      <tr><td class="doc-table-label">Contract period</td><td class="doc-table-value">${contract.startDate ? new Date(contract.startDate).toLocaleDateString("en-IN") : "—"} to ${contract.endDate ? new Date(contract.endDate).toLocaleDateString("en-IN") : "—"}</td></tr>
+      <tr><td class="doc-table-label">Advance paid</td><td class="doc-table-value">₹${formatINR(contract.advanceAmount ?? 0)}</td></tr>
+      <tr><td class="doc-table-label">Remaining / due</td><td class="doc-table-value">₹${formatINR(finalRemaining)}</td></tr>
+    </table>
+
+    <table class="doc-items">
+      <thead>
+        <tr><th>Payment date</th><th>Payment mode</th><th class="num">Cash</th><th class="num">Online</th><th class="num">Amount paid</th></tr>
+      </thead>
+      <tbody>
+        ${rows.join("") || `<tr><td colspan="5">No payments recorded yet.</td></tr>`}
+      </tbody>
+    </table>
+
+    <div class="doc-footer-total">
+      <span>Remaining due</span>
+      <span class="big">₹${formatINR(finalRemaining)}</span>
+    </div>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED CONTRACT STATEMENT ~</p>
+    <div class="doc-sign-row">
+      <div class="doc-sign-box">Bhatta owner / Munim<br />(Stamp &amp; Signature)</div>
+      <div class="doc-sign-box">Sand contractor signature</div>
+    </div>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`Sand Contract ${contract.contractNumber}`, body, CONTRACT_ACCENT);
 }

@@ -28,6 +28,7 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   FESTIVAL: "Festival",
   SALE: "Sale",
   SOIL: "Soil",
+  SAND: "Sand",
   FUEL: "Fuel",
   OTHER: "Other",
 };

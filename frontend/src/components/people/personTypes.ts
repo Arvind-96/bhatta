@@ -16,6 +16,7 @@ export function usePersonTypeMeta(): Record<PersonType, { label: string; hasWage
     CUSTOMER: { label: t("people.typeCustomer"), hasWage: false },
     MUNIM: { label: t("people.typeMunim"), hasWage: false },
     CHOWKIDAR: { label: t("people.typeChowkidar"), hasWage: false },
+    SAND_CONTRACTOR: { label: t("people.typeSandContractor"), hasWage: false },
   };
 }
 
@@ -65,5 +66,6 @@ export const PERSON_TYPES: PersonType[] = [
   "THEKEDAR",
   "PARTNER",
   "LANDOWNER",
+  "SAND_CONTRACTOR",
   "CUSTOMER",
 ];

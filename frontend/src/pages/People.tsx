@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Handshake, MapPinned, Plus, UserPlus, Users } from "lucide-react";
+import { Handshake, MapPinned, Plus, Truck, UserPlus, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +17,12 @@ import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { AddThekedarModal } from "@/components/people/AddThekedarModal";
 import { AddLabourModal } from "@/components/people/AddLabourModal";
 import { AddLandownerModal } from "@/components/people/AddLandownerModal";
+import { AddSandContractorModal } from "@/components/people/AddSandContractorModal";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { LabourDetailPage } from "@/components/people/LabourDetailPage";
 import { ThekedarDetailPage } from "@/components/people/ThekedarDetailPage";
 import { LandownerDetailPage } from "@/components/people/LandownerDetailPage";
+import { SandContractorDetailPage } from "@/components/people/SandContractorDetailPage";
 import { Staff } from "@/pages/Staff";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -30,10 +32,10 @@ import { useAuthStore } from "@/store/auth.store";
 // below — excluded from the "Other" tab's chip filter so the same person
 // isn't reachable two different ways.
 const OTHER_TAB_TYPES = PERSON_TYPES.filter(
-  (t) => !["WORKER", "HELPER", "LABOUR_CONTRACTOR", "MUNIM", "CHOWKIDAR", "LANDOWNER"].includes(t)
+  (t) => !["WORKER", "HELPER", "LABOUR_CONTRACTOR", "MUNIM", "CHOWKIDAR", "LANDOWNER", "SAND_CONTRACTOR"].includes(t)
 );
 
-type PeopleTab = "labour" | "thekedar" | "staff" | "landowner" | "other";
+type PeopleTab = "labour" | "thekedar" | "staff" | "landowner" | "sandContractor" | "other";
 
 function PersonCard({
   person,
@@ -333,6 +335,64 @@ function LandownerTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
   );
 }
 
+function SandContractorTab({ onOpenSandContractor }: { onOpenSandContractor: (id: string) => void }) {
+  const [contractors, setContractors] = useState<Person[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const { t } = useTranslation();
+
+  async function refresh() {
+    setContractors(await api.people.list("SAND_CONTRACTOR"));
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    refresh().catch(console.error);
+  }, [activeKilnId]);
+
+  useKilnEvent("person:update", () => refresh());
+
+  const { page, setPage, pageCount, pageItems: pagedContractors, total } = usePagination(contractors, 12);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-series-4/15 text-series-4">
+            <Truck className="h-4 w-4" />
+          </span>
+          <h3 className="font-display text-base font-bold text-ink-primary">{t("people.sandContractor")}</h3>
+          <Badge variant="neutral">{contractors.length}</Badge>
+        </div>
+        <Button size="sm" onClick={() => setShowAdd(true)}>
+          <Plus className="h-4 w-4" /> {t("people.addSandContractor")}
+        </Button>
+      </div>
+
+      {contractors.length === 0 ? (
+        <Card>
+          <EmptyState icon={Truck} title={t("people.noSandContractorsYet")} />
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-3 md:grid-cols-3">
+            {pagedContractors.map((c) => (
+              <PersonCard
+                key={c._id}
+                person={c}
+                subtitle={c.sandContractorSerial ? `${t("people.sandContractor")} - ${c.sandContractorSerial}` : "—"}
+                onOpen={() => onOpenSandContractor(c._id)}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={12} />
+        </>
+      )}
+      {showAdd && <AddSandContractorModal onClose={() => setShowAdd(false)} onCreated={refresh} />}
+    </div>
+  );
+}
+
 function OtherTab() {
   const [filter, setFilter] = useState<PersonType | "ALL">("ALL");
   const [people, setPeople] = useState<Person[]>([]);
@@ -444,10 +504,15 @@ export function People() {
   const [openLabourId, setOpenLabourId] = useState<string | null>(null);
   const [openThekedarId, setOpenThekedarId] = useState<string | null>(null);
   const [openLandownerId, setOpenLandownerId] = useState<string | null>(null);
+  const [openSandContractorId, setOpenSandContractorId] = useState<string | null>(null);
   const { t } = useTranslation();
 
   if (openLandownerId) {
     return <LandownerDetailPage landownerId={openLandownerId} onBack={() => setOpenLandownerId(null)} />;
+  }
+
+  if (openSandContractorId) {
+    return <SandContractorDetailPage sandContractorId={openSandContractorId} onBack={() => setOpenSandContractorId(null)} />;
   }
 
   if (openLabourId) {
@@ -482,6 +547,7 @@ export function People() {
     { value: "thekedar", label: t("people.thekedarTabLabel") },
     { value: "staff", label: t("nav.staff") },
     { value: "landowner", label: t("people.landowner") },
+    { value: "sandContractor", label: t("people.sandContractor") },
     { value: "other", label: t("people.other") },
   ];
 
@@ -493,6 +559,7 @@ export function People() {
       {tab === "thekedar" && <ThekedarTab onOpenThekedar={setOpenThekedarId} />}
       {tab === "staff" && <Staff />}
       {tab === "landowner" && <LandownerTab onOpenLandowner={setOpenLandownerId} />}
+      {tab === "sandContractor" && <SandContractorTab onOpenSandContractor={setOpenSandContractorId} />}
       {tab === "other" && <OtherTab />}
     </div>
   );
