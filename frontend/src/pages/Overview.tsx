@@ -9,6 +9,7 @@ import {
   type LucideIcon,
   Package,
   Plus,
+  Trash2,
   TrendingUp,
   Truck,
   Wallet,
@@ -19,6 +20,7 @@ import { PeriodStatCard } from "@/components/dashboard/PeriodStatCard";
 import { ProductionChart } from "@/components/dashboard/ProductionChart";
 import { StockOverview } from "@/components/dashboard/StockOverview";
 import { LiveFeed } from "@/components/dashboard/LiveFeed";
+import { LedgerModal } from "@/components/people/LedgerModal";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
@@ -232,9 +234,21 @@ function DashboardStockPanel() {
   const [brickCategories, setBrickCategories] = useState<BrickCategory[]>([]);
   const [fuelStock, setFuelStock] = useState<Record<string, number>>({});
   const [paymentsDue, setPaymentsDue] = useState<PaymentDue[]>([]);
+  const [ledgerFor, setLedgerFor] = useState<Person | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
   const personTypeMeta = usePersonTypeMeta();
+
+  // "Delete" on a due row doesn't erase a single record — amountDue is a
+  // live-computed balance across however many ledger entries make it up
+  // (exactly the kind of stale/incorrect entry that needed cleaning up for
+  // Pradeep@Pappu). So it opens that person's own ledger, where each entry
+  // can be individually edited or deleted, same as everywhere else in the
+  // app — never silently hides a real due amount without resolving it.
+  async function openLedgerFor(personId: string) {
+    const detail = await api.people.get(personId);
+    setLedgerFor(detail.person);
+  }
 
   async function refresh() {
     const [summary, categories, fuel, dues] = await Promise.all([
@@ -372,9 +386,20 @@ function DashboardStockPanel() {
                     <span className="text-ink-secondary">{d.person.name}</span>
                     <span className="text-[11px] text-ink-muted">{personTypeMeta[d.person.type].label}</span>
                   </div>
-                  <span className="font-semibold tabular-nums text-status-critical">
-                    ₹{formatINR(d.amountDue)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-semibold tabular-nums text-status-critical">
+                      ₹{formatINR(d.amountDue)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openLedgerFor(d.person.id)}
+                      className="text-ink-muted hover:text-status-critical"
+                      aria-label={t("overview.resolveDue", { name: d.person.name })}
+                      title={t("overview.resolveDue", { name: d.person.name })}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -384,6 +409,8 @@ function DashboardStockPanel() {
           )}
         </Card>
       </div>
+
+      {ledgerFor && <LedgerModal person={ledgerFor} onClose={() => setLedgerFor(null)} />}
     </div>
   );
 }

@@ -41,6 +41,7 @@ export const overviewDict: Record<string, Record<Locale, string>> = {
   "overview.noBrickCategoriesLogged": { en: "No brick categories logged yet.", hi: "अभी तक कोई ईंट श्रेणी दर्ज नहीं की गई।" },
   "overview.whosePaymentDue": { en: "Whose payment is due", hi: "किसका भुगतान बाकी है" },
   "overview.noPendingPayments": { en: "No pending payments.", hi: "कोई लंबित भुगतान नहीं।" },
+  "overview.resolveDue": { en: "Open {name}'s ledger to resolve this due amount", hi: "यह बकाया राशि ठीक करने के लिए {name} का खाता खोलें" },
   "overview.moreCount": { en: "+{count} more", hi: "+{count} और" },
 
   "overview.sectionTodayProduction": { en: "Today's production", hi: "आज का उत्पादन" },
