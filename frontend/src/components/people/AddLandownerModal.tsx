@@ -175,7 +175,7 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-lg">
+      <Card className="w-full max-w-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink-primary">{t("people.addLandownerModalTitle")}</h3>
           <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
@@ -183,52 +183,60 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex max-h-[75vh] flex-col gap-3 overflow-y-auto pr-1">
-          <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-          <div className="grid grid-cols-2 gap-2">
-            <input placeholder={t("people.mobileNumber")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+        <form onSubmit={handleSubmit} className="flex max-h-[80vh] flex-col gap-5 overflow-y-auto pr-1">
+          {/* Basic details */}
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.mobileNumber")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
+            </div>
             <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+            <div>
+              <p className="mb-1 text-xs text-ink-muted">{t("people.photoOptional")}</p>
+              <PhotoCaptureInput value={photo} onChange={setPhoto} />
+            </div>
           </div>
 
-          <div>
-            <p className="mb-1 text-xs text-ink-muted">{t("people.photoOptional")}</p>
-            <PhotoCaptureInput value={photo} onChange={setPhoto} />
-          </div>
+          {/* Land holdings */}
+          <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.landHoldings")}</p>
+            <label className="flex items-center gap-2">
+              <span className="text-xs text-ink-muted">{t("people.numberOfFields")}</span>
+              <input
+                type="number"
+                min={0}
+                max={50}
+                value={numberOfFields}
+                onChange={(e) => applyFieldCount(e.target.value)}
+                className={cn(inputClass, "w-24")}
+              />
+            </label>
 
-          <div className="border-t border-border pt-3">
-            <label className="mb-1 block text-xs text-ink-muted">{t("people.numberOfFields")}</label>
-            <input
-              type="number"
-              min={0}
-              max={50}
-              value={numberOfFields}
-              onChange={(e) => applyFieldCount(e.target.value)}
-              className={cn(inputClass, "w-32")}
-            />
             {fields.length > 0 && (
-              <div className="mt-2 flex flex-col gap-2">
+              <div className="flex flex-col gap-2">
                 {fields.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="w-14 shrink-0 text-xs text-ink-muted">
+                  <div key={i} className="grid grid-cols-[3.5rem_1fr_8rem_1.5rem] items-center gap-2">
+                    <span className="text-xs text-ink-muted">
                       {t("people.fieldLabel")} {i + 1}
                     </span>
                     <input
                       placeholder={t("people.khasraNumber")}
                       value={f.khasraNumber}
                       onChange={(e) => updateField(i, { khasraNumber: e.target.value })}
-                      className={cn(inputClass, "flex-1")}
+                      className={inputClass}
                     />
                     <input
                       type="number"
                       placeholder={t("people.fieldAreaBigha")}
                       value={f.area}
                       onChange={(e) => updateField(i, { area: e.target.value })}
-                      className={cn(inputClass, "w-28")}
+                      className={inputClass}
                     />
                     <button
                       type="button"
                       onClick={() => removeField(i)}
-                      className="shrink-0 text-status-critical hover:opacity-70"
+                      className="flex items-center justify-center text-status-critical hover:opacity-70"
+                      aria-label={t("common.remove")}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -242,22 +250,24 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
                 setFields((prev) => [...prev, { khasraNumber: "", area: "" }]);
                 setNumberOfFields((n) => String((Number(n) || 0) + 1));
               }}
-              className="mt-2 flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
+              className="flex w-fit items-center gap-1 text-xs font-medium text-series-1 hover:underline"
             >
               <Plus className="h-3.5 w-3.5" /> {t("people.addAnotherField")}
             </button>
           </div>
 
-          <div className="border-t border-border pt-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.contractDetailsOptional")}</p>
-            <div className="flex gap-1">
+          {/* Contract */}
+          <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.contractDetailsOptional")}</p>
+
+            <div className="grid grid-cols-2 gap-1.5">
               {RATE_TYPE_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => setRateType(opt.value)}
                   className={cn(
-                    "flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-colors",
+                    "rounded-lg border px-2 py-2 text-xs font-medium transition-colors",
                     rateType === opt.value
                       ? "border-series-1 bg-series-1/10 text-series-1"
                       : "border-ink-primary/20 bg-surface text-ink-secondary hover:bg-ink-primary/10"
@@ -268,7 +278,7 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
               ))}
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {(rateType === "PER_BIGHA" || rateType === "BOTH") && (
                 <input
                   type="number"
@@ -285,9 +295,9 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
                     placeholder={t("people.depth")}
                     value={contractedDepth}
                     onChange={(e) => setContractedDepth(e.target.value)}
-                    className={inputClass}
+                    className={cn(inputClass, "flex-1")}
                   />
-                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as DepthUnit)} className={inputClass}>
+                  <select value={depthUnit} onChange={(e) => setDepthUnit(e.target.value as DepthUnit)} className={cn(inputClass, "w-24")}>
                     <option value="feet">{t("soil.unitFeet")}</option>
                     <option value="meter">{t("soil.unitMeter")}</option>
                   </select>
@@ -304,7 +314,7 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
               )}
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("soil.contractStartDate")}</span>
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
@@ -315,7 +325,7 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
               </label>
             </div>
 
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
                 placeholder={t("people.advanceAmountPaid")}
@@ -333,7 +343,7 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
             </div>
 
             {advanceAmount && (
-              <div className="mt-2 flex flex-col gap-2">
+              <div className="flex flex-col gap-2">
                 <select
                   value={paymentMode}
                   onChange={(e) => setPaymentMode(e.target.value as LedgerPaymentMode)}
@@ -358,7 +368,7 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
             )}
 
             {wantsContract && (
-              <div className="mt-2 flex items-center justify-between rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-3">
                 <span className="text-sm font-medium text-ink-secondary">{t("people.remainingDueAmount")}</span>
                 <span className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(dueAmount)}</span>
               </div>
@@ -368,14 +378,14 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
           {formError && <p className="text-sm text-status-critical">{formError}</p>}
 
           {uploadWarning ? (
-            <div className="mt-1 flex flex-col gap-2 rounded-xl border border-status-warning/30 bg-status-warning/10 p-3">
+            <div className="flex flex-col gap-2 rounded-xl border border-status-warning/30 bg-status-warning/10 p-3">
               <p className="text-sm text-status-warning">{uploadWarning}</p>
               <Button type="button" onClick={onClose} className="w-full">
                 {t("common.close")}
               </Button>
             </div>
           ) : (
-            <Button type="submit" disabled={loading} className="mt-1 w-full">
+            <Button type="submit" disabled={loading} className="w-full">
               {t("common.add")}
             </Button>
           )}

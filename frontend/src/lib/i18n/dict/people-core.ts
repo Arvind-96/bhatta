@@ -5,9 +5,9 @@ import type { Locale } from "../translations";
 // EnrollFaceModal. Merged into the main dictionary by translations.ts.
 export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   // --- PhotoCaptureInput + new Add-modal fields (joining date, nickname, photo, ID proof) ---
-  "people.uploadPhoto": { en: "Upload", hi: "अपलोड करें" },
-  "people.takePhoto": { en: "Take photo", hi: "फ़ोटो लें" },
-  "people.clickToUploadPhoto": { en: "Click to upload a photo", hi: "फ़ोटो अपलोड करने के लिए क्लिक करें" },
+  "people.uploadPhotoCta": { en: "Upload Photo", hi: "फ़ोटो अपलोड करें" },
+  "people.chooseFromDevice": { en: "Choose from device", hi: "डिवाइस से चुनें" },
+  "people.useWebcam": { en: "Use webcam", hi: "वेबकैम इस्तेमाल करें" },
   "people.startingCamera": { en: "Starting camera…", hi: "कैमरा शुरू हो रहा है…" },
   "people.cameraAccessFailed": { en: "Couldn't access the camera — check permissions, or upload a photo instead.", hi: "कैमरा एक्सेस नहीं हो सका — अनुमतियां जांचें, या इसके बजाय फ़ोटो अपलोड करें।" },
   "people.capture": { en: "Capture", hi: "कैप्चर करें" },
@@ -29,6 +29,7 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   "people.addLandowner": { en: "Add landowner", hi: "खेत मालिक जोड़ें" },
   "people.addLandownerModalTitle": { en: "Add Landowner", hi: "खेत मालिक जोड़ें" },
   "people.noLandownersYet": { en: "No landowners added yet.", hi: "अभी तक कोई खेत मालिक नहीं जोड़ा गया।" },
+  "people.landHoldings": { en: "Land holdings", hi: "भूमि जोत" },
   "people.numberOfFields": { en: "Number of fields / farms", hi: "खेतों/फार्मों की संख्या" },
   "people.fieldLabel": { en: "Field", hi: "खेत" },
   "people.khasraNumber": { en: "Khasra number", hi: "खसरा नंबर" },
