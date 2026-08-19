@@ -9,9 +9,8 @@ import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { LaborDetailPage } from "./LaborDetailPage";
-import type { LedgerEntry, LedgerPaymentMode, MoldingContractorEntry, Person } from "@/types";
+import type { LedgerEntry, MoldingContractorEntry, Person } from "@/types";
 import { formatINR } from "@/lib/utils";
-import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -47,15 +46,16 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   const [laborerCount, setLaborerCount] = useState("");
   const [laborerCountTouched, setLaborerCountTouched] = useState(false);
   const [perLaborFareAmount, setPerLaborFareAmount] = useState("");
-  const [fareMode, setFareMode] = useState<LedgerPaymentMode>("CASH");
-  const [fareCashAmount, setFareCashAmount] = useState("");
-  const [fareOnlineAmount, setFareOnlineAmount] = useState("");
   const [perLaborAdvanceAmount, setPerLaborAdvanceAmount] = useState("");
-  const [advanceMode, setAdvanceMode] = useState<LedgerPaymentMode>("CASH");
-  const [advanceCashAmount, setAdvanceCashAmount] = useState("");
-  const [advanceOnlineAmount, setAdvanceOnlineAmount] = useState("");
-  const [addingToPool, setAddingToPool] = useState(false);
-  const [poolError, setPoolError] = useState("");
+  // Purely client-side running totals for this page view -- "Add to
+  // Remaining Pool" never touches the backend ledger (see addToPool
+  // below), so these intentionally do NOT come from `entry` and reset on
+  // reload. The admin fills these in and tracks them manually; the only
+  // thing that ever posts a real ADVANCE ledger entry (and moves Advance
+  // Given / the Advance history below) is the dedicated Advance quick
+  // action at the top of the page.
+  const [clientTotalFare, setClientTotalFare] = useState(0);
+  const [clientTotalAdvance, setClientTotalAdvance] = useState(0);
 
   async function refresh() {
     const [personDetail, summary, allWorkers, ledger] = await Promise.all([
@@ -104,57 +104,19 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   const pendingFare = (Number(laborerCount) || 0) * (Number(perLaborFareAmount) || 0);
   const pendingAdvance = (Number(laborerCount) || 0) * (Number(perLaborAdvanceAmount) || 0);
 
-  // Bhada (labor fare) and the fixed advance still post as two separate
-  // ledger entries under their own categories (FARE/ADVANCE) — Gang Summary
-  // and every report downstream depends on that split — but a single "Add
-  // to Remaining Pool" action now posts whichever of the two amount fields
-  // are filled in, in one click, instead of two independent buttons.
-  async function addToPool(e: FormEvent) {
+  // Purely arithmetic — no ledger entry, no backend call, no refresh.
+  // "Add to Remaining Pool" only ever updates the client-side running
+  // totals above; it must never post an ADVANCE entry (that's the
+  // dedicated Advance quick action's job) or a FARE entry either, so
+  // clicking it can never move Advance Given, the Advance history below,
+  // or any other backend-derived figure on this page.
+  function addToPool(e: FormEvent) {
     e.preventDefault();
     if (!laborerCount || (!perLaborFareAmount && !perLaborAdvanceAmount)) return;
-    if (perLaborFareAmount && isPaymentSplitMismatched(fareMode, pendingFare, fareCashAmount, fareOnlineAmount)) {
-      setPoolError(t("payment.splitMismatch", { total: pendingFare.toLocaleString("en-IN") }));
-      return;
-    }
-    if (perLaborAdvanceAmount && isPaymentSplitMismatched(advanceMode, pendingAdvance, advanceCashAmount, advanceOnlineAmount)) {
-      setPoolError(t("payment.splitMismatch", { total: pendingAdvance.toLocaleString("en-IN") }));
-      return;
-    }
-    setPoolError("");
-    setAddingToPool(true);
-    try {
-      if (perLaborFareAmount) {
-        await api.people.addLedger(contractorId, {
-          direction: "PAID",
-          amount: pendingFare,
-          reason: t("molding.fareReason", { count: laborerCount, rate: perLaborFareAmount }),
-          category: "FARE",
-          paymentMode: fareMode,
-          cashAmount: fareMode === "CASH_AND_ONLINE" ? Number(fareCashAmount) : undefined,
-          onlineAmount: fareMode === "CASH_AND_ONLINE" ? Number(fareOnlineAmount) : undefined,
-        });
-      }
-      if (perLaborAdvanceAmount) {
-        await api.people.addLedger(contractorId, {
-          direction: "PAID",
-          amount: pendingAdvance,
-          reason: t("molding.advanceReason", { count: laborerCount, rate: perLaborAdvanceAmount }),
-          category: "ADVANCE",
-          paymentMode: advanceMode,
-          cashAmount: advanceMode === "CASH_AND_ONLINE" ? Number(advanceCashAmount) : undefined,
-          onlineAmount: advanceMode === "CASH_AND_ONLINE" ? Number(advanceOnlineAmount) : undefined,
-        });
-      }
-      setPerLaborFareAmount("");
-      setFareCashAmount("");
-      setFareOnlineAmount("");
-      setPerLaborAdvanceAmount("");
-      setAdvanceCashAmount("");
-      setAdvanceOnlineAmount("");
-      await refresh();
-    } finally {
-      setAddingToPool(false);
-    }
+    setClientTotalFare((prev) => prev + pendingFare);
+    setClientTotalAdvance((prev) => prev + pendingAdvance);
+    setPerLaborFareAmount("");
+    setPerLaborAdvanceAmount("");
   }
 
   const backButton = (
@@ -178,20 +140,23 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
     );
   }
 
-  // Per explicit admin request: every money figure on this page shows 0 for
-  // now except Advance Given (still real, from entry.advanceGivenToContractor)
-  // -- the admin is filling everything else in manually themselves, so
-  // nothing else should be auto-computed from the ledger right now.
+  // Per explicit admin request: Gang Summary's money figures and Deducted
+  // stay at 0 -- the admin fills those in manually themselves. Advance
+  // Given is real (entry.advanceGivenToContractor), changed only by the
+  // dedicated Advance quick action above, never by Add to Remaining Pool.
+  // Total Fare/Total Advance are the client-side running totals from
+  // addToPool; Remaining Pool applies the formula live on every click:
+  // Remaining Pool = (Total Fare + Total Advance) - (Deducted + Advance Given).
   // Bricks Produced/Damaged (production data, not money) are unaffected and
   // still come from `entry` live below.
   const advanceGiven = entry?.advanceGivenToContractor ?? 0;
   const balance = 0;
   const totalDue = 0;
   const totalPaid = 0;
-  const totalFare = 0;
-  const totalAdvance = 0;
   const advanceDeducted = 0;
-  const remainingPool = 0;
+  const totalFare = clientTotalFare;
+  const totalAdvance = clientTotalAdvance;
+  const remainingPool = totalFare + totalAdvance - (advanceDeducted + advanceGiven);
 
   return (
     <div>
@@ -303,22 +268,6 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                   onChange={(e) => setPerLaborFareAmount(e.target.value)}
                   className={inputClass}
                 />
-                <select value={fareMode} onChange={(e) => setFareMode(e.target.value as LedgerPaymentMode)} className={inputClass}>
-                  <option value="CASH">{t("dispatch.paymentCash")}</option>
-                  <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
-                  <option value="UPI">{t("dispatch.paymentUpi")}</option>
-                  <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
-                </select>
-                {fareMode === "CASH_AND_ONLINE" && (
-                  <PaymentSplitFields
-                    totalAmount={pendingFare}
-                    cashAmount={fareCashAmount}
-                    onlineAmount={fareOnlineAmount}
-                    onCashAmountChange={setFareCashAmount}
-                    onOnlineAmountChange={setFareOnlineAmount}
-                    inputClassName={inputClass}
-                  />
-                )}
                 <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
                   <span className="text-sm text-ink-muted">{t("molding.thisPaymentAmountLabel")}</span>
                   <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingFare)}</span>
@@ -335,22 +284,6 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                   onChange={(e) => setPerLaborAdvanceAmount(e.target.value)}
                   className={inputClass}
                 />
-                <select value={advanceMode} onChange={(e) => setAdvanceMode(e.target.value as LedgerPaymentMode)} className={inputClass}>
-                  <option value="CASH">{t("dispatch.paymentCash")}</option>
-                  <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
-                  <option value="UPI">{t("dispatch.paymentUpi")}</option>
-                  <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
-                </select>
-                {advanceMode === "CASH_AND_ONLINE" && (
-                  <PaymentSplitFields
-                    totalAmount={pendingAdvance}
-                    cashAmount={advanceCashAmount}
-                    onlineAmount={advanceOnlineAmount}
-                    onCashAmountChange={setAdvanceCashAmount}
-                    onOnlineAmountChange={setAdvanceOnlineAmount}
-                    inputClassName={inputClass}
-                  />
-                )}
                 <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
                   <span className="text-sm text-ink-muted">{t("molding.thisPaymentAmountLabel")}</span>
                   <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingAdvance)}</span>
@@ -358,13 +291,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
               </div>
             </div>
 
-            {poolError && <p className="mt-2 text-sm text-status-critical">{poolError}</p>}
-            <Button
-              type="submit"
-              size="sm"
-              className="mt-3 w-full md:w-auto"
-              disabled={addingToPool || !laborerCount || (!perLaborFareAmount && !perLaborAdvanceAmount)}
-            >
+            <Button type="submit" size="sm" className="mt-3 w-full md:w-auto" disabled={!laborerCount || (!perLaborFareAmount && !perLaborAdvanceAmount)}>
               {t("molding.addToRemainingPoolButton")}
             </Button>
           </form>
