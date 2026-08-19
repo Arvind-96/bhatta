@@ -221,7 +221,7 @@ export function AddLabourModal({ defaultContractorId, onClose, onCreated }: AddL
           </Field>
 
           <Field label={t("people.workTypeFieldLabel")}>
-            <select value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
+            <select required value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
               <option value="">{t("people.selectWorkType")}</option>
               {WORK_TYPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>

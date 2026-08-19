@@ -164,7 +164,7 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
           )}
 
           <Field label={t("people.contractorWorkTypeLabel")}>
-            <select value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
+            <select required value={workType} onChange={(e) => setWorkType(e.target.value as "" | WorkType)} className={inputClass}>
               <option value="">{t("people.selectWorkType")}</option>
               {(Object.entries(workTypeLabels) as [WorkType, string][]).map(([value, label]) => (
                 <option key={value} value={value}>
