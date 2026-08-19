@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { ArrowLeft, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
+import { EditLedgerEntryModal } from "@/components/people/EditLedgerEntryModal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -62,6 +63,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   const [showAddArrival, setShowAddArrival] = useState(false);
   const [editingArrival, setEditingArrival] = useState<SoilArrival | null>(null);
   const [editingContract, setEditingContract] = useState<SoilContract | null>(null);
+  const [editingLedgerEntry, setEditingLedgerEntry] = useState<LedgerEntry | null>(null);
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
@@ -552,6 +554,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                     <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
                     <th className="pb-2 font-medium text-right">{t("people.paidSoFar")}</th>
                     <th className="pb-2 font-medium text-right">{t("people.remainingDue")}</th>
+                    <th className="pb-2 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
@@ -573,6 +576,16 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                         </td>
                         <td className="py-3 text-right tabular-nums text-status-good">₹{formatINR(running.paidSoFar)}</td>
                         <td className="py-3 text-right tabular-nums text-status-critical">₹{formatINR(running.remainingDue)}</td>
+                        <td className="py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setEditingLedgerEntry(entry)}
+                            className="text-ink-muted hover:text-ink-primary"
+                            aria-label={t("people.editLedgerEntry")}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -593,6 +606,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
       {editingContract && (
         <EditSoilContractModal contract={editingContract} onClose={() => setEditingContract(null)} onSaved={refresh} />
       )}
+      {editingLedgerEntry && <EditLedgerEntryModal entry={editingLedgerEntry} onClose={() => setEditingLedgerEntry(null)} />}
     </div>
   );
 }

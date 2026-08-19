@@ -35,6 +35,8 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "expense.amountPlaceholder": { en: "Amount (₹)", hi: "राशि (₹)" },
   "expense.hoursRunOptional": { en: "Hours run (optional)", hi: "घंटे (वैकल्पिक)" },
   "expense.saveExpense": { en: "Save expense", hi: "खर्च सहेजें" },
+  "expense.editExpense": { en: "Edit expense", hi: "खर्च संपादित करें" },
+  "expense.confirmDeleteExpense": { en: "Delete this expense? This cannot be undone.", hi: "यह खर्च हटाएं? इसे वापस नहीं लाया जा सकता।" },
   "expense.noExpensesYet": { en: "No expenses logged yet.", hi: "अभी तक कोई खर्च दर्ज नहीं हुआ।" },
   "expense.hoursAtRate": { en: "{hours}h (₹{rate}/hr)", hi: "{hours} घंटे (₹{rate}/घंटा)" },
 

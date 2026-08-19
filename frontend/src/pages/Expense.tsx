@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
@@ -90,6 +91,118 @@ function TotalsSummary() {
   );
 }
 
+function EditExpenseModal({
+  expense,
+  labels,
+  onClose,
+}: {
+  expense: ExpenseEntry;
+  labels: Record<ExpenseCategory, string>;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [category, setCategory] = useState<ExpenseCategory>(expense.category);
+  const [amount, setAmount] = useState(String(expense.amount));
+  const [paymentMode, setPaymentMode] = useState<"" | SimplePaymentMode>((expense.paymentMode as SimplePaymentMode) ?? "");
+  const [hours, setHours] = useState(expense.hours ? String(expense.hours) : "");
+  const [notes, setNotes] = useState(expense.notes ?? "");
+  const [date, setDate] = useState(expense.date.slice(0, 10));
+  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!amount) return;
+    setLoading(true);
+    try {
+      await api.expenses.update(expense._id, {
+        category,
+        amount: Number(amount),
+        paymentMode: paymentMode || undefined,
+        hours: hours ? Number(hours) : undefined,
+        notes: notes || undefined,
+        date,
+      });
+      onClose();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(t("expense.confirmDeleteExpense"))) return;
+    setDeleting(true);
+    try {
+      await api.expenses.remove(expense._id);
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
+      <Card className="w-full max-w-md hover:translate-y-0">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-ink-primary">{t("expense.editExpense")}</h3>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+          <select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)} className={cn(inputClass, "col-span-2")}>
+            {Object.entries(labels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as "" | SimplePaymentMode)} className={inputClass}>
+            <option value="">{t("common.paymentMode")}</option>
+            <option value="CASH">{t("billing.paymentCash")}</option>
+            <option value="BANK">{t("billing.paymentBank")}</option>
+            <option value="UPI">{t("billing.paymentUpi")}</option>
+          </select>
+          <input required type="number" placeholder={t("expense.amountPlaceholder")} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputClass} />
+          <label className="col-span-2 flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+          </label>
+          {HOURLY_CATEGORIES.includes(category) && (
+            <input
+              type="number"
+              placeholder={t("expense.hoursRunOptional")}
+              value={hours}
+              onChange={(e) => setHours(e.target.value)}
+              className={cn(inputClass, "col-span-2")}
+            />
+          )}
+          <input
+            placeholder={t("common.notes")}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={cn(inputClass, "col-span-2")}
+          />
+          <div className="col-span-2 flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+            </button>
+            <Button type="submit" disabled={loading} className="flex-1">
+              {loading ? t("common.saving") : t("common.saveChanges")}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>,
+    document.body
+  );
+}
+
 export function Expense() {
   const { t } = useTranslation();
   const EXPENSE_LABELS = buildExpenseLabels(t);
@@ -105,6 +218,7 @@ export function Expense() {
     date: new Date().toISOString().slice(0, 10),
   });
   const [loading, setLoading] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ExpenseEntry | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
@@ -239,13 +353,25 @@ export function Expense() {
                   </p>
                   <p className="text-xs text-ink-muted/70">{t("common.entryDateTime")}: {formatDateTime(e.createdAt)}</p>
                 </div>
-                <span className="tabular-nums font-medium text-ink-primary">₹{formatINR(e.amount)}</span>
+                <div className="flex items-center gap-3">
+                  <span className="tabular-nums font-medium text-ink-primary">₹{formatINR(e.amount)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setEditingExpense(e)}
+                    className="text-ink-muted hover:text-ink-primary"
+                    aria-label={t("expense.editExpense")}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
             <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
           </div>
         )}
       </Card>
+
+      {editingExpense && <EditExpenseModal expense={editingExpense} labels={EXPENSE_LABELS} onClose={() => setEditingExpense(null)} />}
     </div>
   );
 }

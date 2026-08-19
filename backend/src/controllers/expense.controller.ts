@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { createExpense, expenseTotalsByCategory, listExpenses } from "../services/expense.service";
+import { createExpense, deleteExpense, expenseTotalsByCategory, listExpenses, updateExpense } from "../services/expense.service";
 import { EXPENSE_CATEGORIES, LEDGER_PAYMENT_MODES } from "../db/schema";
 
 const categorySchema = z.enum(EXPENSE_CATEGORIES);
@@ -40,4 +40,27 @@ export async function totals(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 30;
   const result = await expenseTotalsByCategory(req.kiln!.id, days);
   res.json(result);
+}
+
+const updateSchema = z.object({
+  category: categorySchema.optional(),
+  amount: z.number().positive().optional(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
+  hours: z.number().positive().optional(),
+  date: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export async function update(req: AuthedRequest, res: Response) {
+  const input = updateSchema.parse(req.body);
+  const expense = await updateExpense(req.kiln!.id, req.params.id, {
+    ...input,
+    date: input.date ? new Date(input.date) : undefined,
+  });
+  res.json(expense);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deleteExpense(req.kiln!.id, req.params.id);
+  res.status(204).end();
 }

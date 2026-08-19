@@ -1,13 +1,16 @@
 import { useState } from "react";
+import { Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { LedgerCategory, LedgerEntry } from "@/types";
 import { formatDateTime, formatINR } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
+import { EditLedgerEntryModal } from "@/components/people/EditLedgerEntryModal";
 
 const PAGE_SIZE = 10;
 
 function PaginatedLedgerSection({ titleKey, entries }: { titleKey: string; entries: LedgerEntry[] }) {
   const { t } = useTranslation();
+  const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
   const title = t(titleKey);
   const [page, setPage] = useState(1);
   const total = entries.reduce((sum, e) => sum + e.amount, 0);
@@ -35,6 +38,7 @@ function PaginatedLedgerSection({ titleKey, entries }: { titleKey: string; entri
                   <th className="pb-2 font-medium">{t("people.mode")}</th>
                   <th className="pb-2 font-medium">{t("common.entryDateTime")}</th>
                   <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
+                  <th className="pb-2 font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -46,6 +50,16 @@ function PaginatedLedgerSection({ titleKey, entries }: { titleKey: string; entri
                     <td className="py-3 text-xs text-ink-muted">{formatDateTime(entry.createdAt)}</td>
                     <td className="py-3 text-right tabular-nums font-medium text-ink-primary">
                       ₹{formatINR(entry.amount)}
+                    </td>
+                    <td className="py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setEditingEntry(entry)}
+                        className="text-ink-muted hover:text-ink-primary"
+                        aria-label={t("people.editLedgerEntry")}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -78,6 +92,7 @@ function PaginatedLedgerSection({ titleKey, entries }: { titleKey: string; entri
           )}
         </>
       )}
+      {editingEntry && <EditLedgerEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} />}
     </Card>
   );
 }

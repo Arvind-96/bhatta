@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Wallet, X } from "lucide-react";
+import { Pencil, Wallet, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import type { LedgerCategory, LedgerEntry, LedgerPaymentMode, Person } from "@/t
 import { formatDateTime, formatINR } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { EditLedgerEntryModal } from "@/components/people/EditLedgerEntryModal";
 
 interface LedgerModalProps {
   person: Person;
@@ -40,6 +41,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
   });
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
+  const [editingEntry, setEditingEntry] = useState<LedgerEntry | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const isCustomer = person.type === "CUSTOMER";
   const isPartner = person.type === "PARTNER";
@@ -343,9 +345,9 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
             <div className="max-h-[26rem] space-y-1.5 overflow-y-auto pr-1">
               {entries.length === 0 && <p className="py-4 text-center text-sm text-ink-muted">{t("people.noEntriesYet")}</p>}
               {entries.map((entry) => (
-                <div key={entry._id} className="flex items-center justify-between rounded-xl border border-border px-3 py-3 text-sm">
-                  <div>
-                    <p className="text-ink-primary">{entry.reason}</p>
+                <div key={entry._id} className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate text-ink-primary">{entry.reason}</p>
                     <p className="text-sm text-ink-muted">
                       {new Date(entry.date).toLocaleDateString("en-IN")}
                       {entry.category ? ` · ${entry.category}` : ""}
@@ -355,15 +357,34 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                       {t("common.entryDateTime")}: {formatDateTime(entry.createdAt)}
                     </p>
                   </div>
-                  <Badge variant={entry.direction === "DUE" ? "critical" : "good"}>
-                    {entry.direction === "DUE" ? "+" : "-"}₹{formatINR(entry.amount)}
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingEntry(entry)}
+                      className="text-ink-muted hover:text-ink-primary"
+                      aria-label={t("people.editLedgerEntry")}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <Badge variant={entry.direction === "DUE" ? "critical" : "good"}>
+                      {entry.direction === "DUE" ? "+" : "-"}₹{formatINR(entry.amount)}
+                    </Badge>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </div>
       </Card>
+      {editingEntry && (
+        <EditLedgerEntryModal
+          entry={editingEntry}
+          onClose={() => {
+            setEditingEntry(null);
+            refresh();
+          }}
+        />
+      )}
     </div>,
     document.body
   );

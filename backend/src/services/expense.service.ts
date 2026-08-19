@@ -37,6 +37,33 @@ export async function createExpense(input: CreateExpenseInput) {
   return expense;
 }
 
+export interface UpdateExpenseInput {
+  category?: ExpenseCategory;
+  amount?: number;
+  paymentMode?: ExpensePaymentMode;
+  hours?: number;
+  date?: Date;
+  notes?: string;
+}
+
+export async function updateExpense(kilnId: string, expenseId: string, input: UpdateExpenseInput) {
+  const existing = (await db.select().from(expenses).where(and(eq(expenses._id, expenseId), eq(expenses.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Expense not found in this kiln");
+
+  await db.update(expenses).set(input).where(eq(expenses._id, expenseId));
+  const updated = (await db.select().from(expenses).where(eq(expenses._id, expenseId)))[0]!;
+  emitToKiln(kilnId, "expense:update", updated);
+  return updated;
+}
+
+export async function deleteExpense(kilnId: string, expenseId: string) {
+  const existing = (await db.select().from(expenses).where(and(eq(expenses._id, expenseId), eq(expenses.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Expense not found in this kiln");
+
+  await db.delete(expenses).where(eq(expenses._id, expenseId));
+  emitToKiln(kilnId, "expense:update", { _id: expenseId, deleted: true });
+}
+
 export interface ListExpensesFilter {
   category?: ExpenseCategory;
   from?: Date;

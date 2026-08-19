@@ -204,6 +204,13 @@ export const peopleDetailDict: Record<string, Record<Locale, string>> = {
   "people.addEntry": { en: "Add entry", hi: "एंट्री जोड़ें" },
   "people.history": { en: "History", hi: "इतिहास" },
   "people.noEntriesYet": { en: "No entries yet", hi: "अभी तक कोई एंट्री नहीं" },
+  "people.editLedgerEntry": { en: "Edit entry", hi: "एंट्री संपादित करें" },
+  "people.directionDue": { en: "Due (they owe)", hi: "बकाया (उनसे लेना है)" },
+  "people.directionPaid": { en: "Paid (settled)", hi: "भुगतान (चुका दिया)" },
+  "people.confirmDeleteLedgerEntry": {
+    en: "Delete this entry? This cannot be undone and the balance will update immediately.",
+    hi: "यह एंट्री हटाएं? इसे वापस नहीं लाया जा सकता और बैलेंस तुरंत अपडेट हो जाएगा।",
+  },
 
   // Shared bare category words (LedgerModal category select, LedgerQuickActions
   // buttons, LedgerCategoryHistorySections titles, QuickLedgerModal titles)

@@ -318,6 +318,23 @@ export const api = {
     },
   },
 
+  ledger: {
+    update: (
+      id: string,
+      input: {
+        direction: "DUE" | "PAID";
+        amount: number;
+        reason: string;
+        date?: string;
+        paymentMode?: LedgerPaymentMode;
+        cashAmount?: number;
+        onlineAmount?: number;
+        category?: LedgerCategory;
+      }
+    ) => patch<LedgerEntry>(`/ledger/${id}`, input, true),
+    remove: (id: string) => del<void>(`/ledger/${id}`, true),
+  },
+
   paymentReceipts: {
     list: (personId?: string) =>
       get<PaymentReceipt[]>(`/payment-receipts${personId ? `?personId=${personId}` : ""}`, true),
@@ -501,6 +518,18 @@ export const api = {
       date?: string;
     }) => post<Expense>("/expenses", input, true),
     totals: (days = 30) => get<{ category: ExpenseCategory; amount: number }[]>(`/expenses/totals?days=${days}`, true),
+    update: (
+      id: string,
+      input: Partial<{
+        category: ExpenseCategory;
+        amount: number;
+        paymentMode: SimplePaymentMode;
+        hours: number;
+        notes: string;
+        date: string;
+      }>
+    ) => patch<Expense>(`/expenses/${id}`, input, true),
+    remove: (id: string) => del<void>(`/expenses/${id}`, true),
   },
 
   molding: {

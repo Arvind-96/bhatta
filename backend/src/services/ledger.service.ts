@@ -37,6 +37,40 @@ export async function addLedgerEntry(input: AddLedgerEntryInput) {
   return entry;
 }
 
+export interface UpdateLedgerEntryInput {
+  direction?: "DUE" | "PAID";
+  amount?: number;
+  reason?: string;
+  date?: Date;
+  paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
+  category?: LedgerCategory;
+}
+
+// The admin editing/deleting a past Advance/Kharchi/Festival/Medical/Bill
+// entry directly mutates or removes that row — a deliberate choice (per
+// the admin) over the delta-correction pattern used elsewhere in this
+// file, so a mis-entered amount can just be fixed instead of leaving a
+// trail of offsetting entries.
+export async function updateLedgerEntry(kilnId: string, entryId: string, input: UpdateLedgerEntryInput) {
+  const existing = (await db.select().from(ledgerEntries).where(and(eq(ledgerEntries._id, entryId), eq(ledgerEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Ledger entry not found in this kiln");
+
+  await db.update(ledgerEntries).set(input).where(eq(ledgerEntries._id, entryId));
+  const updated = (await db.select().from(ledgerEntries).where(eq(ledgerEntries._id, entryId)))[0]!;
+  emitToKiln(kilnId, "ledger:update", updated);
+  return updated;
+}
+
+export async function deleteLedgerEntry(kilnId: string, entryId: string) {
+  const existing = (await db.select().from(ledgerEntries).where(and(eq(ledgerEntries._id, entryId), eq(ledgerEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Ledger entry not found in this kiln");
+
+  await db.delete(ledgerEntries).where(eq(ledgerEntries._id, entryId));
+  emitToKiln(kilnId, "ledger:update", { _id: entryId, deleted: true });
+}
+
 export async function listLedgerForPerson(kilnId: string, personId: string) {
   return await db
     .select()
