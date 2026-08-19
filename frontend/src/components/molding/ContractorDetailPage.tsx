@@ -191,6 +191,16 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   }
 
   const balance = entry?.balance ?? 0;
+  // Live preview, not just the posted history: Total Labor Fare is a
+  // guaranteed payment ("the client will definitely pay it") so it's added
+  // to the pool as soon as it's calculated, before "Pay fare" is even
+  // clicked; Total Fixed Advance is provisioned back out the moment it's
+  // calculated too, since that money is already earmarked to flow on to
+  // the gang. Once either is actually submitted, its calculator field
+  // resets to 0 and the posted amount lands in advanceGivenToContractor
+  // instead, so the number doesn't jump — it's the same pool, just backed
+  // by a real ledger entry instead of a pending calculation.
+  const remainingPool = (entry?.advanceGivenToContractor ?? 0) - (entry?.advanceDeductedForWorkers ?? 0) - totalAdvance + totalFare;
 
   return (
     <div>
@@ -364,18 +374,26 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
             </form>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl border border-series-1/30 bg-series-1/5 p-3 text-center">
-            <div>
-              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(entry?.advanceGivenToContractor ?? 0)}</p>
-              <p className="text-sm text-ink-muted">{t("molding.advanceGivenLabel")}</p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalFare)}</p>
+              <p className="text-sm text-ink-muted">{t("molding.totalFareLabel")}</p>
             </div>
-            <div>
+            <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAdvance)}</p>
+              <p className="text-sm text-ink-muted">{t("molding.totalAdvanceLabel")}</p>
+            </div>
+            <div className="rounded-xl bg-series-1 p-3 text-center">
+              <p className="text-lg font-semibold tabular-nums text-white">₹{formatINR(remainingPool)}</p>
+              <p className="text-sm text-white/80">{t("molding.advanceRemainingLabel")}</p>
+            </div>
+            <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
               <p className="text-lg font-semibold tabular-nums text-status-warning">₹{formatINR(entry?.advanceDeductedForWorkers ?? 0)}</p>
               <p className="text-sm text-ink-muted">{t("molding.advanceDeductedLabel")}</p>
             </div>
-            <div>
-              <p className="text-lg font-semibold tabular-nums text-status-good">₹{formatINR(entry?.remainingAdvancePool ?? 0)}</p>
-              <p className="text-sm text-ink-muted">{t("molding.advanceRemainingLabel")}</p>
+            <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(entry?.advanceGivenToContractor ?? 0)}</p>
+              <p className="text-sm text-ink-muted">{t("molding.advanceGivenLabel")}</p>
             </div>
           </div>
         </Card>
