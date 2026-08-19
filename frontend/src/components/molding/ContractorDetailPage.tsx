@@ -178,16 +178,20 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
     );
   }
 
-  const balance = entry?.balance ?? 0;
-  // Total Fare = every Bhada payment ever posted to this contractor
-  // (entry.totalFarePaid); Total Advance = every Fixed Advance payment ever
-  // posted (entry.advanceGivenToContractor) — both running totals from the
-  // ledger, not just this session's pending laborerCount × rate calculation
-  // (pendingFare/pendingAdvance below are only the live preview of what the
-  // form about to submit would add).
-  const totalFare = entry?.totalFarePaid ?? 0;
-  const totalAdvance = entry?.advanceGivenToContractor ?? 0;
-  const remainingPool = totalFare + totalAdvance - ((entry?.advanceDeductedForWorkers ?? 0) + (entry?.advanceGivenToContractor ?? 0));
+  // Per explicit admin request: every money figure on this page shows 0 for
+  // now except Advance Given (still real, from entry.advanceGivenToContractor)
+  // -- the admin is filling everything else in manually themselves, so
+  // nothing else should be auto-computed from the ledger right now.
+  // Bricks Produced/Damaged (production data, not money) are unaffected and
+  // still come from `entry` live below.
+  const advanceGiven = entry?.advanceGivenToContractor ?? 0;
+  const balance = 0;
+  const totalDue = 0;
+  const totalPaid = 0;
+  const totalFare = 0;
+  const totalAdvance = 0;
+  const advanceDeducted = 0;
+  const remainingPool = 0;
 
   return (
     <div>
@@ -253,11 +257,11 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
               <p className="text-sm text-ink-muted">{t("molding.damagedLabel")}</p>
             </div>
             <div>
-              <p className="text-xl font-semibold tabular-nums text-ink-primary">₹{formatINR((entry?.totalDue ?? 0))}</p>
+              <p className="text-xl font-semibold tabular-nums text-ink-primary">₹{formatINR(totalDue)}</p>
               <p className="text-sm text-ink-muted">{t("molding.totalDueLabel")}</p>
             </div>
             <div>
-              <p className="text-xl font-semibold tabular-nums text-ink-primary">₹{formatINR((entry?.totalPaid ?? 0))}</p>
+              <p className="text-xl font-semibold tabular-nums text-ink-primary">₹{formatINR(totalPaid)}</p>
               <p className="text-sm text-ink-muted">{t("molding.totalPaidLabel")}</p>
             </div>
             <div>
@@ -379,11 +383,11 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
               <p className="text-sm text-white/80">{t("molding.advanceRemainingLabel")}</p>
             </div>
             <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
-              <p className="text-lg font-semibold tabular-nums text-status-warning">₹{formatINR(entry?.advanceDeductedForWorkers ?? 0)}</p>
+              <p className="text-lg font-semibold tabular-nums text-status-warning">₹{formatINR(advanceDeducted)}</p>
               <p className="text-sm text-ink-muted">{t("molding.advanceDeductedLabel")}</p>
             </div>
             <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
-              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(entry?.advanceGivenToContractor ?? 0)}</p>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(advanceGiven)}</p>
               <p className="text-sm text-ink-muted">{t("molding.advanceGivenLabel")}</p>
             </div>
           </div>
