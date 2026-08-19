@@ -39,6 +39,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "nav.compare": { en: "Compare", hi: "तुलना" },
   "nav.people": { en: "People", hi: "लोग" },
   "nav.soil": { en: "Soil", hi: "मिट्टी" },
+  "nav.sand": { en: "Sand", hi: "रेत" },
   "nav.molding": { en: "Molding (Pathai)", hi: "पथाई (ढलाई)" },
   "nav.stacking": { en: "Stacking (Bharai)", hi: "भराई (स्टैकिंग)" },
   "nav.firing": { en: "Firing (Pakayi)", hi: "पकाई (जलाई)" },

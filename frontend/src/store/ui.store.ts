@@ -5,6 +5,7 @@ export type AppView =
   | "financialOverview"
   | "people"
   | "soil"
+  | "sand"
   | "molding"
   | "stacking"
   | "firing"
