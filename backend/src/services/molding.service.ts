@@ -340,14 +340,20 @@ export async function moldingContractorSummary(kilnId: string) {
       const { due, paid, balance } = sumByDirection(commissionLedgerEntries);
 
       // Money the kiln has handed this contractor for their Bhada/advance
-      // pool (category ADVANCE, posted from the Labor Fare & Advance
-      // section below) minus whatever's since been paid out to their own
-      // gang workers as Kharchi/Advance/Medical/Festival — continuously up
-      // to date as new worker payments post, no separate reset/session
-      // bookkeeping needed. The pool total itself (which also folds in the
-      // live, not-yet-posted Fare/Advance calculator values) is computed
-      // client-side in ContractorDetailPage, since only the browser knows
-      // what's currently typed into those fields.
+      // pool (categories FARE and ADVANCE, posted from the Labor Fare &
+      // Advance section below), tracked as running totals so the pool the
+      // contractor is holding only ever grows when money actually goes out
+      // to them — it must never be treated as a subtraction, or "give an
+      // advance" would perversely shrink the pool instead of feeding it.
+      // advanceDeductedForWorkers below is what draws the pool back down.
+      // The live, not-yet-posted calculator preview is added on top of
+      // these client-side in ContractorDetailPage, since only the browser
+      // knows what's currently typed into those fields; once submitted,
+      // that same amount just moves from the live preview into these
+      // running totals, so the displayed pool never jumps on submit.
+      const fareGivenToContractor = gangLedgerEntries
+        .filter((e) => e.personId === contractor._id && e.direction === "PAID" && e.category === "FARE")
+        .reduce((sum, e) => sum + e.amount, 0);
       const advanceGivenToContractor = gangLedgerEntries
         .filter((e) => e.personId === contractor._id && e.direction === "PAID" && e.category === "ADVANCE")
         .reduce((sum, e) => sum + e.amount, 0);
@@ -378,6 +384,7 @@ export async function moldingContractorSummary(kilnId: string) {
         totalDue: due,
         totalPaid: paid,
         balance,
+        fareGivenToContractor,
         advanceGivenToContractor,
         advanceDeductedForWorkers,
       };

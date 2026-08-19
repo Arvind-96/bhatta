@@ -181,16 +181,24 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   }
 
   const balance = entry?.balance ?? 0;
-  // Remaining Pool = (Total Fixed Advance + Total Labor Fare) - Advance
-  // Given - Deducted (gang payments). Total Fare/Advance here are the live
-  // calculator values (what's about to be added to the pool), while
-  // Advance Given/Deducted are the already-posted history — so this reads
-  // as "what's left in the pool once this session's fare/advance land,
-  // after what's already been paid out to the contractor and their gang."
-  // Once Fare/Advance are actually submitted, their calculator fields reset
-  // to 0 and the posted amount moves into advanceGivenToContractor instead,
-  // so the number doesn't jump.
-  const remainingPool = totalFare + totalAdvance - (entry?.advanceGivenToContractor ?? 0) - (entry?.advanceDeductedForWorkers ?? 0);
+  // Remaining Pool is what the contractor is currently holding, unspent:
+  // everything ever paid to them for Bhada/advance (fareGivenToContractor +
+  // advanceGivenToContractor, which only ever grow when money actually goes
+  // out to the contractor) plus whatever's sitting in the calculator right
+  // now, about to be added — minus what's since been deducted via their
+  // gang's Kharchi/Advance/Medical/Festival payments. Money paid to the
+  // contractor must always ADD to this, never subtract — subtracting it
+  // would mean "give an advance" perversely shrinks the pool instead of
+  // feeding it, which is what broke this figure before. Once Fare/Advance
+  // are actually submitted, their calculator fields reset to 0 and the same
+  // amount lands in fareGivenToContractor/advanceGivenToContractor instead,
+  // so the total never jumps — it just moves from "pending" to "posted."
+  const remainingPool =
+    totalFare +
+    totalAdvance +
+    (entry?.fareGivenToContractor ?? 0) +
+    (entry?.advanceGivenToContractor ?? 0) -
+    (entry?.advanceDeductedForWorkers ?? 0);
 
   return (
     <div>
