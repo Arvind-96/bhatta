@@ -200,26 +200,31 @@ export async function nikasiOperatorSummary(kilnId: string) {
 // stacking.service.ts's stackingContractorSummary, minus the vehicle
 // roster (nikasi has no equipment-tracking requirement).
 //
-// Neither the contractor's nor the laborers' own workType tag is required
-// to equal "NIKASI" anymore — a thekedar/gang is often tagged with its
-// general trade instead, even when laborers under them regularly get
-// nikasi entries logged and paid. A contractor is included if they're
-// either explicitly tagged "NIKASI" themselves, or actually have at least
-// one laborer assigned via Person.nikasiContractorId (see
-// molding.service.ts's moldingContractorSummary for the identical
-// fix/reasoning on the Pathai side).
+// "Assigned to Nikasi" is decided by relevance, not a single static tag: a
+// laborer counts if their own workType is "NIKASI" OR they have at least
+// one real nikasi entry on file — a laborer who merely shares a
+// nikasiContractorId with a relevant gang, with zero unloading entries of
+// their own, does not (see molding.service.ts's moldingContractorSummary
+// for the identical fix/reasoning on the Pathai side, including why this
+// is tighter than just "assigned via nikasiContractorId"). A contractor is
+// included if they're tagged "NIKASI" themselves, or have at least one
+// Nikasi-relevant laborer by that same rule.
 export async function nikasiContractorSummary(kilnId: string) {
-  const [allContractors, laborers] = await Promise.all([
+  const [allContractors, laborers, allEntries] = await Promise.all([
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
     db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
+    db.select().from(nikasiEntries).where(eq(nikasiEntries.kilnId, kilnId)),
   ]);
 
-  const contractorIdsWithLaborers = new Set(laborers.filter((w) => w.nikasiContractorId).map((w) => w.nikasiContractorId!));
+  const gangIdsWithEntries = new Set(allEntries.map((e) => e.gangId));
+  const relevantLaborers = laborers.filter((w) => w.workType === "NIKASI" || gangIdsWithEntries.has(w._id));
+
+  const contractorIdsWithLaborers = new Set(relevantLaborers.filter((w) => w.nikasiContractorId).map((w) => w.nikasiContractorId!));
   const contractors = allContractors.filter((c) => c.workType === "NIKASI" || contractorIdsWithLaborers.has(c._id));
 
   const contractorResults = await Promise.all(
     contractors.map(async (contractor) => {
-      const gangLaborers = laborers.filter((w) => w.nikasiContractorId === contractor._id);
+      const gangLaborers = relevantLaborers.filter((w) => w.nikasiContractorId === contractor._id);
       const laborerIds = gangLaborers.map((w) => w._id);
       const personIds = [contractor._id, ...laborerIds];
 

@@ -275,42 +275,45 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // PAID, and net balance, all computed live from MoldingEntry/LedgerEntry,
 // nothing stored redundantly.
 //
-// Neither the contractor's nor the workers' own workType tag is required
-// to equal "PATHAI" anymore — on real kilns a thekedar/gang is tagged with
-// its general trade (Beldar/Rawas/Tudi/etc.), not always "Pathai", even
-// when workers under them regularly get molding entries logged and paid.
-// Requiring that tag silently excluded real gangs — and all their real
-// production/earnings — from this whole summary despite their entries and
-// ledger postings being completely correct underneath. A contractor is
-// included if they're either explicitly tagged "PATHAI" themselves, or
-// actually have at least one worker assigned to them via
-// Person.contractorId (the same field createMoldingEntry and
-// LaborDetailPage already use to decide gang membership) — so a thekedar
-// with an unrelated trade tag doesn't clutter this view just for existing,
-// but one with real Pathai workers always shows up. Doesn't affect the
-// whole-kiln totals above (moldingPeriodTotals), which stay unfiltered.
+// "Assigned to Molding (Pathai)" is decided by relevance, not a single
+// static tag: a worker counts if their own workType is "PATHAI" OR they
+// have at least one real molding entry on file (someone whose gang's
+// general trade is tagged Beldar/Rawas/Tudi but who's actually been logged
+// for molding work still needs to show up here) — but a worker who merely
+// shares a contractorId with a Pathai-relevant gang, with zero molding
+// entries of their own, does not (that was cluttering this page with
+// workers who have nothing to do with Pathai). A contractor is included if
+// they're tagged "PATHAI" themselves, or have at least one Pathai-relevant
+// worker by that same rule. Doesn't affect the whole-kiln totals above
+// (moldingPeriodTotals), which stay unfiltered.
 export async function moldingContractorSummary(kilnId: string) {
-  const [allContractors, workers] = await Promise.all([
+  const [allContractors, workers, allEntries] = await Promise.all([
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"), eq(people.active, true))),
+    db.select().from(moldingEntries).where(eq(moldingEntries.kilnId, kilnId)),
   ]);
 
-  const contractorIdsWithWorkers = new Set(workers.filter((w) => w.contractorId).map((w) => w.contractorId!));
-  const contractors = allContractors.filter((c) => c.workType === "PATHAI" || contractorIdsWithWorkers.has(c._id));
+  const workerIdsWithEntries = new Set(allEntries.map((e) => e.workerId));
+  const isPathaiRelevant = (w: (typeof workers)[number]) => w.workType === "PATHAI" || workerIdsWithEntries.has(w._id);
+  const relevantWorkers = workers.filter(isPathaiRelevant);
+
+  const contractorIdsWithRelevantWorkers = new Set(relevantWorkers.filter((w) => w.contractorId).map((w) => w.contractorId!));
+  const contractors = allContractors.filter((c) => c.workType === "PATHAI" || contractorIdsWithRelevantWorkers.has(c._id));
 
   const contractorResults = await Promise.all(
     contractors.map(async (contractor) => {
-      const gangWorkers = workers.filter((w) => w.contractorId === contractor._id);
+      const gangWorkers = relevantWorkers.filter((w) => w.contractorId === contractor._id);
       const workerIds = gangWorkers.map((w) => w._id);
 
-      // Fetched without the washedOut filter — damage is tracked
-      // regardless of whether the batch washed out, so bricksProduced and
-      // damagedCount are derived separately below instead of both being
-      // gated on the same query filter.
-      const [gangEntries, gangLedgerEntries] = await Promise.all([
-        workerIds.length ? db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.workerId, workerIds))) : [],
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, [contractor._id, ...workerIds]))),
-      ]);
+      // Not filtered by washedOut here — damage is tracked regardless of
+      // whether the batch washed out, so bricksProduced and damagedCount
+      // are derived separately below instead of both being gated on the
+      // same filter.
+      const workerIdSet = new Set(workerIds);
+      const gangEntries = allEntries.filter((e) => workerIdSet.has(e.workerId));
+      const gangLedgerEntries = workerIds.length
+        ? await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, [contractor._id, ...workerIds])))
+        : await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, contractor._id)));
 
       const bricksByWorker = new Map<string, number>();
       const damagedByWorker = new Map<string, number>();
@@ -372,10 +375,8 @@ export async function moldingContractorSummary(kilnId: string) {
     })
   );
 
-  const unassignedWorkerIds = workers.filter((w) => !w.contractorId).map((w) => w._id);
-  const unassignedEntries = unassignedWorkerIds.length
-    ? await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.workerId, unassignedWorkerIds)))
-    : [];
+  const unassignedWorkerIds = new Set(relevantWorkers.filter((w) => !w.contractorId).map((w) => w._id));
+  const unassignedEntries = allEntries.filter((e) => unassignedWorkerIds.has(e.workerId));
   const unassignedBricksProduced = unassignedEntries
     .filter((e) => !e.washedOut)
     .reduce((sum, e) => sum + e.bricksCount, 0);
@@ -385,7 +386,7 @@ export async function moldingContractorSummary(kilnId: string) {
     contractors: contractorResults,
     totalProductionAllContractors: contractorResults.reduce((sum, c) => sum + c.totalBricksProduced, 0),
     totalDamagedAllContractors: contractorResults.reduce((sum, c) => sum + c.totalDamaged, 0),
-    unassignedWorkerCount: unassignedWorkerIds.length,
+    unassignedWorkerCount: unassignedWorkerIds.size,
     unassignedBricksProduced,
     unassignedDamaged,
   };
