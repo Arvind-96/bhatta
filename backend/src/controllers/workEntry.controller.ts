@@ -1,7 +1,14 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { createWorkEntry, deleteWorkEntry, listWorkEntries, updateWorkEntry } from "../services/workEntry.service";
+import {
+  createWorkEntry,
+  deleteWorkEntry,
+  listWorkEntries,
+  pakayiContractorSummary,
+  pakayiOperatorSummary,
+  updateWorkEntry,
+} from "../services/workEntry.service";
 import { WORK_TYPES } from "../db/schema";
 
 const createSchema = z.object({
@@ -47,4 +54,14 @@ export async function update(req: AuthedRequest, res: Response) {
 export async function remove(req: AuthedRequest, res: Response) {
   await deleteWorkEntry(req.kiln!.id, req.params.id);
   res.status(204).end();
+}
+
+export async function operatorSummary(req: AuthedRequest, res: Response) {
+  const result = await pakayiOperatorSummary(req.kiln!.id);
+  res.json(result);
+}
+
+export async function contractorSummary(req: AuthedRequest, res: Response) {
+  const result = await pakayiContractorSummary(req.kiln!.id);
+  res.json(result);
 }

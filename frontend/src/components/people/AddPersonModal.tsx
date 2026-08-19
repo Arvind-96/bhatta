@@ -15,6 +15,8 @@ interface AddPersonModalProps {
   defaultBharaiContractorId?: string;
   defaultStackingStage?: StackingStage;
   defaultNikasiContractorId?: string;
+  defaultPakayiContractorId?: string;
+  defaultWorkType?: WorkType;
   defaultIsOfficeStaff?: boolean;
   onClose: () => void;
   onCreated: () => void;
@@ -29,6 +31,8 @@ export function AddPersonModal({
   defaultBharaiContractorId,
   defaultStackingStage,
   defaultNikasiContractorId,
+  defaultPakayiContractorId,
+  defaultWorkType,
   defaultIsOfficeStaff,
   onClose,
   onCreated,
@@ -47,11 +51,12 @@ export function AddPersonModal({
   const [khetLocation, setKhetLocation] = useState("");
   const [agreedDepthFeet, setAgreedDepthFeet] = useState("");
   const [contractorId, setContractorId] = useState(defaultContractorId ?? "");
-  const [workType, setWorkType] = useState<"" | WorkType>("");
+  const [workType, setWorkType] = useState<"" | WorkType>(defaultWorkType ?? "");
   const [payType, setPayType] = useState<"" | PayType>("");
   const [commissionPerThousand, setCommissionPerThousand] = useState("");
   const [bharaiContractorId, setBharaiContractorId] = useState(defaultBharaiContractorId ?? "");
   const [nikasiContractorId, setNikasiContractorId] = useState(defaultNikasiContractorId ?? "");
+  const [pakayiContractorId, setPakayiContractorId] = useState(defaultPakayiContractorId ?? "");
   const [monthlySalary, setMonthlySalary] = useState("");
   const [stackingStage, setStackingStage] = useState<"" | StackingStage>(defaultStackingStage ?? "");
   const [firingShiftAnchorDate, setFiringShiftAnchorDate] = useState("");
@@ -96,13 +101,18 @@ export function AddPersonModal({
         khetLocation: type === "LANDOWNER" && khetLocation ? khetLocation : undefined,
         agreedDepthFeet: type === "LANDOWNER" && agreedDepthFeet ? Number(agreedDepthFeet) : undefined,
         contractorId: (type === "WORKER" || type === "HELPER") && contractorId ? contractorId : undefined,
-        workType: type === "LABOUR_CONTRACTOR" && workType ? workType : undefined,
+        // workType is only exposed as an editable select for LABOUR_CONTRACTOR
+        // (below) -- for WORKER/HELPER it can still be set by a caller via
+        // defaultWorkType (e.g. Firing's own "+ New Labor" button defaulting
+        // to PAKAYI), just not changed from this form.
+        workType: (type === "LABOUR_CONTRACTOR" || type === "WORKER" || type === "HELPER") && workType ? workType : undefined,
         payType:
           (type === "WORKER" || type === "HELPER" || type === "LABOUR_CONTRACTOR") && payType ? payType : undefined,
         commissionPerThousand:
           type === "LABOUR_CONTRACTOR" && commissionPerThousand ? Number(commissionPerThousand) : undefined,
         bharaiContractorId: (type === "WORKER" || type === "HELPER") && bharaiContractorId ? bharaiContractorId : undefined,
         nikasiContractorId: (type === "WORKER" || type === "HELPER") && nikasiContractorId ? nikasiContractorId : undefined,
+        pakayiContractorId: (type === "WORKER" || type === "HELPER") && pakayiContractorId ? pakayiContractorId : undefined,
         monthlySalary:
           (type === "WORKER" ||
             type === "HELPER" ||
@@ -289,6 +299,21 @@ export function AddPersonModal({
               className={inputClass}
             >
               <option value="">{t("people.nikasiThekedarOptional")}</option>
+              {contractors.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {(type === "WORKER" || type === "HELPER") && (
+            <select
+              value={pakayiContractorId}
+              onChange={(e) => setPakayiContractorId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">{t("people.pakayiThekedarOptional")}</option>
               {contractors.map((c) => (
                 <option key={c._id} value={c._id}>
                   {c.name}

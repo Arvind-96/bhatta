@@ -121,6 +121,7 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   "people.stage1GroundLifting": { en: "Stage 1: Ground Lifting & Transport", hi: "चरण 1: ज़मीन से उठाई व परिवहन" },
   "people.stage2ChamberStacking": { en: "Stage 2: Chamber Stacking", hi: "चरण 2: घेर भराई" },
   "people.nikasiThekedarOptional": { en: "Nikasi thekedar / contractor (optional)", hi: "निकासी ठेकेदार (वैकल्पिक)" },
+  "people.pakayiThekedarOptional": { en: "Pakayi thekedar / contractor (optional)", hi: "पकाई ठेकेदार (वैकल्पिक)" },
   "people.workTypeThekedarOptional": {
     en: "Kis kaam ka thekedar (work type, optional)",
     hi: "किस काम का ठेकेदार (काम का प्रकार, वैकल्पिक)",

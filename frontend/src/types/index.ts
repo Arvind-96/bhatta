@@ -107,6 +107,7 @@ export interface Person {
   stackingStage?: StackingStage;
   bharaiContractorId?: string;
   nikasiContractorId?: string;
+  pakayiContractorId?: string;
   firingShiftAnchorDate?: string;
   firingShiftAnchorType?: ShiftType;
   vehicleNumber?: string;
@@ -804,6 +805,53 @@ export interface NikasiContractorSummary {
   contractors: NikasiContractorEntry[];
   totalProductionAllContractors: number;
   totalDamagedAllContractors: number;
+}
+
+export interface PakayiOperatorEntry {
+  operator: {
+    id: string;
+    name: string;
+    phone?: string;
+    type: PersonType;
+    monthlySalary: number | null;
+  };
+  totalQuantity: number;
+  entryCount: number;
+  totalDue: number;
+  totalPaid: number;
+  balance: number;
+}
+
+export interface PakayiOperatorSummary {
+  operators: PakayiOperatorEntry[];
+  totalQuantityAllOperators: number;
+}
+
+export interface PakayiContractorWorker {
+  id: string;
+  name: string;
+  phone?: string;
+  monthlySalary: number | null;
+  quantity: number;
+}
+
+export interface PakayiContractorEntry {
+  contractor: {
+    id: string;
+    name: string;
+    phone?: string;
+    monthlySalary: number | null;
+  };
+  workers: PakayiContractorWorker[];
+  totalQuantity: number;
+  totalDue: number;
+  totalPaid: number;
+  balance: number;
+}
+
+export interface PakayiContractorSummary {
+  contractors: PakayiContractorEntry[];
+  totalQuantityAllContractors: number;
 }
 
 export type BrickVehicleType = "TRUCK" | "TRACTOR";

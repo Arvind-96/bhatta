@@ -43,6 +43,7 @@ export const people = mysqlTable("people", {
   stackingStage: varchar("stackingStage", { length: 50, enum: STACKING_STAGES }),
   bharaiContractorId: varchar("bharaiContractorId", { length: 64 }),
   nikasiContractorId: varchar("nikasiContractorId", { length: 64 }),
+  pakayiContractorId: varchar("pakayiContractorId", { length: 64 }),
   firingShiftAnchorDate: dateColumn("firingShiftAnchorDate"),
   firingShiftAnchorType: varchar("firingShiftAnchorType", { length: 50, enum: ["DAY", "NIGHT"] }),
   vehicleNumber: varchar("vehicleNumber", { length: 255 }),

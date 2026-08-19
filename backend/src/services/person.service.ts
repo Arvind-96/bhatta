@@ -34,6 +34,7 @@ export interface CreatePersonInput {
   stackingStage?: "TRANSPORT" | "CHAMBER_STACKING";
   bharaiContractorId?: string;
   nikasiContractorId?: string;
+  pakayiContractorId?: string;
   firingShiftAnchorDate?: Date;
   firingShiftAnchorType?: "DAY" | "NIGHT";
   vehicleNumber?: string;
@@ -90,6 +91,9 @@ export async function createPerson(input: CreatePersonInput) {
   }
   if (input.nikasiContractorId) {
     await assertPersonOfType(input.kilnId, input.nikasiContractorId, ["LABOUR_CONTRACTOR"]);
+  }
+  if (input.pakayiContractorId) {
+    await assertPersonOfType(input.kilnId, input.pakayiContractorId, ["LABOUR_CONTRACTOR"]);
   }
   // "Landowner - N" / "Sand - N", simple per-kiln count-based sequences —
   // both types are added one at a time by a single admin, not a
@@ -173,6 +177,9 @@ export async function updatePerson(kilnId: string, personId: string, input: Upda
   }
   if (input.nikasiContractorId) {
     await assertPersonOfType(kilnId, input.nikasiContractorId, ["LABOUR_CONTRACTOR"]);
+  }
+  if (input.pakayiContractorId) {
+    await assertPersonOfType(kilnId, input.pakayiContractorId, ["LABOUR_CONTRACTOR"]);
   }
   const existing = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Person not found");

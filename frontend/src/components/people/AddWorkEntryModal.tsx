@@ -25,6 +25,10 @@ interface AddWorkEntryModalProps {
   // Pickable labourers (used from a thekedar's profile) — shown as a
   // select when personId isn't already fixed.
   labourers?: Person[];
+  // Pre-selects the work type (e.g. "PAKAYI" from the Firing page's own
+  // gang detail pages) — still changeable, just saves the admin a step
+  // when opened from a page that already implies which module this is for.
+  defaultWorkType?: WorkType;
   onClose: () => void;
   onCreated: () => void;
 }
@@ -34,11 +38,11 @@ interface AddWorkEntryModalProps {
 // fixed) and from their thekedar's profile (pick which labourer). Posts
 // straight to work-entries, which auto-updates the ledger and both
 // profiles' totals live — no separate sync step.
-export function AddWorkEntryModal({ personId, labourers, onClose, onCreated }: AddWorkEntryModalProps) {
+export function AddWorkEntryModal({ personId, labourers, defaultWorkType, onClose, onCreated }: AddWorkEntryModalProps) {
   const { t } = useTranslation();
   const workTypeLabels = useWorkTypeLabels();
   const [selectedPersonId, setSelectedPersonId] = useState(personId ?? "");
-  const [workType, setWorkType] = useState<"" | WorkType>("");
+  const [workType, setWorkType] = useState<"" | WorkType>(defaultWorkType ?? "");
   const [quantity, setQuantity] = useState("");
   const [ratePerThousand, setRatePerThousand] = useState("");
   const [notes, setNotes] = useState("");

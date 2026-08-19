@@ -65,6 +65,8 @@ import type {
   NikasiOperatorSummary,
   NikasiPeriodTotals,
   OutstandingAdvance,
+  PakayiContractorSummary,
+  PakayiOperatorSummary,
   PaymentDue,
   PaymentMode,
   PaymentReceipt,
@@ -770,6 +772,8 @@ export const api = {
       input: Partial<{ workType: WorkType; quantity: number; ratePerThousand: number; notes: string }>
     ) => patch<WorkEntry>(`/work-entries/${id}`, input, true),
     remove: (id: string) => del<void>(`/work-entries/${id}`, true),
+    pakayiOperatorSummary: () => get<PakayiOperatorSummary>("/work-entries/pakayi-operator-summary", true),
+    pakayiContractorSummary: () => get<PakayiContractorSummary>("/work-entries/pakayi-contractor-summary", true),
   },
 
   soilArrivals: {

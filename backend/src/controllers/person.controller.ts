@@ -50,6 +50,7 @@ const createSchema = z.object({
   stackingStage: z.enum(STACKING_STAGES).optional(),
   bharaiContractorId: z.string().optional(),
   nikasiContractorId: z.string().optional(),
+  pakayiContractorId: z.string().optional(),
   firingShiftAnchorDate: z.string().optional(),
   firingShiftAnchorType: z.enum(["DAY", "NIGHT"]).optional(),
   vehicleNumber: z.string().optional(),

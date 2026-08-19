@@ -11,7 +11,10 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
+import { LedgerModal } from "@/components/people/LedgerModal";
 import { FitterDetailPage } from "@/components/firing/FitterDetailPage";
+import { PakayiContractorDetailPage } from "@/components/firing/PakayiContractorDetailPage";
+import { PakayiOperatorDetailPage } from "@/components/firing/PakayiOperatorDetailPage";
 import type {
   ChamberGrading,
   FireRoundSpeed,
@@ -23,6 +26,8 @@ import type {
   Gher,
   IncidentType,
   KilnIncident,
+  PakayiContractorSummary,
+  PakayiOperatorSummary,
   Person,
   ShiftType,
 } from "@/types";
@@ -866,9 +871,256 @@ function IncidentsTab() {
   );
 }
 
+// Thekedar-wise Pakayi summary — mirrors Nikasi.tsx's ContractorSummarySection:
+// each contractor's mapped worker gang, combined output and ledger balance,
+// click-through to their full profile.
+function PakayiContractorSummarySection({
+  summary,
+  onOpenLedger,
+  onOpenContractor,
+  onAddThekedar,
+}: {
+  summary: PakayiContractorSummary | null;
+  onOpenLedger: (personId: string) => void;
+  onOpenContractor: (contractorId: string) => void;
+  onAddThekedar: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-sm font-semibold text-ink-primary">{t("firing.thekedarWise")}</h4>
+          <p className="text-sm text-ink-muted">{t("firing.thekedarWiseSubtitle")}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {summary && (
+            <p className="text-sm text-ink-muted">
+              {t("firing.totalLabel")}{" "}
+              <span className="font-medium text-ink-primary">{summary.totalQuantityAllContractors.toLocaleString("en-IN")}</span>
+            </p>
+          )}
+          <Button size="sm" onClick={onAddThekedar}>
+            <Plus className="h-4 w-4" /> {t("firing.newThekedar")}
+          </Button>
+        </div>
+      </div>
+
+      {!summary ? null : summary.contractors.length === 0 ? (
+        <Card>
+          <p className="py-6 text-center text-sm text-ink-muted">{t("firing.noThekedarsYet")}</p>
+        </Card>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {summary.contractors.map((c) => (
+            <Card key={c.contractor.id}>
+              <div className="flex items-start justify-between gap-2">
+                <button className="min-w-0 text-left" onClick={() => onOpenContractor(c.contractor.id)}>
+                  <p className="text-sm font-semibold text-ink-primary hover:underline">{c.contractor.name}</p>
+                  <p className="text-sm text-ink-muted">
+                    {t("firing.laborerCount", { count: c.workers.length })}
+                    {c.contractor.monthlySalary ? ` · ₹${formatINR(c.contractor.monthlySalary)}${t("firing.perMonthSuffix")}` : ""}
+                  </p>
+                </button>
+                <button
+                  onClick={() => onOpenLedger(c.contractor.id)}
+                  className="shrink-0 rounded-lg border border-border bg-ink-primary/5 px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10 hover:text-ink-primary"
+                >
+                  {t("firing.ledgerAdvance")}
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-lg font-semibold tabular-nums text-ink-primary">{c.totalQuantity.toLocaleString("en-IN")}</p>
+                  <p className="text-sm text-ink-muted">{t("firing.quantityLabel")}</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(c.totalPaid)}</p>
+                  <p className="text-sm text-ink-muted">{t("firing.paidLabel")}</p>
+                </div>
+                <div>
+                  <p className={`text-lg font-semibold tabular-nums ${c.balance > 0 ? "text-status-critical" : c.balance < 0 ? "text-status-warning" : "text-status-good"}`}>
+                    ₹{formatINR(Math.abs(c.balance))}
+                  </p>
+                  <p className="text-sm text-ink-muted">{c.balance >= 0 ? t("firing.dueLabel") : t("firing.advanceLabel")}</p>
+                </div>
+              </div>
+
+              {c.workers.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-3">
+                  {c.workers.map((w) => (
+                    <span key={w.id} className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary">
+                      {w.name} · {w.quantity.toLocaleString("en-IN")}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Operator-wise Pakayi summary — for independent workers not mapped under
+// any thekedar.
+function PakayiOperatorSummarySection({
+  summary,
+  onOpenLedger,
+  onOpenOperator,
+  onAddOperator,
+}: {
+  summary: PakayiOperatorSummary | null;
+  onOpenLedger: (personId: string) => void;
+  onOpenOperator: (operatorId: string) => void;
+  onAddOperator: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-sm font-semibold text-ink-primary">{t("firing.independentOperators")}</h4>
+          <p className="text-sm text-ink-muted">{t("firing.independentOperatorsSubtitle")}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {summary && (
+            <p className="text-sm text-ink-muted">
+              {t("firing.totalLabel")}{" "}
+              <span className="font-medium text-ink-primary">{summary.totalQuantityAllOperators.toLocaleString("en-IN")}</span>
+            </p>
+          )}
+          <Button size="sm" onClick={onAddOperator}>
+            <Plus className="h-4 w-4" /> {t("firing.newLabor")}
+          </Button>
+        </div>
+      </div>
+
+      {!summary ? null : summary.operators.length === 0 ? (
+        <Card>
+          <p className="py-6 text-center text-sm text-ink-muted">{t("firing.noOperatorsYet")}</p>
+        </Card>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {summary.operators.map((o) => (
+            <Card key={o.operator.id}>
+              <div className="flex items-start justify-between gap-2">
+                <button className="min-w-0 text-left" onClick={() => onOpenOperator(o.operator.id)}>
+                  <p className="text-sm font-semibold text-ink-primary hover:underline">{o.operator.name}</p>
+                  <p className="text-sm text-ink-muted">
+                    {t("firing.entryCount", { count: o.entryCount })}
+                    {o.operator.monthlySalary ? ` · ₹${formatINR(o.operator.monthlySalary)}${t("firing.perMonthSuffix")}` : ""}
+                  </p>
+                </button>
+                <button
+                  onClick={() => onOpenLedger(o.operator.id)}
+                  className="shrink-0 rounded-lg border border-border bg-ink-primary/5 px-2.5 py-1 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10 hover:text-ink-primary"
+                >
+                  {t("firing.ledgerAdvance")}
+                </button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-lg font-semibold tabular-nums text-ink-primary">{o.totalQuantity.toLocaleString("en-IN")}</p>
+                  <p className="text-sm text-ink-muted">{t("firing.quantityLabel")}</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(o.totalPaid)}</p>
+                  <p className="text-sm text-ink-muted">{t("firing.paidLabel")}</p>
+                </div>
+                <div>
+                  <p className={`text-lg font-semibold tabular-nums ${o.balance > 0 ? "text-status-critical" : o.balance < 0 ? "text-status-warning" : "text-status-good"}`}>
+                    ₹{formatINR(Math.abs(o.balance))}
+                  </p>
+                  <p className="text-sm text-ink-muted">{o.balance >= 0 ? t("firing.dueLabel") : t("firing.advanceLabel")}</p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PakayiTab() {
+  const { t } = useTranslation();
+  const [contractorSummary, setContractorSummary] = useState<PakayiContractorSummary | null>(null);
+  const [operatorSummary, setOperatorSummary] = useState<PakayiOperatorSummary | null>(null);
+  const [openContractorId, setOpenContractorId] = useState<string | null>(null);
+  const [openOperatorId, setOpenOperatorId] = useState<string | null>(null);
+  const [ledgerFor, setLedgerFor] = useState<Person | null>(null);
+  const [showAddThekedar, setShowAddThekedar] = useState(false);
+  const [showAddOperator, setShowAddOperator] = useState(false);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+
+  async function refresh() {
+    const [contractorData, operatorData] = await Promise.all([
+      api.workEntries.pakayiContractorSummary(),
+      api.workEntries.pakayiOperatorSummary(),
+    ]);
+    setContractorSummary(contractorData);
+    setOperatorSummary(operatorData);
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    refresh().catch(console.error);
+  }, [activeKilnId]);
+
+  useKilnEvent("workEntry:update", () => refresh());
+  useKilnEvent("ledger:update", () => refresh());
+  useKilnEvent("person:update", () => refresh());
+
+  async function openLedgerFor(personId: string) {
+    const detail = await api.people.get(personId);
+    setLedgerFor(detail.person);
+  }
+
+  if (openContractorId) {
+    return <PakayiContractorDetailPage contractorId={openContractorId} onBack={() => setOpenContractorId(null)} />;
+  }
+  if (openOperatorId) {
+    return <PakayiOperatorDetailPage operatorId={openOperatorId} onBack={() => setOpenOperatorId(null)} />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <PakayiContractorSummarySection
+        summary={contractorSummary}
+        onOpenLedger={openLedgerFor}
+        onOpenContractor={setOpenContractorId}
+        onAddThekedar={() => setShowAddThekedar(true)}
+      />
+      <PakayiOperatorSummarySection
+        summary={operatorSummary}
+        onOpenLedger={openLedgerFor}
+        onOpenOperator={setOpenOperatorId}
+        onAddOperator={() => setShowAddOperator(true)}
+      />
+
+      {ledgerFor && <LedgerModal person={ledgerFor} onClose={() => setLedgerFor(null)} />}
+      {showAddThekedar && (
+        <AddPersonModal
+          defaultType="LABOUR_CONTRACTOR"
+          defaultWorkType="PAKAYI"
+          onClose={() => setShowAddThekedar(false)}
+          onCreated={refresh}
+        />
+      )}
+      {showAddOperator && (
+        <AddPersonModal defaultType="WORKER" defaultWorkType="PAKAYI" onClose={() => setShowAddOperator(false)} onCreated={refresh} />
+      )}
+    </div>
+  );
+}
+
 export function Firing() {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<"shifts" | "grading" | "incidents" | "fuel">("grading");
+  const [tab, setTab] = useState<"shifts" | "grading" | "incidents" | "fuel" | "pakayi">("grading");
   const fuelTypes = useFuelTypes();
 
   return (
@@ -879,6 +1131,7 @@ export function Firing() {
         options={[
           { value: "grading" as const, label: t("firing.tabGrading") },
           { value: "shifts" as const, label: t("firing.tabShifts") },
+          { value: "pakayi" as const, label: t("firing.tabPakayi") },
           { value: "incidents" as const, label: t("firing.tabIncidents") },
           { value: "fuel" as const, label: t("firing.tabFuel") },
         ]}
@@ -888,6 +1141,7 @@ export function Firing() {
 
       {tab === "grading" && <GradingTab />}
       {tab === "shifts" && <ShiftsTab />}
+      {tab === "pakayi" && <PakayiTab />}
       {tab === "incidents" && <IncidentsTab />}
       {tab === "fuel" && <FuelUsageTab fuelTypes={fuelTypes} />}
     </div>

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/client";
-import { workEntries, people, WORK_TYPES } from "../db/schema";
+import { workEntries, people, ledgerEntries, WORK_TYPES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
@@ -152,4 +152,125 @@ export async function listWorkEntries(kilnId: string, filter: ListWorkEntryFilte
     .where(inArray(people._id, personIds));
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
   return rows.map((r) => ({ ...r, personId: personById.get(r.personId) ?? r.personId }));
+}
+
+function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]) {
+  const due = entries.filter((e) => e.direction === "DUE").reduce((sum, e) => sum + e.amount, 0);
+  const paid = entries.filter((e) => e.direction === "PAID").reduce((sum, e) => sum + e.amount, 0);
+  return { due, paid, balance: due - paid };
+}
+
+// Independent Pakayi operators only (no thekedar) — same shape/exclusion
+// rule as nikasi.service.ts's nikasiOperatorSummary: LABOUR_CONTRACTOR
+// persons are always covered by pakayiContractorSummary instead, and
+// anyone mapped under a Pakayi contractor is folded into that contractor's
+// card rather than listed separately here.
+export async function pakayiOperatorSummary(kilnId: string) {
+  const operators = await db
+    .select()
+    .from(people)
+    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.pakayiContractorId), eq(people.active, true)))
+    .orderBy(asc(people.name));
+
+  const allEntries = await db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.workType, "PAKAYI")));
+  const entriesByPerson = new Map<string, typeof allEntries>();
+  for (const e of allEntries) {
+    if (!entriesByPerson.has(e.personId)) entriesByPerson.set(e.personId, []);
+    entriesByPerson.get(e.personId)!.push(e);
+  }
+
+  const results = [];
+  for (const operator of operators) {
+    const opEntries = entriesByPerson.get(operator._id) ?? [];
+    if (opEntries.length === 0) continue;
+
+    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id)));
+    const { due, paid, balance } = sumByDirection(opLedgerEntries);
+
+    results.push({
+      operator: {
+        id: operator._id,
+        name: operator.name,
+        phone: operator.phone,
+        type: operator.type,
+        monthlySalary: operator.monthlySalary ?? null,
+      },
+      totalQuantity: opEntries.reduce((sum, e) => sum + e.quantity, 0),
+      entryCount: opEntries.length,
+      totalDue: due,
+      totalPaid: paid,
+      balance,
+    });
+  }
+
+  return {
+    operators: results,
+    totalQuantityAllOperators: results.reduce((sum, r) => sum + r.totalQuantity, 0),
+  };
+}
+
+// The "how much do I owe Thekedar X's whole Pakayi gang" rollup — every
+// LABOUR_CONTRACTOR, the workers mapped under them for firing-side work
+// (Person.pakayiContractorId), their combined output (including entries
+// logged against the contractor directly) and ledger. Same shape as
+// nikasi.service.ts's nikasiContractorSummary, built on the shared
+// work_entries table (filtered to workType PAKAYI) instead of a dedicated
+// entries table, since Pakayi never got one of its own.
+export async function pakayiContractorSummary(kilnId: string) {
+  const [allContractors, workers, allEntries] = await Promise.all([
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
+    db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.workType, "PAKAYI"))),
+  ]);
+
+  const workerIdsWithEntries = new Set(allEntries.map((e) => e.personId));
+  const relevantWorkers = workers.filter((w) => w.workType === "PAKAYI" || workerIdsWithEntries.has(w._id));
+
+  const contractorIdsWithWorkers = new Set(relevantWorkers.filter((w) => w.pakayiContractorId).map((w) => w.pakayiContractorId!));
+  const contractors = allContractors.filter((c) => c.workType === "PAKAYI" || contractorIdsWithWorkers.has(c._id));
+
+  const contractorResults = await Promise.all(
+    contractors.map(async (contractor) => {
+      const gangWorkers = relevantWorkers.filter((w) => w.pakayiContractorId === contractor._id);
+      const workerIds = gangWorkers.map((w) => w._id);
+      const personIds = [contractor._id, ...workerIds];
+
+      const [gangEntries, gangLedgerEntries] = await Promise.all([
+        db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.workType, "PAKAYI"), inArray(workEntries.personId, personIds))),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))),
+      ]);
+
+      const quantityByWorker = new Map<string, number>();
+      for (const e of gangEntries) {
+        quantityByWorker.set(e.personId, (quantityByWorker.get(e.personId) ?? 0) + e.quantity);
+      }
+      const totalQuantity = gangEntries.reduce((sum, e) => sum + e.quantity, 0);
+      const { due, paid, balance } = sumByDirection(gangLedgerEntries);
+
+      return {
+        contractor: {
+          id: contractor._id,
+          name: contractor.name,
+          phone: contractor.phone,
+          monthlySalary: contractor.monthlySalary ?? null,
+        },
+        workers: gangWorkers.map((w) => ({
+          id: w._id,
+          name: w.name,
+          phone: w.phone,
+          monthlySalary: w.monthlySalary ?? null,
+          quantity: quantityByWorker.get(w._id) ?? 0,
+        })),
+        totalQuantity,
+        totalDue: due,
+        totalPaid: paid,
+        balance,
+      };
+    })
+  );
+
+  return {
+    contractors: contractorResults,
+    totalQuantityAllContractors: contractorResults.reduce((sum, c) => sum + c.totalQuantity, 0),
+  };
 }
