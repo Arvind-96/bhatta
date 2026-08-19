@@ -103,6 +103,7 @@ export const moldingStackingDict: Record<string, Record<Locale, string>> = {
   "molding.laborFareBhada": { en: "Labor fare (Bhada)", hi: "मज़दूर भाड़ा" },
   "molding.perLaborFareAmount": { en: "Fare per laborer (₹)", hi: "प्रति मज़दूर भाड़ा (₹)" },
   "molding.totalFareLabel": { en: "Total fare", hi: "कुल भाड़ा" },
+  "molding.thisPaymentAmountLabel": { en: "This payment", hi: "यह भुगतान" },
   "molding.payFareButton": { en: "Pay fare", hi: "भाड़ा दें" },
   "molding.fixedAdvance": { en: "Fixed advance", hi: "निश्चित पेशगी" },
   "molding.perLaborAdvanceAmount": { en: "Advance per laborer (₹)", hi: "प्रति मज़दूर पेशगी (₹)" },

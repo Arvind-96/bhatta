@@ -188,13 +188,15 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   }
 
   const balance = entry?.balance ?? 0;
-  // Total Fare / Total Advance show 0 until the admin types something in —
-  // just this session's laborer count × rate, not a running historical
-  // total (that's what Advance Given below already tracks separately).
-  const remainingPool =
-    pendingFare +
-    pendingAdvance -
-    ((entry?.advanceDeductedForWorkers ?? 0) + (entry?.advanceGivenToContractor ?? 0));
+  // Total Fare = every Bhada payment ever posted to this contractor
+  // (entry.totalFarePaid); Total Advance = every Fixed Advance payment ever
+  // posted (entry.advanceGivenToContractor) — both running totals from the
+  // ledger, not just this session's pending laborerCount × rate calculation
+  // (pendingFare/pendingAdvance below are only the live preview of what the
+  // form about to submit would add).
+  const totalFare = entry?.totalFarePaid ?? 0;
+  const totalAdvance = entry?.advanceGivenToContractor ?? 0;
+  const remainingPool = totalFare + totalAdvance - ((entry?.advanceDeductedForWorkers ?? 0) + (entry?.advanceGivenToContractor ?? 0));
 
   return (
     <div>
@@ -322,7 +324,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                 />
               )}
               <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
-                <span className="text-sm text-ink-muted">{t("molding.totalFareLabel")}</span>
+                <span className="text-sm text-ink-muted">{t("molding.thisPaymentAmountLabel")}</span>
                 <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingFare)}</span>
               </div>
               {fareError && <p className="text-sm text-status-critical">{fareError}</p>}
@@ -358,7 +360,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
                 />
               )}
               <div className="flex items-center justify-between rounded-lg bg-ink-primary/5 px-3 py-2">
-                <span className="text-sm text-ink-muted">{t("molding.totalAdvanceLabel")}</span>
+                <span className="text-sm text-ink-muted">{t("molding.thisPaymentAmountLabel")}</span>
                 <span className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingAdvance)}</span>
               </div>
               {advanceError && <p className="text-sm text-status-critical">{advanceError}</p>}
@@ -370,11 +372,11 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
             <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
-              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingFare)}</p>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalFare)}</p>
               <p className="text-sm text-ink-muted">{t("molding.totalFareLabel")}</p>
             </div>
             <div className="rounded-xl border border-border bg-ink-primary/5 p-3 text-center">
-              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(pendingAdvance)}</p>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAdvance)}</p>
               <p className="text-sm text-ink-muted">{t("molding.totalAdvanceLabel")}</p>
             </div>
             <div className="rounded-xl bg-series-1 p-3 text-center">

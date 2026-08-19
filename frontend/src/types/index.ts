@@ -577,6 +577,7 @@ export interface MoldingContractorEntry {
   balance: number;
   advanceGivenToContractor: number;
   advanceDeductedForWorkers: number;
+  totalFarePaid: number;
 }
 
 export interface MoldingContractorSummary {

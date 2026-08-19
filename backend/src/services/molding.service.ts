@@ -346,6 +346,13 @@ export async function moldingContractorSummary(kilnId: string) {
       const advanceGivenToContractor = gangLedgerEntries
         .filter((e) => e.personId === contractor._id && e.direction === "PAID" && e.category === "ADVANCE")
         .reduce((sum, e) => sum + e.amount, 0);
+      // Total Labor Fare (Bhada) ever paid to this contractor (category
+      // FARE, posted from the "Pay fare" action below) -- same running-
+      // total shape as advanceGivenToContractor just above, for the Fare
+      // side of the pool instead of the Advance side.
+      const totalFarePaid = gangLedgerEntries
+        .filter((e) => e.personId === contractor._id && e.direction === "PAID" && e.category === "FARE")
+        .reduce((sum, e) => sum + e.amount, 0);
       const advanceDeductedForWorkers = gangLedgerEntries
         .filter(
           (e) =>
@@ -375,6 +382,7 @@ export async function moldingContractorSummary(kilnId: string) {
         balance,
         advanceGivenToContractor,
         advanceDeductedForWorkers,
+        totalFarePaid,
       };
     })
   );
