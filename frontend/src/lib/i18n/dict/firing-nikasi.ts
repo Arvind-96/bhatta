@@ -199,6 +199,7 @@ export const firingNikasiDict: Record<string, Record<Locale, string>> = {
 
   // ---- EditNikasiEntryModal.tsx ----
   "nikasi.editEntry": { en: "Edit nikasi entry", hi: "निकासी एंट्री संपादित करें" },
+  "nikasi.confirmDeleteEntry": { en: "Delete this nikasi entry? This cannot be undone.", hi: "यह निकासी एंट्री हटाएं? इसे वापस नहीं लाया जा सकता।" },
   "nikasi.damagedBricksPlaceholder": { en: "Damaged bricks", hi: "नुकसान हुई ईंटें" },
 
   // ---- NikasiContractorDetailPage.tsx / NikasiOperatorDetailPage.tsx (shared) ----

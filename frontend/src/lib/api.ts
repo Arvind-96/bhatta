@@ -546,6 +546,11 @@ export const api = {
     today: () => get<{ total: number }>("/molding/today", true),
     periodTotals: () => get<MoldingPeriodTotals>("/molding/period-totals", true),
     contractorSummary: () => get<MoldingContractorSummary>("/molding/contractor-summary", true),
+    update: (
+      id: string,
+      input: Partial<{ bricksCount: number; ratePerThousand: number; damagedCount: number; washedOut: boolean; notes: string }>
+    ) => patch<MoldingEntry>(`/molding/${id}`, input, true),
+    remove: (id: string) => del<void>(`/molding/${id}`, true),
   },
 
   wastage: {
@@ -593,6 +598,7 @@ export const api = {
         notes: string;
       }>
     ) => patch<StackingEntry>(`/stacking/${id}`, input, true),
+    remove: (id: string) => del<void>(`/stacking/${id}`, true),
     operatorSummary: () => get<StackingOperatorSummary>("/stacking/operator-summary", true),
     contractorSummary: () => get<StackingContractorSummary>("/stacking/contractor-summary", true),
     tractorFleet: () => get<TractorFleetEntry[]>("/stacking/tractor-fleet", true),
@@ -629,6 +635,7 @@ export const api = {
       post<NikasiEntry>("/nikasi", input, true),
     update: (id: string, input: Partial<{ bricksCount: number; damagedCount: number; notes: string }>) =>
       patch<NikasiEntry>(`/nikasi/${id}`, input, true),
+    remove: (id: string) => del<void>(`/nikasi/${id}`, true),
     operatorSummary: () => get<NikasiOperatorSummary>("/nikasi/operator-summary", true),
     contractorSummary: () => get<NikasiContractorSummary>("/nikasi/contractor-summary", true),
     periodTotals: () => get<NikasiPeriodTotals>("/nikasi/period-totals", true),
@@ -683,6 +690,7 @@ export const api = {
       id: string,
       input: Partial<{ workType: WorkType; quantity: number; ratePerThousand: number; notes: string }>
     ) => patch<WorkEntry>(`/work-entries/${id}`, input, true),
+    remove: (id: string) => del<void>(`/work-entries/${id}`, true),
   },
 
   soilArrivals: {
@@ -725,6 +733,7 @@ export const api = {
         notes: string;
       }>
     ) => patch<SoilArrival>(`/soil-arrivals/${id}`, input, true),
+    remove: (id: string) => del<void>(`/soil-arrivals/${id}`, true),
   },
 
   familyMembers: {
@@ -829,6 +838,20 @@ export const api = {
     }) => post<FuelPurchase>("/fuel-purchases", input, true),
     stockBalance: () => get<Record<string, number>>("/fuel-purchases/stock-balance", true),
     supplierBalances: () => get<SupplierFuelBalance[]>("/fuel-purchases/supplier-balances", true),
+    update: (
+      id: string,
+      input: Partial<{
+        fuelType: string;
+        vehicleNumber: string;
+        invoicedWeightKg: number;
+        actualWeightKg: number;
+        amount: number;
+        paidAmount: number;
+        paymentMode: SimplePaymentMode;
+        notes: string;
+      }>
+    ) => patch<FuelPurchase>(`/fuel-purchases/${id}`, input, true),
+    remove: (id: string) => del<void>(`/fuel-purchases/${id}`, true),
   },
 
   fuelLogs: {
@@ -838,6 +861,9 @@ export const api = {
     efficiency: (days = 7, baselineDays = 30) =>
       get<FuelEfficiency>(`/fuel-logs/efficiency?days=${days}&baselineDays=${baselineDays}`, true),
     periodTotals: () => get<FuelLogPeriodTotals>("/fuel-logs/period-totals", true),
+    update: (id: string, input: Partial<{ gherId: string; fuelType: string; quantityKg: number; notes: string }>) =>
+      patch<FuelLog>(`/fuel-logs/${id}`, input, true),
+    remove: (id: string) => del<void>(`/fuel-logs/${id}`, true),
   },
 
   chamberGradings: {

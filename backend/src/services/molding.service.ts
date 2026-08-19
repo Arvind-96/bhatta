@@ -67,6 +67,134 @@ export async function createMoldingEntry(input: CreateMoldingInput) {
   return entry;
 }
 
+export interface UpdateMoldingInput {
+  bricksCount?: number;
+  ratePerThousand?: number;
+  damagedCount?: number;
+  washedOut?: boolean;
+  notes?: string;
+}
+
+// Full admin edit — a revised bricksCount/rate/washedOut never silently
+// rewrites the wage (and, if the worker has a contractor, the commission)
+// already posted; each gets its own correction entry for the delta,
+// same convention as workEntry.service.ts, applied to both ledgers here.
+export async function updateMoldingEntry(kilnId: string, entryId: string, input: UpdateMoldingInput) {
+  const existing = (await db.select().from(moldingEntries).where(and(eq(moldingEntries._id, entryId), eq(moldingEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Molding entry not found in this kiln");
+
+  const worker = await assertPersonOfType(kilnId, existing.workerId, ["WORKER"]);
+  const oldWage = existing.washedOut ? 0 : (existing.bricksCount / 1000) * existing.ratePerThousand;
+
+  await db.update(moldingEntries).set(input).where(eq(moldingEntries._id, entryId));
+  const updated = (await db.select().from(moldingEntries).where(eq(moldingEntries._id, entryId)))[0]!;
+
+  const wageRelevant = input.bricksCount !== undefined || input.ratePerThousand !== undefined || input.washedOut !== undefined;
+  if (wageRelevant) {
+    const newWage = updated.washedOut ? 0 : (updated.bricksCount / 1000) * updated.ratePerThousand;
+    const delta = Math.round((newWage - oldWage) * 100) / 100;
+    if (delta > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: updated.workerId,
+        direction: "DUE",
+        amount: delta,
+        reason: `Pathai correction: revised up to ${updated.bricksCount.toLocaleString()} bricks`,
+        category: "WAGE",
+      });
+    } else if (delta < 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: updated.workerId,
+        direction: "PAID",
+        amount: -delta,
+        reason: `Pathai correction: revised down to ${updated.bricksCount.toLocaleString()} bricks`,
+        category: "WAGE",
+      });
+    }
+
+    if (worker.contractorId) {
+      const contractor = (await db
+        .select()
+        .from(people)
+        .where(and(eq(people._id, worker.contractorId), eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"))))[0];
+      if (contractor?.commissionPerThousand) {
+        const oldCommission = existing.washedOut ? 0 : (existing.bricksCount / 1000) * contractor.commissionPerThousand;
+        const newCommission = updated.washedOut ? 0 : (updated.bricksCount / 1000) * contractor.commissionPerThousand;
+        const commissionDelta = Math.round((newCommission - oldCommission) * 100) / 100;
+        if (commissionDelta > 0) {
+          await addLedgerEntry({
+            kilnId,
+            personId: contractor._id,
+            direction: "DUE",
+            amount: commissionDelta,
+            reason: `Pathai commission correction: ${worker.name} revised to ${updated.bricksCount.toLocaleString()} bricks`,
+            category: "COMMISSION",
+          });
+        } else if (commissionDelta < 0) {
+          await addLedgerEntry({
+            kilnId,
+            personId: contractor._id,
+            direction: "PAID",
+            amount: -commissionDelta,
+            reason: `Pathai commission correction: ${worker.name} revised to ${updated.bricksCount.toLocaleString()} bricks`,
+            category: "COMMISSION",
+          });
+        }
+      }
+    }
+  }
+
+  emitToKiln(kilnId, "molding:update", updated);
+  return updated;
+}
+
+// Reverses both the worker's wage and (if applicable) the contractor's
+// commission this entry posted, same delta-correction math updateMoldingEntry
+// uses against a target of zero, before removing the row.
+export async function deleteMoldingEntry(kilnId: string, entryId: string) {
+  const existing = (await db.select().from(moldingEntries).where(and(eq(moldingEntries._id, entryId), eq(moldingEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Molding entry not found in this kiln");
+
+  if (!existing.washedOut) {
+    const wage = (existing.bricksCount / 1000) * existing.ratePerThousand;
+    if (wage > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.workerId,
+        direction: "PAID",
+        amount: wage,
+        reason: `Pathai deleted: reversing ₹${wage.toLocaleString("en-IN")}`,
+        category: "WAGE",
+      });
+    }
+
+    const worker = (await db.select().from(people).where(and(eq(people._id, existing.workerId), eq(people.kilnId, kilnId))))[0];
+    if (worker?.contractorId) {
+      const contractor = (await db
+        .select()
+        .from(people)
+        .where(and(eq(people._id, worker.contractorId), eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"))))[0];
+      if (contractor?.commissionPerThousand) {
+        const commission = (existing.bricksCount / 1000) * contractor.commissionPerThousand;
+        if (commission > 0) {
+          await addLedgerEntry({
+            kilnId,
+            personId: contractor._id,
+            direction: "PAID",
+            amount: commission,
+            reason: `Pathai commission deleted: reversing ₹${commission.toLocaleString("en-IN")}`,
+            category: "COMMISSION",
+          });
+        }
+      }
+    }
+  }
+
+  await db.delete(moldingEntries).where(eq(moldingEntries._id, entryId));
+  emitToKiln(kilnId, "molding:update", { _id: entryId, deleted: true });
+}
+
 export interface ListMoldingFilter {
   workerId?: string;
   from?: Date;

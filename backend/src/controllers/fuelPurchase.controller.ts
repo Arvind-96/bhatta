@@ -1,7 +1,14 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { createFuelPurchase, fuelStockBalance, listFuelPurchases, supplierFuelBalances } from "../services/fuelPurchase.service";
+import {
+  createFuelPurchase,
+  deleteFuelPurchase,
+  fuelStockBalance,
+  listFuelPurchases,
+  supplierFuelBalances,
+  updateFuelPurchase,
+} from "../services/fuelPurchase.service";
 import { LEDGER_PAYMENT_MODES } from "../db/schema";
 
 const createSchema = z.object({
@@ -41,4 +48,26 @@ export async function stockBalance(req: AuthedRequest, res: Response) {
 export async function supplierBalances(req: AuthedRequest, res: Response) {
   const balances = await supplierFuelBalances(req.kiln!.id);
   res.json(balances);
+}
+
+const updateSchema = z.object({
+  fuelType: z.string().min(1).optional(),
+  vehicleNumber: z.string().optional(),
+  invoicedWeightKg: z.number().positive().optional(),
+  actualWeightKg: z.number().positive().optional(),
+  amount: z.number().positive().optional(),
+  paidAmount: z.number().nonnegative().optional(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
+  notes: z.string().optional(),
+});
+
+export async function update(req: AuthedRequest, res: Response) {
+  const input = updateSchema.parse(req.body);
+  const purchase = await updateFuelPurchase(req.kiln!.id, req.params.id, input);
+  res.json(purchase);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deleteFuelPurchase(req.kiln!.id, req.params.id);
+  res.status(204).end();
 }

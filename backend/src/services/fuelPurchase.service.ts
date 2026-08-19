@@ -74,6 +74,117 @@ export async function createFuelPurchase(input: CreateFuelPurchaseInput) {
   return purchase;
 }
 
+export interface UpdateFuelPurchaseInput {
+  fuelType?: string;
+  vehicleNumber?: string;
+  invoicedWeightKg?: number;
+  actualWeightKg?: number;
+  amount?: number;
+  paidAmount?: number;
+  paymentMode?: Exclude<(typeof LEDGER_PAYMENT_MODES)[number], "CASH_AND_ONLINE">;
+  notes?: string;
+}
+
+// Full admin edit — supplierId stays fixed once set (same convention as
+// soilArrival's landownerId), so a revised amount/paidAmount just posts a
+// correction entry for the delta on that same supplier's ledger instead of
+// silently rewriting what was already posted.
+export async function updateFuelPurchase(kilnId: string, purchaseId: string, input: UpdateFuelPurchaseInput) {
+  const existing = (await db.select().from(fuelPurchases).where(and(eq(fuelPurchases._id, purchaseId), eq(fuelPurchases.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Fuel purchase not found in this kiln");
+  if (input.fuelType) await assertFuelTypeExists(kilnId, input.fuelType);
+
+  const oldAmount = existing.amount;
+  const oldPaid = existing.paidAmount ?? 0;
+
+  await db.update(fuelPurchases).set(input).where(eq(fuelPurchases._id, purchaseId));
+  const updated = (await db.select().from(fuelPurchases).where(eq(fuelPurchases._id, purchaseId)))[0]!;
+
+  if (existing.supplierId && (input.amount !== undefined || input.paidAmount !== undefined)) {
+    const newAmount = updated.amount;
+    const newPaid = updated.paidAmount ?? 0;
+
+    const amountDelta = Math.round((newAmount - oldAmount) * 100) / 100;
+    if (amountDelta > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.supplierId,
+        direction: "DUE",
+        amount: amountDelta,
+        reason: `Fuel purchase correction: revised up to ₹${newAmount.toLocaleString("en-IN")}`,
+        category: "FUEL",
+      });
+    } else if (amountDelta < 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.supplierId,
+        direction: "PAID",
+        amount: -amountDelta,
+        reason: `Fuel purchase correction: revised down to ₹${newAmount.toLocaleString("en-IN")}`,
+        category: "FUEL",
+      });
+    }
+
+    const paidDelta = Math.round((newPaid - oldPaid) * 100) / 100;
+    if (paidDelta > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.supplierId,
+        direction: "PAID",
+        amount: paidDelta,
+        reason: `Fuel purchase correction: additional ₹${paidDelta.toLocaleString("en-IN")} paid`,
+        category: "FUEL",
+      });
+    } else if (paidDelta < 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.supplierId,
+        direction: "DUE",
+        amount: -paidDelta,
+        reason: `Fuel purchase correction: payment revised down by ₹${(-paidDelta).toLocaleString("en-IN")}`,
+        category: "FUEL",
+      });
+    }
+  }
+
+  emitToKiln(kilnId, "fuelPurchase:update", updated);
+  return updated;
+}
+
+// Reverses this purchase's ledger impact (same delta-correction math
+// updateFuelPurchase uses, applied against a target of zero) before
+// removing the row.
+export async function deleteFuelPurchase(kilnId: string, purchaseId: string) {
+  const existing = (await db.select().from(fuelPurchases).where(and(eq(fuelPurchases._id, purchaseId), eq(fuelPurchases.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Fuel purchase not found in this kiln");
+
+  if (existing.supplierId) {
+    if (existing.amount > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.supplierId,
+        direction: "PAID",
+        amount: existing.amount,
+        reason: `Fuel purchase deleted: reversing ₹${existing.amount.toLocaleString("en-IN")}`,
+        category: "FUEL",
+      });
+    }
+    if ((existing.paidAmount ?? 0) > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.supplierId,
+        direction: "DUE",
+        amount: existing.paidAmount!,
+        reason: `Fuel purchase deleted: reversing ₹${existing.paidAmount!.toLocaleString("en-IN")} payment given`,
+        category: "FUEL",
+      });
+    }
+  }
+
+  await db.delete(fuelPurchases).where(eq(fuelPurchases._id, purchaseId));
+  emitToKiln(kilnId, "fuelPurchase:update", { _id: purchaseId, deleted: true });
+}
+
 export async function listFuelPurchases(kilnId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);

@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { createWorkEntry, listWorkEntries, updateWorkEntry } from "../services/workEntry.service";
+import { createWorkEntry, deleteWorkEntry, listWorkEntries, updateWorkEntry } from "../services/workEntry.service";
 import { WORK_TYPES } from "../db/schema";
 
 const createSchema = z.object({
@@ -42,4 +42,9 @@ export async function update(req: AuthedRequest, res: Response) {
   const input = updateSchema.parse(req.body);
   const entry = await updateWorkEntry(req.kiln!.id, req.params.id, input);
   res.json(entry);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deleteWorkEntry(req.kiln!.id, req.params.id);
+  res.status(204).end();
 }

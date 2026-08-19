@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -38,6 +39,7 @@ export function EditSoilArrivalModal({ entry, drivers, onClose, onSaved }: EditS
   const [soilRemaining, setSoilRemaining] = useState(entry.soilRemaining != null ? String(entry.soilRemaining) : "");
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const landownerId = typeof entry.landownerId === "object" ? entry.landownerId._id : entry.landownerId;
 
@@ -72,9 +74,21 @@ export function EditSoilArrivalModal({ entry, drivers, onClose, onSaved }: EditS
     }
   }
 
-  return (
+  async function handleDelete() {
+    if (!confirm(t("soil.confirmDeleteSoilArrival"))) return;
+    setDeleting(true);
+    try {
+      await api.soilArrivals.remove(entry._id);
+      onSaved();
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md hover:translate-y-0">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink-primary">{t("soil.editSoilArrival")}</h3>
           <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
@@ -191,11 +205,22 @@ export function EditSoilArrivalModal({ entry, drivers, onClose, onSaved }: EditS
             onChange={(e) => setNotes(e.target.value)}
             className={`col-span-2 ${inputClass}`}
           />
-          <Button type="submit" disabled={saving} className="col-span-2">
-            {t("common.saveChanges")}
-          </Button>
+          <div className="col-span-2 flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+            </button>
+            <Button type="submit" disabled={saving} className="flex-1">
+              {t("common.saveChanges")}
+            </Button>
+          </div>
         </form>
       </Card>
-    </div>
+    </div>,
+    document.body
   );
 }

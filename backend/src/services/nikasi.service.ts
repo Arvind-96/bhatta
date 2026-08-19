@@ -52,6 +52,17 @@ export async function updateNikasiEntry(kilnId: string, entryId: string, input: 
   return updated;
 }
 
+// No ledger side effect to reverse — nikasi gangs are paid a monthly
+// salary independent of any single entry (see createNikasiEntry), so this
+// is purely a production-record removal.
+export async function deleteNikasiEntry(kilnId: string, entryId: string) {
+  const existing = (await db.select().from(nikasiEntries).where(and(eq(nikasiEntries._id, entryId), eq(nikasiEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Nikasi entry not found in this kiln");
+
+  await db.delete(nikasiEntries).where(eq(nikasiEntries._id, entryId));
+  emitToKiln(kilnId, "nikasi:update", { _id: entryId, deleted: true });
+}
+
 export interface ListNikasiFilter {
   gherId?: string;
   gangId?: string;

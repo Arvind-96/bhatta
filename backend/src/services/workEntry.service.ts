@@ -109,6 +109,30 @@ export async function updateWorkEntry(kilnId: string, entryId: string, input: Up
   return updated;
 }
 
+// Reverses the wage this entry posted with a PAID correction (same
+// delta-correction math updateWorkEntry uses for a revised quantity/rate,
+// applied against a target of zero) before removing the row.
+export async function deleteWorkEntry(kilnId: string, entryId: string) {
+  const existing = (await db.select().from(workEntries).where(and(eq(workEntries._id, entryId), eq(workEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Work entry not found in this kiln");
+
+  const wage = wageFor(existing.quantity, existing.ratePerThousand);
+  if (wage > 0) {
+    const label = WORK_TYPE_LABELS[existing.workType as WorkType];
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.personId,
+      direction: "PAID",
+      amount: wage,
+      reason: `${label} deleted: reversing ₹${wage.toLocaleString("en-IN")}`,
+      category: "WAGE",
+    });
+  }
+
+  await db.delete(workEntries).where(eq(workEntries._id, entryId));
+  emitToKiln(kilnId, "workEntry:update", { _id: entryId, deleted: true });
+}
+
 export interface ListWorkEntryFilter {
   personId?: string;
   workType?: WorkType;

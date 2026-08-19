@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Pencil, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { cn, formatINR } from "@/lib/utils";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
+import { EditMoldingEntryModal } from "@/components/molding/EditMoldingEntryModal";
 import type { LedgerEntry, MoldingEntry, Person } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -48,6 +49,7 @@ export function LaborDetailPage({ workerId, onBack }: LaborDetailPageProps) {
   const [showLogForm, setShowLogForm] = useState(false);
   const [logForm, setLogForm] = useState({ bricksCount: "", ratePerThousand: "", damagedCount: "", washedOut: false });
   const [loggingProduction, setLoggingProduction] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<MoldingEntry | null>(null);
 
   async function refresh() {
     const [detail, ledger, history] = await Promise.all([
@@ -311,6 +313,7 @@ export function LaborDetailPage({ workerId, onBack }: LaborDetailPageProps) {
                     <th className="pb-2 font-medium">{t("molding.rateColumn")}</th>
                     <th className="pb-2 font-medium">{t("molding.wageColumn")}</th>
                     <th className="pb-2 font-medium">{t("common.status")}</th>
+                    <th className="pb-2 font-medium" />
                   </tr>
                 </thead>
                 <tbody>
@@ -336,6 +339,16 @@ export function LaborDetailPage({ workerId, onBack }: LaborDetailPageProps) {
                           <Badge variant="good">{t("molding.paidEntryBadge")}</Badge>
                         )}
                       </td>
+                      <td className="py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setEditingEntry(entry)}
+                          className="text-ink-muted hover:text-ink-primary"
+                          aria-label={t("molding.editEntry")}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -346,6 +359,7 @@ export function LaborDetailPage({ workerId, onBack }: LaborDetailPageProps) {
 
         <LedgerCategoryHistorySections entries={ledgerEntries} />
       </div>
+      {editingEntry && <EditMoldingEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} onSaved={refresh} />}
     </div>
   );
 }

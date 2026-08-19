@@ -230,4 +230,8 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
 
   // --- components/people/EditWorkEntryModal.tsx ---
   "people.editWorkEntry": { en: "Edit work entry", hi: "काम की एंट्री बदलें" },
+  "people.confirmDeleteWorkEntry": {
+    en: "Delete this work entry? The wage it posted will be reversed and this cannot be undone.",
+    hi: "यह काम की एंट्री हटाएं? इससे बनी मज़दूरी उलट दी जाएगी और इसे वापस नहीं लाया जा सकता।",
+  },
 };

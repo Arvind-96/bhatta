@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -218,6 +219,137 @@ function SupplierBalancesSection() {
   );
 }
 
+function EditFuelPurchaseModal({
+  purchase,
+  fuelTypes,
+  onClose,
+}: {
+  purchase: FuelPurchase;
+  fuelTypes: FuelType[];
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [fuelType, setFuelType] = useState(purchase.fuelType);
+  const [vehicleNumber, setVehicleNumber] = useState(purchase.vehicleNumber ?? "");
+  const [invoicedWeightKg, setInvoicedWeightKg] = useState(String(purchase.invoicedWeightKg));
+  const [actualWeightKg, setActualWeightKg] = useState(String(purchase.actualWeightKg));
+  const [amount, setAmount] = useState(String(purchase.amount));
+  const [paidAmount, setPaidAmount] = useState(purchase.paidAmount ? String(purchase.paidAmount) : "");
+  const [paymentMode, setPaymentMode] = useState<"" | SimplePaymentMode>((purchase.paymentMode as SimplePaymentMode) ?? "");
+  const [notes, setNotes] = useState(purchase.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.fuelPurchases.update(purchase._id, {
+        fuelType,
+        vehicleNumber: vehicleNumber || undefined,
+        invoicedWeightKg: Number(invoicedWeightKg),
+        actualWeightKg: Number(actualWeightKg),
+        amount: Number(amount),
+        paidAmount: paidAmount ? Number(paidAmount) : undefined,
+        paymentMode: paymentMode || undefined,
+        notes: notes || undefined,
+      });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(t("fuel.confirmDeletePurchase"))) return;
+    setDeleting(true);
+    try {
+      await api.fuelPurchases.remove(purchase._id);
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
+      <Card className="w-full max-w-md hover:translate-y-0">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-ink-primary">{t("fuel.editPurchase")}</h3>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+          <select value={fuelType} onChange={(e) => setFuelType(e.target.value)} className={cn(inputClass, "col-span-2")}>
+            {fuelTypes.map((ft) => (
+              <option key={ft._id} value={ft.name}>
+                {ft.name}
+              </option>
+            ))}
+          </select>
+          <input
+            placeholder={t("fuel.transportVehicleNumber")}
+            value={vehicleNumber}
+            onChange={(e) => setVehicleNumber(e.target.value)}
+            className={cn(inputClass, "col-span-2")}
+          />
+          <input
+            required
+            type="number"
+            placeholder={t("fuel.invoicedWeightKg")}
+            value={invoicedWeightKg}
+            onChange={(e) => setInvoicedWeightKg(e.target.value)}
+            className={inputClass}
+          />
+          <input
+            required
+            type="number"
+            placeholder={t("fuel.actualWeighbridgeWeightKg")}
+            value={actualWeightKg}
+            onChange={(e) => setActualWeightKg(e.target.value)}
+            className={inputClass}
+          />
+          <input required type="number" placeholder={t("fuel.totalAmount")} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputClass} />
+          <input
+            type="number"
+            placeholder={t("fuel.paidNowOptional")}
+            value={paidAmount}
+            onChange={(e) => setPaidAmount(e.target.value)}
+            className={inputClass}
+          />
+          <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as "" | SimplePaymentMode)} className={cn(inputClass, "col-span-2")}>
+            <option value="">{t("common.paymentMode")}</option>
+            <option value="CASH">{t("billing.paymentCash")}</option>
+            <option value="BANK">{t("billing.paymentBank")}</option>
+            <option value="UPI">{t("billing.paymentUpi")}</option>
+          </select>
+          <input
+            placeholder={t("common.notes")}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={cn(inputClass, "col-span-2")}
+          />
+          <div className="col-span-2 flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+            </button>
+            <Button type="submit" disabled={saving} className="flex-1">
+              {t("common.saveChanges")}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>,
+    document.body
+  );
+}
+
 function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
   const { t } = useTranslation();
   const [purchases, setPurchases] = useState<FuelPurchase[]>([]);
@@ -235,6 +367,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
     paymentMode: "" as "" | SimplePaymentMode,
   });
   const [loading, setLoading] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<FuelPurchase | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   useEffect(() => {
@@ -422,6 +555,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                   <th className="pb-2 font-medium">{t("fuel.actual")}</th>
                   <th className="pb-2 font-medium">{t("fuel.variance")}</th>
                   <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
+                  <th className="pb-2 font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -447,6 +581,16 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                       <td className="py-3 text-right tabular-nums font-medium text-ink-primary">
                         ₹{formatINR(p.amount)}
                       </td>
+                      <td className="py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setEditingPurchase(p)}
+                          className="text-ink-muted hover:text-ink-primary"
+                          aria-label={t("fuel.editPurchase")}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -456,7 +600,111 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
           </div>
         )}
       </Card>
+
+      {editingPurchase && (
+        <EditFuelPurchaseModal purchase={editingPurchase} fuelTypes={fuelTypes} onClose={() => setEditingPurchase(null)} />
+      )}
     </div>
+  );
+}
+
+function EditFuelLogModal({
+  log,
+  fuelTypes,
+  ghers,
+  onClose,
+}: {
+  log: FuelLog;
+  fuelTypes: FuelType[];
+  ghers: Gher[];
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [gherId, setGherId] = useState(typeof log.gherId === "object" ? log.gherId._id : log.gherId);
+  const [fuelType, setFuelType] = useState(log.fuelType);
+  const [quantityKg, setQuantityKg] = useState(String(log.quantityKg));
+  const [notes, setNotes] = useState(log.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await api.fuelLogs.update(log._id, { gherId, fuelType, quantityKg: Number(quantityKg), notes: notes || undefined });
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(t("fuel.confirmDeleteLog"))) return;
+    setDeleting(true);
+    try {
+      await api.fuelLogs.remove(log._id);
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
+      <Card className="w-full max-w-md hover:translate-y-0">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-ink-primary">{t("fuel.editLog")}</h3>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+          <select required value={gherId} onChange={(e) => setGherId(e.target.value)} className={inputClass}>
+            <option value="">{t("fuel.chamberPlaceholder")}</option>
+            {ghers.map((g) => (
+              <option key={g._id} value={g._id}>
+                {t("fuel.gherNumber", { number: g.number })}
+              </option>
+            ))}
+          </select>
+          <select value={fuelType} onChange={(e) => setFuelType(e.target.value)} className={inputClass}>
+            {fuelTypes.map((ft) => (
+              <option key={ft._id} value={ft.name}>
+                {ft.name}
+              </option>
+            ))}
+          </select>
+          <input
+            required
+            type="number"
+            placeholder={t("fuel.quantityFedKg")}
+            value={quantityKg}
+            onChange={(e) => setQuantityKg(e.target.value)}
+            className={cn(inputClass, "col-span-2")}
+          />
+          <input
+            placeholder={t("common.notes")}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={cn(inputClass, "col-span-2")}
+          />
+          <div className="col-span-2 flex gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
+            </button>
+            <Button type="submit" disabled={saving} className="flex-1">
+              {t("common.saveChanges")}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>,
+    document.body
   );
 }
 
@@ -468,6 +716,7 @@ function ConsumptionTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ gherId: "", fuelType: "", quantityKg: "" });
   const [loading, setLoading] = useState(false);
+  const [editingLog, setEditingLog] = useState<FuelLog | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   useEffect(() => {
@@ -600,13 +849,25 @@ function ConsumptionTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                   </p>
                   <p className="text-sm text-ink-muted">{new Date(l.date).toLocaleDateString("en-IN")}</p>
                 </div>
-                <span className="tabular-nums font-medium text-ink-primary">{l.quantityKg.toLocaleString("en-IN")} kg</span>
+                <div className="flex items-center gap-3">
+                  <span className="tabular-nums font-medium text-ink-primary">{l.quantityKg.toLocaleString("en-IN")} kg</span>
+                  <button
+                    type="button"
+                    onClick={() => setEditingLog(l)}
+                    className="text-ink-muted hover:text-ink-primary"
+                    aria-label={t("fuel.editLog")}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
             <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
           </div>
         )}
       </Card>
+
+      {editingLog && <EditFuelLogModal log={editingLog} fuelTypes={fuelTypes} ghers={ghers} onClose={() => setEditingLog(null)} />}
     </div>
   );
 }

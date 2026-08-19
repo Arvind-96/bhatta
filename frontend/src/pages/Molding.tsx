@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, Hammer, Plus } from "lucide-react";
+import { AlertTriangle, Hammer, Pencil, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { ContractorDetailPage } from "@/components/molding/ContractorDetailPage";
 import { LaborDetailPage } from "@/components/molding/LaborDetailPage";
+import { EditMoldingEntryModal } from "@/components/molding/EditMoldingEntryModal";
 import type { MoldingContractorSummary, MoldingEntry, MoldingPeriodTotals, Person } from "@/types";
 
 const inputClass =
@@ -145,6 +146,7 @@ export function Molding() {
   const [periodTotals, setPeriodTotals] = useState<MoldingPeriodTotals | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [ledgerFor, setLedgerFor] = useState<Person | null>(null);
+  const [editingEntry, setEditingEntry] = useState<MoldingEntry | null>(null);
   const [openContractorId, setOpenContractorId] = useState<string | null>(null);
   const [openWorkerId, setOpenWorkerId] = useState<string | null>(null);
   const [showAddThekedar, setShowAddThekedar] = useState(false);
@@ -361,6 +363,7 @@ export function Molding() {
                   <th className="pb-2 font-medium">{t("molding.rateColumn")}</th>
                   <th className="pb-2 font-medium">{t("molding.wageColumn")}</th>
                   <th className="pb-2 font-medium">{t("common.status")}</th>
+                  <th className="pb-2 font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -394,6 +397,16 @@ export function Molding() {
                       <td className="py-3">
                         {entry.washedOut ? <Badge variant="critical">{t("molding.washedOutBadge")}</Badge> : <Badge variant="good">{t("molding.paidEntryBadge")}</Badge>}
                       </td>
+                      <td className="py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setEditingEntry(entry)}
+                          className="text-ink-muted hover:text-ink-primary"
+                          aria-label={t("molding.editEntry")}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -408,6 +421,7 @@ export function Molding() {
       {showAddThekedar && (
         <AddPersonModal defaultType="LABOUR_CONTRACTOR" onClose={() => setShowAddThekedar(false)} onCreated={refresh} />
       )}
+      {editingEntry && <EditMoldingEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} onSaved={refresh} />}
     </div>
   );
 }

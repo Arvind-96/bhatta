@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { createSoilArrival, listSoilArrivals, updateSoilArrival } from "../services/soilArrival.service";
+import { createSoilArrival, deleteSoilArrival, listSoilArrivals, updateSoilArrival } from "../services/soilArrival.service";
 
 const tractorEntrySchema = z.object({
   driverName: z.string().optional(),
@@ -63,4 +63,9 @@ export async function update(req: AuthedRequest, res: Response) {
   const input = updateSchema.parse(req.body);
   const entry = await updateSoilArrival(req.kiln!.id, req.params.id, input);
   res.json(entry);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deleteSoilArrival(req.kiln!.id, req.params.id);
+  res.status(204).end();
 }

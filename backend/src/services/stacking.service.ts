@@ -71,6 +71,19 @@ export async function updateStackingEntry(kilnId: string, entryId: string, input
   return updated;
 }
 
+// No ledger side effect to reverse (bharai gangs are salary-based, see
+// createStackingEntry) and the gher's current stage is left alone — it may
+// have already moved on to a later real-world stage since this entry was
+// logged, so rewinding it here on a historical-record deletion would risk
+// contradicting the chamber's actual current state.
+export async function deleteStackingEntry(kilnId: string, entryId: string) {
+  const existing = (await db.select().from(stackingEntries).where(and(eq(stackingEntries._id, entryId), eq(stackingEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Stacking entry not found in this kiln");
+
+  await db.delete(stackingEntries).where(eq(stackingEntries._id, entryId));
+  emitToKiln(kilnId, "stacking:update", { _id: entryId, deleted: true });
+}
+
 export interface ListStackingFilter {
   gherId?: string;
   gangId?: string;

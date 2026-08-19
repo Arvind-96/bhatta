@@ -186,6 +186,45 @@ export async function updateSoilArrival(kilnId: string, entryId: string, input: 
   return updated;
 }
 
+// Reverses this arrival's ledger impact with correction entries (same
+// delta-correction math updateSoilArrival already uses for a revised
+// total/given, just applied against a target of zero) before removing the
+// row — never leaves a stray DUE/PAID balance behind for a deleted arrival.
+export async function deleteSoilArrival(kilnId: string, entryId: string) {
+  const existing = (await db.select().from(soilArrivals).where(and(eq(soilArrivals._id, entryId), eq(soilArrivals.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Soil arrival not found in this kiln");
+
+  const given = existing.paymentGiven ?? 0;
+  const pending = existing.paymentPending ?? 0;
+  const total = given + pending;
+
+  if (total > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.landownerId,
+      direction: "PAID",
+      amount: total,
+      reason: `Soil arrival deleted: reversing ₹${total.toLocaleString("en-IN")}`,
+      category: "SOIL",
+      contractId: existing.contractId ?? undefined,
+    });
+  }
+  if (given > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.landownerId,
+      direction: "DUE",
+      amount: given,
+      reason: `Soil arrival deleted: reversing ₹${given.toLocaleString("en-IN")} payment given`,
+      category: "SOIL",
+      contractId: existing.contractId ?? undefined,
+    });
+  }
+
+  await db.delete(soilArrivals).where(eq(soilArrivals._id, entryId));
+  emitToKiln(kilnId, "soilArrival:update", { _id: entryId, deleted: true });
+}
+
 export interface ListSoilArrivalFilter {
   landownerId?: string;
   contractId?: string;

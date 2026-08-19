@@ -25,6 +25,33 @@ export async function createFuelLog(input: CreateFuelLogInput) {
   return log;
 }
 
+export interface UpdateFuelLogInput {
+  gherId?: string;
+  fuelType?: string;
+  quantityKg?: number;
+  notes?: string;
+}
+
+export async function updateFuelLog(kilnId: string, logId: string, input: UpdateFuelLogInput) {
+  const existing = (await db.select().from(fuelLogs).where(and(eq(fuelLogs._id, logId), eq(fuelLogs.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Fuel log not found in this kiln");
+  if (input.gherId) await assertGherInKiln(kilnId, input.gherId);
+  if (input.fuelType) await assertFuelTypeExists(kilnId, input.fuelType);
+
+  await db.update(fuelLogs).set(input).where(eq(fuelLogs._id, logId));
+  const updated = (await db.select().from(fuelLogs).where(eq(fuelLogs._id, logId)))[0]!;
+  emitToKiln(kilnId, "fuelLog:update", updated);
+  return updated;
+}
+
+export async function deleteFuelLog(kilnId: string, logId: string) {
+  const existing = (await db.select().from(fuelLogs).where(and(eq(fuelLogs._id, logId), eq(fuelLogs.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Fuel log not found in this kiln");
+
+  await db.delete(fuelLogs).where(eq(fuelLogs._id, logId));
+  emitToKiln(kilnId, "fuelLog:update", { _id: logId, deleted: true });
+}
+
 export async function listFuelLogs(kilnId: string, days = 14) {
   const since = new Date();
   since.setDate(since.getDate() - days);

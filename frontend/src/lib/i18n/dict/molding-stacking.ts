@@ -57,6 +57,11 @@ export const moldingStackingDict: Record<string, Record<Locale, string>> = {
     hi: "बारिश से बर्बाद (इस एंट्री के लिए न मज़दूरी, न ठेकेदार कमीशन)",
   },
   "molding.saveEntry": { en: "Save entry", hi: "एंट्री सहेजें" },
+  "molding.editEntry": { en: "Edit pathai entry", hi: "पथाई एंट्री संपादित करें" },
+  "molding.confirmDeleteEntry": {
+    en: "Delete this pathai entry? The wage (and commission, if any) it posted will be reversed and this cannot be undone.",
+    hi: "यह पथाई एंट्री हटाएं? इससे बनी मज़दूरी (और कमीशन, अगर कोई हो) उलट दी जाएगी और इसे वापस नहीं लाया जा सकता।",
+  },
   "molding.noEntriesYet": { en: "No molding entries yet.", hi: "अभी तक कोई पथाई एंट्री नहीं है।" },
   "molding.pathaiwalColumn": { en: "Pathaiwal", hi: "पथाईवाल" },
   "molding.thekedarColumn": { en: "Thekedar", hi: "ठेकेदार" },
@@ -219,6 +224,7 @@ export const moldingStackingDict: Record<string, Record<Locale, string>> = {
 
   // ---- components/stacking/EditStackingEntryModal.tsx ----
   "stacking.editBharaiEntry": { en: "Edit bharai entry", hi: "भराई एंट्री संपादित करें" },
+  "stacking.confirmDeleteEntry": { en: "Delete this bharai entry? This cannot be undone.", hi: "यह भराई एंट्री हटाएं? इसे वापस नहीं लाया जा सकता।" },
   "stacking.damagedCountPlaceholder": { en: "Damaged count", hi: "टूट-फूट की गिनती" },
   "stacking.stageNotSet": { en: "Stage — not set", hi: "चरण — सेट नहीं" },
   "stacking.stage1TransportShort": { en: "Stage 1: Transport", hi: "चरण 1: परिवहन" },

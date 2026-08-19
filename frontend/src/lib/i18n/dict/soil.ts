@@ -214,6 +214,10 @@ export const soilDict: Record<string, Record<Locale, string>> = {
 
   // EditSoilArrivalModal.tsx
   "soil.editSoilArrival": { en: "Edit soil arrival", hi: "मिट्टी आवक संपादित करें" },
+  "soil.confirmDeleteSoilArrival": {
+    en: "Delete this soil arrival? Its payment entries will be reversed and this cannot be undone.",
+    hi: "यह मिट्टी आवक हटाएं? इसके भुगतान एंट्री उलट दी जाएंगी और इसे वापस नहीं लाया जा सकता।",
+  },
   "soil.noContract": { en: "No contract", hi: "कोई ठेका नहीं" },
   "soil.trolleysProgressLabel": { en: "{excavated} / {contracted} trolleys", hi: "{excavated} / {contracted} ट्रॉलियां" },
   "soil.depthProgressLabel": { en: " · {used} / {contracted} {unit}", hi: " · {used} / {contracted} {unit}" },

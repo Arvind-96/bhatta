@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import {
   createStackingEntry,
+  deleteStackingEntry,
   listStackingEntries,
   stackingContractorSummary,
   stackingOperatorSummary,
@@ -60,6 +61,11 @@ export async function update(req: AuthedRequest, res: Response) {
   const input = updateSchema.parse(req.body);
   const entry = await updateStackingEntry(req.kiln!.id, req.params.id, input);
   res.json(entry);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deleteStackingEntry(req.kiln!.id, req.params.id);
+  res.status(204).end();
 }
 
 export async function operatorSummary(req: AuthedRequest, res: Response) {

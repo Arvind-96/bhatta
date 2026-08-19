@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { contractorSummary, create, list, periodTotals, today } from "../controllers/molding.controller";
+import { contractorSummary, create, list, periodTotals, remove, today, update } from "../controllers/molding.controller";
 import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
@@ -11,3 +11,5 @@ moldingRouter.get("/", asyncHandler(list));
 moldingRouter.get("/today", asyncHandler(today));
 moldingRouter.get("/period-totals", asyncHandler(periodTotals));
 moldingRouter.get("/contractor-summary", asyncHandler(contractorSummary));
+moldingRouter.patch("/:id", asyncHandler(update));
+moldingRouter.delete("/:id", asyncHandler(remove));

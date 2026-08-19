@@ -4,25 +4,28 @@ import { Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import type { MoldingEntry } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { NikasiEntry } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
-interface EditNikasiEntryModalProps {
-  entry: NikasiEntry;
+interface EditMoldingEntryModalProps {
+  entry: MoldingEntry;
   onClose: () => void;
   onSaved: () => void;
 }
 
-// Full admin edit for a nikasi entry — no wage is tied to bricksCount (the
-// gang is on a fixed monthly salary), so this is just correcting the
-// production record, no ledger side effect.
-export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntryModalProps) {
+// Full admin edit for a pathai entry — a revised bricksCount/rate/washedOut
+// never silently rewrites the worker's wage (or the contractor's commission,
+// if any); the backend posts correction entries for the deltas instead
+// (see molding.service.ts's updateMoldingEntry).
+export function EditMoldingEntryModal({ entry, onClose, onSaved }: EditMoldingEntryModalProps) {
   const { t } = useTranslation();
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
+  const [ratePerThousand, setRatePerThousand] = useState(String(entry.ratePerThousand));
   const [damagedCount, setDamagedCount] = useState(entry.damagedCount ? String(entry.damagedCount) : "");
+  const [washedOut, setWashedOut] = useState(entry.washedOut ?? false);
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -31,9 +34,11 @@ export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntr
     e.preventDefault();
     setSaving(true);
     try {
-      await api.nikasi.update(entry._id, {
+      await api.molding.update(entry._id, {
         bricksCount: Number(bricksCount),
+        ratePerThousand: Number(ratePerThousand),
         damagedCount: damagedCount ? Number(damagedCount) : 0,
+        washedOut,
         notes: notes || undefined,
       });
       onSaved();
@@ -44,10 +49,10 @@ export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntr
   }
 
   async function handleDelete() {
-    if (!confirm(t("nikasi.confirmDeleteEntry"))) return;
+    if (!confirm(t("molding.confirmDeleteEntry"))) return;
     setDeleting(true);
     try {
-      await api.nikasi.remove(entry._id);
+      await api.molding.remove(entry._id);
       onSaved();
       onClose();
     } finally {
@@ -59,31 +64,48 @@ export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntr
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <Card className="w-full max-w-md hover:translate-y-0">
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink-primary">{t("nikasi.editEntry")}</h3>
+          <h3 className="text-sm font-semibold text-ink-primary">{t("molding.editEntry")}</h3>
           <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-2">
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
           <input
             required
             type="number"
-            placeholder={t("nikasi.bricksUnloadedPlaceholder")}
+            placeholder={t("molding.bricksColumn")}
             value={bricksCount}
             onChange={(e) => setBricksCount(e.target.value)}
             className={inputClass}
           />
           <input
+            required
+            type="number"
+            placeholder={t("molding.rateColumn")}
+            value={ratePerThousand}
+            onChange={(e) => setRatePerThousand(e.target.value)}
+            className={inputClass}
+          />
+          <input
             type="number"
             min={0}
-            placeholder={t("nikasi.damagedBricksPlaceholder")}
+            placeholder={t("stacking.damagedLabel")}
             value={damagedCount}
             onChange={(e) => setDamagedCount(e.target.value)}
             className={inputClass}
           />
-          <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
-          <div className="flex gap-2">
+          <label className="flex items-center gap-2 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary">
+            <input type="checkbox" checked={washedOut} onChange={(e) => setWashedOut(e.target.checked)} />
+            {t("molding.washedOutByRain")}
+          </label>
+          <input
+            placeholder={t("common.notes")}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={`col-span-2 ${inputClass}`}
+          />
+          <div className="col-span-2 flex gap-2">
             <button
               type="button"
               onClick={handleDelete}

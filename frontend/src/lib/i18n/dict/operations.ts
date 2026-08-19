@@ -85,6 +85,13 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
     hi: ' — बकाया ऊपर "आपूर्तिकर्ता भुगतान स्थिति" में दिखेगा।',
   },
   "fuel.savePurchase": { en: "Save purchase", hi: "खरीद सहेजें" },
+  "fuel.editPurchase": { en: "Edit purchase", hi: "खरीद संपादित करें" },
+  "fuel.confirmDeletePurchase": {
+    en: "Delete this fuel purchase? Any linked supplier ledger entries will be reversed and this cannot be undone.",
+    hi: "यह ईंधन खरीद हटाएं? जुड़े आपूर्तिकर्ता खाता एंट्री उलट दी जाएंगी और इसे वापस नहीं लाया जा सकता।",
+  },
+  "fuel.editLog": { en: "Edit feeding log", hi: "भरण लॉग संपादित करें" },
+  "fuel.confirmDeleteLog": { en: "Delete this feeding log? This cannot be undone.", hi: "यह भरण लॉग हटाएं? इसे वापस नहीं लाया जा सकता।" },
   "fuel.noPurchasesYet": { en: "No fuel purchases logged yet.", hi: "अभी तक कोई ईंधन खरीद दर्ज नहीं हुई।" },
   "fuel.source": { en: "Source", hi: "स्रोत" },
   "fuel.actual": { en: "Actual", hi: "वास्तविक" },

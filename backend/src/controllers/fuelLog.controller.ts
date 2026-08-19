@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { createFuelLog, fuelLogPeriodTotals, listFuelLogs } from "../services/fuelLog.service";
+import { createFuelLog, deleteFuelLog, fuelLogPeriodTotals, listFuelLogs, updateFuelLog } from "../services/fuelLog.service";
 import { fuelEfficiency } from "../services/firingEfficiency.service";
 
 const createSchema = z.object({
@@ -38,4 +38,22 @@ export async function efficiency(req: AuthedRequest, res: Response) {
 export async function periodTotals(req: AuthedRequest, res: Response) {
   const result = await fuelLogPeriodTotals(req.kiln!.id);
   res.json(result);
+}
+
+const updateSchema = z.object({
+  gherId: z.string().optional(),
+  fuelType: z.string().min(1).optional(),
+  quantityKg: z.number().positive().optional(),
+  notes: z.string().optional(),
+});
+
+export async function update(req: AuthedRequest, res: Response) {
+  const input = updateSchema.parse(req.body);
+  const log = await updateFuelLog(req.kiln!.id, req.params.id, input);
+  res.json(log);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deleteFuelLog(req.kiln!.id, req.params.id);
+  res.status(204).end();
 }
