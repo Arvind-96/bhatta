@@ -289,6 +289,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               categories={categories}
               existing={editingInvoice}
               customers={customersList}
+              defaultCustomerId={customersList.find((c) => c.name.trim().toLowerCase() === dispatch.customerName.trim().toLowerCase())?._id}
               onClose={closeForms}
               onSaved={() => {
                 closeForms();

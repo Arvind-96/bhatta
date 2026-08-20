@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { customers } from "../db/schema";
 import { listInvoicesForCustomer } from "./dispatchDocuments.service";
@@ -36,6 +36,20 @@ export async function createCustomer(kilnId: string, input: CustomerInput) {
 
 export async function listCustomers(kilnId: string) {
   return db.select().from(customers).where(eq(customers.kilnId, kilnId)).orderBy(desc(customers.createdAt));
+}
+
+// Case-insensitive exact-name lookup — used by createDispatch's Brick
+// Loading auto-sync to decide whether a trip's typed customer name already
+// has a profile (link, don't duplicate) or is genuinely new (auto-create).
+export async function findCustomerByName(kilnId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return undefined;
+  return (
+    await db
+      .select()
+      .from(customers)
+      .where(and(eq(customers.kilnId, kilnId), eq(sql`lower(${customers.name})`, trimmed.toLowerCase())))
+  )[0];
 }
 
 // Every invoice "generated under this customer" (see

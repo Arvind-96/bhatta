@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,11 +24,11 @@ interface CreateInvoiceFormProps {
   // picker below is hidden and every field is pre-filled from `fixedCustomer`.
   fixedCustomerId?: string;
   fixedCustomer?: Customer | null;
-  // The customer's current due BEFORE this invoice, used to preview their
-  // overall remaining due after it — only meaningful (and only shown) when
-  // creating a brand-new invoice, since recomputing it correctly for an
-  // edit would need backing out the invoice's own old contribution first.
-  customerCurrentDue?: number;
+  // Pre-selected (but still changeable via the picker) when the caller
+  // already knows which Customer this dispatch belongs to — e.g.
+  // DispatchDetailPage matching the dispatch's customerName against the
+  // Customer list for a dispatch that originated from a Brick Loading trip.
+  defaultCustomerId?: string;
   // Offered as an optional link-to-customer picker when creating from a
   // Dispatch (no fixedCustomerId) — omitted entirely otherwise.
   customers?: Customer[];
@@ -54,7 +54,7 @@ export function CreateInvoiceForm({
   existing,
   fixedCustomerId,
   fixedCustomer,
-  customerCurrentDue,
+  defaultCustomerId,
   customers,
   onClose,
   onSaved,
@@ -67,10 +67,11 @@ export function CreateInvoiceForm({
 
   const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
   const dispatchGstNumber = dispatch && typeof dispatch.customerId === "object" ? dispatch.customerId?.gstNumber ?? "" : "";
-  const [selectedCustomerId, setSelectedCustomerId] = useState(fixedCustomerId ?? existing?.customerId ?? "");
-  const [customerName, setCustomerName] = useState(existing?.customerName ?? fixedCustomer?.name ?? dispatch?.customerName ?? "");
-  const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? fixedCustomer?.addresses[0] ?? dispatch?.customerAddress ?? "");
-  const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? fixedCustomer?.phones[0] ?? dispatch?.customerPhone ?? "");
+  const defaultCustomer = customers?.find((c) => c._id === defaultCustomerId);
+  const [selectedCustomerId, setSelectedCustomerId] = useState(fixedCustomerId ?? existing?.customerId ?? defaultCustomerId ?? "");
+  const [customerName, setCustomerName] = useState(existing?.customerName ?? fixedCustomer?.name ?? defaultCustomer?.name ?? dispatch?.customerName ?? "");
+  const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? fixedCustomer?.addresses[0] ?? defaultCustomer?.addresses[0] ?? dispatch?.customerAddress ?? "");
+  const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? fixedCustomer?.phones[0] ?? defaultCustomer?.phones[0] ?? dispatch?.customerPhone ?? "");
   const [customerGstNumber, setCustomerGstNumber] = useState(existing?.customerGstNumber ?? dispatchGstNumber);
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
   const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
@@ -92,11 +93,44 @@ export function CreateInvoiceForm({
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [customerCurrentPaid, setCustomerCurrentPaid] = useState<number | undefined>(undefined);
+  const [customerCurrentDue, setCustomerCurrentDue] = useState<number | undefined>(undefined);
+
+  // Live balance for whichever customer is currently linked (fixed,
+  // pre-selected, or manually picked) — refetched on every change so
+  // switching the picker always previews the right customer's due, never a
+  // stale one left over from a previous selection. Only meaningful for a
+  // brand-new invoice (see overallDueAfter's own comment below).
+  useEffect(() => {
+    if (!selectedCustomerId || existing) {
+      setCustomerCurrentPaid(undefined);
+      setCustomerCurrentDue(undefined);
+      return;
+    }
+    let cancelled = false;
+    api.customers
+      .detail(selectedCustomerId)
+      .then((d) => {
+        if (cancelled) return;
+        setCustomerCurrentPaid(d.totalPaid);
+        setCustomerCurrentDue(d.totalDue);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCustomerCurrentPaid(undefined);
+        setCustomerCurrentDue(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCustomerId, existing]);
 
   const gross = (Number(bricksCount) || 0) * (Number(ratePerBrick) || 0);
   const net = Math.max(0, gross - (Number(discountAmount) || 0));
   const effectivePaidNow = amountPaidNow ? Number(amountPaidNow) : net;
   const remainingOnThisInvoice = Math.max(0, Math.round((net - effectivePaidNow) * 100) / 100);
+  // Only shown for a brand-new invoice — recomputing it correctly for an
+  // edit would need backing out the invoice's own old contribution first.
   const overallDueAfter = !existing && customerCurrentDue != null ? Math.max(0, customerCurrentDue + remainingOnThisInvoice) : undefined;
 
   function handleCustomerSelect(id: string) {
@@ -168,6 +202,20 @@ export function CreateInvoiceForm({
         <input placeholder={t("brickLoading.customerPhonePlaceholder")} value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className={inputClass} />
         <input placeholder={t("brickLoading.customerAddressPlaceholder")} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} className={inputClass} />
         <input placeholder={t("dispatchDocs.gstNumberPlaceholder")} value={customerGstNumber} onChange={(e) => setCustomerGstNumber(e.target.value)} className={inputClass} />
+
+        {!existing && selectedCustomerId && customerCurrentDue != null && (
+          <div className="col-span-2 grid grid-cols-2 gap-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
+            <div className="text-center">
+              <p className="text-xs text-ink-muted">{t("customer.totalPaidLabel")}</p>
+              <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(customerCurrentPaid ?? 0)}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-ink-muted">{t("customer.totalDueLabel")}</p>
+              <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(customerCurrentDue)}</p>
+            </div>
+          </div>
+        )}
+
         <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
           <option value="">{t("brickLoading.categoryPlaceholder")}</option>
           {categories.map((c) => (

@@ -14,7 +14,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, Person } from "@/types";
+import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, Customer, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -131,6 +131,8 @@ export function BrickLoading() {
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const navigateAndHighlight = useUiStore((s) => s.navigateAndHighlight);
   const { t } = useTranslation();
@@ -151,16 +153,18 @@ export function BrickLoading() {
   const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(filteredEntries, 10);
 
   async function refresh() {
-    const [entriesData, driversData, summary, categoryData] = await Promise.all([
+    const [entriesData, driversData, summary, categoryData, customerData] = await Promise.all([
       api.brickLoading.list(),
       api.people.list("DRIVER"),
       api.brickLoading.driverSummary(),
       api.brickCategories.list(),
+      api.customers.list(),
     ]);
     setEntries(entriesData);
     setDrivers(driversData);
     setDriverSummary(summary);
     setCategories(categoryData);
+    setCustomers(customerData);
   }
 
   useEffect(() => {
@@ -171,6 +175,7 @@ export function BrickLoading() {
   useKilnEvent("brickLoading:update", () => refresh());
   useKilnEvent("ledger:update", () => refresh());
   useKilnEvent("person:update", () => refresh());
+  useKilnEvent("customer:update", () => refresh());
 
   function openLedgerFor(personId: string) {
     const person = drivers.find((p) => p._id === personId);
@@ -231,6 +236,29 @@ export function BrickLoading() {
     return true;
   }
 
+  // Filtered as the admin types the Customer/Party Name — picking one
+  // auto-fills their saved phone/address/driver/vehicle. A name that
+  // doesn't match anything here just stays as free text; whether that
+  // becomes a new Customer profile is decided later, once this trip is
+  // actually turned into a Dispatch (see dispatch.service.ts's
+  // createDispatch, the loadingEntryId branch).
+  const customerSuggestions = form.customerName.trim()
+    ? customers.filter((c) => c.name.toLowerCase().includes(form.customerName.trim().toLowerCase())).slice(0, 8)
+    : [];
+
+  function selectCustomer(c: Customer) {
+    setForm((f) => ({
+      ...f,
+      customerName: c.name,
+      customerPhone: c.phones[0] ?? f.customerPhone,
+      customerAddress: c.addresses[0] ?? f.customerAddress,
+      driverName: c.drivers[0]?.name ?? f.driverName,
+      driverPhone: c.drivers[0]?.phone ?? f.driverPhone,
+      vehicleNumber: c.vehicles[0]?.vehicleNumber ?? f.vehicleNumber,
+    }));
+    setShowCustomerSuggestions(false);
+  }
+
   const selectedCategory = categories.find((c) => c._id === form.categoryId);
   // Total Amount = Loaded Brick Count x this trip's admin-entered price —
   // deliberately never defaulted from the category's own pricePerBrick,
@@ -275,13 +303,36 @@ export function BrickLoading() {
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.customerPartySection")}</p>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  required
-                  placeholder={t("brickLoading.customerNamePlaceholder")}
-                  value={form.customerName}
-                  onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
-                  className={inputClass}
-                />
+                <div className="relative">
+                  <input
+                    required
+                    autoComplete="off"
+                    placeholder={t("brickLoading.customerNamePlaceholder")}
+                    value={form.customerName}
+                    onChange={(e) => {
+                      setForm((f) => ({ ...f, customerName: e.target.value }));
+                      setShowCustomerSuggestions(true);
+                    }}
+                    onFocus={() => setShowCustomerSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 150)}
+                    className={cn(inputClass, "w-full")}
+                  />
+                  {showCustomerSuggestions && customerSuggestions.length > 0 && (
+                    <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-border bg-surface shadow-lg">
+                      {customerSuggestions.map((c) => (
+                        <button
+                          key={c._id}
+                          type="button"
+                          onMouseDown={() => selectCustomer(c)}
+                          className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-ink-primary/5"
+                        >
+                          <span className="text-ink-primary">{c.name}</span>
+                          {c.phones[0] && <span className="text-xs text-ink-muted">{c.phones[0]}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <input
                   required
                   placeholder={t("brickLoading.customerPhonePlaceholder")}

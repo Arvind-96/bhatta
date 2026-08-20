@@ -5,6 +5,7 @@ import { dispatches, people, brickCategories, brickLoadingEntries, kilns, BRICK_
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
+import { createCustomer, findCustomerByName } from "./customer.service";
 import { emitToKiln } from "../config/socket";
 
 export type BrickGrade = (typeof BRICK_GRADES)[number];
@@ -234,6 +235,23 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
   if (loadingEntry) {
     await db.update(brickLoadingEntries).set({ dispatchId: dispatch._id }).where(eq(brickLoadingEntries._id, loadingEntry._id));
     emitToKiln(input.kilnId, "brickLoading:update", (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, loadingEntry._id)))[0]);
+
+    // The Loading Trip form's Customer/Party Name field offers existing
+    // Customer profiles as suggestions, but never forces a pick — so once
+    // this trip actually becomes a Dispatch, resolve that typed name
+    // against the Customer list one more time and auto-create a profile
+    // for it if nothing matched, carrying over every detail the trip
+    // itself collected. A name that already matches an existing profile is
+    // left untouched (never duplicated).
+    if (loadingEntry.customerName?.trim() && !(await findCustomerByName(input.kilnId, loadingEntry.customerName))) {
+      await createCustomer(input.kilnId, {
+        name: loadingEntry.customerName.trim(),
+        phones: loadingEntry.customerPhone ? [loadingEntry.customerPhone] : [],
+        addresses: loadingEntry.customerAddress ? [loadingEntry.customerAddress] : [],
+        drivers: loadingEntry.driverName ? [{ name: loadingEntry.driverName, phone: loadingEntry.driverPhone ?? "", address: "" }] : [],
+        vehicles: [{ vehicleType: loadingEntry.vehicleType, vehicleNumber: loadingEntry.vehicleNumber }],
+      });
+    }
   }
 
   if (input.customerId) {
