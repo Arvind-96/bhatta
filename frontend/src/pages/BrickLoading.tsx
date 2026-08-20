@@ -13,7 +13,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, BrickVehicleType, Person } from "@/types";
+import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -108,16 +108,25 @@ export function BrickLoading() {
   const [ledgerFor, setLedgerFor] = useState<Person | null>(null);
   const [showAddDriver, setShowAddDriver] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BrickLoadingEntry | null>(null);
-  const [form, setForm] = useState({
-    vehicleType: "TRUCK" as BrickVehicleType,
-    vehicleNumber: "",
-    bricksCount: "",
-    categoryId: "",
-    discountAmount: "",
-    loadingCharge: "",
-    unloadingCharge: "",
+  const emptyForm = {
+    customerName: "",
+    customerPhone: "",
+    customerAddress: "",
+    driverName: "",
+    driverPhone: "",
+    tipAmount: "",
     date: new Date().toISOString().slice(0, 10),
-  });
+    loadingLaborerCount: "",
+    loadingRatePerThousand: "",
+    unloadingRatePerThousand: "",
+    categoryId: "",
+    bricksCount: "",
+    unloadedBricksCount: "",
+    vehicleNumber: "",
+    unloadingLaborerCount: "",
+    unloadingDate: "",
+  };
+  const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -158,29 +167,31 @@ export function BrickLoading() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.vehicleNumber || !form.categoryId || !form.bricksCount) return;
+    if (!form.customerName || !form.customerPhone || !form.driverName || !form.driverPhone || !form.vehicleNumber || !form.categoryId || !form.bricksCount) return;
     setLoading(true);
     try {
       await api.brickLoading.create({
-        vehicleType: form.vehicleType,
+        customerName: form.customerName,
+        customerPhone: form.customerPhone,
+        customerAddress: form.customerAddress || undefined,
+        driverName: form.driverName,
+        driverPhone: form.driverPhone,
+        tipAmount: form.tipAmount ? Number(form.tipAmount) : undefined,
+        // Vehicle type isn't collected on this form anymore -- TRUCK is a
+        // safe default for the still-required DB column.
+        vehicleType: "TRUCK",
         vehicleNumber: form.vehicleNumber,
         bricksCount: Number(form.bricksCount),
+        unloadedBricksCount: form.unloadedBricksCount ? Number(form.unloadedBricksCount) : undefined,
+        loadingLaborerCount: form.loadingLaborerCount ? Number(form.loadingLaborerCount) : undefined,
+        loadingRatePerThousand: form.loadingRatePerThousand ? Number(form.loadingRatePerThousand) : undefined,
+        unloadingLaborerCount: form.unloadingLaborerCount ? Number(form.unloadingLaborerCount) : undefined,
+        unloadingRatePerThousand: form.unloadingRatePerThousand ? Number(form.unloadingRatePerThousand) : undefined,
         categoryId: form.categoryId,
-        discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
-        loadingCharge: form.loadingCharge ? Number(form.loadingCharge) : undefined,
-        unloadingCharge: form.unloadingCharge ? Number(form.unloadingCharge) : undefined,
         date: form.date || undefined,
+        unloadingDate: form.unloadingDate || undefined,
       });
-      setForm({
-        vehicleType: "TRUCK",
-        vehicleNumber: "",
-        bricksCount: "",
-        categoryId: "",
-        discountAmount: "",
-        loadingCharge: "",
-        unloadingCharge: "",
-        date: new Date().toISOString().slice(0, 10),
-      });
+      setForm({ ...emptyForm, date: new Date().toISOString().slice(0, 10) });
       setShowForm(false);
       await refresh();
     } finally {
@@ -195,10 +206,19 @@ export function BrickLoading() {
   }
 
   const selectedCategory = categories.find((c) => c._id === form.categoryId);
-  const grossAmount = selectedCategory && form.bricksCount ? Number(form.bricksCount) * selectedCategory.pricePerBrick : 0;
-  const discountForPreview = Number(form.discountAmount) || 0;
-  const netAfterDiscount = grossAmount - discountForPreview;
-  const computedAmount = netAfterDiscount + (Number(form.loadingCharge) || 0) + (Number(form.unloadingCharge) || 0);
+  const pricePerBrick = selectedCategory?.pricePerBrick ?? 0;
+  // Total Amount = Loaded Brick Count x price per brick of the loaded
+  // category — the brick sale value alone; loading/unloading charges are
+  // shown as entirely separate figures below.
+  const totalAmount = form.bricksCount ? Number(form.bricksCount) * pricePerBrick : 0;
+  const totalLoadingCharge =
+    form.bricksCount && form.loadingLaborerCount && form.loadingRatePerThousand
+      ? (Number(form.bricksCount) / 1000) * Number(form.loadingLaborerCount) * Number(form.loadingRatePerThousand)
+      : 0;
+  const totalUnloadingCharge =
+    form.unloadedBricksCount && form.unloadingLaborerCount && form.unloadingRatePerThousand
+      ? (Number(form.unloadedBricksCount) / 1000) * Number(form.unloadingLaborerCount) * Number(form.unloadingRatePerThousand)
+      : 0;
 
   return (
     <div className="space-y-4">
@@ -212,82 +232,166 @@ export function BrickLoading() {
 
       {showForm && (
         <Card>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                required
-                type="number"
-                placeholder={t("brickLoading.bricksLoadedPlaceholder")}
-                value={form.bricksCount}
-                onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
-                className={inputClass}
-              />
-              <select
-                required
-                value={form.categoryId}
-                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-                className={inputClass}
-              >
-                <option value="">{t("brickLoading.categoryPlaceholder")}</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.grade ? `${c.category} (${c.grade})` : c.category}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={form.vehicleType}
-                onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value as BrickVehicleType }))}
-                className={inputClass}
-              >
-                <option value="TRUCK">{t("brickLoading.truck")}</option>
-                <option value="TRACTOR">{t("brickLoading.tractor")}</option>
-              </select>
-              <input
-                required
-                placeholder={t("brickLoading.vehicleNumber")}
-                value={form.vehicleNumber}
-                onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
-                className={inputClass}
-              />
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.customerPartySection")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  required
+                  placeholder={t("brickLoading.customerNamePlaceholder")}
+                  value={form.customerName}
+                  onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  required
+                  placeholder={t("brickLoading.customerPhonePlaceholder")}
+                  value={form.customerPhone}
+                  onChange={(e) => setForm((f) => ({ ...f, customerPhone: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  placeholder={t("brickLoading.customerAddressPlaceholder")}
+                  value={form.customerAddress}
+                  onChange={(e) => setForm((f) => ({ ...f, customerAddress: e.target.value }))}
+                  className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+                />
+              </div>
             </div>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-              <DateInput value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
-            </label>
-
-            <div className="grid grid-cols-3 gap-2">
-              <input
-                type="number"
-                placeholder={t("brickLoading.discountPlaceholder")}
-                value={form.discountAmount}
-                onChange={(e) => setForm((f) => ({ ...f, discountAmount: e.target.value }))}
-                className={inputClass}
-              />
-              <input
-                type="number"
-                placeholder={t("brickLoading.loadingChargePlaceholder")}
-                value={form.loadingCharge}
-                onChange={(e) => setForm((f) => ({ ...f, loadingCharge: e.target.value }))}
-                className={inputClass}
-              />
-              <input
-                type="number"
-                placeholder={t("brickLoading.unloadingChargePlaceholder")}
-                value={form.unloadingCharge}
-                onChange={(e) => setForm((f) => ({ ...f, unloadingCharge: e.target.value }))}
-                className={inputClass}
-              />
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.driverSection")}</p>
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  required
+                  placeholder={t("brickLoading.driverNamePlaceholder")}
+                  value={form.driverName}
+                  onChange={(e) => setForm((f) => ({ ...f, driverName: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  required
+                  placeholder={t("brickLoading.driverPhonePlaceholder")}
+                  value={form.driverPhone}
+                  onChange={(e) => setForm((f) => ({ ...f, driverPhone: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  type="number"
+                  placeholder={t("brickLoading.driverRewardPlaceholder")}
+                  value={form.tipAmount}
+                  onChange={(e) => setForm((f) => ({ ...f, tipAmount: e.target.value }))}
+                  className={inputClass}
+                />
+              </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-3">
-              <span className="text-sm font-medium text-ink-secondary">{t("brickLoading.amountLabel")}</span>
-              <span className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(Math.max(0, computedAmount))}</span>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.loadingSection")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  required
+                  value={form.categoryId}
+                  onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                  className={inputClass}
+                >
+                  <option value="">{t("brickLoading.categoryPlaceholder")}</option>
+                  {categories.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.grade ? `${c.category} (${c.grade})` : c.category}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  required
+                  placeholder={t("brickLoading.vehicleNumber")}
+                  value={form.vehicleNumber}
+                  onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  required
+                  type="number"
+                  placeholder={t("brickLoading.bricksLoadedPlaceholder")}
+                  value={form.bricksCount}
+                  onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  type="number"
+                  placeholder={t("brickLoading.loadingLaborerCountPlaceholder")}
+                  value={form.loadingLaborerCount}
+                  onChange={(e) => setForm((f) => ({ ...f, loadingLaborerCount: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  type="number"
+                  placeholder={t("brickLoading.loadingRatePlaceholder")}
+                  value={form.loadingRatePerThousand}
+                  onChange={(e) => setForm((f) => ({ ...f, loadingRatePerThousand: e.target.value }))}
+                  className={inputClass}
+                />
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-ink-muted">{t("brickLoading.loadingDateLabel")}</span>
+                  <DateInput value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
+                </label>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <div className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
+                  <p className="text-xs text-ink-muted">{t("brickLoading.pricePerBrickLabel")}</p>
+                  <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pricePerBrick)}</p>
+                </div>
+                <div className="rounded-xl border border-series-1/30 bg-series-1/5 px-3 py-2">
+                  <p className="text-xs text-ink-muted">{t("brickLoading.totalAmountLabel")}</p>
+                  <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAmount)}</p>
+                </div>
+                <div className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
+                  <p className="text-xs text-ink-muted">{t("brickLoading.totalLoadingChargeLabel")}</p>
+                  <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalLoadingCharge)}</p>
+                </div>
+              </div>
             </div>
-            {selectedCategory && form.bricksCount && netAfterDiscount <= 0 && discountForPreview > 0 && (
-              <p className="text-sm text-status-warning">{t("brickLoading.discountExceedsGrossWarning")}</p>
-            )}
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.unloadingSection")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  placeholder={t("brickLoading.bricksUnloadedPlaceholder")}
+                  value={form.unloadedBricksCount}
+                  onChange={(e) => setForm((f) => ({ ...f, unloadedBricksCount: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  type="number"
+                  placeholder={t("brickLoading.unloadingLaborerCountPlaceholder")}
+                  value={form.unloadingLaborerCount}
+                  onChange={(e) => setForm((f) => ({ ...f, unloadingLaborerCount: e.target.value }))}
+                  className={inputClass}
+                />
+                <input
+                  type="number"
+                  placeholder={t("brickLoading.unloadingRatePlaceholder")}
+                  value={form.unloadingRatePerThousand}
+                  onChange={(e) => setForm((f) => ({ ...f, unloadingRatePerThousand: e.target.value }))}
+                  className={inputClass}
+                />
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-ink-muted">{t("brickLoading.unloadingDateLabel")}</span>
+                  <DateInput
+                    value={form.unloadingDate}
+                    onChange={(e) => setForm((f) => ({ ...f, unloadingDate: e.target.value }))}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
+                <p className="text-xs text-ink-muted">{t("brickLoading.totalUnloadingChargeLabel")}</p>
+                <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalUnloadingCharge)}</p>
+              </div>
+            </div>
 
             <Button type="submit" disabled={loading}>
               {t("brickLoading.saveEntry")}

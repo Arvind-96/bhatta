@@ -10,14 +10,33 @@ export type BrickVehicleType = (typeof BRICK_VEHICLE_TYPES)[number];
 
 export interface CreateBrickLoadingInput {
   kilnId: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  driverName?: string;
+  driverPhone?: string;
+  tipAmount?: number;
   vehicleType: BrickVehicleType;
   vehicleNumber: string;
   bricksCount: number;
+  unloadedBricksCount?: number;
+  loadingLaborerCount?: number;
+  loadingRatePerThousand?: number;
+  unloadingLaborerCount?: number;
+  unloadingRatePerThousand?: number;
   categoryId: string;
-  loadingCharge?: number;
-  unloadingCharge?: number;
-  discountAmount?: number;
   date?: Date;
+  unloadingDate?: Date;
+}
+
+// Total Loading/Unloading Charge = (bricks/1000) x laborer count x rate
+// per 1,000 bricks per laborer -- same "/1000" convention as every other
+// ratePerThousand computation in this app (molding wages, work entries,
+// etc.); a laborer count or rate left blank simply leaves that charge
+// unset rather than computing a false ₹0.
+function computeLaborCharge(bricks: number | undefined, laborerCount: number | undefined, ratePerThousand: number | undefined) {
+  if (!bricks || !laborerCount || !ratePerThousand) return undefined;
+  return Math.round((bricks / 1000) * laborerCount * ratePerThousand * 100) / 100;
 }
 
 // Plain, sequential per-kiln trip counter — same never-resets convention as
@@ -43,11 +62,12 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   const category = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))))[0];
   if (!category) throw new Error("Brick category not found in this kiln");
 
-  const grossAmount = Math.round(input.bricksCount * (category.pricePerBrick ?? 0) * 100) / 100;
-  const netAfterDiscount = input.discountAmount ? Math.round((grossAmount - input.discountAmount) * 100) / 100 : grossAmount;
-  // Clamped at 0 — a trip's billed amount can't be meaningfully negative
-  // even if a large discount outweighs the category price and charges.
-  const finalAmount = Math.max(0, Math.round((netAfterDiscount + (input.loadingCharge ?? 0) + (input.unloadingCharge ?? 0)) * 100) / 100);
+  // Total Amount = Loaded Brick Count x that category's price per brick —
+  // the brick sale value alone; loading/unloading charges are tracked as
+  // entirely separate figures below, never folded into this one.
+  const finalAmount = Math.round(input.bricksCount * (category.pricePerBrick ?? 0) * 100) / 100;
+  const loadingCharge = computeLaborCharge(input.bricksCount, input.loadingLaborerCount, input.loadingRatePerThousand);
+  const unloadingCharge = computeLaborCharge(input.unloadedBricksCount, input.unloadingLaborerCount, input.unloadingRatePerThousand);
 
   // Retry loop: two concurrent creates for the same kiln can both compute
   // the same trip number (the count-then-insert above isn't atomic under
@@ -64,15 +84,26 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
         _id,
         kilnId: input.kilnId,
         tripNumber,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerAddress: input.customerAddress,
+        driverName: input.driverName,
+        driverPhone: input.driverPhone,
+        tipAmount: input.tipAmount,
         vehicleType: input.vehicleType,
         vehicleNumber: input.vehicleNumber,
         bricksCount: input.bricksCount,
+        unloadedBricksCount: input.unloadedBricksCount,
+        loadingLaborerCount: input.loadingLaborerCount,
+        loadingRatePerThousand: input.loadingRatePerThousand,
+        unloadingLaborerCount: input.unloadingLaborerCount,
+        unloadingRatePerThousand: input.unloadingRatePerThousand,
         categoryId: input.categoryId,
-        loadingCharge: input.loadingCharge,
-        unloadingCharge: input.unloadingCharge,
-        discountAmount: input.discountAmount,
+        loadingCharge,
+        unloadingCharge,
         amount: finalAmount,
         date: input.date,
+        unloadingDate: input.unloadingDate,
       });
       entry = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, _id)))[0];
       break;
@@ -100,13 +131,22 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
 }
 
 export interface UpdateBrickLoadingInput {
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  driverName?: string;
+  driverPhone?: string;
   vehicleType?: BrickVehicleType;
   vehicleNumber?: string;
   bricksCount?: number;
-  discountAmount?: number;
-  loadingCharge?: number;
-  unloadingCharge?: number;
+  unloadedBricksCount?: number;
+  loadingLaborerCount?: number;
+  loadingRatePerThousand?: number;
+  unloadingLaborerCount?: number;
+  unloadingRatePerThousand?: number;
   notes?: string;
+  date?: Date;
+  unloadingDate?: Date;
   // Legacy — only meaningful for entries created before Driver/Tip were
   // removed from the Log Trip form, i.e. rows that already have a
   // driverId. See the driverId guard below.
@@ -117,11 +157,12 @@ export interface UpdateBrickLoadingInput {
 // driver's ledger; a changed tipAmount posts a correction entry for the
 // difference instead (DUE if raised, PAID if lowered), same convention as
 // every other correctable amount in this app (see stacking.service.ts's
-// original wage-delta pattern). A changed bricksCount/discountAmount/
-// loadingCharge/unloadingCharge recomputes the stored `amount` against the
-// entry's existing category price — changing the category itself isn't
-// supported here (that would also need to move stock between categories),
-// so `amount` stays untouched if the entry never had one priced.
+// original wage-delta pattern). A changed bricksCount recomputes the
+// stored `amount` against the entry's existing category price — changing
+// the category itself isn't supported here (that would also need to move
+// stock between categories). A changed bricksCount/unloadedBricksCount/
+// laborer count/rate recomputes loadingCharge/unloadingCharge the same way
+// createBrickLoadingEntry does.
 export async function updateBrickLoadingEntry(kilnId: string, entryId: string, input: UpdateBrickLoadingInput) {
   const existing = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick loading entry not found in this kiln");
@@ -129,21 +170,28 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
   const oldTip = existing.tipAmount ?? 0;
 
   let amountUpdate: { amount?: number } = {};
-  if (
-    existing.categoryId &&
-    (input.bricksCount !== undefined || input.discountAmount !== undefined || input.loadingCharge !== undefined || input.unloadingCharge !== undefined)
-  ) {
+  if (existing.categoryId && input.bricksCount !== undefined) {
     const category = (await db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)))[0];
-    const bricksCount = input.bricksCount ?? existing.bricksCount;
-    const discountAmount = input.discountAmount ?? existing.discountAmount ?? 0;
-    const loadingCharge = input.loadingCharge ?? existing.loadingCharge ?? 0;
-    const unloadingCharge = input.unloadingCharge ?? existing.unloadingCharge ?? 0;
-    const grossAmount = Math.round(bricksCount * (category?.pricePerBrick ?? 0) * 100) / 100;
-    const netAfterDiscount = discountAmount ? Math.round((grossAmount - discountAmount) * 100) / 100 : grossAmount;
-    amountUpdate = { amount: Math.max(0, Math.round((netAfterDiscount + loadingCharge + unloadingCharge) * 100) / 100) };
+    amountUpdate = { amount: Math.round(input.bricksCount * (category?.pricePerBrick ?? 0) * 100) / 100 };
   }
 
-  await db.update(brickLoadingEntries).set({ ...input, ...amountUpdate }).where(eq(brickLoadingEntries._id, entryId));
+  let chargeUpdate: { loadingCharge?: number; unloadingCharge?: number } = {};
+  if (input.bricksCount !== undefined || input.loadingLaborerCount !== undefined || input.loadingRatePerThousand !== undefined) {
+    chargeUpdate.loadingCharge = computeLaborCharge(
+      input.bricksCount ?? existing.bricksCount,
+      input.loadingLaborerCount ?? existing.loadingLaborerCount ?? undefined,
+      input.loadingRatePerThousand ?? existing.loadingRatePerThousand ?? undefined
+    );
+  }
+  if (input.unloadedBricksCount !== undefined || input.unloadingLaborerCount !== undefined || input.unloadingRatePerThousand !== undefined) {
+    chargeUpdate.unloadingCharge = computeLaborCharge(
+      input.unloadedBricksCount ?? existing.unloadedBricksCount ?? undefined,
+      input.unloadingLaborerCount ?? existing.unloadingLaborerCount ?? undefined,
+      input.unloadingRatePerThousand ?? existing.unloadingRatePerThousand ?? undefined
+    );
+  }
+
+  await db.update(brickLoadingEntries).set({ ...input, ...amountUpdate, ...chargeUpdate }).where(eq(brickLoadingEntries._id, entryId));
   const updated = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId)))[0]!;
 
   // A changed bricksCount means the original stock deduction (see

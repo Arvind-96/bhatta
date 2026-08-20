@@ -740,25 +740,43 @@ export const api = {
       return get<BrickLoadingEntry[]>(`/brick-loading${qs ? `?${qs}` : ""}`, true);
     },
     create: (input: {
+      customerName?: string;
+      customerPhone?: string;
+      customerAddress?: string;
+      driverName?: string;
+      driverPhone?: string;
+      tipAmount?: number;
       vehicleType: BrickVehicleType;
       vehicleNumber: string;
       bricksCount: number;
+      unloadedBricksCount?: number;
+      loadingLaborerCount?: number;
+      loadingRatePerThousand?: number;
+      unloadingLaborerCount?: number;
+      unloadingRatePerThousand?: number;
       categoryId: string;
-      loadingCharge?: number;
-      unloadingCharge?: number;
-      discountAmount?: number;
       date?: string;
+      unloadingDate?: string;
     }) => post<BrickLoadingEntry>("/brick-loading", input, true),
     update: (
       id: string,
       input: Partial<{
+        customerName: string;
+        customerPhone: string;
+        customerAddress: string;
+        driverName: string;
+        driverPhone: string;
         vehicleType: BrickVehicleType;
         vehicleNumber: string;
         bricksCount: number;
-        discountAmount: number;
-        loadingCharge: number;
-        unloadingCharge: number;
+        unloadedBricksCount: number;
+        loadingLaborerCount: number;
+        loadingRatePerThousand: number;
+        unloadingLaborerCount: number;
+        unloadingRatePerThousand: number;
         tipAmount: number;
+        date: string;
+        unloadingDate: string;
         notes: string;
       }>
     ) => patch<BrickLoadingEntry>(`/brick-loading/${id}`, input, true),

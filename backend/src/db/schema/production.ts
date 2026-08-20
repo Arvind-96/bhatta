@@ -153,28 +153,62 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   // every row created going forward always gets one (see
   // generateTripNumber/the retry loop in createBrickLoadingEntry).
   tripNumber: varchar("tripNumber", { length: 64 }),
+  // Plain, denormalized identity fields, same convention as
+  // dispatches.customerName/driverName -- a walk-in party/driver for a
+  // single trip, not necessarily a linked Person record.
+  customerName: varchar("customerName", { length: 255 }),
+  customerPhone: varchar("customerPhone", { length: 255 }),
+  customerAddress: varchar("customerAddress", { length: 255 }),
+  driverName: varchar("driverName", { length: 255 }),
+  driverPhone: varchar("driverPhone", { length: 255 }),
   vehicleType: varchar("vehicleType", { length: 50, enum: BRICK_VEHICLE_TYPES }).notNull(),
   vehicleNumber: varchar("vehicleNumber", { length: 255 }).notNull(),
-  // Optional — no longer collected on the Log Trip form (see
-  // brickLoading.service.ts), kept only so rows created before this change
-  // still resolve their driver for display/history.
+  // Legacy — no longer collected on the Log Trip form (driver identity is
+  // now the plain driverName/driverPhone above, matching dispatches' own
+  // driverId-to-driverName migration), kept only so rows created before
+  // this change still resolve their driver for display/history.
   driverId: varchar("driverId", { length: 64 }),
+  // Loaded Brick Count -- what physically left the yard on this trip;
+  // drives the brickCategories stock deduction below same as always.
   bricksCount: int("bricksCount").notNull(),
+  // Unloaded Brick Count -- purely informational/billing (drives
+  // unloadingCharge below), no stock or dispatch side effects.
+  unloadedBricksCount: int("unloadedBricksCount"),
+  loadingLaborerCount: int("loadingLaborerCount"),
+  loadingRatePerThousand: double("loadingRatePerThousand"),
+  unloadingLaborerCount: int("unloadingLaborerCount"),
+  unloadingRatePerThousand: double("unloadingRatePerThousand"),
+  // Driver Reward (Inam) -- a plain stored figure with no ledger effect,
+  // same as dispatches.driverTipAmount; only ever posts a TIP ledger
+  // correction for legacy rows that still carry a driverId (see the
+  // guards in brickLoading.service.ts).
   tipAmount: double("tipAmount").default(0),
+  // Total Loading Charge = (bricksCount/1000) x loadingLaborerCount x
+  // loadingRatePerThousand -- computed and stored at create/edit time,
+  // same convention as `amount` below.
   loadingCharge: double("loadingCharge"),
+  // Total Unloading Charge = (unloadedBricksCount/1000) x
+  // unloadingLaborerCount x unloadingRatePerThousand.
   unloadingCharge: double("unloadingCharge"),
+  // Legacy -- no longer collected on the Log Trip form; kept nullable so
+  // old rows' stored `amount` (which did net this out) still reads back
+  // correctly.
   discountAmount: double("discountAmount"),
-  // The trip's final billed figure — (category price × bricksCount −
-  // discount) + loadingCharge + unloadingCharge — computed and stored at
-  // create/edit time so it displays reliably even if the auto-linked
-  // Dispatch below failed or was never created (e.g. unpriced category).
+  // Total Amount = bricksCount x that category's pricePerBrick -- the
+  // brick sale value alone, independent of loading/unloading charges
+  // above. Computed and stored at create/edit time so it displays
+  // reliably even if the auto-linked Dispatch below failed or was never
+  // created (e.g. unpriced category).
   amount: double("amount"),
   // Which brick category was loaded — drives the auto-created Dispatch's
   // amount (bricksCount * that category's pricePerBrick). See
   // brickLoading.service.ts.
   categoryId: varchar("categoryId", { length: 64 }),
   dispatchId: varchar("dispatchId", { length: 64 }),
+  // Loading Date (existing `date` column, unrenamed to avoid a data
+  // migration -- every historical row's `date` already meant this).
   date: dateColumn(),
+  unloadingDate: datetime("unloadingDate", { mode: "date" }),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({

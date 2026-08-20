@@ -880,10 +880,20 @@ export type BrickVehicleType = "TRUCK" | "TRACTOR";
 export interface BrickLoadingEntry {
   _id: string;
   tripNumber?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  driverName?: string;
+  driverPhone?: string;
   vehicleType: BrickVehicleType;
   vehicleNumber: string;
   driverId?: { _id: string; name: string; type: PersonType } | string;
   bricksCount: number;
+  unloadedBricksCount?: number;
+  loadingLaborerCount?: number;
+  loadingRatePerThousand?: number;
+  unloadingLaborerCount?: number;
+  unloadingRatePerThousand?: number;
   tipAmount?: number;
   loadingCharge?: number;
   unloadingCharge?: number;
@@ -892,6 +902,7 @@ export interface BrickLoadingEntry {
   categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
   dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
   date: string;
+  unloadingDate?: string;
   createdAt: string;
   notes?: string;
 }
