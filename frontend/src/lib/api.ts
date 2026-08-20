@@ -47,6 +47,7 @@ import type {
   JcbWorkLog,
   KilnIncident,
   KilnVehicle,
+  LabourSessionSummary,
   Land,
   LedgerCategory,
   LedgerEntry,
@@ -632,6 +633,14 @@ export const api = {
       input: Partial<{ bricksCount: number; ratePerThousand: number; damagedCount: number; washedOut: boolean; notes: string }>
     ) => patch<MoldingEntry>(`/molding/${id}`, input, true),
     remove: (id: string) => del<void>(`/molding/${id}`, true),
+  },
+
+  labourSessions: {
+    get: (contractorId: string) => get<LabourSessionSummary>(`/labour-sessions/${contractorId}`, true),
+    save: (contractorId: string, input: { numberOfLaborers: number; farePerLaborer: number; advancePerLaborer: number }) =>
+      patch<LabourSessionSummary>(`/labour-sessions/${contractorId}`, input, true),
+    startNew: (contractorId: string, input: { numberOfLaborers: number; farePerLaborer: number; advancePerLaborer: number }) =>
+      post<LabourSessionSummary>(`/labour-sessions/${contractorId}/start-new`, input, true),
   },
 
   wastage: {

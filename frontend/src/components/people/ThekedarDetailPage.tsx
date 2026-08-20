@@ -8,6 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddLabourModal } from "@/components/people/AddLabourModal";
+import { LabourSessionSection } from "@/components/people/LabourSessionSection";
 import { AddWorkEntryModal } from "@/components/people/AddWorkEntryModal";
 import { EditWorkEntryModal } from "@/components/people/EditWorkEntryModal";
 import { PersonAvatar } from "@/components/people/PersonAvatar";
@@ -545,6 +546,8 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
             </div>
           )}
         </Card>
+
+        {thekedar.workType === "PATHAI" && <LabourSessionSection contractorId={thekedarId} editable />}
 
         <LedgerCategoryHistorySections entries={ledgerEntries} />
       </div>

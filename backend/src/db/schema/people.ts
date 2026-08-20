@@ -88,6 +88,31 @@ export const people = mysqlTable("people", {
   kilnTypeIdx: index("people_kiln_type_idx").on(t.kilnId, t.type),
 }));
 
+// One row per Pathai session for a LABOUR_CONTRACTOR (Thekedar) -- the
+// admin-entered terms ("Number of laborers", "Fare per laborer", "Advance
+// per laborer") that drive the "Total Amount Payable by Admin" formula
+// (see labourSession.service.ts). Only one row per (kilnId, contractorId)
+// has endDate NULL at a time -- that's the "current" session; closing it
+// (starting a new one) stamps endDate and its final payable total becomes
+// the next row's carriedForwardAmount, per the admin's carry-forward
+// request. Ledger deductions (advance/kharchi/medical/festival to the gang,
+// advance to the contractor) are never stored here -- they're derived live
+// from ledgerEntries, scoped to [startDate, endDate).
+export const labourSessions = mysqlTable("labour_sessions", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  contractorId: varchar("contractorId", { length: 64 }).notNull(),
+  numberOfLaborers: int("numberOfLaborers").notNull().default(0),
+  farePerLaborer: double("farePerLaborer").notNull().default(0),
+  advancePerLaborer: double("advancePerLaborer").notNull().default(0),
+  carriedForwardAmount: double("carriedForwardAmount").notNull().default(0),
+  startDate: dateColumn("startDate"),
+  endDate: datetime("endDate", { mode: "date" }),
+  createdAt: createdAtColumn(),
+}, (t) => ({
+  kilnContractorIdx: index("labour_session_kiln_contractor_idx").on(t.kilnId, t.contractorId),
+}));
+
 export const FAMILY_RELATIONS = ["SPOUSE", "CHILD", "PARENT", "SIBLING", "OTHER"] as const;
 
 export const familyMembers = mysqlTable("family_members", {

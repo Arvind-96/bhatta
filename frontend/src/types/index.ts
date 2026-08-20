@@ -563,6 +563,27 @@ export interface MoldingContractorGangWorker {
   damagedCount: number;
 }
 
+export interface LabourSession {
+  _id: string;
+  kilnId: string;
+  contractorId: string;
+  numberOfLaborers: number;
+  farePerLaborer: number;
+  advancePerLaborer: number;
+  carriedForwardAmount: number;
+  startDate: string;
+  endDate: string | null;
+  createdAt: string;
+}
+
+export interface LabourSessionSummary {
+  session: LabourSession | null;
+  base: number;
+  deductionsToLaborers: number;
+  advancePaidToContractor: number;
+  total: number;
+}
+
 export interface MoldingContractorEntry {
   contractor: {
     id: string;
