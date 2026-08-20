@@ -314,10 +314,24 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
       .map((c) => ({ date: c.startDate ?? c.createdAt, amount: c.totalContractValue }));
     let paid = 0;
     let due = 0;
+    // Sorting by exact timestamp breaks the common case: a contract with no
+    // explicit startDate falls back to its createdAt (a precise moment,
+    // e.g. 07:53am), which sorts AFTER its own advance's ledger entry (whose
+    // `date` is a plain transaction day, i.e. midnight) even though the
+    // contract's value logically becomes due before or alongside any
+    // payment posted against it that same day. Compare by calendar day
+    // first; on a tie, the contract's due always counts before that day's
+    // ledger entries.
+    const dayStart = (d: string) => new Date(new Date(d).toDateString()).getTime();
     const timeline = [
       ...ledgerEntries.map((e) => ({ date: e.date, type: "entry" as const, entry: e })),
       ...contractDue.map((c) => ({ date: c.date, type: "contract" as const, amount: c.amount })),
-    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    ].sort((a, b) => {
+      const dayDiff = dayStart(a.date) - dayStart(b.date);
+      if (dayDiff !== 0) return dayDiff;
+      if (a.type === b.type) return 0;
+      return a.type === "contract" ? -1 : 1;
+    });
     for (const item of timeline) {
       if (item.type === "contract") {
         due += item.amount;
