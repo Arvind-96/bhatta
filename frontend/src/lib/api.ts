@@ -755,6 +755,7 @@ export const api = {
       unloadingLaborerCount?: number;
       unloadingRatePerThousand?: number;
       categoryId: string;
+      pricePerBrick: number;
       date?: string;
       unloadingDate?: string;
     }) => post<BrickLoadingEntry>("/brick-loading", input, true),
@@ -774,6 +775,7 @@ export const api = {
         loadingRatePerThousand: number;
         unloadingLaborerCount: number;
         unloadingRatePerThousand: number;
+        pricePerBrick: number;
         tipAmount: number;
         date: string;
         unloadingDate: string;

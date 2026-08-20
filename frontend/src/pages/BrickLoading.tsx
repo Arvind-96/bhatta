@@ -120,6 +120,7 @@ export function BrickLoading() {
     loadingRatePerThousand: "",
     unloadingRatePerThousand: "",
     categoryId: "",
+    pricePerBrick: "",
     bricksCount: "",
     unloadedBricksCount: "",
     vehicleNumber: "",
@@ -167,7 +168,17 @@ export function BrickLoading() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.customerName || !form.customerPhone || !form.driverName || !form.driverPhone || !form.vehicleNumber || !form.categoryId || !form.bricksCount) return;
+    if (
+      !form.customerName ||
+      !form.customerPhone ||
+      !form.driverName ||
+      !form.driverPhone ||
+      !form.vehicleNumber ||
+      !form.categoryId ||
+      !form.bricksCount ||
+      !form.pricePerBrick
+    )
+      return;
     setLoading(true);
     try {
       await api.brickLoading.create({
@@ -188,6 +199,7 @@ export function BrickLoading() {
         unloadingLaborerCount: form.unloadingLaborerCount ? Number(form.unloadingLaborerCount) : undefined,
         unloadingRatePerThousand: form.unloadingRatePerThousand ? Number(form.unloadingRatePerThousand) : undefined,
         categoryId: form.categoryId,
+        pricePerBrick: Number(form.pricePerBrick),
         date: form.date || undefined,
         unloadingDate: form.unloadingDate || undefined,
       });
@@ -206,11 +218,11 @@ export function BrickLoading() {
   }
 
   const selectedCategory = categories.find((c) => c._id === form.categoryId);
-  const pricePerBrick = selectedCategory?.pricePerBrick ?? 0;
-  // Total Amount = Loaded Brick Count x price per brick of the loaded
-  // category — the brick sale value alone; loading/unloading charges are
-  // shown as entirely separate figures below.
-  const totalAmount = form.bricksCount ? Number(form.bricksCount) * pricePerBrick : 0;
+  // Total Amount = Loaded Brick Count x this trip's admin-entered price —
+  // deliberately never defaulted from the category's own pricePerBrick,
+  // since the price varies customer to customer; that default is only
+  // shown as a reference hint next to the input below.
+  const totalAmount = form.bricksCount && form.pricePerBrick ? Number(form.bricksCount) * Number(form.pricePerBrick) : 0;
   const totalLoadingCharge =
     form.bricksCount && form.loadingLaborerCount && form.loadingRatePerThousand
       ? (Number(form.bricksCount) / 1000) * Number(form.loadingLaborerCount) * Number(form.loadingRatePerThousand)
@@ -317,6 +329,22 @@ export function BrickLoading() {
                   onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
                   className={inputClass}
                 />
+                <div className="flex flex-col gap-1">
+                  <input
+                    required
+                    type="number"
+                    step="0.01"
+                    placeholder={t("brickLoading.pricePerBrickPlaceholder")}
+                    value={form.pricePerBrick}
+                    onChange={(e) => setForm((f) => ({ ...f, pricePerBrick: e.target.value }))}
+                    className={inputClass}
+                  />
+                  {selectedCategory && (
+                    <span className="text-xs text-ink-muted">
+                      {t("brickLoading.categoryDefaultPriceHint", { amount: formatINR(selectedCategory.pricePerBrick) })}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
                   placeholder={t("brickLoading.loadingLaborerCountPlaceholder")}
@@ -337,11 +365,7 @@ export function BrickLoading() {
                 </label>
               </div>
 
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <div className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
-                  <p className="text-xs text-ink-muted">{t("brickLoading.pricePerBrickLabel")}</p>
-                  <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(pricePerBrick)}</p>
-                </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
                 <div className="rounded-xl border border-series-1/30 bg-series-1/5 px-3 py-2">
                   <p className="text-xs text-ink-muted">{t("brickLoading.totalAmountLabel")}</p>
                   <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalAmount)}</p>

@@ -26,6 +26,7 @@ const createSchema = z.object({
   unloadingLaborerCount: z.number().int().nonnegative().optional(),
   unloadingRatePerThousand: z.number().min(0).optional(),
   categoryId: z.string(),
+  pricePerBrick: z.number().min(0),
   date: z.string().optional(),
   unloadingDate: z.string().optional(),
 });
@@ -63,6 +64,7 @@ const updateSchema = z.object({
   loadingRatePerThousand: z.number().min(0).optional(),
   unloadingLaborerCount: z.number().int().nonnegative().optional(),
   unloadingRatePerThousand: z.number().min(0).optional(),
+  pricePerBrick: z.number().min(0).optional(),
   tipAmount: z.number().min(0).optional(),
   date: z.string().optional(),
   unloadingDate: z.string().optional(),

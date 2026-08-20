@@ -900,6 +900,7 @@ export interface BrickLoadingEntry {
   discountAmount?: number;
   amount?: number;
   categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
+  pricePerBrick?: number;
   dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
   date: string;
   unloadingDate?: string;

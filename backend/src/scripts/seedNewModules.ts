@@ -328,11 +328,13 @@ async function main() {
     for (let d = 14; d >= 0; d--) {
       if (Math.random() < 0.55) continue;
       const driver = randChoice(drivers);
+      const seedCategory = randChoice(seedCategories);
       await createBrickLoadingEntry({
         kilnId,
         vehicleType: randChoice(["TRUCK", "TRACTOR"] as const),
         vehicleNumber: driver.vehicleNumber || `HR-46-B-${randInt(1000, 9999)}`,
-        categoryId: randChoice(seedCategories)._id,
+        categoryId: seedCategory._id,
+        pricePerBrick: seedCategory.pricePerBrick ?? 7,
         bricksCount: randInt(3000, 9000),
         date: dateAtOffset(d),
       });

@@ -194,15 +194,20 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   // old rows' stored `amount` (which did net this out) still reads back
   // correctly.
   discountAmount: double("discountAmount"),
-  // Total Amount = bricksCount x that category's pricePerBrick -- the
+  // Admin-entered price for THIS trip -- deliberately independent of
+  // brickCategories.pricePerBrick (that column is just a default/reference;
+  // the actual price varies customer to customer, so it's never
+  // auto-filled here, only typed in per trip).
+  pricePerBrick: double("pricePerBrick"),
+  // Total Amount = bricksCount x this trip's own pricePerBrick -- the
   // brick sale value alone, independent of loading/unloading charges
   // above. Computed and stored at create/edit time so it displays
   // reliably even if the auto-linked Dispatch below failed or was never
-  // created (e.g. unpriced category).
+  // created.
   amount: double("amount"),
-  // Which brick category was loaded — drives the auto-created Dispatch's
-  // amount (bricksCount * that category's pricePerBrick). See
-  // brickLoading.service.ts.
+  // Which brick category was loaded — for stock deduction only; its own
+  // pricePerBrick is not used to price this trip (see pricePerBrick
+  // above). See brickLoading.service.ts.
   categoryId: varchar("categoryId", { length: 64 }),
   dispatchId: varchar("dispatchId", { length: 64 }),
   // Loading Date (existing `date` column, unrenamed to avoid a data

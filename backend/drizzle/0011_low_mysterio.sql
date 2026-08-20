@@ -1,0 +1,1 @@
+ALTER TABLE `brick_loading_entries` ADD `pricePerBrick` double;

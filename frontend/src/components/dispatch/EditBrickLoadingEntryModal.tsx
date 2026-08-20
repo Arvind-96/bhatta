@@ -35,6 +35,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   const [tipAmount, setTipAmount] = useState(String(entry.tipAmount ?? 0));
   const [vehicleNumber, setVehicleNumber] = useState(entry.vehicleNumber);
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
+  const [pricePerBrick, setPricePerBrick] = useState(entry.pricePerBrick !== undefined ? String(entry.pricePerBrick) : "");
   const [unloadedBricksCount, setUnloadedBricksCount] = useState(entry.unloadedBricksCount ? String(entry.unloadedBricksCount) : "");
   const [loadingLaborerCount, setLoadingLaborerCount] = useState(entry.loadingLaborerCount ? String(entry.loadingLaborerCount) : "");
   const [loadingRatePerThousand, setLoadingRatePerThousand] = useState(entry.loadingRatePerThousand ? String(entry.loadingRatePerThousand) : "");
@@ -61,6 +62,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
         driverPhone: driverPhone || undefined,
         vehicleNumber,
         bricksCount: Number(bricksCount),
+        pricePerBrick: pricePerBrick ? Number(pricePerBrick) : undefined,
         unloadedBricksCount: unloadedBricksCount ? Number(unloadedBricksCount) : undefined,
         loadingLaborerCount: loadingLaborerCount ? Number(loadingLaborerCount) : undefined,
         loadingRatePerThousand: loadingRatePerThousand ? Number(loadingRatePerThousand) : undefined,
@@ -159,6 +161,15 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 placeholder={t("brickLoading.bricksLoadedPlaceholder")}
                 value={bricksCount}
                 onChange={(e) => setBricksCount(e.target.value)}
+                className={inputClass}
+              />
+              <input
+                required
+                type="number"
+                step="0.01"
+                placeholder={t("brickLoading.pricePerBrickPlaceholder")}
+                value={pricePerBrick}
+                onChange={(e) => setPricePerBrick(e.target.value)}
                 className={inputClass}
               />
               <input

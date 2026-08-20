@@ -25,6 +25,9 @@ export interface CreateBrickLoadingInput {
   unloadingLaborerCount?: number;
   unloadingRatePerThousand?: number;
   categoryId: string;
+  // Admin-entered per trip -- never defaulted from the category's own
+  // pricePerBrick, since the price varies customer to customer.
+  pricePerBrick: number;
   date?: Date;
   unloadingDate?: Date;
 }
@@ -62,10 +65,11 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   const category = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))))[0];
   if (!category) throw new Error("Brick category not found in this kiln");
 
-  // Total Amount = Loaded Brick Count x that category's price per brick —
-  // the brick sale value alone; loading/unloading charges are tracked as
-  // entirely separate figures below, never folded into this one.
-  const finalAmount = Math.round(input.bricksCount * (category.pricePerBrick ?? 0) * 100) / 100;
+  // Total Amount = Loaded Brick Count x THIS TRIP's admin-entered price —
+  // never the category's own default pricePerBrick; loading/unloading
+  // charges are tracked as entirely separate figures below, never folded
+  // into this one.
+  const finalAmount = Math.round(input.bricksCount * input.pricePerBrick * 100) / 100;
   const loadingCharge = computeLaborCharge(input.bricksCount, input.loadingLaborerCount, input.loadingRatePerThousand);
   const unloadingCharge = computeLaborCharge(input.unloadedBricksCount, input.unloadingLaborerCount, input.unloadingRatePerThousand);
 
@@ -99,6 +103,7 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
         unloadingLaborerCount: input.unloadingLaborerCount,
         unloadingRatePerThousand: input.unloadingRatePerThousand,
         categoryId: input.categoryId,
+        pricePerBrick: input.pricePerBrick,
         loadingCharge,
         unloadingCharge,
         amount: finalAmount,
@@ -144,6 +149,9 @@ export interface UpdateBrickLoadingInput {
   loadingRatePerThousand?: number;
   unloadingLaborerCount?: number;
   unloadingRatePerThousand?: number;
+  // Admin-entered per trip — never defaulted from the category's own
+  // pricePerBrick.
+  pricePerBrick?: number;
   notes?: string;
   date?: Date;
   unloadingDate?: Date;
@@ -157,12 +165,11 @@ export interface UpdateBrickLoadingInput {
 // driver's ledger; a changed tipAmount posts a correction entry for the
 // difference instead (DUE if raised, PAID if lowered), same convention as
 // every other correctable amount in this app (see stacking.service.ts's
-// original wage-delta pattern). A changed bricksCount recomputes the
-// stored `amount` against the entry's existing category price — changing
-// the category itself isn't supported here (that would also need to move
-// stock between categories). A changed bricksCount/unloadedBricksCount/
-// laborer count/rate recomputes loadingCharge/unloadingCharge the same way
-// createBrickLoadingEntry does.
+// original wage-delta pattern). A changed bricksCount/pricePerBrick
+// recomputes the stored `amount` — changing the category itself isn't
+// supported here (that would also need to move stock between categories).
+// A changed bricksCount/unloadedBricksCount/laborer count/rate recomputes
+// loadingCharge/unloadingCharge the same way createBrickLoadingEntry does.
 export async function updateBrickLoadingEntry(kilnId: string, entryId: string, input: UpdateBrickLoadingInput) {
   const existing = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick loading entry not found in this kiln");
@@ -170,9 +177,10 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
   const oldTip = existing.tipAmount ?? 0;
 
   let amountUpdate: { amount?: number } = {};
-  if (existing.categoryId && input.bricksCount !== undefined) {
-    const category = (await db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)))[0];
-    amountUpdate = { amount: Math.round(input.bricksCount * (category?.pricePerBrick ?? 0) * 100) / 100 };
+  if (input.bricksCount !== undefined || input.pricePerBrick !== undefined) {
+    const bricksCount = input.bricksCount ?? existing.bricksCount;
+    const pricePerBrick = input.pricePerBrick ?? existing.pricePerBrick ?? 0;
+    amountUpdate = { amount: Math.round(bricksCount * pricePerBrick * 100) / 100 };
   }
 
   let chargeUpdate: { loadingCharge?: number; unloadingCharge?: number } = {};
