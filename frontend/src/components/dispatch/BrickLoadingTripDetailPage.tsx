@@ -47,10 +47,13 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
     try {
       const newDispatch = await api.dispatch.create({
         customerName: trip.customerName || t("dispatch.walkInCustomer"),
-        customerAddress: trip.customerAddress,
-        customerPhone: trip.customerPhone,
-        driverName: trip.driverName,
-        driverPhone: trip.driverPhone,
+        // The API returns unset optional fields as null, not undefined —
+        // the create schema only accepts undefined for an omitted
+        // optional string, so null must be normalized here or it 500s.
+        customerAddress: trip.customerAddress ?? undefined,
+        customerPhone: trip.customerPhone ?? undefined,
+        driverName: trip.driverName ?? undefined,
+        driverPhone: trip.driverPhone ?? undefined,
         loadingEntryId: trip._id,
         dispatchedOn: trip.date,
       });
