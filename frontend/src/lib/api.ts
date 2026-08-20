@@ -12,6 +12,7 @@ import type {
   BrickLoadingEntry,
   BrickProductionEntry,
   BrickVehicleType,
+  Challan,
   ChamberCostReport,
   ChamberGrading,
   ComplianceDocument,
@@ -41,9 +42,11 @@ import type {
   FuelLogPeriodTotals,
   FuelPurchase,
   FuelType,
+  GatePassRecord,
   Gher,
   GherStatus,
   IncidentType,
+  Invoice,
   JcbWorkLog,
   KilnIncident,
   KilnVehicle,
@@ -241,6 +244,115 @@ export const api = {
       }>
     ) => patch<Dispatch>(`/dispatch/${id}`, input, true),
     remove: (id: string) => del<void>(`/dispatch/${id}`, true),
+  },
+
+  challans: {
+    list: (dispatchId?: string) => get<Challan[]>(`/challans${dispatchId ? `?dispatchId=${dispatchId}` : ""}`, true),
+    create: (input: {
+      dispatchId: string;
+      vehicleNumber?: string;
+      vehicleType?: string;
+      driverName?: string;
+      driverPhone?: string;
+      customerName: string;
+      customerAddress?: string;
+      customerPhone?: string;
+      categoryId?: string;
+      bricksCount: number;
+      challanDate?: string;
+      notes?: string;
+    }) => post<Challan>("/challans", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        vehicleNumber: string;
+        vehicleType: string;
+        driverName: string;
+        driverPhone: string;
+        customerName: string;
+        customerAddress: string;
+        customerPhone: string;
+        categoryId: string;
+        bricksCount: number;
+        challanDate: string;
+        notes: string;
+      }>
+    ) => patch<Challan>(`/challans/${id}`, input, true),
+    remove: (id: string) => del<void>(`/challans/${id}`, true),
+  },
+
+  gatePasses: {
+    list: (dispatchId?: string) => get<GatePassRecord[]>(`/gate-passes${dispatchId ? `?dispatchId=${dispatchId}` : ""}`, true),
+    create: (input: {
+      dispatchId: string;
+      vehicleNumber?: string;
+      vehicleType?: string;
+      driverName?: string;
+      driverPhone?: string;
+      customerName: string;
+      categoryId?: string;
+      bricksCount: number;
+      gatePassDate?: string;
+      notes?: string;
+    }) => post<GatePassRecord>("/gate-passes", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        vehicleNumber: string;
+        vehicleType: string;
+        driverName: string;
+        driverPhone: string;
+        customerName: string;
+        categoryId: string;
+        bricksCount: number;
+        gatePassDate: string;
+        notes: string;
+      }>
+    ) => patch<GatePassRecord>(`/gate-passes/${id}`, input, true),
+    remove: (id: string) => del<void>(`/gate-passes/${id}`, true),
+  },
+
+  invoices: {
+    list: (dispatchId?: string) => get<Invoice[]>(`/invoices${dispatchId ? `?dispatchId=${dispatchId}` : ""}`, true),
+    create: (input: {
+      dispatchId: string;
+      customerName: string;
+      customerAddress?: string;
+      customerPhone?: string;
+      customerGstNumber?: string;
+      categoryId?: string;
+      bricksCount: number;
+      ratePerBrick?: number;
+      grossAmount?: number;
+      discountAmount?: number;
+      netAmount: number;
+      paymentMode?: PaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
+      invoiceDate?: string;
+      notes?: string;
+    }) => post<Invoice>("/invoices", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        customerName: string;
+        customerAddress: string;
+        customerPhone: string;
+        customerGstNumber: string;
+        categoryId: string;
+        bricksCount: number;
+        ratePerBrick: number;
+        grossAmount: number;
+        discountAmount: number;
+        netAmount: number;
+        paymentMode: PaymentMode;
+        cashAmount: number;
+        onlineAmount: number;
+        invoiceDate: string;
+        notes: string;
+      }>
+    ) => patch<Invoice>(`/invoices/${id}`, input, true),
+    remove: (id: string) => del<void>(`/invoices/${id}`, true),
   },
 
   login: (email: string, password: string) => post<AuthResponse>("/auth/login", { email, password }),

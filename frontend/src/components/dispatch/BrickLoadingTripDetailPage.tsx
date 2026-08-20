@@ -1,5 +1,7 @@
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Pencil, Trash2, Truck } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useUiStore } from "@/store/ui.store";
 import { formatDateTime, formatINR } from "@/lib/utils";
@@ -32,6 +34,31 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
   const navigateAndHighlight = useUiStore((s) => s.navigateAndHighlight);
   const category = typeof trip.categoryId === "object" ? trip.categoryId : null;
   const linkedDispatch = typeof trip.dispatchId === "object" ? trip.dispatchId : null;
+  const [addingToDispatch, setAddingToDispatch] = useState(false);
+
+  // Transfers this trip's customer/driver/vehicle/category/amount to a new
+  // Dispatch entry via the existing loadingEntryId link (createDispatch
+  // authoritatively overrides vehicle/category/bricks/amount from the trip
+  // row itself -- see dispatch.service.ts), then jumps straight to viewing
+  // it on the Dispatch page.
+  async function handleAddToDispatch() {
+    if (!confirm(t("dispatchDocs.confirmAddToDispatch"))) return;
+    setAddingToDispatch(true);
+    try {
+      const newDispatch = await api.dispatch.create({
+        customerName: trip.customerName || t("dispatch.walkInCustomer"),
+        customerAddress: trip.customerAddress,
+        customerPhone: trip.customerPhone,
+        driverName: trip.driverName,
+        driverPhone: trip.driverPhone,
+        loadingEntryId: trip._id,
+        dispatchedOn: trip.date,
+      });
+      navigateAndHighlight("dispatch", newDispatch._id);
+    } finally {
+      setAddingToDispatch(false);
+    }
+  }
 
   return (
     <div>
@@ -50,6 +77,22 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
             </p>
           </div>
           <div className="flex gap-2">
+            {linkedDispatch ? (
+              <button
+                onClick={() => navigateAndHighlight("dispatch", linkedDispatch._id)}
+                className="flex items-center gap-1 rounded-lg border border-series-1/30 bg-series-1/5 px-3 py-1.5 text-xs font-medium text-series-1 hover:bg-series-1/10"
+              >
+                <Truck className="h-3.5 w-3.5" /> {t("dispatchDocs.viewInDispatch")}
+              </button>
+            ) : (
+              <button
+                onClick={handleAddToDispatch}
+                disabled={addingToDispatch}
+                className="flex items-center gap-1 rounded-lg border border-series-1/30 bg-series-1/5 px-3 py-1.5 text-xs font-medium text-series-1 hover:bg-series-1/10 disabled:opacity-50"
+              >
+                <Truck className="h-3.5 w-3.5" /> {t("dispatchDocs.addToDispatchButton")}
+              </button>
+            )}
             <button
               onClick={onEdit}
               className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"

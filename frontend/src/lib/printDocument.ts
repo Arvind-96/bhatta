@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { Dispatch, LedgerEntry, PaymentReceipt, SandContract, SoilContract } from "@/types";
+import type { Challan, Dispatch, GatePassRecord, Invoice, LedgerEntry, PaymentReceipt, SandContract, SoilContract } from "@/types";
 
 // Gate Pass, Challan, and Payment Receipt all share one visual language
 // (red accent bars, a logo mark, a colored "who this is for" box, a
@@ -153,6 +153,11 @@ const GATE_PASS_ACCENT = `:root { --doc-accent: #b8541f; --doc-accent-soft: #e08
 const CHALLAN_ACCENT = `:root { --doc-accent: #c0392b; --doc-accent-soft: #e0705f; --doc-accent-tint: #fdf6ee; }`;
 const RECEIPT_ACCENT = `:root { --doc-accent: #1f7a4d; --doc-accent-soft: #4fae7c; --doc-accent-tint: #f0f8f3; }`;
 const CONTRACT_ACCENT = `:root { --doc-accent: #8a5a2b; --doc-accent-soft: #c08a4f; --doc-accent-tint: #f8f2e9; }`;
+// Distinct from CHALLAN_ACCENT above (which colors the older combined
+// Challan-cum-Invoice print still used by Billing.tsx) — this blue accent
+// is only for the new, genuinely separate priced Invoice record below, so
+// the two remain visually distinguishable even though both say "Invoice".
+const INVOICE_RECORD_ACCENT = `:root { --doc-accent: #2a4d8f; --doc-accent-soft: #5b7dc0; --doc-accent-tint: #eef3fb; }`;
 
 function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
   const html = `<!doctype html>
@@ -370,6 +375,217 @@ export function printInvoice(dispatch: Dispatch, kiln: KilnPrintInfo, accountBal
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`Invoice ${dispatch.invoiceNumber ?? dispatch.slipNumber}`, body, CHALLAN_ACCENT);
+}
+
+// A pure delivery note — no pricing anywhere on it, deliberately distinct
+// from the priced Invoice record below and from the older combined
+// Challan-cum-Invoice print above. Created from a Dispatch's own detail
+// page (see CreateChallanForm.tsx) as its own editable/deletable record,
+// not a live view of the dispatch.
+export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, categoryLabel: string) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const number = `CH-${challan.sequenceNumber}`;
+  const date = challan.challanDate ?? challan.createdAt;
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Delivery Challan</span>
+        <p class="doc-number">${escapeHtml(number)}</p>
+        <p class="doc-date">${new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Delivered to</p>
+        <p class="doc-box-name">${escapeHtml(challan.customerName)}</p>
+        <p class="doc-box-detail">${escapeHtml(challan.customerAddress || "—")}</p>
+        <p class="doc-box-detail">Phone: ${escapeHtml(challan.customerPhone || "—")}</p>
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Bricks</p>
+        <p class="doc-total-amount">${challan.bricksCount.toLocaleString("en-IN")}</p>
+        <p class="doc-amount-words">${escapeHtml(categoryLabel)}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      <tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(challan.vehicleNumber || "—")}</td></tr>
+      <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(challan.vehicleType || "—")}</td></tr>
+      <tr><td class="doc-table-label">Driver</td><td class="doc-table-value">${escapeHtml(challan.driverName || "—")}</td></tr>
+      <tr><td class="doc-table-label">Driver mobile</td><td class="doc-table-value">${escapeHtml(challan.driverPhone || "—")}</td></tr>
+      <tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>
+      ${challan.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(challan.notes)}</td></tr>` : ""}
+    </table>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED DELIVERY CHALLAN — NO PRICING ~</p>
+    <div class="doc-sign-row">
+      <div class="doc-sign-box">Dispatch clerk<br />(Stamp &amp; Signature)</div>
+      <div class="doc-sign-box">Driver signature</div>
+      <div class="doc-sign-box">Received by</div>
+    </div>
+  `;
+  openPrintWindow(`Challan ${number}`, body, CHALLAN_ACCENT);
+}
+
+// Exit-authorization slip — its own editable/deletable record, distinct
+// from the ad-hoc printGatePass above (which reads straight off a
+// Dispatch with nothing saved). Same visual language, same accent.
+export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInfo, categoryLabel: string) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const number = `GP-${gatePass.sequenceNumber}`;
+  const date = gatePass.gatePassDate ?? gatePass.createdAt;
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Gate Pass</span>
+        <p class="doc-number">${escapeHtml(number)}</p>
+        <p class="doc-date">${new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+        <p class="doc-date">Printed: ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Issued to (vehicle owner / customer)</p>
+        <p class="doc-box-name">${escapeHtml(gatePass.customerName)}</p>
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Bricks loaded</p>
+        <p class="doc-total-amount">${gatePass.bricksCount.toLocaleString("en-IN")}</p>
+        <p class="doc-amount-words">${escapeHtml(categoryLabel)}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      <tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(gatePass.vehicleNumber || "—")}</td></tr>
+      <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(gatePass.vehicleType || "—")}</td></tr>
+      <tr><td class="doc-table-label">Driver</td><td class="doc-table-value">${escapeHtml(gatePass.driverName || "—")}</td></tr>
+      <tr><td class="doc-table-label">Driver mobile</td><td class="doc-table-value">${escapeHtml(gatePass.driverPhone || "—")}</td></tr>
+      <tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>
+      <tr><td class="doc-table-label">Bricks loaded</td><td class="doc-table-value">${gatePass.bricksCount.toLocaleString("en-IN")}</td></tr>
+      ${gatePass.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(gatePass.notes)}</td></tr>` : ""}
+    </table>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED GATE PASS ~</p>
+    <div class="doc-sign-row">
+      <div class="doc-sign-box">Gate / Chowkidar<br />(Stamp &amp; Signature)</div>
+      <div class="doc-sign-box">Driver signature</div>
+      <div class="doc-sign-box">Munim / Owner<br />(Stamp &amp; Signature)</div>
+    </div>
+  `;
+  openPrintWindow(`Gate Pass ${number}`, body, GATE_PASS_ACCENT);
+}
+
+// The priced, GST-oriented commercial bill — its own editable/deletable
+// record (see CreateInvoiceForm.tsx), distinct from the older combined
+// Challan-cum-Invoice print above (kept working unchanged for
+// Billing.tsx). Uses INVOICE_RECORD_ACCENT so the two never look alike.
+export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categoryLabel: string) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const number = `INV-${invoice.sequenceNumber}`;
+  const date = invoice.invoiceDate ?? invoice.createdAt;
+  const gross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);
+
+  const itemRows = `
+    <tr>
+      <td>01</td>
+      <td>${escapeHtml(categoryLabel)}</td>
+      <td>${invoice.ratePerBrick ? `₹${invoice.ratePerBrick.toLocaleString("en-IN", { maximumFractionDigits: 2 })}/NOS` : "—"}</td>
+      <td class="num">${invoice.bricksCount.toLocaleString("en-IN")}</td>
+      <td class="num">₹${formatINR(gross)}</td>
+      <td class="num">₹${formatINR(gross)}</td>
+    </tr>
+    ${
+      invoice.discountAmount
+        ? `<tr><td></td><td>Discount</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">− ₹${formatINR(invoice.discountAmount)}</td></tr>`
+        : ""
+    }
+  `;
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+          ${kiln.gstNumber ? `<p class="doc-gst">GSTIN: ${escapeHtml(kiln.gstNumber)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Invoice</span>
+        <p class="doc-number">${escapeHtml(number)}</p>
+        <p class="doc-date">Invoice Date: ${new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+        ${invoice.paymentMode ? `<p class="doc-summary-line">${escapeHtml(paymentModeLabel(invoice))}: ₹${formatINR(invoice.netAmount)}</p>` : ""}
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Bill and Ship To</p>
+        <p class="doc-box-name">${escapeHtml(invoice.customerName)}</p>
+        <p class="doc-box-detail">${escapeHtml(invoice.customerAddress || "—")}</p>
+        <p class="doc-box-detail">Phone: ${escapeHtml(invoice.customerPhone || "—")}</p>
+        <p class="doc-box-detail">GSTIN: ${invoice.customerGstNumber ? escapeHtml(invoice.customerGstNumber) : ""}</p>
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Total amount</p>
+        <p class="doc-total-amount">₹${formatINR(invoice.netAmount)}</p>
+        <p class="doc-amount-words">${escapeHtml(amountInWords(invoice.netAmount))}</p>
+      </div>
+    </div>
+
+    <table class="doc-items">
+      <thead>
+        <tr><th>#</th><th>Item Details</th><th>Price/Unit</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Total</th></tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="3">Sub-total Amount</td><td class="num">${invoice.bricksCount.toLocaleString("en-IN")}</td><td class="num">₹${formatINR(gross)}</td><td class="num">₹${formatINR(invoice.netAmount)}</td></tr>
+      </tfoot>
+    </table>
+
+    <div class="doc-footer-total">
+      <span>Total amount</span>
+      <span class="big">₹${formatINR(invoice.netAmount)}</span>
+      <p class="doc-footer-words">${escapeHtml(amountInWords(invoice.netAmount))}</p>
+    </div>
+
+    ${invoice.notes ? `<table class="doc-table"><tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(invoice.notes)}</td></tr></table>` : ""}
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED INVOICE ~</p>
+    <div class="doc-sign-row doc-sign-row-single">
+      <div class="doc-sign-box">AUTHORISED SIGNATURE</div>
+    </div>
+    <p class="doc-thanks">Thank you for the business.</p>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`Invoice ${number}`, body, INVOICE_RECORD_ACCENT);
 }
 
 // A payment receipt can be issued to anyone in the People directory, not

@@ -1,0 +1,38 @@
+import type { Locale } from "../translations";
+
+// Translation keys for: components/dispatch/DispatchDetailPage,
+// CreateChallanForm, CreateGatePassForm, CreateInvoiceForm +
+// components/dispatch/BrickLoadingTripDetailPage's "Add to Dispatch"
+// button. Merged into the main dictionary by translations.ts.
+export const dispatchDocumentsDict: Record<string, Record<Locale, string>> = {
+  "dispatchDocs.backToDispatch": { en: "Back to Dispatch", hi: "डिस्पैच पर वापस" },
+  "dispatchDocs.dispatchDetailsSection": { en: "Dispatch details", hi: "डिस्पैच विवरण" },
+  "dispatchDocs.generateDocumentsSection": { en: "Generate documents", hi: "दस्तावेज़ बनाएं" },
+  "dispatchDocs.createChallanButton": { en: "Create Challan", hi: "चालान बनाएं" },
+  "dispatchDocs.createGatePassButton": { en: "Create Gate Pass", hi: "गेट पास बनाएं" },
+  "dispatchDocs.createInvoiceButton": { en: "Create Invoice", hi: "इनवॉइस बनाएं" },
+  "dispatchDocs.createChallanTitle": { en: "New delivery challan", hi: "नया डिलीवरी चालान" },
+  "dispatchDocs.createGatePassTitle": { en: "New gate pass", hi: "नया गेट पास" },
+  "dispatchDocs.createInvoiceTitle": { en: "New invoice", hi: "नया इनवॉइस" },
+  "dispatchDocs.generateChallan": { en: "Generate & print challan", hi: "चालान बनाएं व प्रिंट करें" },
+  "dispatchDocs.generateGatePass": { en: "Generate & print gate pass", hi: "गेट पास बनाएं व प्रिंट करें" },
+  "dispatchDocs.generateInvoice": { en: "Generate & print invoice", hi: "इनवॉइस बनाएं व प्रिंट करें" },
+  "dispatchDocs.saveAndReprintChallan": { en: "Save & reprint challan", hi: "चालान सहेजें व दोबारा प्रिंट करें" },
+  "dispatchDocs.saveAndReprintGatePass": { en: "Save & reprint gate pass", hi: "गेट पास सहेजें व दोबारा प्रिंट करें" },
+  "dispatchDocs.saveAndReprintInvoice": { en: "Save & reprint invoice", hi: "इनवॉइस सहेजें व दोबारा प्रिंट करें" },
+  "dispatchDocs.gstNumberPlaceholder": { en: "GST number (optional)", hi: "जीएसटी नंबर (वैकल्पिक)" },
+  "dispatchDocs.ratePerBrickPlaceholder": { en: "Rate per brick (₹)", hi: "प्रति ईंट दर (₹)" },
+  "dispatchDocs.challansListTitle": { en: "Challans created", hi: "बनाए गए चालान" },
+  "dispatchDocs.gatePassesListTitle": { en: "Gate passes created", hi: "बनाए गए गेट पास" },
+  "dispatchDocs.invoicesListTitle": { en: "Invoices created", hi: "बनाए गए इनवॉइस" },
+  "dispatchDocs.confirmDeleteChallan": { en: "Delete challan CH-{number}? This cannot be undone.", hi: "चालान CH-{number} हटाएं? इसे वापस नहीं लाया जा सकता।" },
+  "dispatchDocs.confirmDeleteGatePass": { en: "Delete gate pass GP-{number}? This cannot be undone.", hi: "गेट पास GP-{number} हटाएं? इसे वापस नहीं लाया जा सकता।" },
+  "dispatchDocs.confirmDeleteInvoice": { en: "Delete invoice INV-{number}? This cannot be undone.", hi: "इनवॉइस INV-{number} हटाएं? इसे वापस नहीं लाया जा सकता।" },
+  "dispatchDocs.addToDispatchButton": { en: "Add to Dispatch", hi: "डिस्पैच में जोड़ें" },
+  "dispatchDocs.confirmAddToDispatch": {
+    en: "Create a Dispatch entry from this trip? The trip's customer, driver, vehicle, category, and amount will carry over.",
+    hi: "इस ट्रिप से डिस्पैच एंट्री बनाएं? ट्रिप का ग्राहक, ड्राइवर, वाहन, श्रेणी और राशि इसमें आ जाएगी।",
+  },
+  "dispatchDocs.viewInDispatch": { en: "View in Dispatch", hi: "डिस्पैच में देखें" },
+  "dispatchDocs.alreadyLinkedHint": { en: "This trip is already linked to a dispatch.", hi: "यह ट्रिप पहले से ही एक डिस्पैच से जुड़ी है।" },
+};

@@ -53,6 +53,62 @@ export interface Dispatch {
   createdAt: string;
 }
 
+export interface Challan {
+  _id: string;
+  dispatchId: string;
+  sequenceNumber: number;
+  vehicleNumber?: string;
+  vehicleType?: string;
+  driverName?: string;
+  driverPhone?: string;
+  customerName: string;
+  customerAddress?: string;
+  customerPhone?: string;
+  categoryId?: string;
+  bricksCount: number;
+  challanDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface GatePassRecord {
+  _id: string;
+  dispatchId: string;
+  sequenceNumber: number;
+  vehicleNumber?: string;
+  vehicleType?: string;
+  driverName?: string;
+  driverPhone?: string;
+  customerName: string;
+  categoryId?: string;
+  bricksCount: number;
+  gatePassDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface Invoice {
+  _id: string;
+  dispatchId: string;
+  sequenceNumber: number;
+  customerName: string;
+  customerAddress?: string;
+  customerPhone?: string;
+  customerGstNumber?: string;
+  categoryId?: string;
+  bricksCount: number;
+  ratePerBrick?: number;
+  grossAmount?: number;
+  discountAmount?: number;
+  netAmount: number;
+  paymentMode?: PaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
+  invoiceDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface DispatchTotals {
   days: number;
   bricksCount: number;

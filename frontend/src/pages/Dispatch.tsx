@@ -1,5 +1,5 @@
-import { Fragment, FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { AlertTriangle, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
+import { DispatchDetailPage } from "@/components/dispatch/DispatchDetailPage";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, PaymentMode, Person } from "@/types";
 
@@ -79,13 +80,11 @@ export function Dispatch() {
   const [loadingTrips, setLoadingTrips] = useState<BrickLoadingEntry[]>([]);
   const [reconciliation, setReconciliation] = useState<FinishedGoodsReconciliation | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [adjustingId, setAdjustingId] = useState<string | null>(null);
-  const [adjustForm, setAdjustForm] = useState({ breakageCount: "", returnedCount: "", returnReason: "" });
   const [editingDispatch, setEditingDispatch] = useState<DispatchEntry | null>(null);
+  const [openDispatchId, setOpenDispatchId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const highlightTarget = useUiStore((s) => s.highlightTarget);
   const clearHighlightTarget = useUiStore((s) => s.clearHighlightTarget);
@@ -130,21 +129,16 @@ export function Dispatch() {
   const selectedTrip = unlinkedTrips.find((t) => t._id === form.loadingEntryId);
   const tripLocked = !!form.loadingEntryId;
 
+  // Cross-navigation from another page (e.g. a Loading Trip's "linked
+  // dispatch" link) now opens this dispatch's own detail page directly,
+  // rather than scrolling to a highlighted row in a list the detail page
+  // would immediately cover anyway.
   useEffect(() => {
     if (!highlightTarget || highlightTarget.view !== "dispatch" || dispatches.length === 0) return;
-    const idx = dispatches.findIndex((d) => d._id === highlightTarget.id);
+    const exists = dispatches.some((d) => d._id === highlightTarget.id);
     clearHighlightTarget();
-    if (idx === -1) return;
-    setPage(Math.floor(idx / PAGE_SIZE) + 1);
-    setHighlightedId(highlightTarget.id);
-    const scrollTimer = setTimeout(() => {
-      document.getElementById(`dispatch-row-${highlightTarget.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 50);
-    const clearTimer = setTimeout(() => setHighlightedId(null), 2500);
-    return () => {
-      clearTimeout(scrollTimer);
-      clearTimeout(clearTimer);
-    };
+    if (!exists) return;
+    setOpenDispatchId(highlightTarget.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightTarget, dispatches]);
 
@@ -230,27 +224,18 @@ export function Dispatch() {
     }
   }
 
-  async function submitAdjustment(id: string) {
-    await api.dispatch.adjustment(id, {
-      breakageCount: adjustForm.breakageCount ? Number(adjustForm.breakageCount) : undefined,
-      returnedCount: adjustForm.returnedCount ? Number(adjustForm.returnedCount) : undefined,
-      returnReason: adjustForm.returnReason || undefined,
-    });
-    setAdjustingId(null);
-    setAdjustForm({ breakageCount: "", returnedCount: "", returnReason: "" });
-    refresh();
-  }
-
   async function deleteDispatch(d: DispatchEntry) {
-    if (!confirm(t("dispatch.confirmDeleteDispatch", { slipNumber: d.slipNumber }))) return;
+    if (!confirm(t("dispatch.confirmDeleteDispatch", { slipNumber: d.slipNumber }))) return false;
     await api.dispatch.remove(d._id);
     await refresh();
+    return true;
   }
 
   const totalAmountPreview = (Number(form.amount) || 0) + (Number(form.transportCost) || 0);
+  const openDispatch = dispatches.find((d) => d._id === openDispatchId) ?? null;
 
-  return (
-    <div className="space-y-4">
+  const listView = (
+    <>
       {reconciliation?.alert && (
         <Card className="border-status-critical/40 bg-status-critical/5">
           <div className="flex items-start gap-3">
@@ -487,88 +472,34 @@ export function Dispatch() {
                   <th className="pb-2 font-medium">{t("dispatch.bricksHeader")}</th>
                   <th className="pb-2 font-medium">{t("dispatch.adjustmentsHeader")}</th>
                   <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
-                  <th className="pb-2 font-medium text-right" />
                 </tr>
               </thead>
               <tbody>
                 {pagedDispatches.map((d) => (
-                  <Fragment key={d._id}>
-                    <tr
-                      id={`dispatch-row-${d._id}`}
-                      className={cn("border-b border-border/60 last:border-0 transition-colors", highlightedId === d._id && "bg-series-1/10")}
-                    >
-                      <td className="py-3 text-sm text-ink-muted">{d.slipNumber}</td>
-                      <td className="py-3 text-ink-secondary">
-                        {new Date(d.dispatchedOn).toLocaleDateString("en-IN")}
-                        <p className="text-xs text-ink-muted/70">{formatDateTime(d.createdAt)}</p>
-                      </td>
-                      <td className="py-3 text-ink-primary">{d.customerName}</td>
-                      <td className="py-3">
-                        <Badge variant="neutral">{dispatchCategoryGradeLabel(d, GRADE_LABELS)}</Badge>
-                      </td>
-                      <td className="py-3 tabular-nums text-ink-secondary">{d.bricksCount.toLocaleString("en-IN")}</td>
-                      <td className="py-3">
-                        <button
-                          onClick={() => setAdjustingId(adjustingId === d._id ? null : d._id)}
-                          className="text-xs text-series-1 hover:underline"
-                        >
-                          {d.breakageCount > 0 || d.returnedCount > 0
-                            ? t("dispatch.brokenReturnedSummary", { broken: d.breakageCount, returned: d.returnedCount })
-                            : t("dispatch.addBreakageReturn")}
-                        </button>
-                      </td>
-                      <td className="py-3 text-right tabular-nums font-medium text-ink-primary">
-                        ₹{formatINR(d.amount)}
-                      </td>
-                      <td className="py-3 text-right">
-                        <div className="flex justify-end gap-3">
-                          <button
-                            onClick={() => setEditingDispatch(d)}
-                            className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
-                          >
-                            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                          </button>
-                          <button
-                            onClick={() => deleteDispatch(d)}
-                            className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                    {adjustingId === d._id && (
-                      <tr key={`${d._id}-adjust`}>
-                        <td colSpan={8} className="bg-ink-primary/5 p-3">
-                          <div className="flex flex-wrap items-end gap-2">
-                            <input
-                              type="number"
-                              placeholder={t("dispatch.breakageCountPlaceholder")}
-                              value={adjustForm.breakageCount}
-                              onChange={(e) => setAdjustForm((f) => ({ ...f, breakageCount: e.target.value }))}
-                              className="h-9 w-32 rounded-lg border border-border bg-ink-primary/5 px-2 text-xs text-ink-primary outline-none"
-                            />
-                            <input
-                              type="number"
-                              placeholder={t("dispatch.returnedCountPlaceholder")}
-                              value={adjustForm.returnedCount}
-                              onChange={(e) => setAdjustForm((f) => ({ ...f, returnedCount: e.target.value }))}
-                              className="h-9 w-32 rounded-lg border border-border bg-ink-primary/5 px-2 text-xs text-ink-primary outline-none"
-                            />
-                            <input
-                              placeholder={t("dispatch.returnReasonPlaceholder")}
-                              value={adjustForm.returnReason}
-                              onChange={(e) => setAdjustForm((f) => ({ ...f, returnReason: e.target.value }))}
-                              className="h-9 flex-1 rounded-lg border border-border bg-ink-primary/5 px-2 text-xs text-ink-primary outline-none"
-                            />
-                            <Button size="sm" onClick={() => submitAdjustment(d._id)}>
-                              {t("common.save")}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
+                  <tr
+                    key={d._id}
+                    onClick={() => setOpenDispatchId(d._id)}
+                    className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5"
+                  >
+                    <td className="py-3 text-sm text-ink-muted hover:underline">{d.slipNumber}</td>
+                    <td className="py-3 text-ink-secondary">
+                      {new Date(d.dispatchedOn).toLocaleDateString("en-IN")}
+                      <p className="text-xs text-ink-muted/70">{formatDateTime(d.createdAt)}</p>
+                    </td>
+                    <td className="py-3 text-ink-primary">{d.customerName}</td>
+                    <td className="py-3">
+                      <Badge variant="neutral">{dispatchCategoryGradeLabel(d, GRADE_LABELS)}</Badge>
+                    </td>
+                    <td className="py-3 tabular-nums text-ink-secondary">{d.bricksCount.toLocaleString("en-IN")}</td>
+                    <td className="py-3 text-xs text-ink-muted">
+                      {d.breakageCount > 0 || d.returnedCount > 0
+                        ? t("dispatch.brokenReturnedSummary", { broken: d.breakageCount, returned: d.returnedCount })
+                        : "—"}
+                    </td>
+                    <td className="py-3 text-right tabular-nums font-medium text-ink-primary">
+                      ₹{formatINR(d.amount)}
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -576,6 +507,25 @@ export function Dispatch() {
           </div>
         )}
       </Card>
+    </>
+  );
+
+  return (
+    <div className="space-y-4">
+      {openDispatch ? (
+        <DispatchDetailPage
+          dispatch={openDispatch}
+          categories={categories}
+          onBack={() => setOpenDispatchId(null)}
+          onEdit={() => setEditingDispatch(openDispatch)}
+          onAdjusted={refresh}
+          onDelete={async () => {
+            if (await deleteDispatch(openDispatch)) setOpenDispatchId(null);
+          }}
+        />
+      ) : (
+        listView
+      )}
 
       {editingDispatch && (
         <EditDispatchModal

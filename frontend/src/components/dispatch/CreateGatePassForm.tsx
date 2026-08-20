@@ -1,0 +1,109 @@
+import { FormEvent, useState } from "react";
+import { X } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
+import { api } from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
+import { useTranslation } from "@/hooks/useTranslation";
+import { printGatePassRecord } from "@/lib/printDocument";
+import type { BrickCategory, Dispatch as DispatchEntry, GatePassRecord } from "@/types";
+
+const inputClass =
+  "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
+
+interface CreateGatePassFormProps {
+  dispatch: DispatchEntry;
+  categories: BrickCategory[];
+  existing?: GatePassRecord | null;
+  onClose: () => void;
+  onSaved: () => void;
+}
+
+function categoryLabelFor(categoryId: string, categories: BrickCategory[]) {
+  const c = categories.find((cat) => cat._id === categoryId);
+  if (!c) return "—";
+  return c.grade ? `${c.category} (${c.grade})` : c.category;
+}
+
+// The vehicle exit-authorization slip, its own saved record (see
+// CreateChallanForm.tsx's doc comment for why this is a separate row
+// instead of a live view of the dispatch).
+export function CreateGatePassForm({ dispatch, categories, existing, onClose, onSaved }: CreateGatePassFormProps) {
+  const { t } = useTranslation();
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
+
+  const dispatchCategoryId = typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "";
+  const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch.vehicleNumber ?? "");
+  const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch.vehicleType ?? "");
+  const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch.driverName ?? "");
+  const [driverPhone, setDriverPhone] = useState(existing?.driverPhone ?? dispatch.driverPhone ?? "");
+  const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch.customerName ?? "");
+  const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
+  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch.bricksCount ?? ""));
+  const [gatePassDate, setGatePassDate] = useState((existing?.gatePassDate ?? dispatch.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
+  const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = {
+        vehicleNumber: vehicleNumber || undefined,
+        vehicleType: vehicleType || undefined,
+        driverName: driverName || undefined,
+        driverPhone: driverPhone || undefined,
+        customerName,
+        categoryId: categoryId || undefined,
+        bricksCount: Number(bricksCount),
+        gatePassDate: gatePassDate || undefined,
+        notes: notes || undefined,
+      };
+      const row = existing ? await api.gatePasses.update(existing._id, payload) : await api.gatePasses.create({ dispatchId: dispatch._id, ...payload });
+      printGatePassRecord(row, kilnInfo, categoryLabelFor(categoryId, categories));
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="border-status-warning/30">
+      <div className="mb-3 flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-ink-primary">{t("dispatchDocs.createGatePassTitle")}</h4>
+        <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+        <input required placeholder={t("brickLoading.customerNamePlaceholder")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClass} />
+        <input placeholder={t("brickLoading.driverNamePlaceholder")} value={driverName} onChange={(e) => setDriverName(e.target.value)} className={inputClass} />
+        <input placeholder={t("brickLoading.driverPhonePlaceholder")} value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} className={inputClass} />
+        <input placeholder={t("dispatch.vehicleNumberPlaceholder")} value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className={inputClass} />
+        <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} className={inputClass}>
+          <option value="">{t("dispatch.vehicleTypePlaceholder")}</option>
+          <option value="TRUCK">{t("brickLoading.truck")}</option>
+          <option value="TRACTOR">{t("brickLoading.tractor")}</option>
+        </select>
+        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
+          <option value="">{t("brickLoading.categoryPlaceholder")}</option>
+          {categories.map((c) => (
+            <option key={c._id} value={c._id}>
+              {c.grade ? `${c.category} (${c.grade})` : c.category}
+            </option>
+          ))}
+        </select>
+        <input required type="number" placeholder={t("brickLoading.bricksLoadedPlaceholder")} value={bricksCount} onChange={(e) => setBricksCount(e.target.value)} className={inputClass} />
+        <DateInput value={gatePassDate} onChange={(e) => setGatePassDate(e.target.value)} className={inputClass} />
+        <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1" />
+        <Button type="submit" disabled={saving} className="col-span-2">
+          {existing ? t("dispatchDocs.saveAndReprintGatePass") : t("dispatchDocs.generateGatePass")}
+        </Button>
+      </form>
+    </Card>
+  );
+}

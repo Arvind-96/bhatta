@@ -74,6 +74,86 @@ export const dispatches = mysqlTable("dispatches", {
   kilnDispatchedIdx: index("dispatch_kiln_dispatched_idx").on(t.kilnId, t.dispatchedOn),
 }));
 
+// Three genuinely distinct documents an admin can generate from a Dispatch
+// record's own detail page (see dispatchDocuments.service.ts) — separate
+// from the ad-hoc printGatePass/printInvoice functions the older
+// GatePass.tsx/Billing.tsx pages already use directly off `dispatches`
+// (those are untouched, zero risk of regression). Each row here is its
+// own editable, deletable record with fields specific to that document,
+// not a live view of the dispatch: a Challan is a delivery note with no
+// pricing, a Gate Pass is the exit-authorization slip, an Invoice is the
+// priced/GST commercial bill. `sequenceNumber` is a plain per-kiln
+// counter, generated MAX-based (see generateSequenceNumber) rather than
+// COUNT-based, to avoid the exact collision-after-delete bug fixed in
+// brickLoading.service.ts's generateTripNumber.
+export const challans = mysqlTable("challans", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  dispatchId: varchar("dispatchId", { length: 64 }).notNull(),
+  sequenceNumber: int("sequenceNumber").notNull(),
+  vehicleNumber: varchar("vehicleNumber", { length: 255 }),
+  vehicleType: varchar("vehicleType", { length: 255 }),
+  driverName: varchar("driverName", { length: 255 }),
+  driverPhone: varchar("driverPhone", { length: 255 }),
+  customerName: varchar("customerName", { length: 255 }).notNull(),
+  customerAddress: varchar("customerAddress", { length: 255 }),
+  customerPhone: varchar("customerPhone", { length: 255 }),
+  categoryId: varchar("categoryId", { length: 64 }),
+  bricksCount: int("bricksCount").notNull(),
+  challanDate: dateColumn("challanDate"),
+  notes: text("notes"),
+  createdAt: createdAtColumn(),
+}, (t) => ({
+  kilnDispatchIdx: index("challan_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
+  sequenceUnique: uniqueIndex("challan_kiln_sequence_unique").on(t.kilnId, t.sequenceNumber),
+}));
+
+export const gatePasses = mysqlTable("gate_passes", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  dispatchId: varchar("dispatchId", { length: 64 }).notNull(),
+  sequenceNumber: int("sequenceNumber").notNull(),
+  vehicleNumber: varchar("vehicleNumber", { length: 255 }),
+  vehicleType: varchar("vehicleType", { length: 255 }),
+  driverName: varchar("driverName", { length: 255 }),
+  driverPhone: varchar("driverPhone", { length: 255 }),
+  customerName: varchar("customerName", { length: 255 }).notNull(),
+  categoryId: varchar("categoryId", { length: 64 }),
+  bricksCount: int("bricksCount").notNull(),
+  gatePassDate: dateColumn("gatePassDate"),
+  notes: text("notes"),
+  createdAt: createdAtColumn(),
+}, (t) => ({
+  kilnDispatchIdx: index("gatepass_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
+  sequenceUnique: uniqueIndex("gatepass_kiln_sequence_unique").on(t.kilnId, t.sequenceNumber),
+}));
+
+export const invoices = mysqlTable("invoices", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  dispatchId: varchar("dispatchId", { length: 64 }).notNull(),
+  sequenceNumber: int("sequenceNumber").notNull(),
+  customerName: varchar("customerName", { length: 255 }).notNull(),
+  customerAddress: varchar("customerAddress", { length: 255 }),
+  customerPhone: varchar("customerPhone", { length: 255 }),
+  customerGstNumber: varchar("customerGstNumber", { length: 255 }),
+  categoryId: varchar("categoryId", { length: 64 }),
+  bricksCount: int("bricksCount").notNull(),
+  ratePerBrick: double("ratePerBrick"),
+  grossAmount: double("grossAmount"),
+  discountAmount: double("discountAmount"),
+  netAmount: double("netAmount").notNull(),
+  paymentMode: varchar("paymentMode", { length: 50, enum: DISPATCH_PAYMENT_MODES }),
+  cashAmount: double("cashAmount"),
+  onlineAmount: double("onlineAmount"),
+  invoiceDate: dateColumn("invoiceDate"),
+  notes: text("notes"),
+  createdAt: createdAtColumn(),
+}, (t) => ({
+  kilnDispatchIdx: index("invoice_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
+  sequenceUnique: uniqueIndex("invoice_kiln_sequence_unique").on(t.kilnId, t.sequenceNumber),
+}));
+
 export const stockEntries = mysqlTable("stock_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
