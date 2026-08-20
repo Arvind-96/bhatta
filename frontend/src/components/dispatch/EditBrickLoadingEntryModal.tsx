@@ -35,7 +35,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   const [tipAmount, setTipAmount] = useState(String(entry.tipAmount ?? 0));
   const [vehicleNumber, setVehicleNumber] = useState(entry.vehicleNumber);
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
-  const [pricePerBrick, setPricePerBrick] = useState(entry.pricePerBrick !== undefined ? String(entry.pricePerBrick) : "");
+  const [pricePerBrick, setPricePerBrick] = useState(entry.pricePerBrick != null ? String(entry.pricePerBrick) : "");
   const [unloadedBricksCount, setUnloadedBricksCount] = useState(entry.unloadedBricksCount ? String(entry.unloadedBricksCount) : "");
   const [loadingRatePerThousand, setLoadingRatePerThousand] = useState(entry.loadingRatePerThousand ? String(entry.loadingRatePerThousand) : "");
   const [unloadingRatePerThousand, setUnloadingRatePerThousand] = useState(
@@ -180,7 +180,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 <DateInput value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
               </label>
             </div>
-            {entry.amount !== undefined && (
+            {entry.amount != null && (
               <p className="mt-2 text-sm text-ink-muted">
                 {t("brickLoading.totalAmountLabel")}: <span className="font-semibold text-ink-primary">₹{formatINR(entry.amount)}</span>
               </p>

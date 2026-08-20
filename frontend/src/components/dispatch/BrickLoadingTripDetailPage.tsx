@@ -136,16 +136,16 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
               value={category ? (category.grade ? `${category.category} (${category.grade})` : category.category) : undefined}
             />
             <Field label={t("brickLoading.bricksLoadedPlaceholder")} value={trip.bricksCount.toLocaleString("en-IN")} />
-            <Field label={t("brickLoading.pricePerBrickPlaceholder")} value={trip.pricePerBrick !== undefined ? `₹${trip.pricePerBrick}` : undefined} />
+            <Field label={t("brickLoading.pricePerBrickPlaceholder")} value={trip.pricePerBrick != null ? `₹${trip.pricePerBrick}` : undefined} />
             <Field
               label={t("brickLoading.loadingRatePlaceholder")}
-              value={trip.loadingRatePerThousand !== undefined ? `₹${trip.loadingRatePerThousand}` : undefined}
+              value={trip.loadingRatePerThousand != null ? `₹${trip.loadingRatePerThousand}` : undefined}
             />
             <Field label={t("brickLoading.loadingDateLabel")} value={new Date(trip.date).toLocaleDateString("en-IN")} />
-            <Field label={t("brickLoading.totalAmountLabel")} value={trip.amount !== undefined ? `₹${formatINR(trip.amount)}` : undefined} />
+            <Field label={t("brickLoading.totalAmountLabel")} value={trip.amount != null ? `₹${formatINR(trip.amount)}` : undefined} />
             <Field
               label={t("brickLoading.totalLoadingChargeLabel")}
-              value={trip.loadingCharge !== undefined ? `₹${formatINR(trip.loadingCharge)}` : undefined}
+              value={trip.loadingCharge != null ? `₹${formatINR(trip.loadingCharge)}` : undefined}
             />
           </div>
         </Card>
@@ -156,7 +156,7 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
             <Field label={t("brickLoading.bricksUnloadedPlaceholder")} value={trip.unloadedBricksCount?.toLocaleString("en-IN")} />
             <Field
               label={t("brickLoading.unloadingRatePlaceholder")}
-              value={trip.unloadingRatePerThousand !== undefined ? `₹${trip.unloadingRatePerThousand}` : undefined}
+              value={trip.unloadingRatePerThousand != null ? `₹${trip.unloadingRatePerThousand}` : undefined}
             />
             <Field
               label={t("brickLoading.unloadingDateLabel")}
@@ -164,7 +164,7 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
             />
             <Field
               label={t("brickLoading.totalUnloadingChargeLabel")}
-              value={trip.unloadingCharge !== undefined ? `₹${formatINR(trip.unloadingCharge)}` : undefined}
+              value={trip.unloadingCharge != null ? `₹${formatINR(trip.unloadingCharge)}` : undefined}
             />
           </div>
         </Card>
