@@ -44,8 +44,11 @@ export async function listCustomers(kilnId: string) {
 // drift out of sync with the invoices list it's computed from. An
 // invoice's own contribution: amountPaidNow (or netAmount, when that
 // field was never set — see the schema comment on
-// invoices.amountPaidNow) counts toward paid; whatever's left of
-// netAmount counts toward due. openingPaid/openingDue are the customer's
+// invoices.amountPaidNow) counts toward paid. A real brick sale
+// (bricksCount > 0) also charges its netAmount, so whatever's left
+// unpaid adds to due. A bricksCount === 0 entry (the Add Amount /
+// general-payment flow) charges nothing — it's a pure payment, so it
+// only ever reduces due. openingPaid/openingDue are the customer's
 // starting balances, added on top of every invoice's contribution.
 export async function getCustomerDetail(kilnId: string, customerId: string) {
   const customer = (await db.select().from(customers).where(and(eq(customers._id, customerId), eq(customers.kilnId, kilnId))))[0];
@@ -57,8 +60,9 @@ export async function getCustomerDetail(kilnId: string, customerId: string) {
   let totalDue = customer.openingDue;
   for (const inv of invoiceRows) {
     const paidNow = inv.amountPaidNow ?? inv.netAmount;
+    const charge = inv.bricksCount > 0 ? inv.netAmount : 0;
     totalPaid += paidNow;
-    totalDue += inv.netAmount - paidNow;
+    totalDue += charge - paidNow;
   }
   totalPaid = Math.round(totalPaid * 100) / 100;
   totalDue = Math.round(totalDue * 100) / 100;
