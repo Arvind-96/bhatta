@@ -42,14 +42,24 @@ function computeLaborCharge(bricks: number | undefined, ratePerThousand: number 
   return Math.round((bricks / 1000) * ratePerThousand * 100) / 100;
 }
 
-// Plain, sequential per-kiln trip counter — same never-resets convention as
-// dispatch.service.ts's generateInvoiceNumber. Under MySQL this
-// count-then-insert can race between two concurrent creates for the same
-// kiln, same as slip/invoice numbers — closed by the retry loop in
-// createBrickLoadingEntry below, not by trying to make this atomic.
+// Plain, sequential per-kiln trip counter — never resets. Deliberately
+// MAX(tripNumber)+1, not COUNT(*)+1: a COUNT-based counter recomputes the
+// same already-taken number forever once any row has ever been deleted
+// (COUNT drops but the highest number in use doesn't), so every retry
+// below would collide identically and exhaust the retry budget instead of
+// recovering. MAX-based generation is gap-safe regardless of how many
+// rows were deleted in between. Under MySQL this select-then-insert can
+// still race between two concurrent creates for the same kiln — closed by
+// the retry loop in createBrickLoadingEntry below, not by trying to make
+// this atomic.
 async function generateTripNumber(kilnId: string) {
-  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId)))[0];
-  return String((countRow?.count ?? 0) + 1);
+  const maxRow = (
+    await db
+      .select({ max: sql<number | null>`max(cast(${brickLoadingEntries.tripNumber} as unsigned))` })
+      .from(brickLoadingEntries)
+      .where(eq(brickLoadingEntries.kilnId, kilnId))
+  )[0];
+  return String((maxRow?.max ?? 0) + 1);
 }
 
 // The vehicle-loading operation record — which truck/tractor, how many
