@@ -44,8 +44,14 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId]);
 
-  useKilnEvent("customer:update", () => refresh());
-  useKilnEvent("invoice:update", () => refresh());
+  useKilnEvent<{ _id: string; deleted?: boolean }>("customer:update", (payload) => {
+    if (payload._id === customerId && payload.deleted) {
+      onDeleted();
+      return;
+    }
+    refresh().catch(console.error);
+  });
+  useKilnEvent("invoice:update", () => refresh().catch(console.error));
 
   async function handleDelete() {
     if (!detail) return;
