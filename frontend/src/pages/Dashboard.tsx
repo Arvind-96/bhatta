@@ -17,6 +17,7 @@ import { Dispatch } from "@/pages/Dispatch";
 import { GatePass } from "@/pages/GatePass";
 import { Challan } from "@/pages/Challan";
 import { Invoices } from "@/pages/Invoices";
+import { Customers } from "@/pages/Customers";
 import { Expense } from "@/pages/Expense";
 import { Fuel } from "@/pages/Fuel";
 import { Inventory } from "@/pages/Inventory";
@@ -51,6 +52,7 @@ const VIEWS = {
   gatePass: GatePass,
   challan: Challan,
   invoices: Invoices,
+  customers: Customers,
   expense: Expense,
   fuel: Fuel,
   inventory: Inventory,

@@ -118,6 +118,15 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label={t("common.paymentMode")} value={invoice.paymentMode ?? undefined} />
               <Field label={t("common.amount")} value={`₹${formatINR(invoice.netAmount)}`} />
+              <Field label={t("customer.amountPayingNowPlaceholder")} value={`₹${formatINR(invoice.amountPaidNow ?? invoice.netAmount)}`} />
+              <Field
+                label={t("customer.remainingOnThisInvoiceLabel")}
+                value={
+                  invoice.netAmount - (invoice.amountPaidNow ?? invoice.netAmount) > 0
+                    ? `₹${formatINR(invoice.netAmount - (invoice.amountPaidNow ?? invoice.netAmount))}`
+                    : undefined
+                }
+              />
               {invoice.paymentMode === "CASH_AND_ONLINE" && (
                 <>
                   <Field label="Cash" value={invoice.cashAmount != null ? `₹${formatINR(invoice.cashAmount)}` : undefined} />
@@ -127,12 +136,23 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
             </div>
           </Card>
 
-          <Card className="lg:col-span-2">
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.originatingDispatchSection")}</h4>
-            <button type="button" onClick={() => navigateAndHighlight("dispatch", invoice.dispatchId)} className="text-sm text-series-1 hover:underline">
-              {t("dispatchDocs.viewInDispatch")}
-            </button>
-          </Card>
+          {(invoice.dispatchId || invoice.customerId) && (
+            <Card className="lg:col-span-2">
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.originatingDispatchSection")}</h4>
+              <div className="flex flex-wrap gap-4">
+                {invoice.dispatchId && (
+                  <button type="button" onClick={() => navigateAndHighlight("dispatch", invoice.dispatchId!)} className="text-sm text-series-1 hover:underline">
+                    {t("dispatchDocs.viewInDispatch")}
+                  </button>
+                )}
+                {invoice.customerId && (
+                  <button type="button" onClick={() => navigateAndHighlight("customers", invoice.customerId!)} className="text-sm text-series-1 hover:underline">
+                    {t("customer.viewCustomerProfile")}
+                  </button>
+                )}
+              </div>
+            </Card>
+          )}
 
           {invoice.notes && (
             <Card className="lg:col-span-2">

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { challans, gatePasses, invoices, dispatches, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import { isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
@@ -141,7 +141,11 @@ export async function deleteGatePass(kilnId: string, id: string) {
 // ---- Invoice (priced, GST commercial bill) ----
 
 export interface InvoiceInput {
-  dispatchId: string;
+  // Absent for an invoice created from a Customer's own profile page
+  // (Add Amount, or a Customer-aware Create Invoice) rather than a
+  // Dispatch's detail page.
+  dispatchId?: string;
+  customerId?: string;
   customerName: string;
   customerAddress?: string;
   customerPhone?: string;
@@ -152,6 +156,10 @@ export interface InvoiceInput {
   grossAmount?: number;
   discountAmount?: number;
   netAmount: number;
+  // How much of netAmount is being paid right now — defaults to netAmount
+  // (fully paid) when omitted; see the schema comment on
+  // invoices.amountPaidNow.
+  amountPaidNow?: number;
   paymentMode?: PaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
@@ -160,7 +168,7 @@ export interface InvoiceInput {
 }
 
 export async function createInvoice(kilnId: string, input: InvoiceInput) {
-  await assertDispatch(kilnId, input.dispatchId);
+  if (input.dispatchId) await assertDispatch(kilnId, input.dispatchId);
   let row: typeof invoices.$inferSelect | undefined;
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_NUMBER_GENERATION_ATTEMPTS; attempt++) {
@@ -184,6 +192,21 @@ export async function listInvoices(kilnId: string, dispatchId?: string) {
   const conditions = [eq(invoices.kilnId, kilnId)];
   if (dispatchId) conditions.push(eq(invoices.dispatchId, dispatchId));
   return db.select().from(invoices).where(and(...conditions)).orderBy(desc(invoices.createdAt));
+}
+
+// Every invoice "generated under this customer's name" — matched by
+// customerId when the invoice was created from the Customer's own
+// profile page, OR by an exact (case-insensitive) customerName match for
+// older/Dispatch-created invoices that never had a customerId to begin
+// with. See the schema comment on invoices.customerId for why both are
+// checked instead of just one.
+export async function listInvoicesForCustomer(kilnId: string, customerId: string, customerName: string) {
+  const rows = await db
+    .select()
+    .from(invoices)
+    .where(and(eq(invoices.kilnId, kilnId), or(eq(invoices.customerId, customerId), and(isNull(invoices.customerId), eq(sql`lower(${invoices.customerName})`, customerName.toLowerCase())))))
+    .orderBy(desc(invoices.createdAt));
+  return rows;
 }
 
 export async function updateInvoice(kilnId: string, id: string, input: Partial<Omit<InvoiceInput, "dispatchId">>) {

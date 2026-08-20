@@ -18,7 +18,9 @@ import type {
   ComplianceDocument,
   ComplianceDocumentType,
   ContractDailyMovement,
+  Customer,
   CustomerCreditAging,
+  CustomerDetail,
   DashboardStockSummary,
   DepthUnit,
   DieselPeriodTotals,
@@ -315,7 +317,8 @@ export const api = {
   invoices: {
     list: (dispatchId?: string) => get<Invoice[]>(`/invoices${dispatchId ? `?dispatchId=${dispatchId}` : ""}`, true),
     create: (input: {
-      dispatchId: string;
+      dispatchId?: string;
+      customerId?: string;
       customerName: string;
       customerAddress?: string;
       customerPhone?: string;
@@ -326,6 +329,7 @@ export const api = {
       grossAmount?: number;
       discountAmount?: number;
       netAmount: number;
+      amountPaidNow?: number;
       paymentMode?: PaymentMode;
       cashAmount?: number;
       onlineAmount?: number;
@@ -335,6 +339,7 @@ export const api = {
     update: (
       id: string,
       input: Partial<{
+        customerId: string;
         customerName: string;
         customerAddress: string;
         customerPhone: string;
@@ -345,6 +350,7 @@ export const api = {
         grossAmount: number;
         discountAmount: number;
         netAmount: number;
+        amountPaidNow: number;
         paymentMode: PaymentMode;
         cashAmount: number;
         onlineAmount: number;
@@ -353,6 +359,33 @@ export const api = {
       }>
     ) => patch<Invoice>(`/invoices/${id}`, input, true),
     remove: (id: string) => del<void>(`/invoices/${id}`, true),
+  },
+
+  customers: {
+    list: () => get<Customer[]>("/customers", true),
+    detail: (id: string) => get<CustomerDetail>(`/customers/${id}`, true),
+    create: (input: {
+      name: string;
+      phones?: string[];
+      addresses?: string[];
+      drivers?: { name: string; phone: string; address: string }[];
+      vehicles?: { vehicleType: string; vehicleNumber: string }[];
+      openingPaid?: number;
+      openingDue?: number;
+    }) => post<Customer>("/customers", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        name: string;
+        phones: string[];
+        addresses: string[];
+        drivers: { name: string; phone: string; address: string }[];
+        vehicles: { vehicleType: string; vehicleNumber: string }[];
+        openingPaid: number;
+        openingDue: number;
+      }>
+    ) => patch<Customer>(`/customers/${id}`, input, true),
+    remove: (id: string) => del<void>(`/customers/${id}`, true),
   },
 
   login: (email: string, password: string) => post<AuthResponse>("/auth/login", { email, password }),

@@ -253,12 +253,18 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
 
 // The priced, GST-oriented commercial bill — its own editable/deletable
 // record (see CreateInvoiceForm.tsx). Uses INVOICE_RECORD_ACCENT so it
-// never looks like the delivery-note Challan above.
-export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categoryLabel: string) {
+// never looks like the delivery-note Challan above. `customerOverallDue`
+// is the linked Customer's total remaining due AFTER this invoice/payment
+// (i.e. already reflects it) — passed by callers that have a Customer
+// loaded (CreateInvoiceForm, AddCustomerPaymentModal); omitted when
+// printing an invoice with no linked Customer.
+export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categoryLabel: string, customerOverallDue?: number) {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `INV-${invoice.sequenceNumber}`;
   const date = invoice.invoiceDate ?? invoice.createdAt;
   const gross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);
+  const amountPaidNow = invoice.amountPaidNow ?? invoice.netAmount;
+  const remainingOnThisInvoice = Math.max(0, Math.round((invoice.netAmount - amountPaidNow) * 100) / 100);
 
   const itemRows = `
     <tr>
@@ -328,6 +334,20 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
       <span class="big">₹${formatINR(invoice.netAmount)}</span>
       <p class="doc-footer-words">${escapeHtml(amountInWords(invoice.netAmount))}</p>
     </div>
+
+    <table class="doc-table">
+      <tr><td class="doc-table-label">Amount paying now</td><td class="doc-table-value">₹${formatINR(amountPaidNow)}</td></tr>
+      ${
+        remainingOnThisInvoice > 0
+          ? `<tr><td class="doc-table-label">Remaining on this invoice</td><td class="doc-table-value">₹${formatINR(remainingOnThisInvoice)}</td></tr>`
+          : ""
+      }
+      ${
+        customerOverallDue != null
+          ? `<tr><td class="doc-table-label">Customer's overall remaining due</td><td class="doc-table-value">₹${formatINR(Math.abs(customerOverallDue))}</td></tr>`
+          : ""
+      }
+    </table>
 
     ${invoice.notes ? `<table class="doc-table"><tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(invoice.notes)}</td></tr></table>` : ""}
 

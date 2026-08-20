@@ -89,7 +89,8 @@ export interface GatePassRecord {
 
 export interface Invoice {
   _id: string;
-  dispatchId: string;
+  dispatchId?: string;
+  customerId?: string;
   sequenceNumber: number;
   customerName: string;
   customerAddress?: string;
@@ -101,12 +102,43 @@ export interface Invoice {
   grossAmount?: number;
   discountAmount?: number;
   netAmount: number;
+  amountPaidNow?: number;
   paymentMode?: PaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
   invoiceDate?: string;
   notes?: string;
   createdAt: string;
+}
+
+export interface CustomerDriver {
+  name: string;
+  phone: string;
+  address: string;
+}
+
+export interface CustomerVehicle {
+  vehicleType: string;
+  vehicleNumber: string;
+}
+
+export interface Customer {
+  _id: string;
+  name: string;
+  phones: string[];
+  addresses: string[];
+  drivers: CustomerDriver[];
+  vehicles: CustomerVehicle[];
+  openingPaid: number;
+  openingDue: number;
+  createdAt: string;
+}
+
+export interface CustomerDetail {
+  customer: Customer;
+  invoices: Invoice[];
+  totalPaid: number;
+  totalDue: number;
 }
 
 export interface DispatchTotals {

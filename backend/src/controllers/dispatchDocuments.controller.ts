@@ -84,17 +84,22 @@ export async function deleteGatePassHandler(req: AuthedRequest, res: Response) {
 }
 
 const invoiceSchema = z.object({
-  dispatchId: z.string(),
+  // Absent for a Customer-page-originated invoice (Add Amount, or a
+  // Customer-aware Create Invoice) — bricksCount is 0 in exactly that
+  // case, hence nonnegative() rather than positive() below.
+  dispatchId: z.string().optional(),
+  customerId: z.string().optional(),
   customerName: z.string(),
   customerAddress: z.string().optional(),
   customerPhone: z.string().optional(),
   customerGstNumber: z.string().optional(),
   categoryId: z.string().optional(),
-  bricksCount: z.number().int().positive(),
+  bricksCount: z.number().int().nonnegative(),
   ratePerBrick: z.number().min(0).optional(),
   grossAmount: z.number().min(0).optional(),
   discountAmount: z.number().min(0).optional(),
   netAmount: z.number().min(0),
+  amountPaidNow: z.number().min(0).optional(),
   paymentMode: z.enum(DISPATCH_PAYMENT_MODES).optional(),
   cashAmount: z.number().min(0).optional(),
   onlineAmount: z.number().min(0).optional(),

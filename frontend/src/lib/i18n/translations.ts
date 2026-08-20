@@ -25,6 +25,7 @@ import { moldingStackingDict } from "./dict/molding-stacking";
 import { firingNikasiDict } from "./dict/firing-nikasi";
 import { logisticsDict } from "./dict/logistics";
 import { dispatchDocumentsDict } from "./dict/dispatch-documents";
+import { customerDict } from "./dict/customer";
 import { operationsDict } from "./dict/operations";
 import { staffDict } from "./dict/staff";
 import { overviewDict } from "./dict/overview";
@@ -50,6 +51,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "nav.gatePass": { en: "Gate Pass", hi: "गेट पास" },
   "nav.challan": { en: "Challan", hi: "चालान" },
   "nav.invoices": { en: "Invoices", hi: "इनवॉइस" },
+  "nav.customers": { en: "Customer", hi: "ग्राहक" },
   "nav.expense": { en: "Expense", hi: "खर्च" },
   "nav.fuel": { en: "Fuel", hi: "ईंधन" },
   "nav.inventory": { en: "Inventory", hi: "इन्वेंटरी" },
@@ -203,6 +205,7 @@ export const translations: Record<string, Record<Locale, string>> = {
   ...firingNikasiDict,
   ...logisticsDict,
   ...dispatchDocumentsDict,
+  ...customerDict,
   ...operationsDict,
   ...staffDict,
   ...overviewDict,

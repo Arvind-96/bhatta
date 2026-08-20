@@ -1,4 +1,4 @@
-import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
+import { double, int, json, mysqlTable, varchar, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
 import { LEDGER_PAYMENT_MODES } from "./people";
 
@@ -131,7 +131,19 @@ export const gatePasses = mysqlTable("gate_passes", {
 export const invoices = mysqlTable("invoices", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  dispatchId: varchar("dispatchId", { length: 64 }).notNull(),
+  // Nullable — an invoice generated from a customer's own profile page
+  // (a general/advance payment via "Add Amount", or a sale logged
+  // directly against a Customer record) has no originating Dispatch.
+  dispatchId: varchar("dispatchId", { length: 64 }),
+  // Links to `customers` below — set whenever this invoice was created
+  // from a Customer's own profile page (Add Amount, or a Customer-aware
+  // Create Invoice). Left null for invoices created from a Dispatch's
+  // detail page, which predates the Customer feature and only knows a
+  // plain customerName snapshot; getCustomerDetail's balance/invoice-list
+  // queries match on customerId OR (customerId IS NULL AND a matching
+  // customerName), so pre-existing Dispatch-linked invoices still surface
+  // under a same-named Customer without needing a data migration.
+  customerId: varchar("customerId", { length: 64 }),
   sequenceNumber: int("sequenceNumber").notNull(),
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerAddress: varchar("customerAddress", { length: 255 }),
@@ -143,6 +155,13 @@ export const invoices = mysqlTable("invoices", {
   grossAmount: double("grossAmount"),
   discountAmount: double("discountAmount"),
   netAmount: double("netAmount").notNull(),
+  // How much of `netAmount` is actually being paid at invoice time — the
+  // rest becomes this customer's due balance (see
+  // customer.service.ts:getCustomerDetail). Nullable and defaults to
+  // `netAmount` (fully paid) wherever unset, so every invoice created
+  // before this field existed keeps reading as fully settled, matching
+  // its old behavior.
+  amountPaidNow: double("amountPaidNow"),
   paymentMode: varchar("paymentMode", { length: 50, enum: DISPATCH_PAYMENT_MODES }),
   cashAmount: double("cashAmount"),
   onlineAmount: double("onlineAmount"),
@@ -151,7 +170,33 @@ export const invoices = mysqlTable("invoices", {
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDispatchIdx: index("invoice_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
+  kilnCustomerIdx: index("invoice_kiln_customer_idx").on(t.kilnId, t.customerId),
   sequenceUnique: uniqueIndex("invoice_kiln_sequence_unique").on(t.kilnId, t.sequenceNumber),
+}));
+
+// Every phone/address/driver/vehicle a customer might have — plain JSON
+// arrays rather than four normalized child tables, since nothing here
+// needs its own independent id/lifecycle beyond "belongs to this
+// customer" (no per-row edit history, no other table references a single
+// phone/driver/vehicle by id). openingPaid/openingDue are the balances
+// entered when the customer record is first created (e.g. onboarding an
+// existing customer with prior history); getCustomerDetail adds every
+// linked invoice's paid/due contribution on top of these two, live, on
+// every read -- never stored/cached, so it can never drift out of sync
+// with the invoices themselves.
+export const customers = mysqlTable("customers", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  name: varchar("name", { length: 255 }).notNull(),
+  phones: json("phones").$type<string[]>().default([]),
+  addresses: json("addresses").$type<string[]>().default([]),
+  drivers: json("drivers").$type<{ name: string; phone: string; address: string }[]>().default([]),
+  vehicles: json("vehicles").$type<{ vehicleType: string; vehicleNumber: string }[]>().default([]),
+  openingPaid: double("openingPaid").notNull().default(0),
+  openingDue: double("openingDue").notNull().default(0),
+  createdAt: createdAtColumn(),
+}, (t) => ({
+  kilnIdx: index("customer_kiln_idx").on(t.kilnId),
 }));
 
 export const stockEntries = mysqlTable("stock_entries", {

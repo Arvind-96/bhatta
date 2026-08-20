@@ -11,7 +11,7 @@ import { printChallanRecord, printGatePassRecord, printInvoiceRecord } from "@/l
 import { CreateChallanForm } from "./CreateChallanForm";
 import { CreateGatePassForm } from "./CreateGatePassForm";
 import { CreateInvoiceForm } from "./CreateInvoiceForm";
-import type { BrickCategory, Challan, Dispatch as DispatchEntry, GatePassRecord, Invoice } from "@/types";
+import type { BrickCategory, Challan, Customer, Dispatch as DispatchEntry, GatePassRecord, Invoice } from "@/types";
 
 function Field({ label, value }: { label: string; value?: string | number | null }) {
   if (value === undefined || value === null || value === "") return null;
@@ -58,6 +58,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
   const [challansList, setChallansList] = useState<Challan[]>([]);
   const [gatePassesList, setGatePassesList] = useState<GatePassRecord[]>([]);
   const [invoicesList, setInvoicesList] = useState<Invoice[]>([]);
+  const [customersList, setCustomersList] = useState<Customer[]>([]);
   const [editingChallan, setEditingChallan] = useState<Challan | null>(null);
   const [editingGatePass, setEditingGatePass] = useState<GatePassRecord | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
@@ -86,14 +87,16 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
   }
 
   async function refreshDocs() {
-    const [c, g, i] = await Promise.all([
+    const [c, g, i, cust] = await Promise.all([
       api.challans.list(dispatch._id),
       api.gatePasses.list(dispatch._id),
       api.invoices.list(dispatch._id),
+      api.customers.list(),
     ]);
     setChallansList(c);
     setGatePassesList(g);
     setInvoicesList(i);
+    setCustomersList(cust);
   }
 
   useEffect(() => {
@@ -104,6 +107,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
   useKilnEvent("challan:update", () => refreshDocs());
   useKilnEvent("gatePass:update", () => refreshDocs());
   useKilnEvent("invoice:update", () => refreshDocs());
+  useKilnEvent("customer:update", () => refreshDocs());
 
   function closeForms() {
     setActiveForm(null);
@@ -284,6 +288,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               dispatch={dispatch}
               categories={categories}
               existing={editingInvoice}
+              customers={customersList}
               onClose={closeForms}
               onSaved={() => {
                 closeForms();

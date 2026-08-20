@@ -15,6 +15,7 @@ export type AppView =
   | "gatePass"
   | "challan"
   | "invoices"
+  | "customers"
   | "expense"
   | "fuel"
   | "inventory"
