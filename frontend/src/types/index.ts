@@ -295,16 +295,26 @@ export interface KilnVehicle {
   _id: string;
   name: string;
   type: string;
+  initialMeterReading?: number;
+  oilTankCapacity?: number;
+  notes?: string;
   createdAt: string;
 }
 
 export interface VehicleDieselEntry {
   _id: string;
   vehicleId: { _id: string; name: string; type: string } | string;
+  vehicleType?: string;
   quantityLiters: number;
+  initialMeterReading?: number;
+  lastMeterReading?: number;
+  driverId?: { _id: string; name: string; phone?: string } | string;
+  // Legacy fields — no longer settable from the Log Diesel Fill-up form,
+  // kept only so an old entry that still carries one can display/edit it.
   costAmount?: number;
   paymentMode?: SimplePaymentMode;
   date: string;
+  createdAt: string;
   notes?: string;
 }
 

@@ -9,12 +9,16 @@ import {
   dieselPeriodTotals,
   listDieselEntries,
   listVehicles,
+  updateDieselEntry,
 } from "../services/kilnVehicle.service";
 import { LEDGER_PAYMENT_MODES } from "../db/schema";
 
 const createVehicleSchema = z.object({
   name: z.string().min(1),
   type: z.string().min(1),
+  initialMeterReading: z.number().min(0).optional(),
+  oilTankCapacity: z.number().min(0).optional(),
+  notes: z.string().optional(),
 });
 
 export async function createVehicleHandler(req: AuthedRequest, res: Response) {
@@ -36,6 +40,10 @@ export async function removeVehicleHandler(req: AuthedRequest, res: Response) {
 const createDieselSchema = z.object({
   vehicleId: z.string(),
   quantityLiters: z.number().positive(),
+  initialMeterReading: z.number().min(0).optional(),
+  driverId: z.string().optional(),
+  // Kept accepted (unused by the current form) so an old entry that still
+  // carries these can be edited without them being rejected.
   costAmount: z.number().nonnegative().optional(),
   paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
   date: z.string().optional(),
@@ -54,8 +62,27 @@ export async function createDieselHandler(req: AuthedRequest, res: Response) {
 
 export async function listDieselHandler(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : undefined;
-  const entries = await listDieselEntries(req.kiln!.id, days);
+  const driverId = req.query.driverId ? String(req.query.driverId) : undefined;
+  const entries = await listDieselEntries(req.kiln!.id, { days, driverId });
   res.json(entries);
+}
+
+const updateDieselSchema = z.object({
+  vehicleId: z.string().optional(),
+  quantityLiters: z.number().positive().optional(),
+  initialMeterReading: z.number().min(0).optional(),
+  driverId: z.string().nullable().optional(),
+  date: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export async function updateDieselHandler(req: AuthedRequest, res: Response) {
+  const input = updateDieselSchema.parse(req.body);
+  const entry = await updateDieselEntry(req.kiln!.id, req.params.id, {
+    ...input,
+    date: input.date ? new Date(input.date) : undefined,
+  });
+  res.json(entry);
 }
 
 export async function removeDieselHandler(req: AuthedRequest, res: Response) {

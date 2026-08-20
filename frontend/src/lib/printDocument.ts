@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { Challan, Expense, GatePassRecord, Invoice, LedgerEntry, PaymentReceipt, SandContract, SoilContract } from "@/types";
+import type { Challan, Expense, GatePassRecord, Invoice, LedgerEntry, PaymentReceipt, SandContract, SoilContract, VehicleDieselEntry } from "@/types";
 
 // Gate Pass, Challan, Invoice, and Payment Receipt all share one visual
 // language (accent bars, a logo mark, a colored "who this is for" box, a
@@ -104,6 +104,7 @@ const CONTRACT_ACCENT = `:root { --doc-accent: #8a5a2b; --doc-accent-soft: #c08a
 // two stay visually distinguishable.
 const INVOICE_RECORD_ACCENT = `:root { --doc-accent: #2a4d8f; --doc-accent-soft: #5b7dc0; --doc-accent-tint: #eef3fb; }`;
 const EXPENSE_ACCENT = `:root { --doc-accent: #6b4c9a; --doc-accent-soft: #9a7dc0; --doc-accent-tint: #f4f0fa; }`;
+const DIESEL_ACCENT = `:root { --doc-accent: #b8860b; --doc-accent-soft: #d4a836; --doc-accent-tint: #faf5e6; }`;
 
 function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
   const html = `<!doctype html>
@@ -553,6 +554,62 @@ export function printExpenseRecord(expense: Expense, expenseTypeName: string, ki
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`Expense — ${expenseTypeName}`, body, EXPENSE_ACCENT);
+}
+
+// A single diesel fill-up record's own printout — from the Stock page's
+// Diesel section or a driver's own Staff profile (both reuse this).
+export function printDieselEntry(entry: VehicleDieselEntry, vehicleName: string, driverName: string | undefined, kiln: KilnPrintInfo) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const distanceSinceLastFill =
+    entry.initialMeterReading != null && entry.lastMeterReading != null
+      ? Math.max(0, Math.round((entry.initialMeterReading - entry.lastMeterReading) * 100) / 100)
+      : undefined;
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Diesel Fill-up</span>
+        <p class="doc-date">${new Date(entry.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Vehicle</p>
+        <p class="doc-box-name">${escapeHtml(vehicleName)}${entry.vehicleType ? ` (${escapeHtml(entry.vehicleType)})` : ""}</p>
+        ${driverName ? `<p class="doc-box-detail">Driver: ${escapeHtml(driverName)}</p>` : ""}
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Quantity</p>
+        <p class="doc-total-amount">${entry.quantityLiters.toLocaleString("en-IN")} L</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      ${entry.initialMeterReading != null ? `<tr><td class="doc-table-label">Today's initial meter reading</td><td class="doc-table-value">${entry.initialMeterReading.toLocaleString("en-IN")}</td></tr>` : ""}
+      ${entry.lastMeterReading != null ? `<tr><td class="doc-table-label">Today's last meter reading</td><td class="doc-table-value">${entry.lastMeterReading.toLocaleString("en-IN")}</td></tr>` : ""}
+      ${distanceSinceLastFill != null ? `<tr><td class="doc-table-label">Distance since last fill</td><td class="doc-table-value">${distanceSinceLastFill.toLocaleString("en-IN")}</td></tr>` : ""}
+      ${entry.costAmount != null ? `<tr><td class="doc-table-label">Cost</td><td class="doc-table-value">₹${formatINR(entry.costAmount)}</td></tr>` : ""}
+      <tr><td class="doc-table-label">Entered on</td><td class="doc-table-value">${new Date(entry.createdAt).toLocaleString("en-IN")}</td></tr>
+      ${entry.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(entry.notes)}</td></tr>` : ""}
+    </table>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED RECORD ~</p>
+    <div class="doc-sign-row doc-sign-row-single">
+      <div class="doc-sign-box">Bhatta owner / Munim<br />(Stamp &amp; Signature)</div>
+    </div>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`Diesel Fill-up — ${vehicleName}`, body, DIESEL_ACCENT);
 }
 
 function contractRateBasisText(contract: SoilContract) {

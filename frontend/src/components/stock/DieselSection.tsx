@@ -1,13 +1,15 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { cn, formatINR } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { DieselPeriodTotals, KilnVehicle, SimplePaymentMode, VehicleDieselEntry } from "@/types";
+import { LogDieselFillupForm } from "./LogDieselFillupForm";
+import { DieselEntryDetailPage } from "./DieselEntryDetailPage";
+import type { DieselPeriodTotals, KilnVehicle, Person, VehicleDieselEntry } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -29,26 +31,29 @@ export function DieselSection() {
 
   const [vehicles, setVehicles] = useState<KilnVehicle[]>([]);
   const [entries, setEntries] = useState<VehicleDieselEntry[]>([]);
+  const [drivers, setDrivers] = useState<Person[]>([]);
   const [totals, setTotals] = useState<DieselPeriodTotals | null>(null);
+  const [search, setSearch] = useState("");
+  const [openEntryId, setOpenEntryId] = useState<string | null>(null);
 
   const [showAddVehicle, setShowAddVehicle] = useState(false);
-  const [vehicleForm, setVehicleForm] = useState({ name: "", type: "" });
+  const [vehicleForm, setVehicleForm] = useState({ name: "", type: "", initialMeterReading: "", oilTankCapacity: "", notes: "" });
   const [savingVehicle, setSavingVehicle] = useState(false);
 
   const [showLogForm, setShowLogForm] = useState(false);
-  const [logForm, setLogForm] = useState({ vehicleId: "", quantityLiters: "", costAmount: "", paymentMode: "" as "" | SimplePaymentMode, notes: "" });
-  const [savingLog, setSavingLog] = useState(false);
 
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
-    const [vehicleData, entryData, totalsData] = await Promise.all([
+    const [vehicleData, entryData, driverData, totalsData] = await Promise.all([
       api.kilnVehicles.list(),
       api.kilnVehicles.listDiesel(),
+      api.people.list("DRIVER"),
       api.kilnVehicles.dieselPeriodTotals(),
     ]);
     setVehicles(vehicleData);
     setEntries(entryData);
+    setDrivers(driverData.filter((d) => d.isOfficeStaff));
     setTotals(totalsData);
   }
 
@@ -59,20 +64,21 @@ export function DieselSection() {
 
   useKilnEvent("kilnVehicle:update", () => refresh());
   useKilnEvent("vehicleDiesel:update", () => refresh());
-
-  useEffect(() => {
-    if (!logForm.vehicleId && vehicles.length > 0) {
-      setLogForm((f) => ({ ...f, vehicleId: vehicles[0]._id }));
-    }
-  }, [vehicles, logForm.vehicleId]);
+  useKilnEvent("person:update", () => refresh());
 
   async function addVehicle(e: FormEvent) {
     e.preventDefault();
     if (!vehicleForm.name.trim() || !vehicleForm.type.trim()) return;
     setSavingVehicle(true);
     try {
-      await api.kilnVehicles.create({ name: vehicleForm.name.trim(), type: vehicleForm.type.trim() });
-      setVehicleForm({ name: "", type: "" });
+      await api.kilnVehicles.create({
+        name: vehicleForm.name.trim(),
+        type: vehicleForm.type.trim(),
+        initialMeterReading: vehicleForm.initialMeterReading ? Number(vehicleForm.initialMeterReading) : undefined,
+        oilTankCapacity: vehicleForm.oilTankCapacity ? Number(vehicleForm.oilTankCapacity) : undefined,
+        notes: vehicleForm.notes || undefined,
+      });
+      setVehicleForm({ name: "", type: "", initialMeterReading: "", oilTankCapacity: "", notes: "" });
       setShowAddVehicle(false);
       await refresh();
     } finally {
@@ -86,30 +92,40 @@ export function DieselSection() {
     await refresh();
   }
 
-  async function logDiesel(e: FormEvent) {
-    e.preventDefault();
-    if (!logForm.vehicleId || !logForm.quantityLiters) return;
-    setSavingLog(true);
-    try {
-      await api.kilnVehicles.logDiesel({
-        vehicleId: logForm.vehicleId,
-        quantityLiters: Number(logForm.quantityLiters),
-        costAmount: logForm.costAmount ? Number(logForm.costAmount) : undefined,
-        paymentMode: logForm.paymentMode || undefined,
-        notes: logForm.notes || undefined,
-      });
-      setLogForm((f) => ({ ...f, quantityLiters: "", costAmount: "", paymentMode: "", notes: "" }));
-      setShowLogForm(false);
-      await refresh();
-    } finally {
-      setSavingLog(false);
-    }
+  const openEntry = entries.find((e) => e._id === openEntryId) ?? null;
+  if (openEntry) {
+    return (
+      <DieselEntryDetailPage
+        entry={openEntry}
+        vehicles={vehicles}
+        drivers={drivers}
+        entries={entries}
+        onBack={() => setOpenEntryId(null)}
+        onDeleted={() => {
+          setOpenEntryId(null);
+          refresh();
+        }}
+        onSaved={() => {
+          setOpenEntryId(null);
+          refresh();
+        }}
+      />
+    );
   }
 
-  async function removeDieselEntry(id: string) {
-    await api.kilnVehicles.removeDiesel(id);
-    await refresh();
-  }
+  const filteredEntries = entries.filter((entry) => {
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    const vehicleName = typeof entry.vehicleId === "object" ? entry.vehicleId.name : "";
+    const driverName = typeof entry.driverId === "object" ? entry.driverId?.name ?? "" : "";
+    return (
+      vehicleName.toLowerCase().includes(q) ||
+      (entry.vehicleType ?? "").toLowerCase().includes(q) ||
+      driverName.toLowerCase().includes(q) ||
+      new Date(entry.date).toLocaleDateString("en-IN").includes(q) ||
+      (entry.notes ?? "").toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-4">
@@ -139,6 +155,28 @@ export function DieselSection() {
               value={vehicleForm.name}
               onChange={(e) => setVehicleForm((f) => ({ ...f, name: e.target.value }))}
               className={inputClass}
+            />
+            <input
+              type="number"
+              min={0}
+              placeholder={t("stock.initialMeterReadingPlaceholder")}
+              value={vehicleForm.initialMeterReading}
+              onChange={(e) => setVehicleForm((f) => ({ ...f, initialMeterReading: e.target.value }))}
+              className={inputClass}
+            />
+            <input
+              type="number"
+              min={0}
+              placeholder={t("stock.oilTankCapacityPlaceholder")}
+              value={vehicleForm.oilTankCapacity}
+              onChange={(e) => setVehicleForm((f) => ({ ...f, oilTankCapacity: e.target.value }))}
+              className={inputClass}
+            />
+            <input
+              placeholder={t("stock.vehicleNotePlaceholder")}
+              value={vehicleForm.notes}
+              onChange={(e) => setVehicleForm((f) => ({ ...f, notes: e.target.value }))}
+              className={cn(inputClass, "col-span-2")}
             />
             <Button type="submit" disabled={savingVehicle} className="col-span-2">
               {t("stock.addVehicle")}
@@ -218,62 +256,32 @@ export function DieselSection() {
       </div>
 
       {showLogForm && (
-        <Card>
-          <form onSubmit={logDiesel} className="grid grid-cols-2 gap-2">
-            <select
-              value={logForm.vehicleId}
-              onChange={(e) => setLogForm((f) => ({ ...f, vehicleId: e.target.value }))}
-              className={inputClass}
-            >
-              {vehicles.map((v) => (
-                <option key={v._id} value={v._id}>
-                  {v.name} ({v.type})
-                </option>
-              ))}
-            </select>
-            <input
-              required
-              type="number"
-              min={0}
-              placeholder={t("stock.quantityLiters")}
-              value={logForm.quantityLiters}
-              onChange={(e) => setLogForm((f) => ({ ...f, quantityLiters: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              min={0}
-              placeholder={t("stock.costOptional")}
-              value={logForm.costAmount}
-              onChange={(e) => setLogForm((f) => ({ ...f, costAmount: e.target.value }))}
-              className={inputClass}
-            />
-            <select
-              value={logForm.paymentMode}
-              onChange={(e) => setLogForm((f) => ({ ...f, paymentMode: e.target.value as "" | SimplePaymentMode }))}
-              className={inputClass}
-            >
-              <option value="">{t("common.paymentMode")}</option>
-              <option value="CASH">{t("billing.paymentCash")}</option>
-              <option value="BANK">{t("billing.paymentBank")}</option>
-              <option value="UPI">{t("billing.paymentUpi")}</option>
-            </select>
-            <input
-              placeholder={t("common.notesOptional")}
-              value={logForm.notes}
-              onChange={(e) => setLogForm((f) => ({ ...f, notes: e.target.value }))}
-              className={cn(inputClass, "col-span-2")}
-            />
-            <Button type="submit" disabled={savingLog} className="col-span-2">
-              {t("common.save")}
-            </Button>
-          </form>
-        </Card>
+        <LogDieselFillupForm
+          vehicles={vehicles}
+          drivers={drivers}
+          entries={entries}
+          onSaved={() => {
+            setShowLogForm(false);
+            refresh();
+          }}
+          onCancel={() => setShowLogForm(false)}
+        />
       )}
 
       <Card>
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+          <input
+            placeholder={t("stock.searchDieselEntriesPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={cn(inputClass, "w-full max-w-sm pl-9")}
+          />
+        </div>
         {entries.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-muted">{t("stock.noDieselFillUpsYet")}</p>
+        ) : filteredEntries.length === 0 ? (
+          <p className="py-8 text-center text-sm text-ink-muted">{t("stock.noDieselEntriesMatchSearch")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
@@ -282,31 +290,24 @@ export function DieselSection() {
                   <th className="pb-2 font-medium">{t("common.date")}</th>
                   <th className="pb-2 font-medium">{t("common.vehicle")}</th>
                   <th className="pb-2 font-medium">{t("common.quantity")}</th>
-                  <th className="pb-2 font-medium">{t("stock.cost")}</th>
+                  <th className="pb-2 font-medium">{t("stock.driverNamePlaceholder")}</th>
                   <th className="pb-2 font-medium">{t("common.notes")}</th>
-                  <th className="pb-2 font-medium text-right"></th>
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry._id} className="border-b border-border/60 last:border-0">
+                {filteredEntries.map((entry) => (
+                  <tr
+                    key={entry._id}
+                    onClick={() => setOpenEntryId(entry._id)}
+                    className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5"
+                  >
                     <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
                     <td className="py-3 text-ink-primary">
                       {typeof entry.vehicleId === "object" ? `${entry.vehicleId.name} (${entry.vehicleId.type})` : "—"}
                     </td>
                     <td className="py-3 tabular-nums text-ink-secondary">{entry.quantityLiters.toLocaleString("en-IN")} L</td>
-                    <td className="py-3 tabular-nums text-ink-secondary">
-                      {entry.costAmount != null ? `₹${formatINR(entry.costAmount)}` : "—"}
-                    </td>
+                    <td className="py-3 text-ink-secondary">{typeof entry.driverId === "object" ? entry.driverId?.name ?? "—" : "—"}</td>
                     <td className="py-3 text-ink-secondary">{entry.notes ?? "—"}</td>
-                    <td className="py-3 text-right">
-                      <button
-                        onClick={() => removeDieselEntry(entry._id)}
-                        className="text-xs font-medium text-status-critical hover:underline"
-                      >
-                        {t("common.delete")}
-                      </button>
-                    </td>
                   </tr>
                 ))}
               </tbody>

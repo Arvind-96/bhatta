@@ -1054,11 +1054,22 @@ export const api = {
 
   kilnVehicles: {
     list: () => get<KilnVehicle[]>("/kiln-vehicles", true),
-    create: (input: { name: string; type: string }) => post<KilnVehicle>("/kiln-vehicles", input, true),
+    create: (input: { name: string; type: string; initialMeterReading?: number; oilTankCapacity?: number; notes?: string }) =>
+      post<KilnVehicle>("/kiln-vehicles", input, true),
     remove: (id: string) => del(`/kiln-vehicles/${id}`, true),
-    listDiesel: (days = 60) => get<VehicleDieselEntry[]>(`/kiln-vehicles/diesel?days=${days}`, true),
-    logDiesel: (input: { vehicleId: string; quantityLiters: number; costAmount?: number; paymentMode?: SimplePaymentMode; date?: string; notes?: string }) =>
+    listDiesel: (filter: { days?: number; driverId?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (filter.days) params.set("days", String(filter.days));
+      if (filter.driverId) params.set("driverId", filter.driverId);
+      const qs = params.toString();
+      return get<VehicleDieselEntry[]>(`/kiln-vehicles/diesel${qs ? `?${qs}` : ""}`, true);
+    },
+    logDiesel: (input: { vehicleId: string; quantityLiters: number; initialMeterReading?: number; driverId?: string; date?: string; notes?: string }) =>
       post<VehicleDieselEntry>("/kiln-vehicles/diesel", input, true),
+    updateDiesel: (
+      id: string,
+      input: Partial<{ vehicleId: string; quantityLiters: number; initialMeterReading: number; driverId: string | null; date: string; notes: string }>
+    ) => patch<VehicleDieselEntry>(`/kiln-vehicles/diesel/${id}`, input, true),
     removeDiesel: (id: string) => del(`/kiln-vehicles/diesel/${id}`, true),
     dieselPeriodTotals: () => get<DieselPeriodTotals>("/kiln-vehicles/diesel/period-totals", true),
   },

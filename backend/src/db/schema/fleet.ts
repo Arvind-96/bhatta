@@ -104,6 +104,13 @@ export const kilnVehicles = mysqlTable("kiln_vehicles", {
   kilnId: kilnIdColumn(),
   name: varchar("name", { length: 255 }).notNull(),
   type: varchar("type", { length: 255 }).notNull(),
+  // The vehicle's odometer reading at the time it was added — the baseline
+  // a fresh vehicle's very first diesel entry falls back to for its own
+  // "last known reading" snapshot (see vehicleDieselEntries.lastMeterReading
+  // below), since there's no prior fill-up to read it from yet.
+  initialMeterReading: double("initialMeterReading"),
+  oilTankCapacity: double("oilTankCapacity"),
+  notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnNameIdx: index("kilnvehicle_kiln_name_idx").on(t.kilnId, t.name) }));
 
@@ -111,10 +118,32 @@ export const vehicleDieselEntries = mysqlTable("vehicle_diesel_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
   vehicleId: varchar("vehicleId", { length: 64 }).notNull(),
+  // Snapshot of the vehicle's own `type` at fill-up time — printed/shown on
+  // this entry even if the vehicle's type is edited later, same convention
+  // as dispatches.customerAddress snapshotting the customer's address.
+  vehicleType: varchar("vehicleType", { length: 255 }),
   quantityLiters: double("quantityLiters").notNull(),
+  // The odometer reading AT this fill-up, admin-entered. lastMeterReading
+  // is never admin-entered — it's captured automatically at creation time
+  // from this same vehicle's most recent prior entry's initialMeterReading
+  // (or the vehicle's own baseline initialMeterReading if this is its
+  // first-ever fill), so "initialMeterReading - lastMeterReading" always
+  // reads as the distance covered since the last fill-up.
+  initialMeterReading: double("initialMeterReading"),
+  lastMeterReading: double("lastMeterReading"),
+  // Real link to a `people` row (type DRIVER) — not free text, so a fill-up
+  // can be surfaced on that driver's own Staff profile (see
+  // kilnVehicle.service.ts's createDieselEntry and
+  // StaffDetailPage/DriverDieselHistory.tsx).
+  driverId: varchar("driverId", { length: 64 }),
+  // Nullable, kept only for entries created before this field was removed
+  // from the Log Diesel Fill-up form — never populated by new entries.
   costAmount: double("costAmount"),
   paymentMode: varchar("paymentMode", { length: 50, enum: LEDGER_PAYMENT_MODES }),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
-}, (t) => ({ kilnDateIdx: index("vehicledieselentry_kiln_date_idx").on(t.kilnId, t.date) }));
+}, (t) => ({
+  kilnDateIdx: index("vehicledieselentry_kiln_date_idx").on(t.kilnId, t.date),
+  kilnDriverIdx: index("vehicledieselentry_kiln_driver_idx").on(t.kilnId, t.driverId),
+}));

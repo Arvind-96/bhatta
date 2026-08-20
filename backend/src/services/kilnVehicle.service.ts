@@ -1,13 +1,17 @@
 import { randomUUID } from "crypto";
-import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, ne } from "drizzle-orm";
 import { db } from "../db/client";
-import { kilnVehicles, vehicleDieselEntries, LEDGER_PAYMENT_MODES } from "../db/schema";
+import { kilnVehicles, vehicleDieselEntries, people, LEDGER_PAYMENT_MODES } from "../db/schema";
+import { assertPersonOfType } from "./person.service";
 import { emitToKiln } from "../config/socket";
 
 export interface CreateVehicleInput {
   kilnId: string;
   name: string;
   type: string;
+  initialMeterReading?: number;
+  oilTankCapacity?: number;
+  notes?: string;
 }
 
 export async function createVehicle(input: CreateVehicleInput) {
@@ -36,10 +40,30 @@ async function assertVehicleInKiln(kilnId: string, vehicleId: string) {
   return vehicle;
 }
 
+// The vehicle's own "last known" odometer reading right before a new entry
+// dated `beforeDate` — the most recent prior diesel entry's own
+// initialMeterReading, or the vehicle's baseline initialMeterReading if
+// this is its first-ever fill. Never trusted from the client; always
+// derived server-side so it can't drift from what actually happened.
+async function lastKnownMeterReading(kilnId: string, vehicleId: string, excludeEntryId?: string) {
+  const conditions = [eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.vehicleId, vehicleId)];
+  if (excludeEntryId) conditions.push(ne(vehicleDieselEntries._id, excludeEntryId));
+  const priorEntries = await db
+    .select({ initialMeterReading: vehicleDieselEntries.initialMeterReading, date: vehicleDieselEntries.date, createdAt: vehicleDieselEntries.createdAt })
+    .from(vehicleDieselEntries)
+    .where(and(...conditions))
+    .orderBy(desc(vehicleDieselEntries.date), desc(vehicleDieselEntries.createdAt));
+  if (priorEntries.length && priorEntries[0].initialMeterReading != null) return priorEntries[0].initialMeterReading;
+  const vehicle = await assertVehicleInKiln(kilnId, vehicleId);
+  return vehicle.initialMeterReading ?? undefined;
+}
+
 export interface CreateDieselEntryInput {
   kilnId: string;
   vehicleId: string;
   quantityLiters: number;
+  initialMeterReading?: number;
+  driverId?: string;
   costAmount?: number;
   paymentMode?: Exclude<(typeof LEDGER_PAYMENT_MODES)[number], "CASH_AND_ONLINE">;
   date?: Date;
@@ -47,23 +71,78 @@ export interface CreateDieselEntryInput {
 }
 
 export async function createDieselEntry(input: CreateDieselEntryInput) {
-  await assertVehicleInKiln(input.kilnId, input.vehicleId);
+  const vehicle = await assertVehicleInKiln(input.kilnId, input.vehicleId);
+  if (input.driverId) await assertPersonOfType(input.kilnId, input.driverId, ["DRIVER"]);
+
+  const lastMeterReading = await lastKnownMeterReading(input.kilnId, input.vehicleId);
+
   const _id = randomUUID();
-  await db.insert(vehicleDieselEntries).values({ ...input, _id });
+  await db.insert(vehicleDieselEntries).values({ ...input, vehicleType: vehicle.type, lastMeterReading, _id });
   const entry = (await db.select().from(vehicleDieselEntries).where(eq(vehicleDieselEntries._id, _id)))[0]!;
   emitToKiln(input.kilnId, "vehicleDiesel:update", entry);
   return entry;
 }
 
-export async function listDieselEntries(kilnId: string, days = 60) {
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-  const rows = await db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), gte(vehicleDieselEntries.date, since))).orderBy(desc(vehicleDieselEntries.date));
+export interface UpdateDieselEntryInput {
+  vehicleId?: string;
+  quantityLiters?: number;
+  initialMeterReading?: number;
+  driverId?: string | null;
+  date?: Date;
+  notes?: string;
+}
+
+export async function updateDieselEntry(kilnId: string, entryId: string, input: UpdateDieselEntryInput) {
+  const existing = (await db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries._id, entryId), eq(vehicleDieselEntries.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Diesel entry not found in this kiln");
+  if (input.driverId) await assertPersonOfType(kilnId, input.driverId, ["DRIVER"]);
+
+  const vehicleId = input.vehicleId ?? existing.vehicleId;
+  let vehicleType = existing.vehicleType;
+  if (input.vehicleId && input.vehicleId !== existing.vehicleId) {
+    const vehicle = await assertVehicleInKiln(kilnId, input.vehicleId);
+    vehicleType = vehicle.type;
+  }
+  // Re-derive lastMeterReading whenever the vehicle or this entry's own
+  // reading changes, so it stays consistent with the rest of that
+  // vehicle's history instead of going stale.
+  const lastMeterReading =
+    input.vehicleId || input.initialMeterReading !== undefined ? await lastKnownMeterReading(kilnId, vehicleId, entryId) : existing.lastMeterReading;
+
+  await db.update(vehicleDieselEntries).set({ ...input, vehicleType, lastMeterReading }).where(eq(vehicleDieselEntries._id, entryId));
+  const updated = (await db.select().from(vehicleDieselEntries).where(eq(vehicleDieselEntries._id, entryId)))[0]!;
+  emitToKiln(kilnId, "vehicleDiesel:update", updated);
+  return updated;
+}
+
+export interface ListDieselEntriesFilter {
+  days?: number;
+  driverId?: string;
+}
+
+export async function listDieselEntries(kilnId: string, filter: ListDieselEntriesFilter = {}) {
+  const conditions = [eq(vehicleDieselEntries.kilnId, kilnId)];
+  if (filter.days) {
+    const since = new Date();
+    since.setDate(since.getDate() - filter.days);
+    conditions.push(gte(vehicleDieselEntries.date, since));
+  }
+  if (filter.driverId) conditions.push(eq(vehicleDieselEntries.driverId, filter.driverId));
+  const rows = await db.select().from(vehicleDieselEntries).where(and(...conditions)).orderBy(desc(vehicleDieselEntries.date));
 
   const vehicleIds = [...new Set(rows.map((r) => r.vehicleId))];
   const vehicleRows = vehicleIds.length ? await db.select({ _id: kilnVehicles._id, name: kilnVehicles.name, type: kilnVehicles.type }).from(kilnVehicles).where(inArray(kilnVehicles._id, vehicleIds)) : [];
   const vehicleById = new Map(vehicleRows.map((v) => [v._id, v]));
-  return rows.map((r) => ({ ...r, vehicleId: vehicleById.get(r.vehicleId) ?? r.vehicleId }));
+
+  const driverIds = [...new Set(rows.map((r) => r.driverId).filter((id): id is string => !!id))];
+  const driverRows = driverIds.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(inArray(people._id, driverIds)) : [];
+  const driverById = new Map(driverRows.map((d) => [d._id, d]));
+
+  return rows.map((r) => ({
+    ...r,
+    vehicleId: vehicleById.get(r.vehicleId) ?? r.vehicleId,
+    driverId: r.driverId ? driverById.get(r.driverId) ?? r.driverId : r.driverId,
+  }));
 }
 
 export async function deleteDieselEntry(kilnId: string, entryId: string) {

@@ -18,6 +18,7 @@ import { printLedgerEntry } from "@/lib/printDocument";
 import { usePersonTypeMeta } from "@/components/people/personTypes";
 import { AttendanceCalendar } from "./AttendanceCalendar";
 import { SalarySlipHistory } from "./SalarySlipHistory";
+import { DriverDieselHistory } from "./DriverDieselHistory";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -466,6 +467,12 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
         <AttendanceCalendar personId={staffId} />
         <SalarySlipHistory personId={staffId} />
       </div>
+
+      {staff.type === "DRIVER" && (
+        <div className="mt-4">
+          <DriverDieselHistory personId={staffId} />
+        </div>
+      )}
 
       {ledgerOpen && <LedgerModal person={staff} onClose={() => setLedgerOpen(false)} />}
       {editingLedgerEntry && (
