@@ -30,6 +30,10 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   "people.addLandownerModalTitle": { en: "Add Landowner", hi: "खेत मालिक जोड़ें" },
   "people.noLandownersYet": { en: "No landowners added yet.", hi: "अभी तक कोई खेत मालिक नहीं जोड़ा गया।" },
   "people.landHoldings": { en: "Land holdings", hi: "भूमि जोत" },
+  "people.addLandFirstHint": {
+    en: "Add a land parcel (Khet area) in this profile's edit form before adding a contract",
+    hi: "अनुबंध जोड़ने से पहले इस प्रोफ़ाइल के संपादन फ़ॉर्म में एक भूमि (खेत क्षेत्र) जोड़ें",
+  },
   "people.numberOfFields": { en: "Number of fields / farms", hi: "खेतों/फार्मों की संख्या" },
   "people.fieldLabel": { en: "Field", hi: "खेत" },
   "people.khasraNumber": { en: "Khasra number", hi: "खसरा नंबर" },

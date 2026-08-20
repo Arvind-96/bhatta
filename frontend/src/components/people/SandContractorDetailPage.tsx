@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddSandDeliveryModal } from "@/components/sand/AddSandDeliveryModal";
 import { EditSandDeliveryModal } from "@/components/sand/EditSandDeliveryModal";
+import { AddSandContractModal } from "@/components/sand/AddSandContractModal";
 import { EditSandContractModal } from "@/components/sand/EditSandContractModal";
 import { PersonAvatar } from "@/components/people/PersonAvatar";
 import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
@@ -68,6 +69,7 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [showAddDelivery, setShowAddDelivery] = useState(false);
+  const [showAddContract, setShowAddContract] = useState(false);
   const [editingDelivery, setEditingDelivery] = useState<SandDelivery | null>(null);
   const [editingContract, setEditingContract] = useState<SandContract | null>(null);
   const [editingLedgerEntry, setEditingLedgerEntry] = useState<LedgerEntry | null>(null);
@@ -197,11 +199,40 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
   // ledgerEntries comes back newest-first — the running paid-so-far/
   // remaining-due shown alongside each row still needs to build up
   // chronologically, same computation LandownerDetailPage uses.
+  //
+  // For PER_TROLLEY contracts specifically, no DUE ledger entry is ever
+  // posted for the agreed totalContractValue (only real deliveries bill
+  // their own DUE later, per sandContract.service.ts) -- so without this,
+  // the running "remaining due" would clamp to 0 the moment the advance
+  // (PAID) posts, same root cause as the Contract Payment Summary card's
+  // contractBalance above. Each contract's totalContractValue is folded in
+  // as a synthetic DUE contribution dated at its own startDate, merged into
+  // the same chronological pass, so per-row Remaining Due tracks the
+  // agreed contract total rather than only what's actually been billed.
   const runningTotalsById = new Map<string, { paidSoFar: number; remainingDue: number }>();
   {
+    // Only PER_TROLLEY contracts need this -- PER_THOUSAND_BRICKS already
+    // gets a real DUE entry posted for totalContractValue at creation time
+    // (see sandContract.service.ts), so adding it again here would
+    // double-count.
+    const contractDue = contracts
+      .filter((c) => c.rateType === "PER_TROLLEY")
+      .map((c) => ({
+        date: c.startDate ?? c.createdAt,
+        amount: c.totalContractValue,
+      }));
     let paid = 0;
     let due = 0;
-    for (const entry of [...ledgerEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {
+    const timeline = [
+      ...ledgerEntries.map((e) => ({ date: e.date, type: "entry" as const, entry: e })),
+      ...contractDue.map((c) => ({ date: c.date, type: "contract" as const, amount: c.amount })),
+    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    for (const item of timeline) {
+      if (item.type === "contract") {
+        due += item.amount;
+        continue;
+      }
+      const entry = item.entry;
       if (entry.direction === "PAID") paid += entry.amount;
       else due += entry.amount;
       runningTotalsById.set(entry._id, { paidSoFar: paid, remainingDue: Math.max(0, due - paid) });
@@ -303,7 +334,12 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
         </Card>
 
         <Card className="lg:col-span-2">
-          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("sand.contractPaymentSummary")}</h4>
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("sand.contractPaymentSummary")}</h4>
+            <Button size="sm" onClick={() => setShowAddContract(true)}>
+              <Plus className="h-4 w-4" /> {t("sand.newContractModalTitle")}
+            </Button>
+          </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <p className="text-xl font-semibold tabular-nums text-ink-primary">₹{formatINR(totalContractPayment)}</p>
@@ -460,6 +496,7 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
       {ledgerOpen && <LedgerModal person={contractor} onClose={() => setLedgerOpen(false)} />}
       {showAddDelivery && <AddSandDeliveryModal sandContractorId={sandContractorId} onClose={() => setShowAddDelivery(false)} onCreated={refresh} />}
       {editingDelivery && <EditSandDeliveryModal entry={editingDelivery} onClose={() => setEditingDelivery(null)} onSaved={refresh} />}
+      {showAddContract && <AddSandContractModal sandContractorId={sandContractorId} onClose={() => setShowAddContract(false)} onCreated={refresh} />}
       {editingContract && <EditSandContractModal contract={editingContract} onClose={() => setEditingContract(null)} onSaved={refresh} />}
       {editingLedgerEntry && <EditLedgerEntryModal entry={editingLedgerEntry} onClose={() => setEditingLedgerEntry(null)} />}
     </div>

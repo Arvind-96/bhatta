@@ -58,6 +58,8 @@ export const sandDict: Record<string, Record<Locale, string>> = {
   "sand.paymentHistory": { en: "Payment History", hi: "भुगतान इतिहास" },
   "sand.noLedgerEntriesYet": { en: "No payment entries yet.", hi: "अभी तक कोई भुगतान एंट्री नहीं।" },
 
+  "sand.newContractModalTitle": { en: "New contract", hi: "नया अनुबंध" },
+  "sand.saveContract": { en: "Save contract", hi: "अनुबंध सहेजें" },
   "sand.editContractTitle": { en: "Edit contract {contractNumber}", hi: "अनुबंध {contractNumber} संपादित करें" },
   "sand.confirmDeleteContract": {
     en: "Delete contract {contractNumber}? Its payment history is kept but will no longer be linked to a contract.",

@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddSoilArrivalModal } from "@/components/soil/AddSoilArrivalModal";
 import { EditSoilArrivalModal } from "@/components/soil/EditSoilArrivalModal";
+import { AddSoilContractModal } from "@/components/soil/AddSoilContractModal";
 import { EditSoilContractModal } from "@/components/soil/EditSoilContractModal";
 import { rateBasisLabel, contractStatusLabel } from "@/components/soil/ContractDetailPage";
 import { PersonAvatar } from "@/components/people/PersonAvatar";
@@ -69,6 +70,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [showAddArrival, setShowAddArrival] = useState(false);
+  const [showAddContract, setShowAddContract] = useState(false);
   const [editingArrival, setEditingArrival] = useState<SoilArrival | null>(null);
   const [editingContract, setEditingContract] = useState<SoilContract | null>(null);
   const [editingLedgerEntry, setEditingLedgerEntry] = useState<LedgerEntry | null>(null);
@@ -295,11 +297,33 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   // alongside each row still needs to build up chronologically, so it's
   // computed once here over a date-ascending copy and looked up by id
   // while rendering in the existing newest-first order.
+  //
+  // For PER_TROLLEY contracts specifically, no DUE ledger entry is ever
+  // posted for the agreed totalContractValue (only real arrivals bill
+  // their own DUE later, per soilContract.service.ts) -- so without this,
+  // the running "remaining due" would clamp to 0 the moment the advance
+  // (PAID) posts. Each such contract's totalContractValue is folded in as
+  // a synthetic DUE contribution dated at its own startDate, merged into
+  // the same chronological pass. Non-PER_TROLLEY contracts already get a
+  // real DUE entry posted at creation time, so they're excluded here to
+  // avoid double-counting.
   const runningTotalsById = new Map<string, { paidSoFar: number; remainingDue: number }>();
   {
+    const contractDue = contracts
+      .filter((c) => c.rateType === "PER_TROLLEY")
+      .map((c) => ({ date: c.startDate ?? c.createdAt, amount: c.totalContractValue }));
     let paid = 0;
     let due = 0;
-    for (const entry of [...ledgerEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {
+    const timeline = [
+      ...ledgerEntries.map((e) => ({ date: e.date, type: "entry" as const, entry: e })),
+      ...contractDue.map((c) => ({ date: c.date, type: "contract" as const, amount: c.amount })),
+    ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    for (const item of timeline) {
+      if (item.type === "contract") {
+        due += item.amount;
+        continue;
+      }
+      const entry = item.entry;
       if (entry.direction === "PAID") paid += entry.amount;
       else due += entry.amount;
       runningTotalsById.set(entry._id, { paidSoFar: paid, remainingDue: Math.max(0, due - paid) });
@@ -502,7 +526,12 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
         </Card>
 
         <Card className="lg:col-span-2">
-          <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.contractPaymentSummary")}</h4>
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.contractPaymentSummary")}</h4>
+            <Button size="sm" onClick={() => setShowAddContract(true)} disabled={lands.length === 0} title={lands.length === 0 ? t("people.addLandFirstHint") : undefined}>
+              <Plus className="h-4 w-4" /> {t("soil.newContract")}
+            </Button>
+          </div>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <p className="text-xl font-semibold tabular-nums text-ink-primary">₹{formatINR(totalContractPayment)}</p>
@@ -678,6 +707,9 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
       )}
       {editingArrival && (
         <EditSoilArrivalModal entry={editingArrival} drivers={drivers} onClose={() => setEditingArrival(null)} onSaved={refresh} />
+      )}
+      {showAddContract && (
+        <AddSoilContractModal landownerId={landownerId} lands={lands} onClose={() => setShowAddContract(false)} onCreated={refresh} />
       )}
       {editingContract && (
         <EditSoilContractModal contract={editingContract} onClose={() => setEditingContract(null)} onSaved={refresh} />
