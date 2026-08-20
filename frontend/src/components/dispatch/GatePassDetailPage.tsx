@@ -46,7 +46,7 @@ export function GatePassDetailPage({ gatePass, categories, onBack, onDeleted }: 
   const [editing, setEditing] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(t("dispatchDocs.confirmDeleteGatePass", { number: gatePass.sequenceNumber }))) return;
+    if (!confirm(t("dispatchDocs.confirmDeleteGatePass", { number: gatePass.sequenceNumber ?? "—" }))) return;
     await api.gatePasses.remove(gatePass._id);
     onDeleted();
   }
@@ -60,7 +60,7 @@ export function GatePassDetailPage({ gatePass, categories, onBack, onDeleted }: 
       <Card className="mb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-ink-primary">GP-{gatePass.sequenceNumber} · {gatePass.customerName}</h3>
+            <h3 className="text-lg font-semibold text-ink-primary">GP-{gatePass.sequenceNumber ?? "—"} · {gatePass.customerName}</h3>
             <p className="text-sm text-ink-muted">
               {gatePass.gatePassDate ? new Date(gatePass.gatePassDate).toLocaleDateString("en-IN") : "—"}
             </p>

@@ -140,7 +140,7 @@ ${bodyHtml}
 // record, not a live view of the dispatch.
 export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, categoryLabel: string) {
   const logoLetter = kilnLogoLetter(kiln.name);
-  const number = `CH-${challan.sequenceNumber}`;
+  const number = `CH-${challan.sequenceNumber ?? "—"}`;
   const date = challan.challanDate ?? challan.createdAt;
 
   const body = `
@@ -199,7 +199,7 @@ export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, catego
 // Dispatch with nothing saved). Same visual language, same accent.
 export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInfo, categoryLabel: string) {
   const logoLetter = kilnLogoLetter(kiln.name);
-  const number = `GP-${gatePass.sequenceNumber}`;
+  const number = `GP-${gatePass.sequenceNumber ?? "—"}`;
   const date = gatePass.gatePassDate ?? gatePass.createdAt;
 
   const body = `
@@ -262,7 +262,7 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
 // printing an invoice with no linked Customer.
 export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categoryLabel: string, customerOverallDue?: number) {
   const logoLetter = kilnLogoLetter(kiln.name);
-  const number = `INV-${invoice.sequenceNumber}`;
+  const number = `INV-${invoice.sequenceNumber ?? "—"}`;
   const date = invoice.invoiceDate ?? invoice.createdAt;
   const gross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);
   const amountPaidNow = invoice.amountPaidNow ?? invoice.netAmount;

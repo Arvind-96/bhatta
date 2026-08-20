@@ -21,6 +21,11 @@ export const dispatchDocumentsDict: Record<string, Record<Locale, string>> = {
   "dispatchDocs.saveAndReprintGatePass": { en: "Save & reprint gate pass", hi: "गेट पास सहेजें व दोबारा प्रिंट करें" },
   "dispatchDocs.saveAndReprintInvoice": { en: "Save & reprint invoice", hi: "इनवॉइस सहेजें व दोबारा प्रिंट करें" },
   "dispatchDocs.gstNumberPlaceholder": { en: "GST number (optional)", hi: "जीएसटी नंबर (वैकल्पिक)" },
+  "dispatchDocs.serialNumberLabel": { en: "Serial number", hi: "क्रम संख्या" },
+  "dispatchDocs.serialNumberHint": {
+    en: "Auto-suggested from the sequence — clear it to save without a number; the same number will be suggested next time.",
+    hi: "क्रम से स्वतः सुझाया गया — बिना नंबर के सहेजने के लिए इसे खाली करें; अगली बार वही नंबर फिर सुझाया जाएगा।",
+  },
   "dispatchDocs.ratePerBrickPlaceholder": { en: "Rate per brick (₹)", hi: "प्रति ईंट दर (₹)" },
   "dispatchDocs.challansListTitle": { en: "Challans created", hi: "बनाए गए चालान" },
   "dispatchDocs.gatePassesListTitle": { en: "Gate passes created", hi: "बनाए गए गेट पास" },

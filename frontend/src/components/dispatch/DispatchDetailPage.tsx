@@ -126,17 +126,17 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
   }
 
   async function deleteChallan(c: Challan) {
-    if (!confirm(t("dispatchDocs.confirmDeleteChallan", { number: c.sequenceNumber }))) return;
+    if (!confirm(t("dispatchDocs.confirmDeleteChallan", { number: c.sequenceNumber ?? "—" }))) return;
     await api.challans.remove(c._id);
     await refreshDocs();
   }
   async function deleteGatePass(g: GatePassRecord) {
-    if (!confirm(t("dispatchDocs.confirmDeleteGatePass", { number: g.sequenceNumber }))) return;
+    if (!confirm(t("dispatchDocs.confirmDeleteGatePass", { number: g.sequenceNumber ?? "—" }))) return;
     await api.gatePasses.remove(g._id);
     await refreshDocs();
   }
   async function deleteInvoice(i: Invoice) {
-    if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: i.sequenceNumber }))) return;
+    if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: i.sequenceNumber ?? "—" }))) return;
     await api.invoices.remove(i._id);
     await refreshDocs();
   }
@@ -306,7 +306,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               {challansList.map((c) => (
                 <div key={c._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                   <div>
-                    <p className="text-ink-primary">CH-{c.sequenceNumber}</p>
+                    <p className="text-ink-primary">CH-{c.sequenceNumber ?? "—"}</p>
                     <p className="text-sm text-ink-muted">{c.bricksCount.toLocaleString("en-IN")} {t("brickLoading.bricksUnit")} · {c.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -333,7 +333,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               {gatePassesList.map((g) => (
                 <div key={g._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                   <div>
-                    <p className="text-ink-primary">GP-{g.sequenceNumber}</p>
+                    <p className="text-ink-primary">GP-{g.sequenceNumber ?? "—"}</p>
                     <p className="text-sm text-ink-muted">{g.bricksCount.toLocaleString("en-IN")} {t("brickLoading.bricksUnit")} · {g.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -360,7 +360,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               {invoicesList.map((i) => (
                 <div key={i._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                   <div>
-                    <p className="text-ink-primary">INV-{i.sequenceNumber}</p>
+                    <p className="text-ink-primary">INV-{i.sequenceNumber ?? "—"}</p>
                     <p className="text-sm text-ink-muted">₹{formatINR(i.netAmount)} · {i.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">

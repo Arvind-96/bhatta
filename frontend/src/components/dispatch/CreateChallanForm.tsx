@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
   const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
+  const [sequenceNumber, setSequenceNumber] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
   const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch?.vehicleType ?? "");
   const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch?.driverName ?? "");
@@ -57,11 +58,22 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
 
+  // Pre-fill the Serial Number field with the next available number in the
+  // sequence — the admin can accept it, change it, or clear it entirely.
+  // Only for a brand-new challan; an existing one keeps whatever number
+  // (or lack of one) it already has, shown read-only on its detail page.
+  useEffect(() => {
+    if (existing) return;
+    api.challans.nextSequenceNumber().then((r) => setSequenceNumber(String(r.nextSequenceNumber)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
       const payload = {
+        sequenceNumber: sequenceNumber ? Number(sequenceNumber) : undefined,
         vehicleNumber: vehicleNumber || undefined,
         vehicleType: vehicleType || undefined,
         driverName: driverName || undefined,
@@ -91,6 +103,18 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
         </button>
       </div>
       <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+        {!existing && (
+          <label className="col-span-2 flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("dispatchDocs.serialNumberLabel")}</span>
+            <input
+              type="number"
+              value={sequenceNumber}
+              onChange={(e) => setSequenceNumber(e.target.value)}
+              className={inputClass}
+            />
+            <span className="text-xs text-ink-muted">{t("dispatchDocs.serialNumberHint")}</span>
+          </label>
+        )}
         <input required placeholder={t("brickLoading.customerNamePlaceholder")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClass} />
         <input placeholder={t("brickLoading.customerPhonePlaceholder")} value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className={inputClass} />
         <input placeholder={t("brickLoading.customerAddressPlaceholder")} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1" />

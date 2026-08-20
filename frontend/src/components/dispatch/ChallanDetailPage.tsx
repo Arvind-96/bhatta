@@ -49,7 +49,7 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
   const [editing, setEditing] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(t("dispatchDocs.confirmDeleteChallan", { number: challan.sequenceNumber }))) return;
+    if (!confirm(t("dispatchDocs.confirmDeleteChallan", { number: challan.sequenceNumber ?? "—" }))) return;
     await api.challans.remove(challan._id);
     onDeleted();
   }
@@ -63,7 +63,7 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
       <Card className="mb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-ink-primary">CH-{challan.sequenceNumber} · {challan.customerName}</h3>
+            <h3 className="text-lg font-semibold text-ink-primary">CH-{challan.sequenceNumber ?? "—"} · {challan.customerName}</h3>
             <p className="text-sm text-ink-muted">
               {challan.challanDate ? new Date(challan.challanDate).toLocaleDateString("en-IN") : "—"}
             </p>

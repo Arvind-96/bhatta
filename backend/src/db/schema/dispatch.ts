@@ -85,12 +85,18 @@ export const dispatches = mysqlTable("dispatches", {
 // priced/GST commercial bill. `sequenceNumber` is a plain per-kiln
 // counter, generated MAX-based (see generateSequenceNumber) rather than
 // COUNT-based, to avoid the exact collision-after-delete bug fixed in
-// brickLoading.service.ts's generateTripNumber.
+// brickLoading.service.ts's generateTripNumber. Nullable — the Create form
+// pre-fills the suggested next number but the admin can clear it and save
+// blank; MAX() over a nullable column already ignores NULL rows, so a
+// blank save doesn't advance/consume the sequence (the same number is
+// suggested again next time). The (kilnId, sequenceNumber) unique index
+// below still holds with multiple NULLs per kiln — MySQL treats NULLs as
+// distinct from each other in a unique index.
 export const challans = mysqlTable("challans", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
   dispatchId: varchar("dispatchId", { length: 64 }).notNull(),
-  sequenceNumber: int("sequenceNumber").notNull(),
+  sequenceNumber: int("sequenceNumber"),
   vehicleNumber: varchar("vehicleNumber", { length: 255 }),
   vehicleType: varchar("vehicleType", { length: 255 }),
   driverName: varchar("driverName", { length: 255 }),
@@ -112,7 +118,7 @@ export const gatePasses = mysqlTable("gate_passes", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
   dispatchId: varchar("dispatchId", { length: 64 }).notNull(),
-  sequenceNumber: int("sequenceNumber").notNull(),
+  sequenceNumber: int("sequenceNumber"),
   vehicleNumber: varchar("vehicleNumber", { length: 255 }),
   vehicleType: varchar("vehicleType", { length: 255 }),
   driverName: varchar("driverName", { length: 255 }),
@@ -144,7 +150,7 @@ export const invoices = mysqlTable("invoices", {
   // customerName), so pre-existing Dispatch-linked invoices still surface
   // under a same-named Customer without needing a data migration.
   customerId: varchar("customerId", { length: 64 }),
-  sequenceNumber: int("sequenceNumber").notNull(),
+  sequenceNumber: int("sequenceNumber"),
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerAddress: varchar("customerAddress", { length: 255 }),
   customerPhone: varchar("customerPhone", { length: 255 }),

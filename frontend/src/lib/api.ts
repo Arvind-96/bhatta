@@ -252,8 +252,10 @@ export const api = {
 
   challans: {
     list: (dispatchId?: string) => get<Challan[]>(`/challans${dispatchId ? `?dispatchId=${dispatchId}` : ""}`, true),
+    nextSequenceNumber: () => get<{ nextSequenceNumber: number }>("/challans/next-sequence-number", true),
     create: (input: {
       dispatchId: string;
+      sequenceNumber?: number;
       vehicleNumber?: string;
       vehicleType?: string;
       driverName?: string;
@@ -269,6 +271,7 @@ export const api = {
     update: (
       id: string,
       input: Partial<{
+        sequenceNumber: number;
         vehicleNumber: string;
         vehicleType: string;
         driverName: string;
@@ -287,8 +290,10 @@ export const api = {
 
   gatePasses: {
     list: (dispatchId?: string) => get<GatePassRecord[]>(`/gate-passes${dispatchId ? `?dispatchId=${dispatchId}` : ""}`, true),
+    nextSequenceNumber: () => get<{ nextSequenceNumber: number }>("/gate-passes/next-sequence-number", true),
     create: (input: {
       dispatchId: string;
+      sequenceNumber?: number;
       vehicleNumber?: string;
       vehicleType?: string;
       driverName?: string;
@@ -302,6 +307,7 @@ export const api = {
     update: (
       id: string,
       input: Partial<{
+        sequenceNumber: number;
         vehicleNumber: string;
         vehicleType: string;
         driverName: string;
@@ -318,8 +324,10 @@ export const api = {
 
   invoices: {
     list: (dispatchId?: string) => get<Invoice[]>(`/invoices${dispatchId ? `?dispatchId=${dispatchId}` : ""}`, true),
+    nextSequenceNumber: () => get<{ nextSequenceNumber: number }>("/invoices/next-sequence-number", true),
     create: (input: {
       dispatchId?: string;
+      sequenceNumber?: number;
       customerId?: string;
       customerName: string;
       customerAddress?: string;
@@ -341,6 +349,7 @@ export const api = {
     update: (
       id: string,
       input: Partial<{
+        sequenceNumber: number;
         customerId: string;
         customerName: string;
         customerAddress: string;

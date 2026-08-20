@@ -51,7 +51,7 @@ export function GatePass() {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
-      String(e.sequenceNumber).includes(q) ||
+      (e.sequenceNumber != null && String(e.sequenceNumber).includes(q)) ||
       e.customerName.toLowerCase().includes(q) ||
       (e.vehicleNumber ?? "").toLowerCase().includes(q) ||
       (e.driverName ?? "").toLowerCase().includes(q)
@@ -98,7 +98,7 @@ export function GatePass() {
             <tbody>
               {pagedEntries.map((e) => (
                 <tr key={e._id} onClick={() => setOpenId(e._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                  <td className="py-3 text-ink-primary hover:underline">GP-{e.sequenceNumber}</td>
+                  <td className="py-3 text-ink-primary hover:underline">GP-{e.sequenceNumber ?? "—"}</td>
                   <td className="py-3 text-ink-secondary">{e.gatePassDate ? new Date(e.gatePassDate).toLocaleDateString("en-IN") : "—"}</td>
                   <td className="py-3 text-ink-primary">{e.customerName}</td>
                   <td className="py-3 text-ink-secondary">{e.vehicleNumber ?? "—"}</td>

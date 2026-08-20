@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
   const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
+  const [sequenceNumber, setSequenceNumber] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
   const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch?.vehicleType ?? "");
   const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch?.driverName ?? "");
@@ -50,11 +51,18 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (existing) return;
+    api.gatePasses.nextSequenceNumber().then((r) => setSequenceNumber(String(r.nextSequenceNumber)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
       const payload = {
+        sequenceNumber: sequenceNumber ? Number(sequenceNumber) : undefined,
         vehicleNumber: vehicleNumber || undefined,
         vehicleType: vehicleType || undefined,
         driverName: driverName || undefined,
@@ -82,6 +90,18 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
         </button>
       </div>
       <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+        {!existing && (
+          <label className="col-span-2 flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("dispatchDocs.serialNumberLabel")}</span>
+            <input
+              type="number"
+              value={sequenceNumber}
+              onChange={(e) => setSequenceNumber(e.target.value)}
+              className={inputClass}
+            />
+            <span className="text-xs text-ink-muted">{t("dispatchDocs.serialNumberHint")}</span>
+          </label>
+        )}
         <input required placeholder={t("brickLoading.customerNamePlaceholder")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClass} />
         <input placeholder={t("brickLoading.driverNamePlaceholder")} value={driverName} onChange={(e) => setDriverName(e.target.value)} className={inputClass} />
         <input placeholder={t("brickLoading.driverPhonePlaceholder")} value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} className={inputClass} />

@@ -56,7 +56,7 @@ export interface Dispatch {
 export interface Challan {
   _id: string;
   dispatchId: string;
-  sequenceNumber: number;
+  sequenceNumber?: number;
   vehicleNumber?: string;
   vehicleType?: string;
   driverName?: string;
@@ -74,7 +74,7 @@ export interface Challan {
 export interface GatePassRecord {
   _id: string;
   dispatchId: string;
-  sequenceNumber: number;
+  sequenceNumber?: number;
   vehicleNumber?: string;
   vehicleType?: string;
   driverName?: string;
@@ -91,7 +91,7 @@ export interface Invoice {
   _id: string;
   dispatchId?: string;
   customerId?: string;
-  sequenceNumber: number;
+  sequenceNumber?: number;
   customerName: string;
   customerAddress?: string;
   customerPhone?: string;

@@ -201,7 +201,7 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
                     <tbody>
                       {invoices.map((inv) => (
                         <tr key={inv._id} onClick={() => setOpenInvoiceId(inv._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                          <td className="py-3 text-ink-primary hover:underline">INV-{inv.sequenceNumber}</td>
+                          <td className="py-3 text-ink-primary hover:underline">INV-{inv.sequenceNumber ?? "—"}</td>
                           <td className="py-3 text-ink-secondary">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString("en-IN") : "—"}</td>
                           <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(inv.netAmount)}</td>
                           <td className="py-3 text-right tabular-nums text-ink-secondary">₹{formatINR(inv.amountPaidNow ?? inv.netAmount)}</td>

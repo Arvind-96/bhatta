@@ -95,6 +95,13 @@ export function CreateInvoiceForm({
   const [formError, setFormError] = useState("");
   const [customerCurrentPaid, setCustomerCurrentPaid] = useState<number | undefined>(undefined);
   const [customerCurrentDue, setCustomerCurrentDue] = useState<number | undefined>(undefined);
+  const [sequenceNumber, setSequenceNumber] = useState("");
+
+  useEffect(() => {
+    if (existing) return;
+    api.invoices.nextSequenceNumber().then((r) => setSequenceNumber(String(r.nextSequenceNumber)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Live balance for whichever customer is currently linked (fixed,
   // pre-selected, or manually picked) — refetched on every change so
@@ -153,6 +160,7 @@ export function CreateInvoiceForm({
     setSaving(true);
     try {
       const payload = {
+        sequenceNumber: sequenceNumber ? Number(sequenceNumber) : undefined,
         customerId: selectedCustomerId || undefined,
         customerName,
         customerAddress: customerAddress || undefined,
@@ -188,6 +196,18 @@ export function CreateInvoiceForm({
         </button>
       </div>
       <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
+        {!existing && (
+          <label className="col-span-2 flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("dispatchDocs.serialNumberLabel")}</span>
+            <input
+              type="number"
+              value={sequenceNumber}
+              onChange={(e) => setSequenceNumber(e.target.value)}
+              className={inputClass}
+            />
+            <span className="text-xs text-ink-muted">{t("dispatchDocs.serialNumberHint")}</span>
+          </label>
+        )}
         {customers && !fixedCustomerId && (
           <select value={selectedCustomerId} onChange={(e) => handleCustomerSelect(e.target.value)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1">
             <option value="">{t("customer.linkToCustomerPlaceholder")}</option>

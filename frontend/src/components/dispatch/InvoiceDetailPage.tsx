@@ -47,7 +47,7 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
   const [editing, setEditing] = useState(false);
 
   async function handleDelete() {
-    if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: invoice.sequenceNumber }))) return;
+    if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: invoice.sequenceNumber ?? "—" }))) return;
     await api.invoices.remove(invoice._id);
     onDeleted();
   }
@@ -61,7 +61,7 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
       <Card className="mb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-ink-primary">INV-{invoice.sequenceNumber} · {invoice.customerName}</h3>
+            <h3 className="text-lg font-semibold text-ink-primary">INV-{invoice.sequenceNumber ?? "—"} · {invoice.customerName}</h3>
             <p className="text-sm text-ink-muted">
               {invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString("en-IN") : "—"} · ₹{formatINR(invoice.netAmount)}
             </p>
