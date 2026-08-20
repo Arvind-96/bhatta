@@ -542,7 +542,7 @@ export function printExpenseRecord(expense: Expense, expenseTypeName: string, ki
       ${expense.quantity != null ? `<tr><td class="doc-table-label">Quantity</td><td class="doc-table-value">${expense.quantity.toLocaleString("en-IN")}</td></tr>` : ""}
       <tr><td class="doc-table-label">Transaction date</td><td class="doc-table-value">${new Date(expense.date).toLocaleDateString("en-IN")}</td></tr>
       <tr><td class="doc-table-label">System entry date</td><td class="doc-table-value">${new Date(expense.createdAt).toLocaleString("en-IN")}</td></tr>
-      ${dueAfter != null ? `<tr><td class="doc-table-label">${expenseTypeName} — remaining due</td><td class="doc-table-value">₹${formatINR(Math.abs(dueAfter))}</td></tr>` : ""}
+      ${dueAfter != null ? `<tr><td class="doc-table-label">${expenseTypeName} — remaining due</td><td class="doc-table-value">₹${formatINR(Math.max(0, dueAfter))}</td></tr>` : ""}
       ${expense.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(expense.notes)}</td></tr>` : ""}
     </table>
 

@@ -107,7 +107,7 @@ export function ExpenseTypeDetailPage({ expenseTypeId, expenseTypes, onBack }: E
           </div>
           <div className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-center">
             <p className="text-xs text-ink-muted">{t("customer.totalDueLabel")}</p>
-            <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(Math.abs(totalDue))}</p>
+            <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(Math.max(0, totalDue))}</p>
           </div>
         </div>
       </Card>

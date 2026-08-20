@@ -174,7 +174,7 @@ export function AddExpenseForm({ expenseTypes, existing, existingTypeName, onSav
             </div>
             <div className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-center">
               <p className="text-xs text-ink-muted">{t("customer.totalDueLabel")}</p>
-              <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(previewDue ?? 0)}</p>
+              <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(Math.max(0, previewDue ?? 0))}</p>
             </div>
           </div>
         ) : null)}
