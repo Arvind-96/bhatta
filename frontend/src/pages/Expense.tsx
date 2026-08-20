@@ -1,229 +1,33 @@
-import { FormEvent, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { List, Plus, Search } from "lucide-react";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pagination, usePagination } from "@/components/ui/pagination";
-import { DateInput } from "@/components/ui/date-input";
-import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { Expense as ExpenseEntry, ExpenseCategory, SimplePaymentMode } from "@/types";
+import { cn } from "@/lib/utils";
+import { AddExpenseForm } from "@/components/expense/AddExpenseForm";
+import { ExpenseTypeDetailPage } from "@/components/expense/ExpenseTypeDetailPage";
+import type { ExpenseType } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
-type Translate = (key: string, params?: Record<string, string | number>) => string;
-
-function buildExpenseLabels(t: Translate): Record<ExpenseCategory, string> {
-  return {
-    JCB_RENTAL: t("expense.categoryJcbRental"),
-    ROYALTY_CHALLAN: t("expense.categoryRoyaltyChallan"),
-    TUBEWELL_DIESEL: t("expense.categoryTubewellDiesel"),
-    TUBEWELL_ELECTRICITY: t("expense.categoryTubewellElectricity"),
-    WATER: t("expense.categoryWater"),
-    MOLD_SAND: t("expense.categoryMoldSand"),
-    TARPAULIN: t("expense.categoryTarpaulin"),
-    LABOR_COLONY: t("expense.categoryLaborColony"),
-    LOCAL_CHANDA: t("expense.categoryLocalChanda"),
-    PETTY_CASH: t("expense.categoryPettyCash"),
-    MACHINERY_REPAIR: t("expense.categoryMachineryRepair"),
-    DRIVER_BHATTA: t("expense.categoryDriverBhatta"),
-    POLICE_CHALLAN: t("expense.categoryPoliceChallan"),
-    COMMISSION_DALALI: t("expense.categoryCommissionDalali"),
-    TRANSIT_TAX: t("expense.categoryTransitTax"),
-    OTHER: t("expense.categoryOther"),
-  };
-}
-
-function buildPettyCashReasons(t: Translate): string[] {
-  return [
-    t("expense.reasonChaiNashta"),
-    t("expense.reasonStationery"),
-    t("expense.reasonPujaFestival"),
-    t("expense.reasonFirstAid"),
-    t("expense.reasonLocalConveyance"),
-    t("expense.reasonHardwareRepair"),
-  ];
-}
-
-const HOURLY_CATEGORIES: ExpenseCategory[] = ["JCB_RENTAL", "TUBEWELL_DIESEL", "TUBEWELL_ELECTRICITY"];
-
-function TotalsSummary() {
-  const { t } = useTranslation();
-  const EXPENSE_LABELS = buildExpenseLabels(t);
-  const [totals, setTotals] = useState<{ category: ExpenseCategory; amount: number }[]>([]);
-  const activeKilnId = useAuthStore((s) => s.activeKilnId);
-
-  async function refresh() {
-    setTotals(await api.expenses.totals());
-  }
-
-  useEffect(() => {
-    if (!activeKilnId) return;
-    refresh().catch(console.error);
-  }, [activeKilnId]);
-
-  useKilnEvent("expense:update", () => refresh());
-
-  const grandTotal = totals.reduce((sum, row) => sum + row.amount, 0);
-
-  return (
-    <Card>
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("expense.last30Days")}</h4>
-        <p className="text-xl font-semibold tabular-nums text-ink-primary">₹{formatINR(grandTotal)}</p>
-      </div>
-      {totals.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-3">
-          {totals
-            .slice()
-            .sort((a, b) => b.amount - a.amount)
-            .map((row) => (
-              <span key={row.category} className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary">
-                {EXPENSE_LABELS[row.category]}: ₹{formatINR(row.amount)}
-              </span>
-            ))}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function EditExpenseModal({
-  expense,
-  labels,
-  onClose,
-}: {
-  expense: ExpenseEntry;
-  labels: Record<ExpenseCategory, string>;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const [category, setCategory] = useState<ExpenseCategory>(expense.category);
-  const [amount, setAmount] = useState(String(expense.amount));
-  const [paymentMode, setPaymentMode] = useState<"" | SimplePaymentMode>((expense.paymentMode as SimplePaymentMode) ?? "");
-  const [hours, setHours] = useState(expense.hours ? String(expense.hours) : "");
-  const [notes, setNotes] = useState(expense.notes ?? "");
-  const [date, setDate] = useState(expense.date.slice(0, 10));
-  const [loading, setLoading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!amount) return;
-    setLoading(true);
-    try {
-      await api.expenses.update(expense._id, {
-        category,
-        amount: Number(amount),
-        paymentMode: paymentMode || undefined,
-        hours: hours ? Number(hours) : undefined,
-        notes: notes || undefined,
-        date,
-      });
-      onClose();
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDelete() {
-    if (!confirm(t("expense.confirmDeleteExpense"))) return;
-    setDeleting(true);
-    try {
-      await api.expenses.remove(expense._id);
-      onClose();
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
-      <Card className="w-full max-w-md hover:translate-y-0">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink-primary">{t("expense.editExpense")}</h3>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-          <select value={category} onChange={(e) => setCategory(e.target.value as ExpenseCategory)} className={cn(inputClass, "col-span-2")}>
-            {Object.entries(labels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as "" | SimplePaymentMode)} className={inputClass}>
-            <option value="">{t("common.paymentMode")}</option>
-            <option value="CASH">{t("billing.paymentCash")}</option>
-            <option value="BANK">{t("billing.paymentBank")}</option>
-            <option value="UPI">{t("billing.paymentUpi")}</option>
-          </select>
-          <input required type="number" placeholder={t("expense.amountPlaceholder")} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputClass} />
-          <label className="col-span-2 flex flex-col gap-1">
-            <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-            <DateInput value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
-          </label>
-          {HOURLY_CATEGORIES.includes(category) && (
-            <input
-              type="number"
-              placeholder={t("expense.hoursRunOptional")}
-              value={hours}
-              onChange={(e) => setHours(e.target.value)}
-              className={cn(inputClass, "col-span-2")}
-            />
-          )}
-          <input
-            placeholder={t("common.notes")}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className={cn(inputClass, "col-span-2")}
-          />
-          <div className="col-span-2 flex gap-2">
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-status-critical/30 bg-status-critical/5 px-3.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-            </button>
-            <Button type="submit" disabled={loading} className="flex-1">
-              {loading ? t("common.saving") : t("common.saveChanges")}
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>,
-    document.body
-  );
-}
-
+// Two modes toggled by the page's own "Add Expense"/"View All Expenses"
+// buttons (item 1/2), mirroring the Customer page's mode-toggle pattern —
+// View All Expenses lands on a list of expense TYPES (item 3); clicking one
+// drills into ExpenseTypeDetailPage for its own Total Paid/Due + expenses.
 export function Expense() {
-  const { t } = useTranslation();
-  const EXPENSE_LABELS = buildExpenseLabels(t);
-  const PETTY_CASH_REASONS = buildPettyCashReasons(t);
-  const [expenses, setExpenses] = useState<ExpenseEntry[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    category: "JCB_RENTAL" as ExpenseCategory,
-    amount: "",
-    paymentMode: "" as "" | SimplePaymentMode,
-    hours: "",
-    notes: "",
-    date: new Date().toISOString().slice(0, 10),
-  });
-  const [loading, setLoading] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<ExpenseEntry | null>(null);
+  const [mode, setMode] = useState<"list" | "add">("list");
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
+  const [search, setSearch] = useState("");
+  const [openTypeId, setOpenTypeId] = useState<string | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const { t } = useTranslation();
 
   async function refresh() {
-    setExpenses(await api.expenses.list());
+    setExpenseTypes(await api.expenseTypes.list());
   }
 
   useEffect(() => {
@@ -231,148 +35,66 @@ export function Expense() {
     refresh().catch(console.error);
   }, [activeKilnId]);
 
-  useKilnEvent("expense:update", () => refresh());
+  useKilnEvent("expenseType:update", () => refresh());
 
-  const { page, setPage, pageCount, pageItems: pagedExpenses, total } = usePagination(expenses, 10);
+  const filtered = expenseTypes.filter((tp) => !search.trim() || tp.name.toLowerCase().includes(search.trim().toLowerCase()));
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!form.amount) return;
-    setLoading(true);
-    try {
-      await api.expenses.create({
-        category: form.category,
-        amount: Number(form.amount),
-        paymentMode: form.paymentMode || undefined,
-        hours: form.hours ? Number(form.hours) : undefined,
-        notes: form.notes || undefined,
-        date: form.date || undefined,
-      });
-      setForm({ category: "JCB_RENTAL", amount: "", paymentMode: "", hours: "", notes: "", date: new Date().toISOString().slice(0, 10) });
-      setShowForm(false);
-      await refresh();
-    } finally {
-      setLoading(false);
-    }
+  if (openTypeId) {
+    return <ExpenseTypeDetailPage expenseTypeId={openTypeId} expenseTypes={expenseTypes} onBack={() => setOpenTypeId(null)} />;
   }
 
   return (
     <div className="space-y-4">
-      <TotalsSummary />
-
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setShowForm((s) => !s)}>
-          <Plus className="h-4 w-4" /> {t("expense.logExpense")}
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant={mode === "add" ? "primary" : "outline"} onClick={() => setMode("add")}>
+          <Plus className="h-4 w-4" /> {t("expense.addExpenseButton")}
+        </Button>
+        <Button size="sm" variant={mode === "list" ? "primary" : "outline"} onClick={() => setMode("list")}>
+          <List className="h-4 w-4" /> {t("expense.viewAllExpensesButton")}
         </Button>
       </div>
 
-      {showForm && (
+      {mode === "add" ? (
+        <AddExpenseForm
+          expenseTypes={expenseTypes}
+          onSaved={() => {
+            setMode("list");
+            refresh();
+          }}
+        />
+      ) : (
         <Card>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-            <select
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value as ExpenseCategory }))}
-              className={inputClass}
-            >
-              {Object.entries(EXPENSE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
+          <CardHeader>
+            <CardTitle>{t("expense.expenseTypesHeading")}</CardTitle>
+          </CardHeader>
+          <div className="relative mb-3">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+            <input
+              placeholder={t("expense.searchExpenseTypesPlaceholder")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className={cn(inputClass, "w-full max-w-sm pl-9")}
+            />
+          </div>
+          {expenseTypes.length === 0 ? (
+            <p className="py-8 text-center text-sm text-ink-muted">{t("expense.noExpenseTypesYet")}</p>
+          ) : filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-ink-muted">{t("dispatchDocs.noMatchSearch")}</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((tp) => (
+                <button
+                  key={tp._id}
+                  onClick={() => setOpenTypeId(tp._id)}
+                  className="rounded-xl border border-border bg-ink-primary/5 px-4 py-3 text-left text-sm font-medium text-ink-primary hover:bg-ink-primary/10"
+                >
+                  {tp.name}
+                </button>
               ))}
-            </select>
-            <select
-              value={form.paymentMode}
-              onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value as "" | SimplePaymentMode }))}
-              className={inputClass}
-            >
-              <option value="">{t("common.paymentMode")}</option>
-              <option value="CASH">{t("billing.paymentCash")}</option>
-              <option value="BANK">{t("billing.paymentBank")}</option>
-              <option value="UPI">{t("billing.paymentUpi")}</option>
-            </select>
-            <input
-              required
-              type="number"
-              placeholder={t("expense.amountPlaceholder")}
-              value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-              className={inputClass}
-            />
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-              <DateInput value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
-            </label>
-            {HOURLY_CATEGORIES.includes(form.category) && (
-              <input
-                type="number"
-                placeholder={t("expense.hoursRunOptional")}
-                value={form.hours}
-                onChange={(e) => setForm((f) => ({ ...f, hours: e.target.value }))}
-                className={inputClass}
-              />
-            )}
-            {form.category === "PETTY_CASH" && (
-              <div className="col-span-2 flex flex-wrap gap-1.5">
-                {PETTY_CASH_REASONS.map((reason) => (
-                  <button
-                    key={reason}
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, notes: reason }))}
-                    className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary hover:bg-ink-primary/10 hover:text-ink-primary"
-                  >
-                    {reason}
-                  </button>
-                ))}
-              </div>
-            )}
-            <input
-              placeholder={t("common.notes")}
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              className={cn(inputClass, "col-span-2")}
-            />
-            <Button type="submit" disabled={loading} className="col-span-2">
-              {t("expense.saveExpense")}
-            </Button>
-          </form>
+            </div>
+          )}
         </Card>
       )}
-
-      <Card>
-        {expenses.length === 0 ? (
-          <p className="py-8 text-center text-sm text-ink-muted">{t("expense.noExpensesYet")}</p>
-        ) : (
-          <div className="space-y-1">
-            {pagedExpenses.map((e) => (
-              <div key={e._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
-                <div>
-                  <p className="text-ink-primary">{EXPENSE_LABELS[e.category]}</p>
-                  <p className="text-sm text-ink-muted">
-                    {new Date(e.date).toLocaleDateString("en-IN")}
-                    {e.hours ? ` · ${t("expense.hoursAtRate", { hours: e.hours, rate: Math.round(e.amount / e.hours) })}` : ""}
-                    {e.notes ? ` · ${e.notes}` : ""}
-                  </p>
-                  <p className="text-xs text-ink-muted/70">{t("common.entryDateTime")}: {formatDateTime(e.createdAt)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="tabular-nums font-medium text-ink-primary">₹{formatINR(e.amount)}</span>
-                  <button
-                    type="button"
-                    onClick={() => setEditingExpense(e)}
-                    className="text-ink-muted hover:text-ink-primary"
-                    aria-label={t("expense.editExpense")}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
-          </div>
-        )}
-      </Card>
-
-      {editingExpense && <EditExpenseModal expense={editingExpense} labels={EXPENSE_LABELS} onClose={() => setEditingExpense(null)} />}
     </div>
   );
 }

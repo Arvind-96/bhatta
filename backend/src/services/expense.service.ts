@@ -3,14 +3,17 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { expenses, soilTrips, dispatches, EXPENSE_CATEGORIES, LEDGER_PAYMENT_MODES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
+import { findOrCreateExpenseType } from "./expenseType.service";
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export type ExpensePaymentMode = Exclude<(typeof LEDGER_PAYMENT_MODES)[number], "CASH_AND_ONLINE">;
 
 export interface CreateExpenseInput {
   kilnId: string;
-  category: ExpenseCategory;
+  expenseTypeId?: string;
+  category?: ExpenseCategory;
   amount: number;
+  quantity?: number;
   paymentMode?: ExpensePaymentMode;
   hours?: number;
   date?: Date;
@@ -37,9 +40,21 @@ export async function createExpense(input: CreateExpenseInput) {
   return expense;
 }
 
+// Auto-logs a cost that already lives on a Brick Loading trip or Dispatch
+// row (driver reward/inam, loading charge, unloading charge) as a first-
+// class Expense the moment that row is created — see brickLoading.service.ts
+// createBrickLoadingEntry and dispatch.service.ts createDispatch, the only
+// two call sites. Silently no-ops for a zero/missing amount so callers
+// don't need their own guard.
+export async function autoLogExpense(kilnId: string, typeName: string, amount: number | null | undefined, date: Date | undefined, notes: string) {
+  if (!amount || amount <= 0) return;
+  const expenseType = await findOrCreateExpenseType(kilnId, typeName);
+  await createExpense({ kilnId, expenseTypeId: expenseType._id, amount, date, notes });
+}
+
 export interface UpdateExpenseInput {
-  category?: ExpenseCategory;
   amount?: number;
+  quantity?: number;
   paymentMode?: ExpensePaymentMode;
   hours?: number;
   date?: Date;

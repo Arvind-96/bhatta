@@ -28,6 +28,8 @@ import type {
   DispatchTotals,
   Expense,
   ExpenseCategory,
+  ExpenseType,
+  ExpenseTypeDetail,
   FamilyForPerson,
   FamilyMember,
   FamilyRelation,
@@ -735,8 +737,9 @@ export const api = {
   expenses: {
     list: () => get<Expense[]>("/expenses", true),
     create: (input: {
-      category: ExpenseCategory;
+      expenseTypeName: string;
       amount: number;
+      quantity?: number;
       paymentMode?: SimplePaymentMode;
       hours?: number;
       notes?: string;
@@ -748,8 +751,8 @@ export const api = {
     update: (
       id: string,
       input: Partial<{
-        category: ExpenseCategory;
         amount: number;
+        quantity: number;
         paymentMode: SimplePaymentMode;
         hours: number;
         notes: string;
@@ -757,6 +760,14 @@ export const api = {
       }>
     ) => patch<Expense>(`/expenses/${id}`, input, true),
     remove: (id: string) => del<void>(`/expenses/${id}`, true),
+  },
+
+  expenseTypes: {
+    list: () => get<ExpenseType[]>("/expense-types", true),
+    detail: (id: string) => get<ExpenseTypeDetail>(`/expense-types/${id}`, true),
+    create: (input: { name: string; openingPaid?: number; openingDue?: number }) => post<ExpenseType>("/expense-types", input, true),
+    update: (id: string, input: Partial<{ name: string; openingPaid: number; openingDue: number }>) =>
+      patch<ExpenseType>(`/expense-types/${id}`, input, true),
   },
 
   molding: {

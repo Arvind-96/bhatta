@@ -6,6 +6,7 @@ import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
 import { createCustomer, findCustomerByName } from "./customer.service";
+import { autoLogExpense } from "./expense.service";
 import { emitToKiln } from "../config/socket";
 
 export type BrickGrade = (typeof BRICK_GRADES)[number];
@@ -278,6 +279,15 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
   });
 
   emitToKiln(input.kilnId, "dispatch:update", dispatch);
+
+  // Same auto-log as brickLoading.service.ts's createBrickLoadingEntry —
+  // driverTipAmount here never had any other effect (see this interface's
+  // own comment above) and would double-count if this dispatch came from a
+  // loading trip (that trip already logs its own tip separately), but
+  // BrickLoadingTripDetailPage's "Add to Dispatch" never sends
+  // driverTipAmount, so that path is safe by construction.
+  await autoLogExpense(input.kilnId, "Driver Reward / Inam", dispatch.driverTipAmount, dispatchedOn, `Dispatch ${dispatch.slipNumber}`);
+
   return dispatch;
 }
 

@@ -622,15 +622,34 @@ export type ExpenseCategory =
 
 export interface Expense {
   _id: string;
-  category: ExpenseCategory;
+  category?: ExpenseCategory;
+  expenseTypeId?: string;
   amount: number;
+  quantity?: number;
   paymentMode?: SimplePaymentMode;
   hours?: number;
   date: string;
+  // System Entry Date — the date this record was actually logged into the
+  // software, always "today" at creation and never editable afterward.
   createdAt: string;
   notes?: string;
   soilTripId?: string;
   dispatchId?: string;
+}
+
+export interface ExpenseType {
+  _id: string;
+  name: string;
+  openingPaid: number;
+  openingDue: number;
+  createdAt: string;
+}
+
+export interface ExpenseTypeDetail {
+  expenseType: ExpenseType;
+  expenses: Expense[];
+  totalPaid: number;
+  totalDue: number;
 }
 
 export interface MoldingEntry {

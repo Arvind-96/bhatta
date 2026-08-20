@@ -4,6 +4,7 @@ import { db } from "../db/client";
 import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
 import { addLedgerEntry } from "./ledger.service";
 import { deleteDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
+import { autoLogExpense } from "./expense.service";
 import { emitToKiln } from "../config/socket";
 
 export type BrickVehicleType = (typeof BRICK_VEHICLE_TYPES)[number];
@@ -142,6 +143,16 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   emitToKiln(input.kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0]);
 
   emitToKiln(input.kilnId, "brickLoading:update", entry);
+
+  // Driver reward, loading charge, and unloading charge are real costs
+  // that, until now, just sat unused on this row — auto-log each as its
+  // own Expense the moment the trip is created, under a fixed type name so
+  // they always land in the same Expense Type bucket (see
+  // expense.service.ts's autoLogExpense; no-ops for a zero/unset amount).
+  await autoLogExpense(input.kilnId, "Driver Reward / Inam", entry.tipAmount, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`);
+  await autoLogExpense(input.kilnId, "Loading Charge", entry.loadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`);
+  await autoLogExpense(input.kilnId, "Unloading Charge", entry.unloadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`);
+
   return entry;
 }
 

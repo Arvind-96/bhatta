@@ -237,22 +237,62 @@ export const stockLoadingEntries = mysqlTable("stock_loading_entries", {
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("stockloading_kiln_date_idx").on(t.kilnId, t.date) }));
 
+// Legacy fixed categorization — superseded by the free-form expenseTypes
+// table below (admin-extensible, matching the Customer feature's dropdown
+// pattern), but kept so historical rows created under the old system keep
+// their original label. New rows leave this null and are categorized
+// purely via expenseTypeId instead.
 export const EXPENSE_CATEGORIES = [
   "JCB_RENTAL", "ROYALTY_CHALLAN", "TUBEWELL_DIESEL", "TUBEWELL_ELECTRICITY", "WATER",
   "MOLD_SAND", "TARPAULIN", "LABOR_COLONY", "LOCAL_CHANDA", "PETTY_CASH",
   "MACHINERY_REPAIR", "DRIVER_BHATTA", "POLICE_CHALLAN", "COMMISSION_DALALI", "TRANSIT_TAX", "OTHER",
 ] as const;
 
+// The admin-extensible dropdown list for the Expense page — the "Add
+// Expense Type" free-text field on the Add Expense form auto-creates one
+// of these the first time a name is typed that doesn't already match, the
+// same find-or-create-by-name pattern used for Customer profiles from the
+// Brick Loading form (see customer.service.ts's findCustomerByName). Total
+// Paid/Total Due are never stored here — always recomputed live from
+// openingPaid/openingDue plus every expense row's own amount (see
+// expenseType.service.ts's getExpenseTypeDetail), the same "opening
+// balance + live recomputation" pattern as the Customer feature's
+// openingPaid/openingDue. Every expense logged under a type is treated as
+// a pure payment (there's no separate "new charge" concept for expenses,
+// unlike a Customer's invoices) — it always adds to paid and subtracts
+// from due, exactly like a Customer's Add Amount / general payment.
+export const expenseTypes = mysqlTable("expense_types", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  name: varchar("name", { length: 255 }).notNull(),
+  openingPaid: double("openingPaid").notNull().default(0),
+  openingDue: double("openingDue").notNull().default(0),
+  createdAt: createdAtColumn(),
+}, (t) => ({
+  kilnIdx: index("expensetype_kiln_idx").on(t.kilnId),
+  kilnNameUnique: uniqueIndex("expensetype_kiln_name_unique").on(t.kilnId, t.name),
+}));
+
 export const expenses = mysqlTable("expenses", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
-  category: varchar("category", { length: 50, enum: EXPENSE_CATEGORIES }).notNull(),
+  // Nullable now — see the EXPENSE_CATEGORIES comment above; new rows use
+  // expenseTypeId instead.
+  category: varchar("category", { length: 50, enum: EXPENSE_CATEGORIES }),
+  expenseTypeId: varchar("expenseTypeId", { length: 64 }),
   amount: double("amount").notNull(),
+  // Only meaningful for the Gas Cylinder expense type (quantity of
+  // cylinders) — left null for every other type.
+  quantity: double("quantity"),
   // A single mode label is enough here (unlike dispatches/ledger entries) —
   // expenses aren't customer-facing bills that get split payments, this
   // just powers the Financial Overview's cash/online breakdown.
   paymentMode: varchar("paymentMode", { length: 50, enum: LEDGER_PAYMENT_MODES }),
   hours: double("hours"),
+  // Transaction Date — the actual date the payment was made (admin-set,
+  // editable). System Entry Date (the date logged into the software,
+  // always "today", read-only) is `createdAt` below — no separate column
+  // needed since createdAtColumn() already captures exactly that.
   date: dateColumn(),
   notes: text("notes"),
   soilTripId: varchar("soilTripId", { length: 64 }),
@@ -262,6 +302,7 @@ export const expenses = mysqlTable("expenses", {
 }, (t) => ({
   kilnDateIdx: index("expense_kiln_date_idx").on(t.kilnId, t.date),
   kilnCategoryIdx: index("expense_kiln_category_idx").on(t.kilnId, t.category),
+  kilnExpenseTypeIdx: index("expense_kiln_expensetype_idx").on(t.kilnId, t.expenseTypeId),
 }));
 
 export const COMPLIANCE_DOCUMENT_TYPES = [

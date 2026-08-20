@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { Challan, GatePassRecord, Invoice, LedgerEntry, PaymentReceipt, SandContract, SoilContract } from "@/types";
+import type { Challan, Expense, GatePassRecord, Invoice, LedgerEntry, PaymentReceipt, SandContract, SoilContract } from "@/types";
 
 // Gate Pass, Challan, Invoice, and Payment Receipt all share one visual
 // language (accent bars, a logo mark, a colored "who this is for" box, a
@@ -103,6 +103,7 @@ const CONTRACT_ACCENT = `:root { --doc-accent: #8a5a2b; --doc-accent-soft: #c08a
 // this blue accent is only for the priced Invoice record below, so the
 // two stay visually distinguishable.
 const INVOICE_RECORD_ACCENT = `:root { --doc-accent: #2a4d8f; --doc-accent-soft: #5b7dc0; --doc-accent-tint: #eef3fb; }`;
+const EXPENSE_ACCENT = `:root { --doc-accent: #6b4c9a; --doc-accent-soft: #9a7dc0; --doc-accent-tint: #f4f0fa; }`;
 
 function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
   const html = `<!doctype html>
@@ -497,6 +498,61 @@ export function printLedgerEntry(entry: LedgerEntry, recipientName: string, kiln
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`${isPaid ? "Payment Slip" : "Due Entry"} — ${recipientName}`, body, RECEIPT_ACCENT);
+}
+
+// A single Expense record's own printout, from the Expense feature's
+// per-type detail/profile page (see expenseType.service.ts's paid/due
+// model this mirrors — every expense is a pure payment, so "remaining due"
+// here is the expense TYPE's own running due after this entry, not this
+// entry's own).
+export function printExpenseRecord(expense: Expense, expenseTypeName: string, kiln: KilnPrintInfo, dueAfter?: number) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Expense</span>
+        <p class="doc-date">${new Date(expense.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Expense type</p>
+        <p class="doc-box-name">${escapeHtml(expenseTypeName)}</p>
+        ${expense.paymentMode ? `<p class="doc-box-detail">${escapeHtml(paymentModeLabel(expense))}</p>` : ""}
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Amount paying</p>
+        <p class="doc-total-amount">₹${formatINR(expense.amount)}</p>
+        <p class="doc-amount-words">${escapeHtml(amountInWords(expense.amount))}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      ${expense.quantity != null ? `<tr><td class="doc-table-label">Quantity</td><td class="doc-table-value">${expense.quantity.toLocaleString("en-IN")}</td></tr>` : ""}
+      <tr><td class="doc-table-label">Transaction date</td><td class="doc-table-value">${new Date(expense.date).toLocaleDateString("en-IN")}</td></tr>
+      <tr><td class="doc-table-label">System entry date</td><td class="doc-table-value">${new Date(expense.createdAt).toLocaleString("en-IN")}</td></tr>
+      ${dueAfter != null ? `<tr><td class="doc-table-label">${expenseTypeName} — remaining due</td><td class="doc-table-value">₹${formatINR(Math.abs(dueAfter))}</td></tr>` : ""}
+      ${expense.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(expense.notes)}</td></tr>` : ""}
+    </table>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED RECORD ~</p>
+    <div class="doc-sign-row doc-sign-row-single">
+      <div class="doc-sign-box">Bhatta owner / Munim<br />(Stamp &amp; Signature)</div>
+    </div>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`Expense — ${expenseTypeName}`, body, EXPENSE_ACCENT);
 }
 
 function contractRateBasisText(contract: SoilContract) {

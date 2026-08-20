@@ -26,6 +26,7 @@ import { firingNikasiDict } from "./dict/firing-nikasi";
 import { logisticsDict } from "./dict/logistics";
 import { dispatchDocumentsDict } from "./dict/dispatch-documents";
 import { customerDict } from "./dict/customer";
+import { expenseDict } from "./dict/expense";
 import { operationsDict } from "./dict/operations";
 import { staffDict } from "./dict/staff";
 import { overviewDict } from "./dict/overview";
@@ -206,6 +207,7 @@ export const translations: Record<string, Record<Locale, string>> = {
   ...logisticsDict,
   ...dispatchDocumentsDict,
   ...customerDict,
+  ...expenseDict,
   ...operationsDict,
   ...staffDict,
   ...overviewDict,

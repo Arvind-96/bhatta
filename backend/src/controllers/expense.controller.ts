@@ -2,13 +2,19 @@ import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { createExpense, deleteExpense, expenseTotalsByCategory, listExpenses, updateExpense } from "../services/expense.service";
+import { findOrCreateExpenseType } from "../services/expenseType.service";
 import { EXPENSE_CATEGORIES, LEDGER_PAYMENT_MODES } from "../db/schema";
 
 const categorySchema = z.enum(EXPENSE_CATEGORIES);
 
 const createSchema = z.object({
-  category: categorySchema,
+  // The admin either picked an existing type from the dropdown or typed a
+  // new one into "Add Expense Type" — either way the client just sends the
+  // resolved name and the server finds-or-creates it (see
+  // expenseType.service.ts's findOrCreateExpenseType).
+  expenseTypeName: z.string().min(1),
   amount: z.number().positive(),
+  quantity: z.number().positive().optional(),
   paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
   hours: z.number().positive().optional(),
   date: z.string().optional(),
@@ -19,8 +25,11 @@ const createSchema = z.object({
 
 export async function create(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);
+  const { expenseTypeName, ...rest } = input;
+  const expenseType = await findOrCreateExpenseType(req.kiln!.id, expenseTypeName);
   const expense = await createExpense({
-    ...input,
+    ...rest,
+    expenseTypeId: expenseType._id,
     kilnId: req.kiln!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
@@ -43,8 +52,8 @@ export async function totals(req: AuthedRequest, res: Response) {
 }
 
 const updateSchema = z.object({
-  category: categorySchema.optional(),
   amount: z.number().positive().optional(),
+  quantity: z.number().positive().optional(),
   paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
   hours: z.number().positive().optional(),
   date: z.string().optional(),

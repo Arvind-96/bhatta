@@ -119,7 +119,10 @@ async function compareFuel(kilnId: string, from: Date, to: Date) {
 async function compareExpense(kilnId: string, from: Date, to: Date) {
   const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, from), lte(expenses.date, to)));
   const byCategory = new Map<string, number>();
-  for (const r of rows) byCategory.set(r.category, (byCategory.get(r.category) ?? 0) + r.amount);
+  for (const r of rows) {
+    const cat = r.category ?? "OTHER";
+    byCategory.set(cat, (byCategory.get(cat) ?? 0) + r.amount);
+  }
   return {
     totalAmount: rows.reduce((sum, r) => sum + r.amount, 0),
     entryCount: rows.length,
