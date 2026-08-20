@@ -41,7 +41,6 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "brickLoading.driverPhonePlaceholder": { en: "Driver phone number", hi: "ड्राइवर का फ़ोन नंबर" },
   "brickLoading.driverRewardPlaceholder": { en: "Driver reward / Inam (₹, optional)", hi: "ड्राइवर इनाम (₹, वैकल्पिक)" },
   "brickLoading.loadingSection": { en: "Loading", hi: "लदाई" },
-  "brickLoading.loadingLaborerCountPlaceholder": { en: "Number of loading laborers", hi: "लदाई मज़दूरों की संख्या" },
   "brickLoading.loadingRatePlaceholder": { en: "Loading rate per 1,000 bricks per laborer (₹)", hi: "प्रति 1,000 ईंट प्रति मज़दूर लदाई दर (₹)" },
   "brickLoading.loadingDateLabel": { en: "Loading date", hi: "लदाई की तारीख" },
   "brickLoading.pricePerBrickPlaceholder": { en: "Price per brick (₹) — enter manually", hi: "प्रति ईंट मूल्य (₹) — मैन्युअल रूप से दर्ज करें" },
@@ -50,7 +49,6 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "brickLoading.totalLoadingChargeLabel": { en: "Total loading charge", hi: "कुल लदाई शुल्क" },
   "brickLoading.unloadingSection": { en: "Unloading", hi: "उतराई" },
   "brickLoading.bricksUnloadedPlaceholder": { en: "Unloaded brick count", hi: "उतरी ईंटों की संख्या" },
-  "brickLoading.unloadingLaborerCountPlaceholder": { en: "Number of unloading laborers", hi: "उतराई मज़दूरों की संख्या" },
   "brickLoading.unloadingRatePlaceholder": { en: "Unloading rate per 1,000 bricks per laborer (₹)", hi: "प्रति 1,000 ईंट प्रति मज़दूर उतराई दर (₹)" },
   "brickLoading.unloadingDateLabel": { en: "Unloading date", hi: "उतराई की तारीख" },
   "brickLoading.totalUnloadingChargeLabel": { en: "Total unloading charge", hi: "कुल उतराई शुल्क" },
@@ -62,6 +60,9 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
     en: "Delete this loading trip for {vehicleNumber}? Any linked dispatch and stock will be reversed.",
     hi: "{vehicleNumber} के लिए यह लदाई ट्रिप हटाएं? जुड़ा हुआ डिस्पैच और स्टॉक वापस कर दिया जाएगा।",
   },
+  "brickLoading.searchTripsPlaceholder": { en: "Search trips by trip #, vehicle, customer, driver, category…", hi: "ट्रिप #, वाहन, ग्राहक, ड्राइवर, श्रेणी से ट्रिप खोजें…" },
+  "brickLoading.noTripsMatchSearch": { en: "No trips match your search.", hi: "आपकी खोज से मेल खाती कोई ट्रिप नहीं मिली।" },
+  "brickLoading.backToLoadingTrips": { en: "Back to Loading trips", hi: "लदाई ट्रिप पर वापस" },
 
   // Dispatch.tsx
   "dispatch.mismatchAlert": {

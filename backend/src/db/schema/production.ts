@@ -174,6 +174,11 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   // Unloaded Brick Count -- purely informational/billing (drives
   // unloadingCharge below), no stock or dispatch side effects.
   unloadedBricksCount: int("unloadedBricksCount"),
+  // Legacy -- no longer collected on the Log Trip form or used in the
+  // loadingCharge/unloadingCharge formulas below (see
+  // brickLoading.service.ts's computeLaborCharge), kept nullable so rows
+  // created before laborer count was dropped from the form still read
+  // back correctly.
   loadingLaborerCount: int("loadingLaborerCount"),
   loadingRatePerThousand: double("loadingRatePerThousand"),
   unloadingLaborerCount: int("unloadingLaborerCount"),

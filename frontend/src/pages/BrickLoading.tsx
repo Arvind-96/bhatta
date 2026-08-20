@@ -1,12 +1,13 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { DateInput } from "@/components/ui/date-input";
-import { formatDateTime, formatINR } from "@/lib/utils";
+import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { EditBrickLoadingEntryModal } from "@/components/dispatch/EditBrickLoadingEntryModal";
+import { BrickLoadingTripDetailPage } from "@/components/dispatch/BrickLoadingTripDetailPage";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -108,6 +109,8 @@ export function BrickLoading() {
   const [ledgerFor, setLedgerFor] = useState<Person | null>(null);
   const [showAddDriver, setShowAddDriver] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BrickLoadingEntry | null>(null);
+  const [openTripId, setOpenTripId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const emptyForm = {
     customerName: "",
     customerPhone: "",
@@ -116,7 +119,6 @@ export function BrickLoading() {
     driverPhone: "",
     tipAmount: "",
     date: new Date().toISOString().slice(0, 10),
-    loadingLaborerCount: "",
     loadingRatePerThousand: "",
     unloadingRatePerThousand: "",
     categoryId: "",
@@ -124,7 +126,6 @@ export function BrickLoading() {
     bricksCount: "",
     unloadedBricksCount: "",
     vehicleNumber: "",
-    unloadingLaborerCount: "",
     unloadingDate: "",
   };
   const [form, setForm] = useState(emptyForm);
@@ -133,7 +134,21 @@ export function BrickLoading() {
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const navigateAndHighlight = useUiStore((s) => s.navigateAndHighlight);
   const { t } = useTranslation();
-  const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(entries, 10);
+  const filteredEntries = entries.filter((entry) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const category = typeof entry.categoryId === "object" ? entry.categoryId : null;
+    return (
+      (entry.tripNumber ?? "").toLowerCase().includes(q) ||
+      entry.vehicleNumber.toLowerCase().includes(q) ||
+      (entry.customerName ?? "").toLowerCase().includes(q) ||
+      (entry.customerPhone ?? "").includes(q) ||
+      (entry.driverName ?? "").toLowerCase().includes(q) ||
+      (entry.driverPhone ?? "").includes(q) ||
+      (category ? category.category.toLowerCase().includes(q) : false)
+    );
+  });
+  const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(filteredEntries, 10);
 
   async function refresh() {
     const [entriesData, driversData, summary, categoryData] = await Promise.all([
@@ -194,9 +209,7 @@ export function BrickLoading() {
         vehicleNumber: form.vehicleNumber,
         bricksCount: Number(form.bricksCount),
         unloadedBricksCount: form.unloadedBricksCount ? Number(form.unloadedBricksCount) : undefined,
-        loadingLaborerCount: form.loadingLaborerCount ? Number(form.loadingLaborerCount) : undefined,
         loadingRatePerThousand: form.loadingRatePerThousand ? Number(form.loadingRatePerThousand) : undefined,
-        unloadingLaborerCount: form.unloadingLaborerCount ? Number(form.unloadingLaborerCount) : undefined,
         unloadingRatePerThousand: form.unloadingRatePerThousand ? Number(form.unloadingRatePerThousand) : undefined,
         categoryId: form.categoryId,
         pricePerBrick: Number(form.pricePerBrick),
@@ -212,9 +225,10 @@ export function BrickLoading() {
   }
 
   async function deleteEntry(entry: BrickLoadingEntry) {
-    if (!confirm(t("brickLoading.confirmDeleteTrip", { vehicleNumber: entry.vehicleNumber }))) return;
+    if (!confirm(t("brickLoading.confirmDeleteTrip", { vehicleNumber: entry.vehicleNumber }))) return false;
     await api.brickLoading.remove(entry._id);
     await refresh();
+    return true;
   }
 
   const selectedCategory = categories.find((c) => c._id === form.categoryId);
@@ -223,17 +237,30 @@ export function BrickLoading() {
   // since the price varies customer to customer; that default is only
   // shown as a reference hint next to the input below.
   const totalAmount = form.bricksCount && form.pricePerBrick ? Number(form.bricksCount) * Number(form.pricePerBrick) : 0;
+  // Total loading/unloading charge = brick count x rate per 1,000 bricks —
+  // laborer count is no longer part of this formula.
   const totalLoadingCharge =
-    form.bricksCount && form.loadingLaborerCount && form.loadingRatePerThousand
-      ? (Number(form.bricksCount) / 1000) * Number(form.loadingLaborerCount) * Number(form.loadingRatePerThousand)
-      : 0;
+    form.bricksCount && form.loadingRatePerThousand ? (Number(form.bricksCount) / 1000) * Number(form.loadingRatePerThousand) : 0;
   const totalUnloadingCharge =
-    form.unloadedBricksCount && form.unloadingLaborerCount && form.unloadingRatePerThousand
-      ? (Number(form.unloadedBricksCount) / 1000) * Number(form.unloadingLaborerCount) * Number(form.unloadingRatePerThousand)
+    form.unloadedBricksCount && form.unloadingRatePerThousand
+      ? (Number(form.unloadedBricksCount) / 1000) * Number(form.unloadingRatePerThousand)
       : 0;
+
+  const openTrip = entries.find((e) => e._id === openTripId) ?? null;
 
   return (
     <div className="space-y-4">
+      {openTrip ? (
+        <BrickLoadingTripDetailPage
+          trip={openTrip}
+          onBack={() => setOpenTripId(null)}
+          onEdit={() => setEditingEntry(openTrip)}
+          onDelete={async () => {
+            if (await deleteEntry(openTrip)) setOpenTripId(null);
+          }}
+        />
+      ) : (
+        <>
       <DriverSummarySection summary={driverSummary} onOpenLedger={openLedgerFor} onAddDriver={() => setShowAddDriver(true)} />
 
       <div className="flex justify-end">
@@ -347,13 +374,6 @@ export function BrickLoading() {
                 </div>
                 <input
                   type="number"
-                  placeholder={t("brickLoading.loadingLaborerCountPlaceholder")}
-                  value={form.loadingLaborerCount}
-                  onChange={(e) => setForm((f) => ({ ...f, loadingLaborerCount: e.target.value }))}
-                  className={inputClass}
-                />
-                <input
-                  type="number"
                   placeholder={t("brickLoading.loadingRatePlaceholder")}
                   value={form.loadingRatePerThousand}
                   onChange={(e) => setForm((f) => ({ ...f, loadingRatePerThousand: e.target.value }))}
@@ -385,13 +405,6 @@ export function BrickLoading() {
                   placeholder={t("brickLoading.bricksUnloadedPlaceholder")}
                   value={form.unloadedBricksCount}
                   onChange={(e) => setForm((f) => ({ ...f, unloadedBricksCount: e.target.value }))}
-                  className={inputClass}
-                />
-                <input
-                  type="number"
-                  placeholder={t("brickLoading.unloadingLaborerCountPlaceholder")}
-                  value={form.unloadingLaborerCount}
-                  onChange={(e) => setForm((f) => ({ ...f, unloadingLaborerCount: e.target.value }))}
                   className={inputClass}
                 />
                 <input
@@ -428,8 +441,19 @@ export function BrickLoading() {
         <CardHeader>
           <CardTitle>{t("brickLoading.loadingTrips")}</CardTitle>
         </CardHeader>
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+          <input
+            placeholder={t("brickLoading.searchTripsPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={cn(inputClass, "w-full max-w-sm pl-9")}
+          />
+        </div>
         {entries.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-muted">{t("brickLoading.noTripsYet")}</p>
+        ) : filteredEntries.length === 0 ? (
+          <p className="py-8 text-center text-sm text-ink-muted">{t("brickLoading.noTripsMatchSearch")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
@@ -442,7 +466,6 @@ export function BrickLoading() {
                   <th className="pb-2 font-medium">{t("brickLoading.bricksHeader")}</th>
                   <th className="pb-2 font-medium">{t("common.amount")}</th>
                   <th className="pb-2 font-medium">{t("brickLoading.dispatchHeader")}</th>
-                  <th className="pb-2 font-medium text-right"></th>
                 </tr>
               </thead>
               <tbody>
@@ -450,8 +473,12 @@ export function BrickLoading() {
                   const category = typeof entry.categoryId === "object" ? entry.categoryId : null;
                   const linkedDispatch = typeof entry.dispatchId === "object" ? entry.dispatchId : null;
                   return (
-                  <tr key={entry._id} className="border-b border-border/60 last:border-0">
-                    <td className="py-3 text-ink-primary">{entry.tripNumber ? `#${entry.tripNumber}` : "—"}</td>
+                  <tr
+                    key={entry._id}
+                    onClick={() => setOpenTripId(entry._id)}
+                    className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5"
+                  >
+                    <td className="py-3 text-ink-primary hover:underline">{entry.tripNumber ? `#${entry.tripNumber}` : "—"}</td>
                     <td className="py-3 text-ink-secondary">
                       {new Date(entry.date).toLocaleDateString("en-IN")}
                       <p className="text-xs text-ink-muted/70">{formatDateTime(entry.createdAt)}</p>
@@ -468,7 +495,10 @@ export function BrickLoading() {
                       {linkedDispatch ? (
                         <button
                           type="button"
-                          onClick={() => navigateAndHighlight("dispatch", linkedDispatch._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateAndHighlight("dispatch", linkedDispatch._id);
+                          }}
                           className="text-series-1 hover:underline"
                         >
                           {linkedDispatch.slipNumber}
@@ -476,22 +506,6 @@ export function BrickLoading() {
                       ) : (
                         "—"
                       )}
-                    </td>
-                    <td className="py-3 text-right">
-                      <div className="flex justify-end gap-3">
-                        <button
-                          onClick={() => setEditingEntry(entry)}
-                          className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline"
-                        >
-                          <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                        </button>
-                        <button
-                          onClick={() => deleteEntry(entry)}
-                          className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-                        </button>
-                      </div>
                     </td>
                   </tr>
                   );
@@ -502,6 +516,8 @@ export function BrickLoading() {
           </div>
         )}
       </Card>
+        </>
+      )}
 
       {ledgerFor && <LedgerModal person={ledgerFor} onClose={() => setLedgerFor(null)} />}
       {showAddDriver && (

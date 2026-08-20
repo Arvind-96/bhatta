@@ -750,9 +750,7 @@ export const api = {
       vehicleNumber: string;
       bricksCount: number;
       unloadedBricksCount?: number;
-      loadingLaborerCount?: number;
       loadingRatePerThousand?: number;
-      unloadingLaborerCount?: number;
       unloadingRatePerThousand?: number;
       categoryId: string;
       pricePerBrick: number;
@@ -771,9 +769,7 @@ export const api = {
         vehicleNumber: string;
         bricksCount: number;
         unloadedBricksCount: number;
-        loadingLaborerCount: number;
         loadingRatePerThousand: number;
-        unloadingLaborerCount: number;
         unloadingRatePerThousand: number;
         pricePerBrick: number;
         tipAmount: number;

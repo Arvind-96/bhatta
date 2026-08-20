@@ -32,14 +32,14 @@ export interface CreateBrickLoadingInput {
   unloadingDate?: Date;
 }
 
-// Total Loading/Unloading Charge = (bricks/1000) x laborer count x rate
-// per 1,000 bricks per laborer -- same "/1000" convention as every other
-// ratePerThousand computation in this app (molding wages, work entries,
-// etc.); a laborer count or rate left blank simply leaves that charge
-// unset rather than computing a false ₹0.
-function computeLaborCharge(bricks: number | undefined, laborerCount: number | undefined, ratePerThousand: number | undefined) {
-  if (!bricks || !laborerCount || !ratePerThousand) return undefined;
-  return Math.round((bricks / 1000) * laborerCount * ratePerThousand * 100) / 100;
+// Total Loading/Unloading Charge = (bricks/1000) x rate per 1,000 bricks --
+// same "/1000" convention as every other ratePerThousand computation in
+// this app (molding wages, work entries, etc.). Laborer count is no longer
+// part of this formula (removed from the Log Trip form) -- a rate left
+// blank simply leaves the charge unset rather than computing a false ₹0.
+function computeLaborCharge(bricks: number | undefined, ratePerThousand: number | undefined) {
+  if (!bricks || !ratePerThousand) return undefined;
+  return Math.round((bricks / 1000) * ratePerThousand * 100) / 100;
 }
 
 // Plain, sequential per-kiln trip counter — same never-resets convention as
@@ -70,8 +70,8 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   // charges are tracked as entirely separate figures below, never folded
   // into this one.
   const finalAmount = Math.round(input.bricksCount * input.pricePerBrick * 100) / 100;
-  const loadingCharge = computeLaborCharge(input.bricksCount, input.loadingLaborerCount, input.loadingRatePerThousand);
-  const unloadingCharge = computeLaborCharge(input.unloadedBricksCount, input.unloadingLaborerCount, input.unloadingRatePerThousand);
+  const loadingCharge = computeLaborCharge(input.bricksCount, input.loadingRatePerThousand);
+  const unloadingCharge = computeLaborCharge(input.unloadedBricksCount, input.unloadingRatePerThousand);
 
   // Retry loop: two concurrent creates for the same kiln can both compute
   // the same trip number (the count-then-insert above isn't atomic under
@@ -184,17 +184,15 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
   }
 
   let chargeUpdate: { loadingCharge?: number; unloadingCharge?: number } = {};
-  if (input.bricksCount !== undefined || input.loadingLaborerCount !== undefined || input.loadingRatePerThousand !== undefined) {
+  if (input.bricksCount !== undefined || input.loadingRatePerThousand !== undefined) {
     chargeUpdate.loadingCharge = computeLaborCharge(
       input.bricksCount ?? existing.bricksCount,
-      input.loadingLaborerCount ?? existing.loadingLaborerCount ?? undefined,
       input.loadingRatePerThousand ?? existing.loadingRatePerThousand ?? undefined
     );
   }
-  if (input.unloadedBricksCount !== undefined || input.unloadingLaborerCount !== undefined || input.unloadingRatePerThousand !== undefined) {
+  if (input.unloadedBricksCount !== undefined || input.unloadingRatePerThousand !== undefined) {
     chargeUpdate.unloadingCharge = computeLaborCharge(
       input.unloadedBricksCount ?? existing.unloadedBricksCount ?? undefined,
-      input.unloadingLaborerCount ?? existing.unloadingLaborerCount ?? undefined,
       input.unloadingRatePerThousand ?? existing.unloadingRatePerThousand ?? undefined
     );
   }
@@ -299,7 +297,15 @@ export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickL
     conditions.push(gte(brickLoadingEntries.date, since));
   }
 
-  const rows = await db.select().from(brickLoadingEntries).where(and(...conditions)).orderBy(desc(brickLoadingEntries.date));
+  // Most recent first: `date` is the primary business ordering, but two
+  // trips logged the same day sort by actual entry order (createdAt) as a
+  // tiebreak, so "most recent" always means the trip just added shows on
+  // top instead of an arbitrary same-day order.
+  const rows = await db
+    .select()
+    .from(brickLoadingEntries)
+    .where(and(...conditions))
+    .orderBy(desc(brickLoadingEntries.date), desc(brickLoadingEntries.createdAt));
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const dispatchIds = [...new Set(rows.map((r) => r.dispatchId).filter((v): v is string => !!v))];
   const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];

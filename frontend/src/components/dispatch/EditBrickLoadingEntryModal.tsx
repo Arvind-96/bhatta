@@ -20,12 +20,12 @@ interface EditBrickLoadingEntryModalProps {
 // Full admin edit — mirrors every field on the Log Trip form (see
 // BrickLoading.tsx) so a trip can be corrected the same way it was
 // entered. Category can't be changed here (that would also need to move
-// stock between categories) — bricksCount/unloadedBricksCount/laborer
-// count/rate edits recompute the stored Total Amount/Total Loading
-// Charge/Total Unloading Charge server-side. Changing tipAmount (Driver
-// Reward) never silently rewrites what was already posted to a driver's
-// ledger for legacy entries that still carry a driverId — the backend
-// posts a correction entry for the difference instead.
+// stock between categories) — bricksCount/unloadedBricksCount/rate edits
+// recompute the stored Total Amount/Total Loading Charge/Total Unloading
+// Charge server-side. Changing tipAmount (Driver Reward) never silently
+// rewrites what was already posted to a driver's ledger for legacy
+// entries that still carry a driverId — the backend posts a correction
+// entry for the difference instead.
 export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBrickLoadingEntryModalProps) {
   const [customerName, setCustomerName] = useState(entry.customerName ?? "");
   const [customerPhone, setCustomerPhone] = useState(entry.customerPhone ?? "");
@@ -37,9 +37,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
   const [pricePerBrick, setPricePerBrick] = useState(entry.pricePerBrick !== undefined ? String(entry.pricePerBrick) : "");
   const [unloadedBricksCount, setUnloadedBricksCount] = useState(entry.unloadedBricksCount ? String(entry.unloadedBricksCount) : "");
-  const [loadingLaborerCount, setLoadingLaborerCount] = useState(entry.loadingLaborerCount ? String(entry.loadingLaborerCount) : "");
   const [loadingRatePerThousand, setLoadingRatePerThousand] = useState(entry.loadingRatePerThousand ? String(entry.loadingRatePerThousand) : "");
-  const [unloadingLaborerCount, setUnloadingLaborerCount] = useState(entry.unloadingLaborerCount ? String(entry.unloadingLaborerCount) : "");
   const [unloadingRatePerThousand, setUnloadingRatePerThousand] = useState(
     entry.unloadingRatePerThousand ? String(entry.unloadingRatePerThousand) : ""
   );
@@ -64,9 +62,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
         bricksCount: Number(bricksCount),
         pricePerBrick: pricePerBrick ? Number(pricePerBrick) : undefined,
         unloadedBricksCount: unloadedBricksCount ? Number(unloadedBricksCount) : undefined,
-        loadingLaborerCount: loadingLaborerCount ? Number(loadingLaborerCount) : undefined,
         loadingRatePerThousand: loadingRatePerThousand ? Number(loadingRatePerThousand) : undefined,
-        unloadingLaborerCount: unloadingLaborerCount ? Number(unloadingLaborerCount) : undefined,
         unloadingRatePerThousand: unloadingRatePerThousand ? Number(unloadingRatePerThousand) : undefined,
         ...(hasDriver ? { tipAmount: tipAmount ? Number(tipAmount) : 0 } : {}),
         date: date || undefined,
@@ -174,13 +170,6 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
               />
               <input
                 type="number"
-                placeholder={t("brickLoading.loadingLaborerCountPlaceholder")}
-                value={loadingLaborerCount}
-                onChange={(e) => setLoadingLaborerCount(e.target.value)}
-                className={inputClass}
-              />
-              <input
-                type="number"
                 placeholder={t("brickLoading.loadingRatePlaceholder")}
                 value={loadingRatePerThousand}
                 onChange={(e) => setLoadingRatePerThousand(e.target.value)}
@@ -206,13 +195,6 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 placeholder={t("brickLoading.bricksUnloadedPlaceholder")}
                 value={unloadedBricksCount}
                 onChange={(e) => setUnloadedBricksCount(e.target.value)}
-                className={inputClass}
-              />
-              <input
-                type="number"
-                placeholder={t("brickLoading.unloadingLaborerCountPlaceholder")}
-                value={unloadingLaborerCount}
-                onChange={(e) => setUnloadingLaborerCount(e.target.value)}
                 className={inputClass}
               />
               <input
