@@ -15,7 +15,8 @@ import { Nikasi } from "@/pages/Nikasi";
 import { BrickLoading } from "@/pages/BrickLoading";
 import { Dispatch } from "@/pages/Dispatch";
 import { GatePass } from "@/pages/GatePass";
-import { Billing } from "@/pages/Billing";
+import { Challan } from "@/pages/Challan";
+import { Invoices } from "@/pages/Invoices";
 import { Expense } from "@/pages/Expense";
 import { Fuel } from "@/pages/Fuel";
 import { Inventory } from "@/pages/Inventory";
@@ -48,7 +49,8 @@ const VIEWS = {
   brickLoading: BrickLoading,
   dispatch: Dispatch,
   gatePass: GatePass,
-  billing: Billing,
+  challan: Challan,
+  invoices: Invoices,
   expense: Expense,
   fuel: Fuel,
   inventory: Inventory,
@@ -63,7 +65,7 @@ const VIEWS = {
 
 const QUICK_ACTIONS = [
   { key: "topbar.logProduction", icon: Hammer, view: "molding" as const, tone: "text-series-1" },
-  { key: "topbar.newReceipt", icon: Receipt, view: "billing" as const, tone: "text-series-3" },
+  { key: "topbar.newReceipt", icon: Receipt, view: "invoices" as const, tone: "text-series-3" },
   { key: "topbar.newSoilTrip", icon: Truck, view: "soil" as const, tone: "text-series-5" },
 ];
 

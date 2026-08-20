@@ -13,7 +13,9 @@ const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
 interface CreateGatePassFormProps {
-  dispatch: DispatchEntry;
+  // Null when opened from the standalone Gate Pass detail page to edit an
+  // already-created record with no Dispatch loaded.
+  dispatch: DispatchEntry | null;
   categories: BrickCategory[];
   existing?: GatePassRecord | null;
   onClose: () => void;
@@ -36,15 +38,15 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
-  const dispatchCategoryId = typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "";
-  const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch.vehicleNumber ?? "");
-  const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch.vehicleType ?? "");
-  const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch.driverName ?? "");
-  const [driverPhone, setDriverPhone] = useState(existing?.driverPhone ?? dispatch.driverPhone ?? "");
-  const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch.customerName ?? "");
+  const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
+  const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
+  const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch?.vehicleType ?? "");
+  const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch?.driverName ?? "");
+  const [driverPhone, setDriverPhone] = useState(existing?.driverPhone ?? dispatch?.driverPhone ?? "");
+  const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch?.customerName ?? "");
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
-  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch.bricksCount ?? ""));
-  const [gatePassDate, setGatePassDate] = useState((existing?.gatePassDate ?? dispatch.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
+  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
+  const [gatePassDate, setGatePassDate] = useState((existing?.gatePassDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -63,7 +65,7 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
         gatePassDate: gatePassDate || undefined,
         notes: notes || undefined,
       };
-      const row = existing ? await api.gatePasses.update(existing._id, payload) : await api.gatePasses.create({ dispatchId: dispatch._id, ...payload });
+      const row = existing ? await api.gatePasses.update(existing._id, payload) : await api.gatePasses.create({ dispatchId: dispatch!._id, ...payload });
       printGatePassRecord(row, kilnInfo, categoryLabelFor(categoryId, categories));
       onSaved();
     } finally {

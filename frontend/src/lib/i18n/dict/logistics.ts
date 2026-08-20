@@ -1,10 +1,11 @@
 import type { Locale } from "../translations";
 
 // Translation keys for: pages/BrickLoading.tsx, pages/Dispatch.tsx,
-// pages/GatePass.tsx, pages/Billing.tsx +
+// pages/Invoices.tsx (Payment Receipts/Credit Aging section) +
 // components/dispatch/EditBrickLoadingEntryModal +
 // components/billing/CreatePaymentReceiptModal. Merged into the main
-// dictionary by translations.ts.
+// dictionary by translations.ts. (Gate Pass/Challan-specific keys now
+// live in dict/dispatch-documents.ts.)
 export const logisticsDict: Record<string, Record<Locale, string>> = {
   // BrickLoading.tsx + EditBrickLoadingEntryModal.tsx
   "brickLoading.driverWiseHeading": { en: "Driver-wise loading & incentives", hi: "ड्राइवर अनुसार लदाई व इनाम" },
@@ -131,39 +132,13 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "dispatch.returnedCountPlaceholder": { en: "Returned count", hi: "वापसी गिनती" },
   "dispatch.returnReasonPlaceholder": { en: "Return reason", hi: "वापसी का कारण" },
 
-  // GatePass.tsx
-  "gatePass.gradeA1": { en: "A-1", hi: "A-1" },
-  "gatePass.gradeJhama": { en: "Jhama", hi: "झामा" },
-  "gatePass.gradePela": { en: "Pela/Seem", hi: "पेला/सीम" },
-  "gatePass.heading": { en: "Gate Pass", hi: "गेट पास" },
-  "gatePass.description": {
-    en: "Issued automatically for every truck/tractor loaded and dispatched — pick a record below to print its slip.",
-    hi: "हर लदे और डिस्पैच हुए ट्रक/ट्रैक्टर के लिए यह अपने आप जारी होता है — पर्ची प्रिंट करने के लिए नीचे से रिकॉर्ड चुनें।",
-  },
-  "gatePass.noDispatches60Days": { en: "No dispatches in the last 60 days.", hi: "पिछले 60 दिनों में कोई डिस्पैच नहीं।" },
-  "gatePass.slipHeader": { en: "Slip #", hi: "पर्ची #" },
-  "gatePass.vehicleOwnerCustomerHeader": { en: "Vehicle owner / customer", hi: "वाहन मालिक / ग्राहक" },
-  "gatePass.gradeHeader": { en: "Grade", hi: "ग्रेड" },
-  "gatePass.bricksHeader": { en: "Bricks", hi: "ईंटें" },
-
-  // Billing.tsx
-  "billing.gradeA1": { en: "A-1", hi: "A-1" },
-  "billing.gradeJhama": { en: "Jhama", hi: "झामा" },
-  "billing.gradePela": { en: "Pela/Seem", hi: "पेला/सीम" },
+  // Invoices.tsx (Payment Receipts + Credit Aging, moved here from the
+  // removed Billing.tsx)
   "billing.newPaymentReceipt": { en: "New payment receipt", hi: "नई भुगतान रसीद" },
-  "billing.billedLast30Days": { en: "billed (last 30 days)", hi: "बिल (पिछले 30 दिन)" },
-  "billing.billsLast30Days": { en: "bills (last 30 days)", hi: "बिल संख्या (पिछले 30 दिन)" },
   "billing.outstandingCredit": { en: "outstanding credit", hi: "बकाया उधार" },
-  "billing.noBillsLast60Days": { en: "No bills in the last 60 days.", hi: "पिछले 60 दिनों में कोई बिल नहीं।" },
-  "billing.invoiceHeader": { en: "Slip #", hi: "पर्ची #" },
-  "billing.customerHeader": { en: "Customer", hi: "ग्राहक" },
-  "billing.gradeHeader": { en: "Grade", hi: "ग्रेड" },
-  "billing.bricksHeader": { en: "Bricks", hi: "ईंटें" },
   "billing.outstandingCreditByCustomer": { en: "Outstanding credit by customer", hi: "ग्राहक अनुसार बकाया उधार" },
   "billing.daysPending": { en: "{days} days pending", hi: "{days} दिन से लंबित" },
-  "billing.recentPaymentReceipts": { en: "Recent payment receipts", hi: "हाल की भुगतान रसीदें" },
   "billing.paymentReceiptsHeading": { en: "Payment receipts", hi: "भुगतान रसीदें" },
-  "billing.noReceiptsYet": { en: "No payment receipts yet.", hi: "अभी तक कोई भुगतान रसीद नहीं है।" },
   "billing.confirmDeleteReceipt": {
     en: "Delete receipt {receiptNumber}? This reverses the payment on {name}'s account and can't be undone.",
     hi: "रसीद {receiptNumber} हटाएं? इससे {name} के खाते से यह भुगतान वापस हो जाएगा और यह पूर्ववत नहीं हो सकता।",

@@ -1,15 +1,13 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { Challan, Dispatch, GatePassRecord, Invoice, LedgerEntry, PaymentReceipt, SandContract, SoilContract } from "@/types";
+import type { Challan, GatePassRecord, Invoice, LedgerEntry, PaymentReceipt, SandContract, SoilContract } from "@/types";
 
-// Gate Pass, Challan, and Payment Receipt all share one visual language
-// (red accent bars, a logo mark, a colored "who this is for" box, a
-// structured detail table, a signature row) so the three read as one
-// consistent, professional paper trail instead of three differently
-// designed printouts — even though Gate Pass/Challan print off the same
-// Dispatch record and Payment Receipt off a different one. Each is opened
-// as a real new window (not an in-page @media print block) so the SPA's
-// own layout never bleeds into the printed page.
+// Gate Pass, Challan, Invoice, and Payment Receipt all share one visual
+// language (accent bars, a logo mark, a colored "who this is for" box, a
+// structured detail table, a signature row) so the four read as one
+// consistent, professional paper trail. Each is opened as a real new
+// window (not an in-page @media print block) so the SPA's own layout
+// never bleeds into the printed page.
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -17,11 +15,6 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function personName(ref: { _id: string; name: string } | string | undefined) {
-  if (!ref) return "";
-  return typeof ref === "string" ? "" : ref.name;
 }
 
 // A CASH_AND_ONLINE mode is meaningless on paper as just the label — the
@@ -32,53 +25,6 @@ function paymentModeLabel(entry: { paymentMode?: string | null; cashAmount?: num
     return `Cash ₹${formatINR(entry.cashAmount ?? 0)} + Online ₹${formatINR(entry.onlineAmount ?? 0)}`;
   }
   return entry.paymentMode ?? "—";
-}
-
-const GRADE_LABELS: Record<string, string> = {
-  A1: "A-1 Grade",
-  JHAMA: "Jhama",
-  PELA: "Pela / Seem",
-};
-
-// Prefer the free-form category+grade (e.g. "Second Class (A1)") when this
-// dispatch is linked to one; fall back to the older fixed A1/JHAMA/PELA
-// classification otherwise.
-function categoryGradeLabel(dispatch: Dispatch) {
-  const cat = dispatch.categoryId;
-  if (cat && typeof cat === "object") {
-    return cat.grade ? `${cat.category} (${cat.grade})` : cat.category;
-  }
-  return GRADE_LABELS[dispatch.grade] ?? dispatch.grade;
-}
-
-// Prefer the snapshot taken at sale time (works for walk-in clients with no
-// linked customerId, and stays correct even if the linked Person's own
-// record is edited later); fall back to the populated customerId object for
-// dispatches created before these snapshot columns existed.
-function customerAddress(dispatch: Dispatch) {
-  const ref = dispatch.customerId;
-  return dispatch.customerAddress || (ref && typeof ref === "object" ? ref.address : undefined);
-}
-
-function customerPhone(dispatch: Dispatch) {
-  const ref = dispatch.customerId;
-  return dispatch.customerPhone || (ref && typeof ref === "object" ? ref.phone : undefined);
-}
-
-function customerGstNumber(ref: Dispatch["customerId"]) {
-  return ref && typeof ref === "object" ? ref.gstNumber : undefined;
-}
-
-// Same fallback: the Log Dispatch form now captures driver name/phone as
-// plain text (no Person linkage) — prefer that, fall back to the populated
-// driverId object for legacy rows.
-function driverName(dispatch: Dispatch) {
-  return dispatch.driverName || personName(dispatch.driverId);
-}
-
-function driverPhone(dispatch: Dispatch) {
-  const ref = dispatch.driverId;
-  return dispatch.driverPhone || (ref && typeof ref === "object" ? ref.phone : undefined);
 }
 
 function kilnLogoLetter(kilnName: string) {
@@ -153,10 +99,9 @@ const GATE_PASS_ACCENT = `:root { --doc-accent: #b8541f; --doc-accent-soft: #e08
 const CHALLAN_ACCENT = `:root { --doc-accent: #c0392b; --doc-accent-soft: #e0705f; --doc-accent-tint: #fdf6ee; }`;
 const RECEIPT_ACCENT = `:root { --doc-accent: #1f7a4d; --doc-accent-soft: #4fae7c; --doc-accent-tint: #f0f8f3; }`;
 const CONTRACT_ACCENT = `:root { --doc-accent: #8a5a2b; --doc-accent-soft: #c08a4f; --doc-accent-tint: #f8f2e9; }`;
-// Distinct from CHALLAN_ACCENT above (which colors the older combined
-// Challan-cum-Invoice print still used by Billing.tsx) — this blue accent
-// is only for the new, genuinely separate priced Invoice record below, so
-// the two remain visually distinguishable even though both say "Invoice".
+// Distinct from CHALLAN_ACCENT above (the delivery-note Challan record) —
+// this blue accent is only for the priced Invoice record below, so the
+// two stay visually distinguishable.
 const INVOICE_RECORD_ACCENT = `:root { --doc-accent: #2a4d8f; --doc-accent-soft: #5b7dc0; --doc-accent-tint: #eef3fb; }`;
 
 function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
@@ -187,201 +132,10 @@ ${bodyHtml}
   }
 }
 
-// Exit-authorization slip — what the driver physically carries out of the
-// yard. Every field the client asked for is a mandatory, always-shown row
-// (never conditionally hidden) since a gate guard needs one consistent
-// checklist regardless of which fields happen to be filled in.
-export function printGatePass(dispatch: Dispatch, kiln: KilnPrintInfo) {
-  const driver = driverName(dispatch);
-  const driverPh = driverPhone(dispatch);
-  const clientAddress = customerAddress(dispatch);
-  const clientPhone = customerPhone(dispatch);
-  const logoLetter = kilnLogoLetter(kiln.name);
-
-  const body = `
-    <div class="doc-topbar"></div>
-    <div class="doc-header">
-      <div class="doc-brand">
-        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
-        <div>
-          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
-          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
-          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
-          ${kiln.gstNumber ? `<p class="doc-gst">GSTIN: ${escapeHtml(kiln.gstNumber)}</p>` : ""}
-        </div>
-      </div>
-      <div class="doc-meta">
-        <span class="doc-badge">Gate Pass</span>
-        <p class="doc-number">${escapeHtml(dispatch.slipNumber)}</p>
-        <p class="doc-date">${new Date(dispatch.dispatchedOn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
-        <p class="doc-date">Printed: ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
-      </div>
-    </div>
-
-    <div class="doc-box">
-      <div>
-        <p class="doc-box-label">Issued to (vehicle owner / customer)</p>
-        <p class="doc-box-name">${escapeHtml(dispatch.customerName)}</p>
-        <p class="doc-box-detail">${escapeHtml(clientAddress || "—")}</p>
-        <p class="doc-box-detail">Phone: ${escapeHtml(clientPhone || "—")}</p>
-      </div>
-      <div class="doc-totalbox">
-        <p class="doc-total-label">Bricks loaded</p>
-        <p class="doc-total-amount">${dispatch.bricksCount.toLocaleString("en-IN")}</p>
-        <p class="doc-amount-words">${escapeHtml(categoryGradeLabel(dispatch))}</p>
-      </div>
-    </div>
-
-    <table class="doc-table">
-      <tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(dispatch.vehicleNumber || "—")}</td></tr>
-      <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(dispatch.vehicleType || "—")}</td></tr>
-      <tr><td class="doc-table-label">Driver</td><td class="doc-table-value">${escapeHtml(driver || "—")}</td></tr>
-      <tr><td class="doc-table-label">Driver mobile</td><td class="doc-table-value">${escapeHtml(driverPh || "—")}</td></tr>
-      <tr><td class="doc-table-label">Driver tip / inaam</td><td class="doc-table-value">${dispatch.driverTipAmount ? `₹${formatINR(dispatch.driverTipAmount)}` : "—"}</td></tr>
-      <tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryGradeLabel(dispatch))}</td></tr>
-      <tr><td class="doc-table-label">Bricks loaded</td><td class="doc-table-value">${dispatch.bricksCount.toLocaleString("en-IN")}</td></tr>
-      <tr><td class="doc-table-label">Transport cost</td><td class="doc-table-value">${dispatch.transportCost ? `₹${formatINR(dispatch.transportCost)} (paid by ${escapeHtml(dispatch.transportPaidBy ?? "—")})` : "—"}</td></tr>
-    </table>
-
-    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED GATE PASS ~</p>
-    <div class="doc-sign-row">
-      <div class="doc-sign-box">Gate / Chowkidar<br />(Stamp &amp; Signature)</div>
-      <div class="doc-sign-box">Driver signature</div>
-      <div class="doc-sign-box">Munim / Owner<br />(Stamp &amp; Signature)</div>
-    </div>
-  `;
-  openPrintWindow(`Gate Pass ${dispatch.slipNumber}`, body, GATE_PASS_ACCENT);
-}
-
-// Billing/delivery document — matches the kiln's own real paper invoice
-// format (client-supplied sample): red accent bars, a "Bill and Ship To"
-// box with a live account-balance figure, an item table, and the amount
-// spelled out in words. Discount and transport-cost rows are additive
-// extras beyond the sample (that particular invoice had neither) — they
-// only appear when actually set, so a plain sale still prints exactly
-// like the sample. Vehicle/driver/tip are mandatory, always-shown rows.
-// `accountBalance` is the customer's current ledger balance (positive =
-// still due, negative = advance held), fetched live by the caller right
-// before printing.
-export function printInvoice(dispatch: Dispatch, kiln: KilnPrintInfo, accountBalance?: number) {
-  const discount = dispatch.discountAmount ?? 0;
-  const netAmount = dispatch.amount;
-  const grossAmount = netAmount + discount;
-  const rate = dispatch.bricksCount > 0 ? grossAmount / dispatch.bricksCount : 0;
-  const clientAddress = customerAddress(dispatch);
-  const clientPhone = customerPhone(dispatch);
-  const clientGst = customerGstNumber(dispatch.customerId);
-  const isFullyPaid = accountBalance != null && accountBalance <= 0;
-  const logoLetter = kilnLogoLetter(kiln.name);
-  const driver = driverName(dispatch);
-  const driverPh = driverPhone(dispatch);
-
-  const itemRows = `
-    <tr>
-      <td>01</td>
-      <td>${escapeHtml(categoryGradeLabel(dispatch))}</td>
-      <td>₹${rate.toLocaleString("en-IN", { maximumFractionDigits: 2 })}/NOS</td>
-      <td class="num">${dispatch.bricksCount.toLocaleString("en-IN")}</td>
-      <td class="num">₹${formatINR(grossAmount)}</td>
-      <td class="num">₹${formatINR(grossAmount)}</td>
-    </tr>
-    ${
-      discount > 0
-        ? `<tr><td></td><td>Discount</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">− ₹${formatINR(discount)}</td></tr>`
-        : ""
-    }
-    ${
-      dispatch.transportCost
-        ? `<tr><td></td><td>Transport (paid by ${escapeHtml(dispatch.transportPaidBy ?? "—")})</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">₹${formatINR(dispatch.transportCost)}</td></tr>`
-        : ""
-    }
-  `;
-
-  const body = `
-    <div class="doc-topbar"></div>
-    <div class="doc-header">
-      <div class="doc-brand">
-        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
-        <div>
-          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
-          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
-          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
-          ${kiln.gstNumber ? `<p class="doc-gst">GSTIN: ${escapeHtml(kiln.gstNumber)}</p>` : ""}
-        </div>
-      </div>
-      <div class="doc-meta">
-        <span class="doc-badge">Challan</span>
-        <p class="doc-number">Invoice No.${escapeHtml(dispatch.invoiceNumber ?? dispatch.slipNumber)}</p>
-        <p class="doc-date">Invoice Date: ${new Date(dispatch.dispatchedOn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
-        <p class="doc-summary-line">${escapeHtml(paymentModeLabel(dispatch))}: ₹${formatINR(netAmount)}</p>
-      </div>
-    </div>
-
-    <div class="doc-box">
-      <div>
-        <p class="doc-box-label">Bill and Ship To</p>
-        <p class="doc-box-name">${escapeHtml(dispatch.customerName)}</p>
-        <p class="doc-box-detail">${escapeHtml(clientAddress || "—")}</p>
-        <p class="doc-box-detail">Phone: ${escapeHtml(clientPhone || "—")}</p>
-        <p class="doc-box-detail">GSTIN: ${clientGst ? escapeHtml(clientGst) : ""}</p>
-      </div>
-      <div class="doc-totalbox">
-        ${isFullyPaid ? `<div class="doc-stamp"><span>THANK YOU</span><span>PAID</span></div>` : ""}
-        <p class="doc-total-label">Total amount</p>
-        <p class="doc-total-amount">₹${formatINR(netAmount)}</p>
-        <p class="doc-amount-words">${escapeHtml(amountInWords(netAmount))}</p>
-      </div>
-    </div>
-
-    <table class="doc-table">
-      <tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(dispatch.vehicleNumber || "—")}</td></tr>
-      <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(dispatch.vehicleType || "—")}</td></tr>
-      <tr><td class="doc-table-label">Driver</td><td class="doc-table-value">${escapeHtml(driver || "—")}</td></tr>
-      <tr><td class="doc-table-label">Driver mobile</td><td class="doc-table-value">${escapeHtml(driverPh || "—")}</td></tr>
-      <tr><td class="doc-table-label">Driver tip / inaam</td><td class="doc-table-value">${dispatch.driverTipAmount ? `₹${formatINR(dispatch.driverTipAmount)}` : "—"}</td></tr>
-    </table>
-
-    <table class="doc-items">
-      <thead>
-        <tr><th>#</th><th>Item Details</th><th>Price/Unit</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Total</th></tr>
-      </thead>
-      <tbody>
-        ${itemRows}
-      </tbody>
-      <tfoot>
-        <tr><td colspan="3">Sub-total Amount</td><td class="num">${dispatch.bricksCount.toLocaleString("en-IN")}</td><td class="num">₹${formatINR(grossAmount)}</td><td class="num">₹${formatINR(netAmount)}</td></tr>
-      </tfoot>
-    </table>
-
-    <div class="doc-footer-total">
-      <span>Total amount</span>
-      <span class="big">₹${formatINR(netAmount)}</span>
-      <p class="doc-footer-words">${escapeHtml(amountInWords(netAmount))}</p>
-    </div>
-
-    ${
-      accountBalance != null
-        ? `<table class="doc-table">
-            <tr><td class="doc-table-label">${accountBalance >= 0 ? "Remaining due (account balance)" : "Advance held (account balance)"}</td><td class="doc-table-value">₹${formatINR(Math.abs(accountBalance))}</td></tr>
-          </table>`
-        : ""
-    }
-
-    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED INVOICE ~</p>
-    <div class="doc-sign-row doc-sign-row-single">
-      <div class="doc-sign-box">AUTHORISED SIGNATURE</div>
-    </div>
-    <p class="doc-thanks">Thank you for the business.</p>
-    <div class="doc-bottombar"></div>
-  `;
-  openPrintWindow(`Invoice ${dispatch.invoiceNumber ?? dispatch.slipNumber}`, body, CHALLAN_ACCENT);
-}
-
 // A pure delivery note — no pricing anywhere on it, deliberately distinct
-// from the priced Invoice record below and from the older combined
-// Challan-cum-Invoice print above. Created from a Dispatch's own detail
-// page (see CreateChallanForm.tsx) as its own editable/deletable record,
-// not a live view of the dispatch.
+// from the priced Invoice record below. Created from a Dispatch's own
+// detail page (see CreateChallanForm.tsx) as its own editable/deletable
+// record, not a live view of the dispatch.
 export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, categoryLabel: string) {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `CH-${challan.sequenceNumber}`;
@@ -498,9 +252,8 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
 }
 
 // The priced, GST-oriented commercial bill — its own editable/deletable
-// record (see CreateInvoiceForm.tsx), distinct from the older combined
-// Challan-cum-Invoice print above (kept working unchanged for
-// Billing.tsx). Uses INVOICE_RECORD_ACCENT so the two never look alike.
+// record (see CreateInvoiceForm.tsx). Uses INVOICE_RECORD_ACCENT so it
+// never looks like the delivery-note Challan above.
 export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categoryLabel: string) {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `INV-${invoice.sequenceNumber}`;

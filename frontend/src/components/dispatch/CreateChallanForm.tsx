@@ -13,7 +13,11 @@ const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
 interface CreateChallanFormProps {
-  dispatch: DispatchEntry;
+  // Null when opened from the standalone Challan detail page to edit an
+  // already-created record with no Dispatch loaded -- every field falls
+  // back to `existing` in that case, so `dispatch` is only ever consulted
+  // for the initial pre-fill on a brand-new challan.
+  dispatch: DispatchEntry | null;
   categories: BrickCategory[];
   existing?: Challan | null;
   onClose: () => void;
@@ -39,17 +43,17 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
-  const dispatchCategoryId = typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "";
-  const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch.vehicleNumber ?? "");
-  const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch.vehicleType ?? "");
-  const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch.driverName ?? "");
-  const [driverPhone, setDriverPhone] = useState(existing?.driverPhone ?? dispatch.driverPhone ?? "");
-  const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch.customerName ?? "");
-  const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? dispatch.customerAddress ?? "");
-  const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? dispatch.customerPhone ?? "");
+  const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
+  const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
+  const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch?.vehicleType ?? "");
+  const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch?.driverName ?? "");
+  const [driverPhone, setDriverPhone] = useState(existing?.driverPhone ?? dispatch?.driverPhone ?? "");
+  const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch?.customerName ?? "");
+  const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? dispatch?.customerAddress ?? "");
+  const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? dispatch?.customerPhone ?? "");
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
-  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch.bricksCount ?? ""));
-  const [challanDate, setChallanDate] = useState((existing?.challanDate ?? dispatch.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
+  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
+  const [challanDate, setChallanDate] = useState((existing?.challanDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -70,7 +74,7 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
         challanDate: challanDate || undefined,
         notes: notes || undefined,
       };
-      const row = existing ? await api.challans.update(existing._id, payload) : await api.challans.create({ dispatchId: dispatch._id, ...payload });
+      const row = existing ? await api.challans.update(existing._id, payload) : await api.challans.create({ dispatchId: dispatch!._id, ...payload });
       printChallanRecord(row, kilnInfo, categoryLabelFor(categoryId, categories));
       onSaved();
     } finally {

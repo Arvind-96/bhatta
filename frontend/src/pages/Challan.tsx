@@ -7,8 +7,8 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
-import { GatePassDetailPage } from "@/components/dispatch/GatePassDetailPage";
-import type { BrickCategory, GatePassRecord } from "@/types";
+import { ChallanDetailPage } from "@/components/dispatch/ChallanDetailPage";
+import type { BrickCategory, Challan as ChallanEntry } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -20,14 +20,12 @@ function categoryLabelFor(categoryId: string | undefined, categories: BrickCateg
   return c.grade ? `${c.category} (${c.grade})` : c.category;
 }
 
-// Every Gate Pass ever generated from a Dispatch's detail page (see
-// CreateGatePassForm.tsx) — its own list now, independent of the Dispatch
-// table itself. Sorted most-recent-first by the backend
-// (listGatePasses orders desc(createdAt)). Live-synced via the same
-// gatePass:update socket event DispatchDetailPage/GatePassDetailPage
-// listen for, so an edit or delete from anywhere reflects here too.
-export function GatePass() {
-  const [entries, setEntries] = useState<GatePassRecord[]>([]);
+// Every Challan (delivery note, no pricing) ever generated from a
+// Dispatch's detail page — its own list, live-synced via the same
+// challan:update socket event DispatchDetailPage/ChallanDetailPage
+// listen for. See GatePass.tsx for the identical page shape this mirrors.
+export function Challan() {
+  const [entries, setEntries] = useState<ChallanEntry[]>([]);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -35,7 +33,7 @@ export function GatePass() {
   const { t } = useTranslation();
 
   async function refresh() {
-    const [entriesData, categoryData] = await Promise.all([api.gatePasses.list(), api.brickCategories.list()]);
+    const [entriesData, categoryData] = await Promise.all([api.challans.list(), api.brickCategories.list()]);
     setEntries(entriesData);
     setCategories(categoryData);
   }
@@ -45,7 +43,7 @@ export function GatePass() {
     refresh().catch(console.error);
   }, [activeKilnId]);
 
-  useKilnEvent("gatePass:update", () => refresh());
+  useKilnEvent("challan:update", () => refresh());
 
   const filteredEntries = entries.filter((e) => {
     if (!search.trim()) return true;
@@ -61,25 +59,25 @@ export function GatePass() {
   const openEntry = entries.find((e) => e._id === openId) ?? null;
 
   if (openEntry) {
-    return <GatePassDetailPage gatePass={openEntry} categories={categories} onBack={() => setOpenId(null)} onDeleted={() => setOpenId(null)} />;
+    return <ChallanDetailPage challan={openEntry} categories={categories} onBack={() => setOpenId(null)} onDeleted={() => setOpenId(null)} />;
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("nav.gatePass")}</CardTitle>
+        <CardTitle>{t("nav.challan")}</CardTitle>
       </CardHeader>
       <div className="relative mb-3">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
         <input
-          placeholder={t("dispatchDocs.searchGatePassesPlaceholder")}
+          placeholder={t("dispatchDocs.searchChallansPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={cn(inputClass, "w-full max-w-sm pl-9")}
         />
       </div>
       {entries.length === 0 ? (
-        <p className="py-8 text-center text-sm text-ink-muted">{t("dispatchDocs.noGatePassesYet")}</p>
+        <p className="py-8 text-center text-sm text-ink-muted">{t("dispatchDocs.noChallansYet")}</p>
       ) : filteredEntries.length === 0 ? (
         <p className="py-8 text-center text-sm text-ink-muted">{t("dispatchDocs.noMatchSearch")}</p>
       ) : (
@@ -98,8 +96,8 @@ export function GatePass() {
             <tbody>
               {pagedEntries.map((e) => (
                 <tr key={e._id} onClick={() => setOpenId(e._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                  <td className="py-3 text-ink-primary hover:underline">GP-{e.sequenceNumber}</td>
-                  <td className="py-3 text-ink-secondary">{e.gatePassDate ? new Date(e.gatePassDate).toLocaleDateString("en-IN") : "—"}</td>
+                  <td className="py-3 text-ink-primary hover:underline">CH-{e.sequenceNumber}</td>
+                  <td className="py-3 text-ink-secondary">{e.challanDate ? new Date(e.challanDate).toLocaleDateString("en-IN") : "—"}</td>
                   <td className="py-3 text-ink-primary">{e.customerName}</td>
                   <td className="py-3 text-ink-secondary">{e.vehicleNumber ?? "—"}</td>
                   <td className="py-3 text-ink-secondary">{categoryLabelFor(e.categoryId, categories)}</td>

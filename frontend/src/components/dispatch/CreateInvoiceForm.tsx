@@ -15,7 +15,9 @@ const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
 interface CreateInvoiceFormProps {
-  dispatch: DispatchEntry;
+  // Null when opened from the standalone Invoice detail page to edit an
+  // already-created record with no Dispatch loaded.
+  dispatch: DispatchEntry | null;
   categories: BrickCategory[];
   existing?: Invoice | null;
   onClose: () => void;
@@ -39,22 +41,28 @@ export function CreateInvoiceForm({ dispatch, categories, existing, onClose, onS
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
-  const dispatchCategoryId = typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "";
-  const dispatchGstNumber = typeof dispatch.customerId === "object" ? dispatch.customerId?.gstNumber ?? "" : "";
-  const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch.customerName ?? "");
-  const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? dispatch.customerAddress ?? "");
-  const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? dispatch.customerPhone ?? "");
+  const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
+  const dispatchGstNumber = dispatch && typeof dispatch.customerId === "object" ? dispatch.customerId?.gstNumber ?? "" : "";
+  const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch?.customerName ?? "");
+  const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? dispatch?.customerAddress ?? "");
+  const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? dispatch?.customerPhone ?? "");
   const [customerGstNumber, setCustomerGstNumber] = useState(existing?.customerGstNumber ?? dispatchGstNumber);
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
-  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch.bricksCount ?? ""));
+  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
   const [ratePerBrick, setRatePerBrick] = useState(
-    existing?.ratePerBrick != null ? String(existing.ratePerBrick) : dispatch.bricksCount ? String(Math.round((dispatch.amount / dispatch.bricksCount) * 100) / 100) : ""
+    existing?.ratePerBrick != null
+      ? String(existing.ratePerBrick)
+      : dispatch?.bricksCount
+      ? String(Math.round((dispatch.amount / dispatch.bricksCount) * 100) / 100)
+      : ""
   );
-  const [discountAmount, setDiscountAmount] = useState(existing?.discountAmount != null ? String(existing.discountAmount) : dispatch.discountAmount != null ? String(dispatch.discountAmount) : "");
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>(existing?.paymentMode ?? dispatch.paymentMode ?? "CASH");
+  const [discountAmount, setDiscountAmount] = useState(
+    existing?.discountAmount != null ? String(existing.discountAmount) : dispatch?.discountAmount != null ? String(dispatch.discountAmount) : ""
+  );
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>(existing?.paymentMode ?? dispatch?.paymentMode ?? "CASH");
   const [cashAmount, setCashAmount] = useState(existing?.cashAmount != null ? String(existing.cashAmount) : "");
   const [onlineAmount, setOnlineAmount] = useState(existing?.onlineAmount != null ? String(existing.onlineAmount) : "");
-  const [invoiceDate, setInvoiceDate] = useState((existing?.invoiceDate ?? dispatch.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
+  const [invoiceDate, setInvoiceDate] = useState((existing?.invoiceDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -88,7 +96,7 @@ export function CreateInvoiceForm({ dispatch, categories, existing, onClose, onS
         invoiceDate: invoiceDate || undefined,
         notes: notes || undefined,
       };
-      const row = existing ? await api.invoices.update(existing._id, payload) : await api.invoices.create({ dispatchId: dispatch._id, ...payload });
+      const row = existing ? await api.invoices.update(existing._id, payload) : await api.invoices.create({ dispatchId: dispatch!._id, ...payload });
       printInvoiceRecord(row, kilnInfo, categoryLabelFor(categoryId, categories));
       onSaved();
     } finally {
