@@ -36,6 +36,7 @@ export const dispatchDocumentsDict: Record<string, Record<Locale, string>> = {
   "dispatchDocs.viewInDispatch": { en: "View in Dispatch", hi: "डिस्पैच में देखें" },
   "dispatchDocs.alreadyLinkedHint": { en: "This trip is already linked to a dispatch.", hi: "यह ट्रिप पहले से ही एक डिस्पैच से जुड़ी है।" },
   "dispatchDocs.originatingDispatchSection": { en: "Originating dispatch", hi: "मूल डिस्पैच" },
+  "dispatchDocs.linkedRecordsSection": { en: "Linked records", hi: "जुड़े रिकॉर्ड" },
   "dispatchDocs.backToChallans": { en: "Back to Challan", hi: "चालान पर वापस" },
   "dispatchDocs.backToGatePasses": { en: "Back to Gate Pass", hi: "गेट पास पर वापस" },
   "dispatchDocs.backToInvoices": { en: "Back to Invoices", hi: "इनवॉइस पर वापस" },

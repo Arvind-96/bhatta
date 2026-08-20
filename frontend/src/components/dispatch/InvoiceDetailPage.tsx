@@ -138,7 +138,7 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
 
           {(invoice.dispatchId || invoice.customerId) && (
             <Card className="lg:col-span-2">
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.originatingDispatchSection")}</h4>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t(invoice.dispatchId ? "dispatchDocs.originatingDispatchSection" : "dispatchDocs.linkedRecordsSection")}</h4>
               <div className="flex flex-wrap gap-4">
                 {invoice.dispatchId && (
                   <button type="button" onClick={() => navigateAndHighlight("dispatch", invoice.dispatchId!)} className="text-sm text-series-1 hover:underline">
