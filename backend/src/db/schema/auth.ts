@@ -1,4 +1,4 @@
-import { double, int, mysqlTable, varchar, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
+import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
 import { idColumn, createdAtColumn } from "./_helpers";
 
 export const kilns = mysqlTable("kilns", {
@@ -23,6 +23,23 @@ export const kilns = mysqlTable("kilns", {
   // Printed on the Challan when set — optional, many small kilns aren't
   // GST-registered.
   gstNumber: varchar("gstNumber", { length: 255 }),
+  // GST invoice billing details (Settings > Billing) — all optional, all
+  // print-only (never touch ledger/customer-balance math). `stateCode` is
+  // free text (e.g. "UP Code 09"), matching how the admin's own paper
+  // invoice book labels it — not decomposed into a structured state+number
+  // pair, since it's shown verbatim on the invoice, never parsed.
+  stateCode: varchar("stateCode", { length: 255 }),
+  bankAccountNumber: varchar("bankAccountNumber", { length: 255 }),
+  bankName: varchar("bankName", { length: 255 }),
+  bankIfscCode: varchar("bankIfscCode", { length: 255 }),
+  // Relative path under DATA_DIR, same convention as people.photoPath —
+  // see replaceKilnFile in auth.service.ts.
+  signaturePath: varchar("signaturePath", { length: 512 }),
+  // Copied onto each new invoice as an editable snapshot (see
+  // invoices.termsAndConditions) rather than referenced live, so an old
+  // invoice's printed terms never silently change if this default is
+  // edited later.
+  defaultTermsAndConditions: text("defaultTermsAndConditions"),
   createdAt: createdAtColumn(),
 });
 

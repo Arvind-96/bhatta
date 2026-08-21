@@ -75,7 +75,16 @@ export function CreateInvoiceForm({
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
-  const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
+  const kilnInfo = {
+    name: activeKiln?.name ?? "Bhatta Cloud",
+    location: activeKiln?.location,
+    phone: activeKiln?.phone,
+    gstNumber: activeKiln?.gstNumber,
+    stateCode: activeKiln?.stateCode,
+    bankAccountNumber: activeKiln?.bankAccountNumber,
+    bankName: activeKiln?.bankName,
+    bankIfscCode: activeKiln?.bankIfscCode,
+  };
 
   const dispatchGstNumber = dispatch && typeof dispatch.customerId === "object" ? dispatch.customerId?.gstNumber ?? "" : "";
   const defaultCustomer = customers?.find((c) => c._id === defaultCustomerId);
@@ -84,6 +93,14 @@ export function CreateInvoiceForm({
   const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? fixedCustomer?.addresses[0] ?? defaultCustomer?.addresses[0] ?? dispatch?.customerAddress ?? "");
   const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? fixedCustomer?.phones[0] ?? defaultCustomer?.phones[0] ?? dispatch?.customerPhone ?? "");
   const [customerGstNumber, setCustomerGstNumber] = useState(existing?.customerGstNumber ?? dispatchGstNumber);
+  const [customerStateCode, setCustomerStateCode] = useState(existing?.customerStateCode ?? "");
+  // Auto-filled from the originating Dispatch's own vehicleNumber (still
+  // editable) — same "snapshot, then independently editable" convention as
+  // customerAddress/customerPhone above.
+  const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
+  const [gstRatePercent, setGstRatePercent] = useState(existing?.gstRatePercent != null ? String(existing.gstRatePercent) : "");
+  const [gstType, setGstType] = useState<"CGST_SGST" | "IGST">(existing?.gstType ?? "CGST_SGST");
+  const [termsAndConditions, setTermsAndConditions] = useState(existing?.termsAndConditions ?? activeKiln?.defaultTermsAndConditions ?? "");
   const [items, setItems] = useState<LineItemRow[]>(seedInvoiceItems(existing, dispatch));
   const [discountAmount, setDiscountAmount] = useState(
     existing?.discountAmount != null ? String(existing.discountAmount) : dispatch?.discountAmount != null ? String(dispatch.discountAmount) : ""
@@ -178,6 +195,11 @@ export function CreateInvoiceForm({
         customerAddress: customerAddress || undefined,
         customerPhone: customerPhone || undefined,
         customerGstNumber: customerGstNumber || undefined,
+        customerStateCode: customerStateCode || undefined,
+        vehicleNumber: vehicleNumber || undefined,
+        gstRatePercent: gstRatePercent ? Number(gstRatePercent) : undefined,
+        gstType: gstRatePercent ? gstType : undefined,
+        termsAndConditions: termsAndConditions || undefined,
         categoryId: lineItems[0].categoryId || undefined,
         bricksCount,
         items: lineItems,
@@ -199,12 +221,15 @@ export function CreateInvoiceForm({
       // so api.customers.detail() already reflects it, giving an accurate
       // print on both a brand-new invoice AND an edit (the old preview only
       // ever covered the "new" case).
-      const { stamp, overallDue } = await resolvePaymentInfo({
-        customerId: row.customerId || selectedCustomerId || undefined,
-        customerName,
-        remainingOnThisDoc: Math.max(0, Math.round((row.netAmount - (row.amountPaidNow ?? row.netAmount)) * 100) / 100),
-      });
-      printInvoiceRecord(row, kilnInfo, categories, overallDue, stamp);
+      const [{ stamp, overallDue }, signatureDataUri] = await Promise.all([
+        resolvePaymentInfo({
+          customerId: row.customerId || selectedCustomerId || undefined,
+          customerName,
+          remainingOnThisDoc: Math.max(0, Math.round((row.netAmount - (row.amountPaidNow ?? row.netAmount)) * 100) / 100),
+        }),
+        api.kilns.fetchSignatureDataUri(),
+      ]);
+      printInvoiceRecord(row, { ...kilnInfo, signatureDataUri }, categories, overallDue, stamp);
       onSaved();
     } finally {
       setSaving(false);
@@ -246,6 +271,8 @@ export function CreateInvoiceForm({
         <input placeholder={t("brickLoading.customerPhonePlaceholder")} value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className={inputClass} />
         <input placeholder={t("brickLoading.customerAddressPlaceholder")} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} className={inputClass} />
         <input placeholder={t("dispatchDocs.gstNumberPlaceholder")} value={customerGstNumber} onChange={(e) => setCustomerGstNumber(e.target.value)} className={inputClass} />
+        <input placeholder={t("dispatchDocs.customerStateCodePlaceholder")} value={customerStateCode} onChange={(e) => setCustomerStateCode(e.target.value)} className={inputClass} />
+        <input placeholder={t("dispatch.vehicleNumberPlaceholder")} value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className={inputClass} />
 
         {!existing && selectedCustomerId && customerCurrentDue != null && (
           <div className="col-span-2 grid grid-cols-2 gap-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
@@ -321,6 +348,35 @@ export function CreateInvoiceForm({
           </div>
         )}
         <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1" />
+
+        <div className="col-span-2 flex flex-col gap-2 rounded-xl border border-border bg-ink-primary/5 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.gstDetailsSection")}</p>
+          <p className="text-xs text-ink-muted">{t("dispatchDocs.gstDetailsHint")}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="number"
+              step="0.01"
+              placeholder={t("dispatchDocs.gstRatePlaceholder")}
+              value={gstRatePercent}
+              onChange={(e) => setGstRatePercent(e.target.value)}
+              className={inputClass}
+            />
+            {gstRatePercent && (
+              <select value={gstType} onChange={(e) => setGstType(e.target.value as "CGST_SGST" | "IGST")} className={inputClass}>
+                <option value="CGST_SGST">{t("dispatchDocs.gstTypeSameState")}</option>
+                <option value="IGST">{t("dispatchDocs.gstTypeDifferentState")}</option>
+              </select>
+            )}
+          </div>
+        </div>
+        <textarea
+          placeholder={t("settings.termsAndConditionsPlaceholder")}
+          value={termsAndConditions}
+          onChange={(e) => setTermsAndConditions(e.target.value)}
+          rows={3}
+          className="col-span-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+        />
+
         {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
         <Button type="submit" disabled={saving} className="col-span-2">
           {existing ? t("dispatchDocs.saveAndReprintInvoice") : t("dispatchDocs.generateInvoice")}

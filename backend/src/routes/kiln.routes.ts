@@ -2,17 +2,21 @@ import { Router } from "express";
 import {
   createKiln,
   finishOnboarding,
+  getSignature,
   listKilns,
   publicKiln,
+  updateBilling,
   updateGeofence,
   updateGst,
   updateProfile,
   updateSeason,
   updateShiftTimes,
   updateYardCapacity,
+  uploadSignatureHandler,
 } from "../controllers/kiln.controller";
 import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
+import { uploadSignature } from "../middleware/upload.middleware";
 
 export const kilnRouter = Router();
 
@@ -27,4 +31,7 @@ kilnRouter.patch("/season", resolveKiln, asyncHandler(updateSeason));
 kilnRouter.patch("/shift-times", resolveKiln, asyncHandler(updateShiftTimes));
 kilnRouter.patch("/gst", resolveKiln, asyncHandler(updateGst));
 kilnRouter.patch("/profile", resolveKiln, asyncHandler(updateProfile));
+kilnRouter.patch("/billing", resolveKiln, asyncHandler(updateBilling));
+kilnRouter.post("/signature", resolveKiln, uploadSignature, asyncHandler(uploadSignatureHandler));
+kilnRouter.get("/signature", resolveKiln, asyncHandler(getSignature));
 kilnRouter.post("/onboarding/complete", resolveKiln, asyncHandler(finishOnboarding));

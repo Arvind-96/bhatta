@@ -47,7 +47,16 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
-  const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
+  const kilnInfo = {
+    name: activeKiln?.name ?? "Bhatta Cloud",
+    location: activeKiln?.location,
+    phone: activeKiln?.phone,
+    gstNumber: activeKiln?.gstNumber,
+    stateCode: activeKiln?.stateCode,
+    bankAccountNumber: activeKiln?.bankAccountNumber,
+    bankName: activeKiln?.bankName,
+    bankIfscCode: activeKiln?.bankIfscCode,
+  };
 
   const [activeForm, setActiveForm] = useState<"challan" | "gatePass" | "invoice" | null>(null);
   const [challansList, setChallansList] = useState<Challan[]>([]);
@@ -146,8 +155,11 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
   }
   async function printInvoice(i: Invoice) {
     const remainingOnThisDoc = Math.max(0, Math.round((i.netAmount - (i.amountPaidNow ?? i.netAmount)) * 100) / 100);
-    const { stamp, overallDue } = await resolvePaymentInfo({ customerId: i.customerId, customerName: i.customerName, remainingOnThisDoc });
-    printInvoiceRecord(i, kilnInfo, categories, overallDue, stamp);
+    const [{ stamp, overallDue }, signatureDataUri] = await Promise.all([
+      resolvePaymentInfo({ customerId: i.customerId, customerName: i.customerName, remainingOnThisDoc }),
+      api.kilns.fetchSignatureDataUri(),
+    ]);
+    printInvoiceRecord(i, { ...kilnInfo, signatureDataUri }, categories, overallDue, stamp);
   }
 
   const driver = dispatch.driverName || (typeof dispatch.driverId === "object" ? dispatch.driverId?.name : undefined);

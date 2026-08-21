@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
+import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
 import type { ComplianceDocument, ComplianceDocumentType, StockAudit } from "@/types";
 
 const inputClass =
@@ -427,6 +428,140 @@ function GstSettings() {
   );
 }
 
+// GST invoice billing details (State Code, Bank details, default Terms &
+// Conditions) — separate card/save action from GstSettings above since
+// it's a distinct set of fields with its own PATCH endpoint
+// (api.kilns.updateBilling), all print-only on the Invoice (see
+// printDocument.ts's printInvoiceRecord).
+function BillingDetailsSettings() {
+  const { t } = useTranslation();
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const setKilns = useAuthStore((s) => s.setKilns);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+
+  const [stateCode, setStateCode] = useState(activeKiln?.stateCode ?? "");
+  const [bankAccountNumber, setBankAccountNumber] = useState(activeKiln?.bankAccountNumber ?? "");
+  const [bankName, setBankName] = useState(activeKiln?.bankName ?? "");
+  const [bankIfscCode, setBankIfscCode] = useState(activeKiln?.bankIfscCode ?? "");
+  const [defaultTermsAndConditions, setDefaultTermsAndConditions] = useState(activeKiln?.defaultTermsAndConditions ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setStateCode(activeKiln?.stateCode ?? "");
+    setBankAccountNumber(activeKiln?.bankAccountNumber ?? "");
+    setBankName(activeKiln?.bankName ?? "");
+    setBankIfscCode(activeKiln?.bankIfscCode ?? "");
+    setDefaultTermsAndConditions(activeKiln?.defaultTermsAndConditions ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKilnId]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const patch = {
+        stateCode: stateCode.trim() || null,
+        bankAccountNumber: bankAccountNumber.trim() || null,
+        bankName: bankName.trim() || null,
+        bankIfscCode: bankIfscCode.trim() || null,
+        defaultTermsAndConditions: defaultTermsAndConditions.trim() || null,
+      };
+      await api.kilns.updateBilling(patch);
+      setKilns(kilns.map((k) => (k.kilnId === activeKilnId ? { ...k, ...Object.fromEntries(Object.entries(patch).map(([key, v]) => [key, v ?? undefined])) } : k)));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle>{t("settings.billingDetails")}</CardTitle>
+      </CardHeader>
+      <p className="mb-4 text-sm text-ink-muted">{t("settings.billingDetailsDescription")}</p>
+
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <input placeholder={t("settings.stateCodePlaceholder")} value={stateCode} onChange={(e) => setStateCode(e.target.value)} className={inputClass} />
+        <input placeholder={t("settings.bankAccountNumberPlaceholder")} value={bankAccountNumber} onChange={(e) => setBankAccountNumber(e.target.value)} className={inputClass} />
+        <input placeholder={t("settings.bankNamePlaceholder")} value={bankName} onChange={(e) => setBankName(e.target.value)} className={inputClass} />
+        <input placeholder={t("settings.bankIfscPlaceholder")} value={bankIfscCode} onChange={(e) => setBankIfscCode(e.target.value)} className={inputClass} />
+        <textarea
+          placeholder={t("settings.termsAndConditionsPlaceholder")}
+          value={defaultTermsAndConditions}
+          onChange={(e) => setDefaultTermsAndConditions(e.target.value)}
+          rows={4}
+          className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+        />
+        <Button type="submit" disabled={saving}>
+          {saved ? t("settings.saved") : saving ? t("settings.savingEllipsis") : t("settings.saveBillingDetails")}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+// Shown above "AUTHORISED SIGNATURE" on the printed Invoice when set (see
+// printInvoiceRecord) — uploaded once here, unlike PhotoCaptureInput's
+// usual "hold the file, upload after the parent record is created" use on
+// a person's own profile: the kiln already exists, so this uploads
+// immediately on pick rather than deferring to a later form submit.
+function SignatureSettings() {
+  const { t } = useTranslation();
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const setKilns = useAuthStore((s) => s.setKilns);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    if (activeKiln?.signaturePath) {
+      api.kilns.fetchSignatureBlob().then((blob) => {
+        if (cancelled || !blob) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      });
+    } else {
+      setPreviewUrl(null);
+    }
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [activeKilnId, activeKiln?.signaturePath]);
+
+  async function handleChange(file: File | Blob | null) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const updated = await api.kilns.uploadSignature(file);
+      setKilns(kilns.map((k) => (k.kilnId === activeKilnId ? { ...k, signaturePath: updated.signaturePath } : k)));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle>{t("settings.authorisedSignature")}</CardTitle>
+      </CardHeader>
+      <p className="mb-4 text-sm text-ink-muted">{t("settings.authorisedSignatureDescription")}</p>
+      {previewUrl && (
+        <img src={previewUrl} alt="" className="mb-3 h-20 max-w-full rounded-xl border border-border bg-white object-contain p-2" />
+      )}
+      <PhotoCaptureInput value={null} onChange={handleChange} />
+      {uploading && <p className="mt-2 text-sm text-ink-muted">{t("settings.savingEllipsis")}</p>}
+    </Card>
+  );
+}
+
 const COMPLIANCE_LABEL_KEYS: Record<ComplianceDocumentType, string> = {
   PCB_CONSENT_TO_OPERATE: "settings.pcbConsent",
   MINING_ROYALTY_LICENSE: "settings.miningRoyaltyLicense",
@@ -654,6 +789,8 @@ export function Settings() {
       <SeasonSettings />
       <ShiftSettings />
       <GstSettings />
+      <BillingDetailsSettings />
+      <SignatureSettings />
       <ComplianceSettings />
       <StockAuditSettings />
     </div>

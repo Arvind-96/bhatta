@@ -116,6 +116,13 @@ export interface Invoice {
   customerAddress?: string;
   customerPhone?: string;
   customerGstNumber?: string;
+  customerStateCode?: string;
+  vehicleNumber?: string;
+  gstRatePercent?: number;
+  gstType?: "CGST_SGST" | "IGST";
+  session?: string;
+  sessionSerialNumber?: number;
+  termsAndConditions?: string;
   categoryId?: string;
   items?: BrickLineItem[];
   bricksCount: number;

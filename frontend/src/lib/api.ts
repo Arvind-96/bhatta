@@ -457,6 +457,45 @@ export const api = {
     updateProfile: (input: { name?: string; location?: string; phone?: string }) =>
       patch("/kilns/profile", input, true),
     updateGst: (gstNumber: string | null) => patch("/kilns/gst", { gstNumber }, true),
+    updateBilling: (input: {
+      stateCode?: string | null;
+      bankAccountNumber?: string | null;
+      bankName?: string | null;
+      bankIfscCode?: string | null;
+      defaultTermsAndConditions?: string | null;
+    }) => patch<UserKiln>("/kilns/billing", input, true),
+    uploadSignature: (file: File | Blob) => postFile<UserKiln>("/kilns/signature", "signature", file),
+    // Mirrors people.fetchIdentityProofBlob's authenticated-blob pattern —
+    // a plain <img src> can't send the auth/X-Kiln-Id headers this route
+    // needs, and printDocument.ts needs the bytes anyway (to embed as a
+    // base64 data URI in the print window, which has no app auth context).
+    fetchSignatureBlob: async (): Promise<Blob | null> => {
+      const { token, activeKilnId } = useAuthStore.getState();
+      const res = await fetch(`${API_URL}/api/kilns/signature`, {
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(activeKilnId ? { "X-Kiln-Id": activeKilnId } : {}) },
+      });
+      if (!res.ok) return null;
+      return res.blob();
+    },
+    // Every printInvoiceRecord caller needs the signature as a base64 data
+    // URI (the print window is a standalone blob document with no app auth
+    // context, so it can't load an authenticated <img src> directly) —
+    // centralized here rather than re-implemented at each of the 4 call
+    // sites (CreateInvoiceForm, InvoiceDetailPage, DispatchDetailPage,
+    // AddCustomerPaymentModal).
+    fetchSignatureDataUri: async (): Promise<string | undefined> => {
+      const { activeKilnId, kilns } = useAuthStore.getState();
+      const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+      if (!activeKiln?.signaturePath) return undefined;
+      const blob = await api.kilns.fetchSignatureBlob();
+      if (!blob) return undefined;
+      return await new Promise<string | undefined>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : undefined);
+        reader.onerror = () => resolve(undefined);
+        reader.readAsDataURL(blob);
+      });
+    },
     completeOnboarding: () => post("/kilns/onboarding/complete", {}, true),
   },
 

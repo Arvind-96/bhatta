@@ -21,6 +21,15 @@ export const dispatchDocumentsDict: Record<string, Record<Locale, string>> = {
   "dispatchDocs.saveAndReprintGatePass": { en: "Save & reprint gate pass", hi: "गेट पास सहेजें व दोबारा प्रिंट करें" },
   "dispatchDocs.saveAndReprintInvoice": { en: "Save & reprint invoice", hi: "इनवॉइस सहेजें व दोबारा प्रिंट करें" },
   "dispatchDocs.gstNumberPlaceholder": { en: "GST number (optional)", hi: "जीएसटी नंबर (वैकल्पिक)" },
+  "dispatchDocs.customerStateCodePlaceholder": { en: "Customer State Code (e.g. RJ-08)", hi: "ग्राहक स्टेट कोड (जैसे RJ-08)" },
+  "dispatchDocs.gstDetailsSection": { en: "GST Details", hi: "जीएसटी विवरण" },
+  "dispatchDocs.gstDetailsHint": {
+    en: "Optional — leave blank for a plain invoice with no tax breakdown. Set a rate to show CGST/SGST or IGST on the printed invoice.",
+    hi: "वैकल्पिक — बिना टैक्स विवरण वाले सामान्य इनवॉइस के लिए खाली छोड़ें। प्रिंट किए गए इनवॉइस पर CGST/SGST या IGST दिखाने के लिए एक दर सेट करें।",
+  },
+  "dispatchDocs.gstRatePlaceholder": { en: "GST rate % (e.g. 12)", hi: "जीएसटी दर % (जैसे 12)" },
+  "dispatchDocs.gstTypeSameState": { en: "Same state (CGST + SGST)", hi: "समान राज्य (CGST + SGST)" },
+  "dispatchDocs.gstTypeDifferentState": { en: "Different state (IGST)", hi: "अलग राज्य (IGST)" },
   "dispatchDocs.serialNumberLabel": { en: "Serial number", hi: "क्रम संख्या" },
   "dispatchDocs.serialNumberHint": {
     en: "Auto-suggested from the sequence — clear it to save without a number; the same number will be suggested next time.",

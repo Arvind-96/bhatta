@@ -1,8 +1,10 @@
 import { randomUUID } from "crypto";
+import fs from "fs";
+import path from "path";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { asc, eq, inArray, count } from "drizzle-orm";
-import { db } from "../db/client";
+import { db, DATA_DIR } from "../db/client";
 import { kilns, users, kilnMemberships, people, ghers } from "../db/schema";
 import { env } from "../config/env";
 
@@ -201,6 +203,60 @@ export async function updateKilnProfile(
   const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
   if (!kiln) throw new Error("Kiln not found");
   return kiln;
+}
+
+export interface KilnBillingDetailsInput {
+  stateCode?: string | null;
+  bankAccountNumber?: string | null;
+  bankName?: string | null;
+  bankIfscCode?: string | null;
+  defaultTermsAndConditions?: string | null;
+}
+
+// GST invoice billing details (Settings > Billing) — every field is
+// print-only (see printInvoiceRecord), never consulted anywhere else, so
+// this is a plain field patch with no side effects, same shape as
+// setGstNumber/updateKilnProfile above.
+export async function setKilnBillingDetails(kilnId: string, input: KilnBillingDetailsInput) {
+  await db.update(kilns).set(input).where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
+  if (!kiln) throw new Error("Kiln not found");
+  return kiln;
+}
+
+const KILN_FILES_DIR = path.join(DATA_DIR, "kilns");
+
+function kilnFileDir(kilnId: string) {
+  return path.join(KILN_FILES_DIR, kilnId);
+}
+
+// Same replace-in-place pattern as person.service.ts's replacePersonFile —
+// deletes any stale signature file of the same kind before writing the new
+// one, so re-uploading never leaves an orphaned old file on disk.
+export async function saveKilnSignature(kilnId: string, file: { buffer: Buffer; originalname: string }) {
+  const existing = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
+  if (!existing) throw new Error("Kiln not found");
+
+  const dir = kilnFileDir(kilnId);
+  fs.mkdirSync(dir, { recursive: true });
+  for (const stale of fs.readdirSync(dir).filter((f) => f.startsWith("signature"))) {
+    fs.unlinkSync(path.join(dir, stale));
+  }
+
+  const ext = path.extname(file.originalname) || ".bin";
+  const relativePath = path.join("kilns", kilnId, `signature${ext}`);
+  fs.writeFileSync(path.join(DATA_DIR, relativePath), file.buffer);
+
+  await db.update(kilns).set({ signaturePath: relativePath }).where(eq(kilns._id, kilnId));
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0]!;
+  return kiln;
+}
+
+export async function getKilnSignaturePath(kilnId: string) {
+  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
+  if (!kiln) throw new Error("Kiln not found");
+  if (!kiln.signaturePath) return null;
+  return path.join(DATA_DIR, kiln.signaturePath);
 }
 
 export async function completeOnboarding(kilnId: string) {

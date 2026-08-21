@@ -93,6 +93,15 @@ export interface KilnPrintInfo {
   location?: string;
   phone?: string;
   gstNumber?: string;
+  stateCode?: string;
+  bankAccountNumber?: string;
+  bankName?: string;
+  bankIfscCode?: string;
+  // Already-resolved base64 data URI (see api.kilns.fetchSignatureBlob) —
+  // the print window is a standalone blob document with no app auth
+  // context, so it can't load an authenticated image URL directly; the
+  // caller must resolve the bytes first.
+  signatureDataUri?: string;
 }
 
 // Shared by all three documents — red accent bars top/bottom, a logo
@@ -152,6 +161,27 @@ const DOCUMENT_STYLES = `
   .doc-sign-box { flex: 1; text-align: center; border-top: 1.5px solid #bbb; padding-top: 6px; font-size: 12px; color: #555; font-weight: 600; }
   .doc-sign-row-single .doc-sign-box { flex: none; width: 220px; }
   .doc-thanks { font-size: 13px; color: #444; margin-top: 22px; text-align: center; }
+  /* GST invoice bottom section (printInvoiceRecord, only when the admin
+     has set a GST rate on the invoice — see its own doc comment) —
+     replicates the reference paper invoice book's layout: Amount in
+     Words + Bank Details on the left, the tax breakdown table on the
+     right, then Terms & Conditions + signature block below. */
+  .doc-gst-bottom { display: flex; justify-content: space-between; gap: 20px; margin-top: 18px; align-items: flex-start; }
+  .doc-gst-bottom-left { flex: 1; min-width: 0; }
+  .doc-words-label { font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 4px; }
+  .doc-words-value { font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 0 0 12px; }
+  .doc-bank-details p { font-size: 12px; color: #444; margin: 2px 0; }
+  table.doc-tax-table { width: 100%; min-width: 220px; border-collapse: collapse; font-size: 13px; }
+  table.doc-tax-table td { padding: 6px 8px; border-bottom: 1px solid #eee; }
+  table.doc-tax-table td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
+  table.doc-tax-table tr.doc-tax-total td { font-weight: 800; border-top: 2px solid var(--doc-accent); border-bottom: none; font-size: 14px; }
+  .doc-certify { text-align: right; font-size: 11px; color: #888; margin: 8px 0 0; font-style: italic; }
+  .doc-terms { font-size: 11px; color: #555; flex: 1; }
+  .doc-terms p.doc-terms-title { margin: 0 0 4px; font-weight: 700; color: #1a1a1a; }
+  .doc-terms-body { margin: 0; white-space: pre-line; line-height: 1.5; }
+  .doc-signature-block { flex: none; width: 220px; text-align: center; }
+  .doc-for-kiln { font-weight: 700; margin: 0 0 4px; color: #1a1a1a; }
+  .doc-signature-img { display: block; height: 50px; max-width: 180px; object-fit: contain; margin: 4px auto; }
   @media print { .doc-topbar, .doc-bottombar { -webkit-print-color-adjust: exact; print-color-adjust: exact; } table.doc-items th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } table.doc-table tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .doc-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 `;
 
@@ -337,6 +367,16 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
   openPrintWindow(`Gate Pass ${number}`, body, GATE_PASS_ACCENT);
 }
 
+// e.g. "JVS Bricks" -> "JVS" — mirrors dispatch.service.ts's own
+// kilnPrefix (used for slip numbers) exactly. Duplicated here rather than
+// imported since this is frontend code and that one's a backend service
+// function; kept in sync deliberately, same short pure rule either side.
+function invoiceKilnPrefix(kilnName: string) {
+  const firstWord = kilnName.trim().split(/\s+/)[0] ?? "";
+  const alnum = firstWord.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  return alnum || "KILN";
+}
+
 // The priced, GST-oriented commercial bill — its own editable/deletable
 // record (see CreateInvoiceForm.tsx). Uses INVOICE_RECORD_ACCENT so it
 // never looks like the delivery-note Challan above. `customerOverallDue`
@@ -348,7 +388,15 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
 // this invoice's own paid/remaining amount.
 export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categories: BrickCategory[], customerOverallDue?: number, paymentStamp?: PaymentStamp, fallbackLabel = "—") {
   const logoLetter = kilnLogoLetter(kiln.name);
-  const number = `INV-${invoice.sequenceNumber ?? "—"}`;
+  // {kilnPrefix}/{session}/{sessionSerialNumber} (e.g. "JVS/26-27/04") once
+  // an invoice has both (every invoice created after this feature shipped)
+  // — falls back to the pre-existing INV-{sequenceNumber} format for any
+  // older invoice being reprinted, so a historical reprint never breaks or
+  // silently shows a wrong/missing number.
+  const number =
+    invoice.session && invoice.sessionSerialNumber != null
+      ? `${invoiceKilnPrefix(kiln.name)}/${invoice.session}/${invoice.sessionSerialNumber}`
+      : `INV-${invoice.sequenceNumber ?? "—"}`;
   const date = invoice.invoiceDate ?? invoice.createdAt;
   const gross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);
   const amountPaidNow = invoice.amountPaidNow ?? invoice.netAmount;
@@ -396,6 +444,25 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
     }
   `;
 
+  // GST breakdown — print-only (never touches netAmount/ledger math), and
+  // entirely opt-in: the admin sets a rate directly on the invoice (see
+  // CreateInvoiceForm.tsx), CGST+SGST for a same-state sale or the full
+  // rate as IGST for an inter-state one. Computed on `invoice.netAmount`
+  // (the existing post-discount figure) — "Amount Before Tax" in the
+  // reference invoice book this replicates.
+  const hasGst = invoice.gstRatePercent != null && invoice.gstRatePercent > 0;
+  const gstRate = invoice.gstRatePercent ?? 0;
+  const isIgst = invoice.gstType === "IGST";
+  const cgstRate = isIgst ? 0 : gstRate / 2;
+  const sgstRate = isIgst ? 0 : gstRate / 2;
+  const igstRate = isIgst ? gstRate : 0;
+  const cgstAmount = Math.round((invoice.netAmount * cgstRate) / 100 * 100) / 100;
+  const sgstAmount = Math.round((invoice.netAmount * sgstRate) / 100 * 100) / 100;
+  const igstAmount = Math.round((invoice.netAmount * igstRate) / 100 * 100) / 100;
+  const totalAfterTax = Math.round((invoice.netAmount + cgstAmount + sgstAmount + igstAmount) * 100) / 100;
+  const invoiceTotalRounded = Math.round(totalAfterTax);
+  const hasBankDetails = !!(kiln.bankAccountNumber || kiln.bankName || kiln.bankIfscCode);
+
   const body = `
     <div class="doc-topbar"></div>
     <div class="doc-header">
@@ -406,10 +473,11 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
           ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
           ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
           ${kiln.gstNumber ? `<p class="doc-gst">GSTIN: ${escapeHtml(kiln.gstNumber)}</p>` : ""}
+          ${kiln.gstNumber && kiln.stateCode ? `<p class="doc-gst">State Code: ${escapeHtml(kiln.stateCode)}</p>` : ""}
         </div>
       </div>
       <div class="doc-meta">
-        <span class="doc-badge">Invoice</span>
+        <span class="doc-badge">${kiln.gstNumber ? "GST Invoice" : "Invoice"}</span>
         <p class="doc-number">${escapeHtml(number)}</p>
         <p class="doc-date">Invoice Date: ${new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
         ${invoice.paymentMode ? `<p class="doc-summary-line">${escapeHtml(paymentModeLabel(invoice))}: ₹${formatINR(invoice.netAmount)}</p>` : ""}
@@ -422,7 +490,8 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
         <p class="doc-box-name">${escapeHtml(invoice.customerName)}</p>
         <p class="doc-box-detail">${escapeHtml(invoice.customerAddress || "—")}</p>
         <p class="doc-box-detail">Phone: ${escapeHtml(invoice.customerPhone || "—")}</p>
-        <p class="doc-box-detail">GSTIN: ${invoice.customerGstNumber ? escapeHtml(invoice.customerGstNumber) : ""}</p>
+        ${invoice.customerGstNumber ? `<p class="doc-box-detail">GSTIN: ${escapeHtml(invoice.customerGstNumber)}</p>` : ""}
+        ${invoice.customerStateCode ? `<p class="doc-box-detail">State Code: ${escapeHtml(invoice.customerStateCode)}</p>` : ""}
       </div>
       <div class="doc-totalbox">
         ${stampHtml(resolvedStamp)}
@@ -451,6 +520,8 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
     </div>
 
     <table class="doc-table">
+      ${invoice.vehicleNumber ? `<tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(invoice.vehicleNumber)}</td></tr>` : ""}
+      ${invoice.paymentMode ? `<tr><td class="doc-table-label">Payment mode</td><td class="doc-table-value">${escapeHtml(paymentModeLabel(invoice))}</td></tr>` : ""}
       <tr><td class="doc-table-label">Amount paying now</td><td class="doc-table-value">₹${formatINR(amountPaidNow)}</td></tr>
       ${
         remainingOnThisInvoice > 0
@@ -468,9 +539,58 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
     ${invoice.notes ? `<table class="doc-table"><tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(invoice.notes)}</td></tr></table>` : ""}
 
     <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED INVOICE ~</p>
+
+    ${
+      hasGst
+        ? `
+    <div class="doc-gst-bottom">
+      <div class="doc-gst-bottom-left">
+        <p class="doc-words-label">Amount in Words</p>
+        <p class="doc-words-value">${escapeHtml(amountInWords(invoice.netAmount))} Only</p>
+        ${
+          hasBankDetails
+            ? `<div class="doc-bank-details">
+                ${kiln.bankAccountNumber ? `<p>Bank Details: ${escapeHtml(kiln.name)}, A/c ${escapeHtml(kiln.bankAccountNumber)}</p>` : ""}
+                ${kiln.bankName ? `<p>Bank Name: ${escapeHtml(kiln.bankName)}</p>` : ""}
+                ${kiln.bankIfscCode ? `<p>Bank IFSC Code: ${escapeHtml(kiln.bankIfscCode)}</p>` : ""}
+              </div>`
+            : ""
+        }
+      </div>
+      <table class="doc-tax-table">
+        <tr><td>Amount Before Tax</td><td>₹${formatINR(invoice.netAmount)}</td></tr>
+        <tr><td>Add: CGST @ ${cgstRate}%</td><td>₹${formatINR(cgstAmount)}</td></tr>
+        <tr><td>Add: SGST @ ${sgstRate}%</td><td>₹${formatINR(sgstAmount)}</td></tr>
+        <tr><td>Add: IGST @ ${igstRate}%</td><td>₹${formatINR(igstAmount)}</td></tr>
+        <tr class="doc-tax-total"><td>Total Amount After Tax</td><td>₹${formatINR(totalAfterTax)}</td></tr>
+        <tr class="doc-tax-total"><td>Invoice Total (Round off)</td><td>₹${invoiceTotalRounded.toLocaleString("en-IN")}</td></tr>
+      </table>
+    </div>
+    <p class="doc-certify">Certified that the particulars given above are true &amp; correct</p>
+
+    <div class="doc-sign-row">
+      ${
+        invoice.termsAndConditions
+          ? `<div class="doc-terms">
+              <p class="doc-terms-title">Terms &amp; Conditions:</p>
+              <p class="doc-terms-body">${escapeHtml(invoice.termsAndConditions)}</p>
+            </div>`
+          : `<div class="doc-terms"></div>`
+      }
+      <div class="doc-signature-block">
+        <p class="doc-for-kiln">For ${escapeHtml(kiln.name)}</p>
+        ${kiln.signatureDataUri ? `<img class="doc-signature-img" src="${kiln.signatureDataUri}" alt="" />` : ""}
+        <p>Authorised Signatory</p>
+      </div>
+    </div>
+    `
+        : `
     <div class="doc-sign-row doc-sign-row-single">
       <div class="doc-sign-box">AUTHORISED SIGNATURE</div>
     </div>
+    `
+    }
+
     <p class="doc-thanks">Thank you for the business.</p>
     <div class="doc-bottombar"></div>
   `;

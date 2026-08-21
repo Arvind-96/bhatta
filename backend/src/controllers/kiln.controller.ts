@@ -1,11 +1,15 @@
+import fs from "fs";
 import { Response } from "express";
 import { z } from "zod";
 import {
   completeOnboarding,
   createAdditionalKiln,
   defaultKilnPublicInfo,
+  getKilnSignaturePath,
   listUserKilns,
+  saveKilnSignature,
   setGstNumber,
+  setKilnBillingDetails,
   setKilnGeofence,
   setSeason,
   setShiftTimes,
@@ -116,6 +120,32 @@ export async function updateProfile(req: AuthedRequest, res: Response) {
   const input = profileSchema.parse(req.body);
   const kiln = await updateKilnProfile(req.kiln!.id, input);
   res.json(kiln);
+}
+
+const billingSchema = z.object({
+  stateCode: z.string().trim().optional().nullable(),
+  bankAccountNumber: z.string().trim().optional().nullable(),
+  bankName: z.string().trim().optional().nullable(),
+  bankIfscCode: z.string().trim().optional().nullable(),
+  defaultTermsAndConditions: z.string().optional().nullable(),
+});
+
+export async function updateBilling(req: AuthedRequest, res: Response) {
+  const input = billingSchema.parse(req.body);
+  const kiln = await setKilnBillingDetails(req.kiln!.id, input);
+  res.json(kiln);
+}
+
+export async function uploadSignatureHandler(req: AuthedRequest & { file?: Express.Multer.File }, res: Response) {
+  if (!req.file) return res.status(400).json({ error: "No signature file uploaded" });
+  const kiln = await saveKilnSignature(req.kiln!.id, { buffer: req.file.buffer, originalname: req.file.originalname });
+  res.json(kiln);
+}
+
+export async function getSignature(req: AuthedRequest, res: Response) {
+  const filePath = await getKilnSignaturePath(req.kiln!.id);
+  if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: "No signature uploaded for this kiln" });
+  res.sendFile(filePath);
 }
 
 export async function finishOnboarding(req: AuthedRequest, res: Response) {

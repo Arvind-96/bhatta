@@ -13,6 +13,12 @@ export interface UserKiln {
   location?: string;
   phone?: string;
   gstNumber?: string;
+  stateCode?: string;
+  bankAccountNumber?: string;
+  bankName?: string;
+  bankIfscCode?: string;
+  signaturePath?: string;
+  defaultTermsAndConditions?: string;
   seasonStartMonth?: number;
   seasonStartDay?: number;
   dayShiftStart?: string;

@@ -43,8 +43,10 @@ function formatDDMMYYYY(date: Date) {
 }
 
 // e.g. "JVS Bricks" -> "JVS" — the kiln's own short prefix, not a fixed
-// abbreviation scheme.
-function kilnPrefix(kilnName: string) {
+// abbreviation scheme. Exported for dispatchDocuments.service.ts's GST
+// invoice number ({kilnPrefix}/{session}/{sessionSerialNumber}) — same
+// prefix rule, no reason to duplicate it.
+export function kilnPrefix(kilnName: string) {
   const firstWord = kilnName.trim().split(/\s+/)[0] ?? "";
   const alnum = firstWord.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
   return alnum || "KILN";

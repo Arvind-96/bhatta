@@ -171,6 +171,31 @@ export const invoices = mysqlTable("invoices", {
   customerAddress: varchar("customerAddress", { length: 255 }),
   customerPhone: varchar("customerPhone", { length: 255 }),
   customerGstNumber: varchar("customerGstNumber", { length: 255 }),
+  // Free text, e.g. "RJ-08" — matches customerGstNumber's own free-text
+  // convention (not decomposed/validated), shown verbatim on the printed
+  // invoice next to the customer's GSTIN.
+  customerStateCode: varchar("customerStateCode", { length: 255 }),
+  // Auto-filled from the originating Dispatch's own vehicleNumber (still
+  // editable) — same "snapshot, then independently editable" convention as
+  // customerAddress/customerPhone below.
+  vehicleNumber: varchar("vehicleNumber", { length: 255 }),
+  // GST breakdown — print-only, never affects netAmount/ledger math (see
+  // printInvoiceRecord). Left null = no GST section on the printed
+  // invoice at all, matching a kiln that isn't GST-registered.
+  gstRatePercent: double("gstRatePercent"),
+  gstType: varchar("gstType", { length: 20, enum: ["CGST_SGST", "IGST"] }),
+  // Indian financial year (Apr–Mar), e.g. "26-27", computed once from
+  // invoiceDate at creation and frozen — together with sessionSerialNumber
+  // below, forms the printed invoice number ({kilnPrefix}/{session}/
+  // {sessionSerialNumber}). Deliberately separate from the pre-existing
+  // sequenceNumber/"Serial Number" field (unique per kiln, never
+  // session-scoped) so Challan/Gate Pass numbering and this kiln's
+  // existing invoice serial history are completely unaffected.
+  session: varchar("session", { length: 20 }),
+  sessionSerialNumber: int("sessionSerialNumber"),
+  // Snapshot of kilns.defaultTermsAndConditions at creation time, editable
+  // per invoice from then on — same convention as customerAddress.
+  termsAndConditions: text("termsAndConditions"),
   categoryId: varchar("categoryId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
   // Multi-category breakdown — see BrickLineItem's doc comment in

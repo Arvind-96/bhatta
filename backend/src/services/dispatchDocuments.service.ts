@@ -208,6 +208,13 @@ export interface InvoiceInput {
   customerAddress?: string;
   customerPhone?: string;
   customerGstNumber?: string;
+  customerStateCode?: string;
+  vehicleNumber?: string;
+  // GST breakdown — print-only, see the schema comment on
+  // invoices.gstRatePercent. Left undefined = no GST section printed.
+  gstRatePercent?: number;
+  gstType?: "CGST_SGST" | "IGST";
+  termsAndConditions?: string;
   categoryId?: string;
   bricksCount: number;
   // Multi-category breakdown — see BrickLineItem's doc comment in
@@ -233,12 +240,34 @@ export interface InvoiceInput {
   notes?: string;
 }
 
+// Indian financial year, Apr 1 – Mar 31, e.g. Aug 2026 or Jan 2027 both
+// give "26-27" — the {session} segment of the GST invoice number format
+// ({kilnPrefix}/{session}/{sessionSerialNumber}, see createInvoice below).
+// Deliberately independent of the kiln's own configurable bhatta season
+// (kilns.seasonStartMonth/Day, e.g. Aug 1 by default) — that's a
+// brick-production-cycle concept used for season-scoped reporting, not
+// the fixed calendar GST/accounting year.
+function financialYearSession(date: Date): string {
+  const year = date.getFullYear();
+  const startYear = date.getMonth() >= 3 ? year : year - 1; // getMonth() is 0-based; 3 = April
+  const shortStart = String(startYear).slice(-2);
+  const shortEnd = String(startYear + 1).slice(-2);
+  return `${shortStart}-${shortEnd}`;
+}
+
 export async function createInvoice(kilnId: string, rawInput: InvoiceInput) {
   if (rawInput.dispatchId) await assertDispatch(kilnId, rawInput.dispatchId);
   const input = applyItemsAggregate(rawInput);
+  const invoiceDate = input.invoiceDate ?? new Date();
+  const session = financialYearSession(invoiceDate);
+  const sameSessionCount = (
+    await db.select({ count: sql<number>`count(*)` }).from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.session, session)))
+  )[0]?.count ?? 0;
+  const sessionSerialNumber = sameSessionCount + 1;
+
   const _id = randomUUID();
   try {
-    await db.insert(invoices).values({ ...input, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId });
+    await db.insert(invoices).values({ ...input, invoiceDate, session, sessionSerialNumber, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId });
   } catch (err) {
     if (isDuplicateEntryError(err)) throw new Error(`Serial number ${input.sequenceNumber} is already in use in this kiln — refresh and try again.`);
     throw err;

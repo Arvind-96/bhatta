@@ -38,7 +38,16 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
-  const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
+  const kilnInfo = {
+    name: activeKiln?.name ?? "Bhatta Cloud",
+    location: activeKiln?.location,
+    phone: activeKiln?.phone,
+    gstNumber: activeKiln?.gstNumber,
+    stateCode: activeKiln?.stateCode,
+    bankAccountNumber: activeKiln?.bankAccountNumber,
+    bankName: activeKiln?.bankName,
+    bankIfscCode: activeKiln?.bankIfscCode,
+  };
   const [editing, setEditing] = useState(false);
 
   async function handleDelete() {
@@ -49,8 +58,11 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
 
   async function handlePrint() {
     const remainingOnThisDoc = Math.max(0, Math.round((invoice.netAmount - (invoice.amountPaidNow ?? invoice.netAmount)) * 100) / 100);
-    const { stamp, overallDue } = await resolvePaymentInfo({ customerId: invoice.customerId, customerName: invoice.customerName, remainingOnThisDoc });
-    printInvoiceRecord(invoice, kilnInfo, categories, overallDue, stamp);
+    const [{ stamp, overallDue }, signatureDataUri] = await Promise.all([
+      resolvePaymentInfo({ customerId: invoice.customerId, customerName: invoice.customerName, remainingOnThisDoc }),
+      api.kilns.fetchSignatureDataUri(),
+    ]);
+    printInvoiceRecord(invoice, { ...kilnInfo, signatureDataUri }, categories, overallDue, stamp);
   }
 
   const invoiceGross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);

@@ -25,3 +25,12 @@ export const uploadIdentityProof = multer({
     cb(null, true);
   },
 }).single("document");
+
+export const uploadSignature = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!IMAGE_TYPES.includes(file.mimetype)) return cb(new Error("Signature must be a JPEG, PNG, or WebP image"));
+    cb(null, true);
+  },
+}).single("signature");
