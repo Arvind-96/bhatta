@@ -21,6 +21,20 @@ export interface ProductionSeriesPoint {
 export type BrickGrade = "A1" | "JHAMA" | "PELA";
 export type PaymentMode = "CASH" | "BANK" | "UPI" | "GST_INVOICE" | "CASH_AND_ONLINE";
 
+// One row per brick category on a Brick Loading trip / Dispatch / Challan /
+// Gate Pass / Invoice — a single transaction can cover several categories
+// at once. `pricePerBrick`/`amount` are unused on Challan/Gate Pass (no
+// pricing there, same as those documents' own single-category fields).
+// `categoryId` is a plain id on write, resolved to the full category
+// object on read (same enrich-in-place convention as every other id field
+// in this file) — hence the union.
+export interface BrickLineItem {
+  categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
+  bricksCount: number;
+  pricePerBrick?: number;
+  amount?: number;
+}
+
 export interface Dispatch {
   _id: string;
   customerName: string;
@@ -44,6 +58,7 @@ export interface Dispatch {
   cashAmount?: number;
   onlineAmount?: number;
   categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
+  items?: BrickLineItem[];
   vehicleNumber?: string;
   vehicleType?: string;
   driverTipAmount?: number;
@@ -66,6 +81,7 @@ export interface Challan {
   customerAddress?: string;
   customerPhone?: string;
   categoryId?: string;
+  items?: BrickLineItem[];
   bricksCount: number;
   placeOfSupply?: string;
   challanDate?: string;
@@ -83,6 +99,7 @@ export interface GatePassRecord {
   driverPhone?: string;
   customerName: string;
   categoryId?: string;
+  items?: BrickLineItem[];
   bricksCount: number;
   placeOfSupply?: string;
   gatePassDate?: string;
@@ -100,6 +117,7 @@ export interface Invoice {
   customerPhone?: string;
   customerGstNumber?: string;
   categoryId?: string;
+  items?: BrickLineItem[];
   bricksCount: number;
   ratePerBrick?: number;
   grossAmount?: number;
@@ -398,7 +416,7 @@ export interface PaymentReceipt {
 }
 
 export interface CustomerCreditAging {
-  person: Person;
+  person: { _id: string; name: string; phone?: string };
   outstandingCredit: number;
   daysPending: number;
   overLimit: boolean;
@@ -1028,6 +1046,7 @@ export interface BrickLoadingEntry {
   amount?: number;
   categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
   pricePerBrick?: number;
+  items?: BrickLineItem[];
   placeOfSupply?: string;
   dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
   date: string;
@@ -1320,8 +1339,26 @@ export interface Machine {
   name: string;
   type: MachineType;
   identifier?: string;
+  purchaseDate?: string;
+  price?: number | null;
+  purchasedByName?: string;
+  purchasedByPhone?: string;
+  warrantyDetails?: string;
+  totalPaid?: number | null;
+  remainingDue?: number | null;
+  tenureMonths?: number | null;
   active: boolean;
   notes?: string;
+  createdAt: string;
+}
+
+export interface MachineInstallmentPayment {
+  _id: string;
+  machineId: string;
+  amount: number;
+  date: string;
+  notes?: string;
+  createdAt: string;
 }
 
 export type MachineFuelType = "DIESEL" | "PETROL" | "ELECTRICITY";
@@ -1416,12 +1453,13 @@ export interface SalarySlip {
   daysLate: number;
   grossSalary: number;
   deductions: number;
+  advanceDeducted: number;
   netSalary: number;
   generatedAt: string;
 }
 
 export interface SalaryStatusEntry {
-  person: { _id: string; name: string; designation: string; monthlySalary: number };
+  person: { _id: string; name: string; designation: string; monthlySalary: number | null };
   slip: SalarySlip | null;
 }
 

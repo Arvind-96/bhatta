@@ -25,6 +25,16 @@ export const salaryDict: Record<string, Record<Locale, string>> = {
   "salary.noSalariedStaff": { en: "No staff with a monthly salary set yet.", hi: "अभी तक किसी स्टाफ का मासिक वेतन सेट नहीं है।" },
   "salary.slipHistory": { en: "Salary Slip History", hi: "वेतन पर्ची इतिहास" },
   "salary.noSlipsYet": { en: "No salary slips generated yet.", hi: "अभी तक कोई वेतन पर्ची जनरेट नहीं हुई।" },
+  "salary.generateForMonth": { en: "Generate salary for this month", hi: "इस महीने का वेतन जनरेट करें" },
+  "salary.regenerateForMonth": { en: "Regenerate salary for this month", hi: "इस महीने का वेतन फिर से जनरेट करें" },
+  "salary.advanceDeductedLabel": { en: "Advance deducted", hi: "एडवांस काटा गया" },
+  "salary.totalAdvanceGivenLabel": { en: "Advance given", hi: "एडवांस दिया गया" },
+  "salary.confirmDeleteSlip": { en: "Delete the {month} salary slip? This can't be undone.", hi: "{month} की वेतन पर्ची हटाएं? यह पूर्ववत नहीं किया जा सकता।" },
+  "salary.editSlipTitle": { en: "Edit Salary Slip", hi: "वेतन पर्ची संपादित करें" },
+  "salary.editSlipNote": {
+    en: "Manually overrides this slip's final numbers — the PDF stays as originally generated.",
+    hi: "यह इस पर्ची के अंतिम आंकड़ों को मैन्युअल रूप से बदल देता है — PDF मूल रूप से जनरेट किए गए अनुसार ही रहेगी।",
+  },
 
   "calendar.title": { en: "Attendance Calendar", hi: "हाज़िरी कैलेंडर" },
   "calendar.present": { en: "Present", hi: "उपस्थित" },

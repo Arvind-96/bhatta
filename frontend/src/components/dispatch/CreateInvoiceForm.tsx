@@ -10,6 +10,7 @@ import { printInvoiceRecord } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { formatINR } from "@/lib/utils";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { BrickLineItemsEditor, emptyLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, Customer, Dispatch as DispatchEntry, Invoice, PaymentMode } from "@/types";
 
 const inputClass =
@@ -37,10 +38,20 @@ interface CreateInvoiceFormProps {
   onSaved: () => void;
 }
 
-function categoryLabelFor(categoryId: string, categories: BrickCategory[]) {
-  const c = categories.find((cat) => cat._id === categoryId);
-  if (!c) return "—";
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
+// Seeds the line-item rows from a saved invoice's own items (or its
+// legacy single categoryId/bricksCount/ratePerBrick scalars), or — for a
+// brand-new invoice — from the source dispatch, defaulting the price per
+// row to the dispatch's own overall bricks-to-amount rate (the same
+// default the single-category form used before multi-category items).
+function seedInvoiceItems(existing: Invoice | null | undefined, dispatch: DispatchEntry | null): LineItemRow[] {
+  if (existing) {
+    return lineItemRowsFrom({ items: existing.items, categoryId: existing.categoryId, bricksCount: existing.bricksCount, pricePerBrick: existing.ratePerBrick });
+  }
+  if (dispatch) {
+    const impliedRate = dispatch.bricksCount ? Math.round((dispatch.amount / dispatch.bricksCount) * 100) / 100 : undefined;
+    return lineItemRowsFrom({ items: dispatch.items, categoryId: dispatch.categoryId, bricksCount: dispatch.bricksCount, pricePerBrick: impliedRate });
+  }
+  return [emptyLineItemRow()];
 }
 
 // The priced/GST commercial bill, its own saved record (see
@@ -66,7 +77,6 @@ export function CreateInvoiceForm({
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
-  const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
   const dispatchGstNumber = dispatch && typeof dispatch.customerId === "object" ? dispatch.customerId?.gstNumber ?? "" : "";
   const defaultCustomer = customers?.find((c) => c._id === defaultCustomerId);
   const [selectedCustomerId, setSelectedCustomerId] = useState(fixedCustomerId ?? existing?.customerId ?? defaultCustomerId ?? "");
@@ -74,15 +84,7 @@ export function CreateInvoiceForm({
   const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? fixedCustomer?.addresses[0] ?? defaultCustomer?.addresses[0] ?? dispatch?.customerAddress ?? "");
   const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? fixedCustomer?.phones[0] ?? defaultCustomer?.phones[0] ?? dispatch?.customerPhone ?? "");
   const [customerGstNumber, setCustomerGstNumber] = useState(existing?.customerGstNumber ?? dispatchGstNumber);
-  const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
-  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
-  const [ratePerBrick, setRatePerBrick] = useState(
-    existing?.ratePerBrick != null
-      ? String(existing.ratePerBrick)
-      : dispatch?.bricksCount
-      ? String(Math.round((dispatch.amount / dispatch.bricksCount) * 100) / 100)
-      : ""
-  );
+  const [items, setItems] = useState<LineItemRow[]>(seedInvoiceItems(existing, dispatch));
   const [discountAmount, setDiscountAmount] = useState(
     existing?.discountAmount != null ? String(existing.discountAmount) : dispatch?.discountAmount != null ? String(dispatch.discountAmount) : ""
   );
@@ -134,7 +136,9 @@ export function CreateInvoiceForm({
     };
   }, [selectedCustomerId, existing]);
 
-  const gross = (Number(bricksCount) || 0) * (Number(ratePerBrick) || 0);
+  const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+  const bricksCount = validItems.reduce((sum, row) => sum + (Number(row.bricksCount) || 0), 0);
+  const gross = validItems.reduce((sum, row) => sum + (Number(row.bricksCount) || 0) * (Number(row.pricePerBrick) || 0), 0);
   const net = Math.max(0, gross - (Number(discountAmount) || 0));
   const effectivePaidNow = amountPaidNow ? Number(amountPaidNow) : net;
   const remainingOnThisInvoice = Math.max(0, Math.round((net - effectivePaidNow) * 100) / 100);
@@ -154,6 +158,7 @@ export function CreateInvoiceForm({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (validItems.length === 0) return;
     if (isPaymentSplitMismatched(paymentMode, net, cashAmount, onlineAmount)) {
       setFormError(t("payment.splitMismatch", { total: net.toLocaleString("en-IN") }));
       return;
@@ -161,6 +166,11 @@ export function CreateInvoiceForm({
     setFormError("");
     setSaving(true);
     try {
+      const lineItems = validItems.map((row) => ({
+        categoryId: row.categoryId,
+        bricksCount: Number(row.bricksCount),
+        pricePerBrick: row.pricePerBrick ? Number(row.pricePerBrick) : undefined,
+      }));
       const payload = {
         sequenceNumber: sequenceNumber ? Number(sequenceNumber) : undefined,
         customerId: selectedCustomerId || undefined,
@@ -168,9 +178,10 @@ export function CreateInvoiceForm({
         customerAddress: customerAddress || undefined,
         customerPhone: customerPhone || undefined,
         customerGstNumber: customerGstNumber || undefined,
-        categoryId: categoryId || undefined,
-        bricksCount: Number(bricksCount),
-        ratePerBrick: ratePerBrick ? Number(ratePerBrick) : undefined,
+        categoryId: lineItems[0].categoryId || undefined,
+        bricksCount,
+        items: lineItems,
+        ratePerBrick: lineItems.length === 1 ? lineItems[0].pricePerBrick : undefined,
         grossAmount: gross || undefined,
         discountAmount: discountAmount ? Number(discountAmount) : undefined,
         netAmount: net,
@@ -193,7 +204,7 @@ export function CreateInvoiceForm({
         customerName,
         remainingOnThisDoc: Math.max(0, Math.round((row.netAmount - (row.amountPaidNow ?? row.netAmount)) * 100) / 100),
       });
-      printInvoiceRecord(row, kilnInfo, categoryLabelFor(categoryId, categories), overallDue, stamp);
+      printInvoiceRecord(row, kilnInfo, categories, overallDue, stamp);
       onSaved();
     } finally {
       setSaving(false);
@@ -249,16 +260,9 @@ export function CreateInvoiceForm({
           </div>
         )}
 
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
-          <option value="">{t("brickLoading.categoryPlaceholder")}</option>
-          {categories.map((c) => (
-            <option key={c._id} value={c._id}>
-              {c.grade ? `${c.category} (${c.grade})` : c.category}
-            </option>
-          ))}
-        </select>
-        <input required type="number" placeholder={t("brickLoading.bricksLoadedPlaceholder")} value={bricksCount} onChange={(e) => setBricksCount(e.target.value)} className={inputClass} />
-        <input type="number" placeholder={t("dispatchDocs.ratePerBrickPlaceholder")} value={ratePerBrick} onChange={(e) => setRatePerBrick(e.target.value)} className={inputClass} />
+        <div className="col-span-2">
+          <BrickLineItemsEditor items={items} onChange={setItems} categories={categories} />
+        </div>
         <input type="number" placeholder={t("dispatch.discountPlaceholder")} value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} className={inputClass} />
 
         <div className="col-span-2 flex items-center justify-between rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-2">

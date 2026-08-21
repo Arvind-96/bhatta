@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { printChallanRecord } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
+import { BrickLineItemsEditor, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, Challan, Dispatch as DispatchEntry } from "@/types";
 
 const inputClass =
@@ -25,12 +26,6 @@ interface CreateChallanFormProps {
   onSaved: () => void;
 }
 
-function categoryLabelFor(categoryId: string, categories: BrickCategory[]) {
-  const c = categories.find((cat) => cat._id === categoryId);
-  if (!c) return "—";
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
-}
-
 // A pure delivery note (no pricing) editable independently of the
 // Dispatch record it's created from -- pre-filled from the dispatch the
 // first time, then its own saved fields on every re-open. Generating
@@ -44,7 +39,6 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
-  const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
   const [sequenceNumber, setSequenceNumber] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
   const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch?.vehicleType ?? "");
@@ -53,8 +47,7 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
   const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch?.customerName ?? "");
   const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? dispatch?.customerAddress ?? "");
   const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? dispatch?.customerPhone ?? "");
-  const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
-  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
+  const [items, setItems] = useState<LineItemRow[]>(lineItemRowsFrom(existing ?? dispatch ?? { bricksCount: 0 }));
   const [placeOfSupply, setPlaceOfSupply] = useState(existing?.placeOfSupply ?? dispatch?.placeOfSupply ?? "");
   const [challanDate, setChallanDate] = useState((existing?.challanDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
   const [notes, setNotes] = useState(existing?.notes ?? "");
@@ -72,8 +65,11 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+    if (validItems.length === 0) return;
     setSaving(true);
     try {
+      const lineItems = validItems.map((row) => ({ categoryId: row.categoryId, bricksCount: Number(row.bricksCount) }));
       const payload = {
         sequenceNumber: sequenceNumber ? Number(sequenceNumber) : undefined,
         vehicleNumber: vehicleNumber || undefined,
@@ -83,15 +79,16 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
         customerName,
         customerAddress: customerAddress || undefined,
         customerPhone: customerPhone || undefined,
-        categoryId: categoryId || undefined,
-        bricksCount: Number(bricksCount),
+        categoryId: lineItems[0].categoryId || undefined,
+        bricksCount: lineItems.reduce((sum, i) => sum + i.bricksCount, 0),
+        items: lineItems,
         placeOfSupply: placeOfSupply || undefined,
         challanDate,
         notes: notes || undefined,
       };
       const row = existing ? await api.challans.update(existing._id, payload) : await api.challans.create({ dispatchId: dispatch!._id, ...payload });
       const { stamp } = await resolvePaymentInfo({ customerName, remainingOnThisDoc: 0 });
-      printChallanRecord(row, kilnInfo, categoryLabelFor(categoryId, categories), stamp);
+      printChallanRecord(row, kilnInfo, categories, stamp);
       onSaved();
     } finally {
       setSaving(false);
@@ -130,15 +127,9 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
           <option value="TRUCK">{t("brickLoading.truck")}</option>
           <option value="TRACTOR">{t("brickLoading.tractor")}</option>
         </select>
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
-          <option value="">{t("brickLoading.categoryPlaceholder")}</option>
-          {categories.map((c) => (
-            <option key={c._id} value={c._id}>
-              {c.grade ? `${c.category} (${c.grade})` : c.category}
-            </option>
-          ))}
-        </select>
-        <input required type="number" placeholder={t("brickLoading.bricksLoadedPlaceholder")} value={bricksCount} onChange={(e) => setBricksCount(e.target.value)} className={inputClass} />
+        <div className="col-span-2">
+          <BrickLineItemsEditor items={items} onChange={setItems} categories={categories} pricingEnabled={false} />
+        </div>
         <input placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")} value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} className={inputClass} />
         <label className="flex flex-col gap-1">
           <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>

@@ -97,10 +97,15 @@ function StaffSection({
 
 export function Staff() {
   const { t } = useTranslation();
+  const personTypeMeta = usePersonTypeMeta();
   const [munims, setMunims] = useState<StaffMember[]>([]);
   const [chowkidars, setChowkidars] = useState<StaffMember[]>([]);
   const [officeHelpers, setOfficeHelpers] = useState<StaffMember[]>([]);
-  const [staffDrivers, setStaffDrivers] = useState<StaffMember[]>([]);
+  const [drivers, setDrivers] = useState<StaffMember[]>([]);
+  const [suppliers, setSuppliers] = useState<StaffMember[]>([]);
+  const [partners, setPartners] = useState<StaffMember[]>([]);
+  const [fitters, setFitters] = useState<StaffMember[]>([]);
+  const [customers, setCustomers] = useState<StaffMember[]>([]);
   const [openStaffId, setOpenStaffId] = useState<string | null>(null);
   const [addType, setAddType] = useState<PersonType | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -111,22 +116,37 @@ export function Staff() {
   }
 
   async function refresh() {
-    const [munimList, chowkidarList, helperList, driverList] = await Promise.all([
+    const [munimList, chowkidarList, helperList, driverList, supplierList, partnerList, fitterList, customerList] = await Promise.all([
       api.people.list("MUNIM"),
       api.people.list("CHOWKIDAR"),
       api.people.list("HELPER"),
       api.people.list("DRIVER"),
+      api.people.list("SUPPLIER"),
+      api.people.list("PARTNER"),
+      api.people.list("FITTER"),
+      api.people.list("CUSTOMER"),
     ]);
-    const [munimMembers, chowkidarMembers, helperMembers, driverMembers] = await Promise.all([
+    const [munimMembers, chowkidarMembers, helperMembers, driverMembers, supplierMembers, partnerMembers, fitterMembers, customerMembers] = await Promise.all([
       withBalance(munimList),
       withBalance(chowkidarList),
       withBalance(helperList.filter((h) => h.isOfficeStaff)),
-      withBalance(driverList.filter((d) => d.isOfficeStaff)),
+      // Every Driver, not just office-flagged ones — this absorbs what the
+      // now-removed People > Other tab's Driver filter used to show, so
+      // every driver profile stays reachable from somewhere.
+      withBalance(driverList),
+      withBalance(supplierList),
+      withBalance(partnerList),
+      withBalance(fitterList),
+      withBalance(customerList),
     ]);
     setMunims(munimMembers);
     setChowkidars(chowkidarMembers);
     setOfficeHelpers(helperMembers);
-    setStaffDrivers(driverMembers);
+    setDrivers(driverMembers);
+    setSuppliers(supplierMembers);
+    setPartners(partnerMembers);
+    setFitters(fitterMembers);
+    setCustomers(customerMembers);
   }
 
   useEffect(() => {
@@ -141,6 +161,8 @@ export function Staff() {
     return <StaffDetailPage staffId={openStaffId} onBack={() => setOpenStaffId(null)} />;
   }
 
+  const totalOnRoster = munims.length + chowkidars.length + officeHelpers.length + drivers.length + suppliers.length + partners.length + fitters.length + customers.length;
+
   return (
     <div className="space-y-6">
       <Card>
@@ -148,16 +170,18 @@ export function Staff() {
           <CardTitle>{t("staff.adminTitle")}</CardTitle>
           <span className="text-sm text-ink-muted">{t("staff.adminSubtitle")}</span>
         </CardHeader>
-        <p className="text-3xl font-semibold tabular-nums text-ink-primary">
-          {munims.length + chowkidars.length + officeHelpers.length + staffDrivers.length}
-        </p>
+        <p className="text-3xl font-semibold tabular-nums text-ink-primary">{totalOnRoster}</p>
         <p className="text-sm text-ink-muted">{t("staff.totalOnRoster")}</p>
       </Card>
 
       <StaffSection title={t("staff.munim")} members={munims} onOpen={setOpenStaffId} onAdd={() => setAddType("MUNIM")} />
       <StaffSection title={t("staff.helperOffice")} members={officeHelpers} onOpen={setOpenStaffId} onAdd={() => setAddType("HELPER")} />
       <StaffSection title={t("staff.chowkidar")} members={chowkidars} onOpen={setOpenStaffId} onAdd={() => setAddType("CHOWKIDAR")} />
-      <StaffSection title={t("staff.driverStaff")} members={staffDrivers} onOpen={setOpenStaffId} onAdd={() => setAddType("DRIVER")} />
+      <StaffSection title={t("staff.driverStaff")} members={drivers} onOpen={setOpenStaffId} onAdd={() => setAddType("DRIVER")} />
+      <StaffSection title={personTypeMeta.SUPPLIER.label} members={suppliers} onOpen={setOpenStaffId} onAdd={() => setAddType("SUPPLIER")} />
+      <StaffSection title={personTypeMeta.PARTNER.label} members={partners} onOpen={setOpenStaffId} onAdd={() => setAddType("PARTNER")} />
+      <StaffSection title={personTypeMeta.FITTER.label} members={fitters} onOpen={setOpenStaffId} onAdd={() => setAddType("FITTER")} />
+      <StaffSection title={personTypeMeta.CUSTOMER.label} members={customers} onOpen={setOpenStaffId} onAdd={() => setAddType("CUSTOMER")} />
 
       {addType && (
         <AddPersonModal

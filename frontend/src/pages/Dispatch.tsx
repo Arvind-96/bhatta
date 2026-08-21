@@ -15,16 +15,13 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import { DispatchDetailPage } from "@/components/dispatch/DispatchDetailPage";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { BrickLineItemsEditor, emptyLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, PaymentMode, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
 const PAGE_SIZE = 10;
-
-function categoryGradeLabel(c: BrickCategory) {
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
-}
 
 // Prefer the free-form category+grade this dispatch was linked to over the
 // older fixed A1/JHAMA/PELA classification — same fallback rule used on the
@@ -60,10 +57,10 @@ function emptyForm() {
     driverName: "",
     driverPhone: "",
     driverTipAmount: "",
-    bricksCount: "",
     amount: "",
+    amountAutoFilled: true,
     discountAmount: "",
-    categoryId: "",
+    items: [emptyLineItemRow()] as LineItemRow[],
     placeOfSupply: "",
     notes: "",
     transportCost: "",
@@ -129,6 +126,20 @@ export function Dispatch() {
   const unlinkedTrips = loadingTrips.filter((t) => !t.dispatchId);
   const selectedTrip = unlinkedTrips.find((t) => t._id === form.loadingEntryId);
   const tripLocked = !!form.loadingEntryId;
+  const totalBricksFromItems = form.items.reduce((sum, row) => sum + (Number(row.bricksCount) || 0), 0);
+
+  // Recomputes the suggested top-level `amount` from summed item amounts —
+  // an editable default, never enforced server-side (see createDispatch's
+  // items branch: the billed amount stays whatever the admin types at the
+  // top level, same as before multi-category items). Stops overwriting the
+  // admin's own typed value the moment they edit `amount` directly (see the
+  // amount input's onChange below, which flips amountAutoFilled off).
+  function handleItemsChange(items: LineItemRow[]) {
+    setForm((f) => {
+      const newTotal = items.reduce((s, r) => s + (Number(r.bricksCount) || 0) * (Number(r.pricePerBrick) || 0), 0);
+      return { ...f, items, amount: f.amountAutoFilled && newTotal ? String(newTotal) : f.amount };
+    });
+  }
 
   // Cross-navigation from another page (e.g. a Loading Trip's "linked
   // dispatch" link) now opens this dispatch's own detail page directly,
@@ -156,21 +167,20 @@ export function Dispatch() {
 
   function handleTripSelect(id: string) {
     if (!id) {
-      setForm((f) => ({ ...f, loadingEntryId: "", vehicleNumber: "", vehicleType: "", bricksCount: "", amount: "", discountAmount: "", categoryId: "" }));
+      setForm((f) => ({ ...f, loadingEntryId: "", vehicleNumber: "", vehicleType: "", amount: "", amountAutoFilled: true, discountAmount: "", items: [emptyLineItemRow()] }));
       return;
     }
     const trip = unlinkedTrips.find((t) => t._id === id);
     if (!trip) return;
-    const categoryId = typeof trip.categoryId === "object" ? trip.categoryId?._id ?? "" : trip.categoryId ?? "";
     setForm((f) => ({
       ...f,
       loadingEntryId: id,
       vehicleNumber: trip.vehicleNumber,
       vehicleType: trip.vehicleType,
-      bricksCount: String(trip.bricksCount),
       amount: trip.amount != null ? String(trip.amount) : "",
+      amountAutoFilled: false,
       discountAmount: trip.discountAmount != null ? String(trip.discountAmount) : "",
-      categoryId,
+      items: lineItemRowsFrom(trip),
       // These, unlike the fields above, are never backend-overridden for a
       // linked trip — just a starting point the admin can still edit freely.
       customerName: trip.customerName || f.customerName,
@@ -188,7 +198,7 @@ export function Dispatch() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.customerName) return;
-    if (!tripLocked && (!form.bricksCount || !form.amount)) return;
+    if (!tripLocked && (totalBricksFromItems === 0 || !form.amount)) return;
     if (!tripLocked && Number(form.discountAmount) > Number(form.amount)) {
       setFormError(t("dispatch.discountExceedsAmount"));
       return;
@@ -210,10 +220,17 @@ export function Dispatch() {
         customerAddress: form.customerAddress || undefined,
         customerPhone: form.customerPhone || undefined,
         loadingEntryId: form.loadingEntryId || undefined,
-        bricksCount: form.bricksCount ? Number(form.bricksCount) : undefined,
         amount: form.amount ? Number(form.amount) : undefined,
         discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
-        categoryId: form.categoryId || undefined,
+        items: tripLocked
+          ? undefined
+          : form.items
+              .filter((row) => row.categoryId && row.bricksCount)
+              .map((row) => ({
+                categoryId: row.categoryId,
+                bricksCount: Number(row.bricksCount),
+                pricePerBrick: row.pricePerBrick ? Number(row.pricePerBrick) : undefined,
+              })),
         vehicleNumber: form.vehicleNumber || undefined,
         vehicleType: form.vehicleType || undefined,
         driverName: form.driverName || undefined,
@@ -354,39 +371,17 @@ export function Dispatch() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                type="number"
-                placeholder={t("dispatch.driverTipPlaceholder")}
-                value={form.driverTipAmount}
-                onChange={(e) => setForm((f) => ({ ...f, driverTipAmount: e.target.value }))}
-                className={inputClass}
-              />
-              <select
-                value={form.categoryId}
-                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-                disabled={tripLocked}
-                className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
-              >
-                <option value="">{t("dispatch.categoryPlaceholder")}</option>
-                {categories.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {categoryGradeLabel(c)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <input
+              type="number"
+              placeholder={t("dispatch.driverTipPlaceholder")}
+              value={form.driverTipAmount}
+              onChange={(e) => setForm((f) => ({ ...f, driverTipAmount: e.target.value }))}
+              className={inputClass}
+            />
 
-            <div className="grid grid-cols-3 gap-2">
-              <input
-                required={!tripLocked}
-                type="number"
-                placeholder={t("dispatch.bricksDispatchedPlaceholder")}
-                value={form.bricksCount}
-                onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
-                disabled={tripLocked}
-                className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
-              />
+            <BrickLineItemsEditor items={form.items} onChange={handleItemsChange} categories={categories} readOnly={tripLocked} />
+
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
                 placeholder={t("dispatch.discountPlaceholder")}
@@ -400,7 +395,7 @@ export function Dispatch() {
                 type="number"
                 placeholder={t("dispatch.amountPlaceholder")}
                 value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value, amountAutoFilled: false }))}
                 disabled={tripLocked}
                 className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
               />

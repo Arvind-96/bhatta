@@ -6,8 +6,9 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useUiStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
 import { formatDateTime } from "@/lib/utils";
-import { printGatePassRecord } from "@/lib/printDocument";
+import { printGatePassRecord, resolveItemRows } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
+import { LineItemsDetailTable } from "@/components/dispatch/BrickLineItemsEditor";
 import { CreateGatePassForm } from "./CreateGatePassForm";
 import type { BrickCategory, GatePassRecord } from "@/types";
 
@@ -19,13 +20,6 @@ function Field({ label, value }: { label: string; value?: string | number | null
       <p className="text-sm text-ink-primary">{value}</p>
     </div>
   );
-}
-
-function categoryLabelFor(categoryId: string | undefined, categories: BrickCategory[]) {
-  if (!categoryId) return "—";
-  const c = categories.find((cat) => cat._id === categoryId);
-  if (!c) return "—";
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
 }
 
 interface GatePassDetailPageProps {
@@ -55,8 +49,10 @@ export function GatePassDetailPage({ gatePass, categories, onBack, onDeleted }: 
 
   async function handlePrint() {
     const { stamp } = await resolvePaymentInfo({ customerName: gatePass.customerName, remainingOnThisDoc: 0 });
-    printGatePassRecord(gatePass, kilnInfo, categoryLabelFor(gatePass.categoryId, categories), stamp);
+    printGatePassRecord(gatePass, kilnInfo, categories, stamp);
   }
+
+  const itemRows = resolveItemRows(gatePass.items, categories, { categoryId: gatePass.categoryId, bricksCount: gatePass.bricksCount });
 
   return (
     <div>
@@ -121,10 +117,15 @@ export function GatePassDetailPage({ gatePass, categories, onBack, onDeleted }: 
           <Card className="lg:col-span-2">
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.dispatchDetailsSection")}</h4>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Field label={t("brickLoading.categoryHeader")} value={categoryLabelFor(gatePass.categoryId, categories)} />
+              {itemRows.length <= 1 && <Field label={t("brickLoading.categoryHeader")} value={itemRows[0]?.label ?? "—"} />}
               <Field label={t("brickLoading.bricksLoadedPlaceholder")} value={gatePass.bricksCount.toLocaleString("en-IN")} />
               <Field label={t("dispatchDocs.placeOfSupplyPlaceholder")} value={gatePass.placeOfSupply} />
             </div>
+            {itemRows.length > 1 && (
+              <div className="mt-3">
+                <LineItemsDetailTable rows={itemRows} />
+              </div>
+            )}
           </Card>
 
           <Card className="lg:col-span-2">

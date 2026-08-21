@@ -20,6 +20,16 @@ import {
   nextInvoiceSequenceNumber,
 } from "../services/dispatchDocuments.service";
 
+// One row per brick category on this document — see BrickLineItem's doc
+// comment in db/schema/_helpers.ts. `pricePerBrick` is unused on Challan/
+// Gate Pass (no pricing there, same as their existing bricksCount-only
+// scalar shape) but accepted on all three for one shared schema.
+const lineItemSchema = z.object({
+  categoryId: z.string().optional(),
+  bricksCount: z.number().int().positive(),
+  pricePerBrick: z.number().min(0).optional(),
+});
+
 // Absent/undefined means "leave blank" — the admin cleared the pre-filled
 // suggestion; see dispatchDocuments.service.ts's createChallan/etc.
 const challanSchema = z.object({
@@ -34,6 +44,7 @@ const challanSchema = z.object({
   customerPhone: z.string().optional(),
   categoryId: z.string().optional(),
   bricksCount: z.number().int().positive(),
+  items: z.array(lineItemSchema).optional(),
   placeOfSupply: z.string().optional(),
   challanDate: z.string().min(1, "Transaction date is required"),
   notes: z.string().optional(),
@@ -71,6 +82,7 @@ const gatePassSchema = z.object({
   customerName: z.string(),
   categoryId: z.string().optional(),
   bricksCount: z.number().int().positive(),
+  items: z.array(lineItemSchema).optional(),
   placeOfSupply: z.string().optional(),
   gatePassDate: z.string().min(1, "Transaction date is required"),
   notes: z.string().optional(),
@@ -111,6 +123,7 @@ const invoiceSchema = z.object({
   customerGstNumber: z.string().optional(),
   categoryId: z.string().optional(),
   bricksCount: z.number().int().nonnegative(),
+  items: z.array(lineItemSchema).optional(),
   ratePerBrick: z.number().min(0).optional(),
   grossAmount: z.number().min(0).optional(),
   discountAmount: z.number().min(0).optional(),

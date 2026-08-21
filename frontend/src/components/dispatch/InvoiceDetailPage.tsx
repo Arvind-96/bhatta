@@ -6,8 +6,9 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useUiStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
 import { formatDateTime, formatINR } from "@/lib/utils";
-import { printInvoiceRecord } from "@/lib/printDocument";
+import { printInvoiceRecord, resolveItemRows } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
+import { LineItemsDetailTable } from "@/components/dispatch/BrickLineItemsEditor";
 import { CreateInvoiceForm } from "./CreateInvoiceForm";
 import type { BrickCategory, Invoice } from "@/types";
 
@@ -19,13 +20,6 @@ function Field({ label, value }: { label: string; value?: string | number | null
       <p className="text-sm text-ink-primary">{value}</p>
     </div>
   );
-}
-
-function categoryLabelFor(categoryId: string | undefined, categories: BrickCategory[]) {
-  if (!categoryId) return "—";
-  const c = categories.find((cat) => cat._id === categoryId);
-  if (!c) return "—";
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
 }
 
 interface InvoiceDetailPageProps {
@@ -56,8 +50,16 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
   async function handlePrint() {
     const remainingOnThisDoc = Math.max(0, Math.round((invoice.netAmount - (invoice.amountPaidNow ?? invoice.netAmount)) * 100) / 100);
     const { stamp, overallDue } = await resolvePaymentInfo({ customerId: invoice.customerId, customerName: invoice.customerName, remainingOnThisDoc });
-    printInvoiceRecord(invoice, kilnInfo, categoryLabelFor(invoice.categoryId, categories), overallDue, stamp);
+    printInvoiceRecord(invoice, kilnInfo, categories, overallDue, stamp);
   }
+
+  const invoiceGross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);
+  const itemRows = resolveItemRows(invoice.items, categories, {
+    categoryId: invoice.categoryId,
+    bricksCount: invoice.bricksCount,
+    pricePerBrick: invoice.ratePerBrick,
+    amount: invoiceGross,
+  });
 
   return (
     <div>
@@ -116,12 +118,19 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
           <Card>
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.dispatchDetailsSection")}</h4>
             <div className="grid grid-cols-2 gap-3">
-              <Field label={t("brickLoading.categoryHeader")} value={categoryLabelFor(invoice.categoryId, categories)} />
+              {itemRows.length <= 1 && <Field label={t("brickLoading.categoryHeader")} value={itemRows[0]?.label ?? "—"} />}
               <Field label={t("brickLoading.bricksLoadedPlaceholder")} value={invoice.bricksCount.toLocaleString("en-IN")} />
-              <Field label={t("dispatchDocs.ratePerBrickPlaceholder")} value={invoice.ratePerBrick != null ? `₹${invoice.ratePerBrick}` : undefined} />
+              {itemRows.length <= 1 && (
+                <Field label={t("dispatchDocs.ratePerBrickPlaceholder")} value={invoice.ratePerBrick != null ? `₹${invoice.ratePerBrick}` : undefined} />
+              )}
               <Field label={t("dispatch.discountPlaceholder")} value={invoice.discountAmount ? `₹${formatINR(invoice.discountAmount)}` : undefined} />
               <Field label={t("dispatchDocs.placeOfSupplyPlaceholder")} value={invoice.placeOfSupply} />
             </div>
+            {itemRows.length > 1 && (
+              <div className="mt-3">
+                <LineItemsDetailTable rows={itemRows} pricingEnabled />
+              </div>
+            )}
           </Card>
 
           <Card className="lg:col-span-2">

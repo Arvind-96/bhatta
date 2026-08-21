@@ -6,14 +6,11 @@ import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { BrickLineItemsEditor, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, PaymentMode, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
-
-function categoryGradeLabel(c: BrickCategory) {
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
-}
 
 interface EditDispatchModalProps {
   dispatch: DispatchEntry;
@@ -36,14 +33,12 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
 
   const initialCustomerId = typeof dispatch.customerId === "object" ? dispatch.customerId?._id ?? "" : dispatch.customerId ?? "";
   const initialDriverId = typeof dispatch.driverId === "object" ? dispatch.driverId?._id ?? "" : dispatch.driverId ?? "";
-  const initialCategoryId = typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "";
   const grossAmount = dispatch.amount + (dispatch.discountAmount ?? 0);
 
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [customerName, setCustomerName] = useState(dispatch.customerName);
   const [grade, setGrade] = useState<BrickGrade>(dispatch.grade);
-  const [categoryId, setCategoryId] = useState(initialCategoryId);
-  const [bricksCount, setBricksCount] = useState(String(dispatch.bricksCount));
+  const [items, setItems] = useState<LineItemRow[]>(lineItemRowsFrom(dispatch));
   const [amount, setAmount] = useState(String(grossAmount));
   const [discountAmount, setDiscountAmount] = useState(dispatch.discountAmount ? String(dispatch.discountAmount) : "");
   const [driverId, setDriverId] = useState(initialDriverId);
@@ -74,9 +69,11 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
     if (customer) setCustomerName(customer.name);
   }
 
+  const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!customerName || !bricksCount || !amount) return;
+    if (!customerName || validItems.length === 0 || !amount) return;
     const netAmount = Number(amount) - (Number(discountAmount) || 0);
     if (Number(discountAmount) > Number(amount)) {
       setFormError(t("dispatch.discountExceedsAmount"));
@@ -93,8 +90,11 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
         customerName,
         customerId: customerId || null,
         grade,
-        categoryId: categoryId || null,
-        bricksCount: Number(bricksCount),
+        items: validItems.map((row) => ({
+          categoryId: row.categoryId,
+          bricksCount: Number(row.bricksCount),
+          pricePerBrick: row.pricePerBrick ? Number(row.pricePerBrick) : undefined,
+        })),
         amount: Number(amount),
         discountAmount: discountAmount ? Number(discountAmount) : 0,
         driverId: driverId || null,
@@ -153,14 +153,6 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
             <option value="JHAMA">{t("dispatch.gradeJhama")}</option>
             <option value="PELA">{t("dispatch.gradePela")}</option>
           </select>
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
-            <option value="">{t("dispatch.categoryPlaceholder")}</option>
-            {categories.map((c) => (
-              <option key={c._id} value={c._id}>
-                {categoryGradeLabel(c)}
-              </option>
-            ))}
-          </select>
           <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as PaymentMode)} className={inputClass}>
             <option value="CASH">{t("dispatch.paymentCash")}</option>
             <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
@@ -178,14 +170,9 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
               inputClassName={inputClass}
             />
           )}
-          <input
-            required
-            type="number"
-            placeholder={t("dispatch.bricksDispatchedPlaceholder")}
-            value={bricksCount}
-            onChange={(e) => setBricksCount(e.target.value)}
-            className={inputClass}
-          />
+          <div className="col-span-2">
+            <BrickLineItemsEditor items={items} onChange={setItems} categories={categories} />
+          </div>
           <input
             required
             type="number"

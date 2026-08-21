@@ -7,6 +7,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR } from "@/lib/utils";
+import { StaffDetailPage } from "@/components/staff/StaffDetailPage";
 import type { SalaryStatusEntry } from "@/types";
 
 function currentMonth() {
@@ -14,6 +15,11 @@ function currentMonth() {
   return { year: now.getFullYear(), month: now.getMonth() + 1 };
 }
 
+// Deliberately reuses the exact same StaffDetailPage component the People
+// page's Staff tab opens (not a Salary-specific view) — this is what keeps
+// the two pages "linked and synced": an edit made from either always shows
+// up on the other immediately, since there's only one profile component
+// and one underlying `people` record, never a second copy of the data.
 export function Salary() {
   const { t } = useTranslation();
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -21,6 +27,7 @@ export function Salary() {
   const [entries, setEntries] = useState<SalaryStatusEntry[]>([]);
   const [generating, setGenerating] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
+  const [openStaffId, setOpenStaffId] = useState<string | null>(null);
 
   const month = `${cursor.year}-${String(cursor.month).padStart(2, "0")}`;
   const monthLabel = new Date(cursor.year, cursor.month - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
@@ -47,6 +54,10 @@ export function Salary() {
     } finally {
       setGenerating(false);
     }
+  }
+
+  if (openStaffId) {
+    return <StaffDetailPage staffId={openStaffId} onBack={() => setOpenStaffId(null)} />;
   }
 
   return (
@@ -87,27 +98,26 @@ export function Salary() {
         ) : (
           <div className="space-y-2">
             {entries.map(({ person, slip }) => (
-              <div key={person._id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+              <button
+                key={person._id}
+                onClick={() => setOpenStaffId(person._id)}
+                className="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-ink-primary/5"
+              >
                 <div>
                   <p className="font-medium text-ink-primary">{person.name}</p>
-                  <p className="text-sm text-ink-muted">{person.designation} · ₹{formatINR(person.monthlySalary)}/mo</p>
+                  <p className="text-sm text-ink-muted">
+                    {person.designation}
+                    {person.monthlySalary ? ` · ₹${formatINR(person.monthlySalary)}/mo` : ""}
+                  </p>
                 </div>
                 <div className="flex items-center gap-3">
                   {slip ? (
-                    <>
-                      <span className="font-semibold tabular-nums text-ink-primary">₹{formatINR(slip.netSalary)}</span>
-                      <a href={api.salary.pdfUrl(slip._id, "en")} target="_blank" rel="noreferrer" className="text-series-1 hover:underline">
-                        {t("salary.viewEnglish")}
-                      </a>
-                      <a href={api.salary.pdfUrl(slip._id, "hi")} target="_blank" rel="noreferrer" className="text-series-1 hover:underline">
-                        {t("salary.viewHindi")}
-                      </a>
-                    </>
+                    <span className="font-semibold tabular-nums text-ink-primary">₹{formatINR(slip.netSalary)}</span>
                   ) : (
                     <span className="rounded-full bg-ink-primary/5 px-2.5 py-1 text-sm text-ink-muted">{t("salary.status.pending")}</span>
                   )}
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

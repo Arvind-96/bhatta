@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { Challan, Expense, GatePassRecord, Invoice, LedgerEntry, PaymentReceipt, SandContract, SoilContract, VehicleDieselEntry } from "@/types";
+import type { BrickCategory, BrickLineItem, Challan, Expense, GatePassRecord, Invoice, LedgerEntry, Machine, MachineInstallmentPayment, PaymentReceipt, SandContract, SoilContract, VehicleDieselEntry } from "@/types";
 
 // Gate Pass, Challan, Invoice, and Payment Receipt all share one visual
 // language (accent bars, a logo mark, a colored "who this is for" box, a
@@ -36,6 +36,43 @@ function kilnLogoLetter(kilnName: string) {
 function titleCase(value?: string | null) {
   if (!value) return value;
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+export interface ResolvedLineItem {
+  label: string;
+  bricksCount: number;
+  pricePerBrick?: number;
+  amount?: number;
+}
+
+// Resolves a document's `items` array (or, for a record predating this
+// feature, its single legacy categoryId/bricksCount/pricePerBrick scalars)
+// into print-ready rows with the category label already looked up. Shared
+// by all three documents so the "multi-category table vs. single legacy
+// row" decision is made in one place. `categories` is the kiln's full
+// brick-category list — Challan/Gate Pass/Invoice items only ever carry a
+// plain categoryId string (unlike a Brick Loading trip's own items, which
+// the backend enriches), so the label lookup always happens here.
+export function resolveItemRows(
+  items: BrickLineItem[] | undefined,
+  categories: BrickCategory[],
+  fallback: { categoryId?: { _id: string; category: string; grade?: string } | string; bricksCount: number; pricePerBrick?: number; amount?: number }
+): ResolvedLineItem[] {
+  const source = items && items.length > 0 ? items : fallback.categoryId || fallback.bricksCount > 0 ? [fallback] : [];
+  return source.map((it) => {
+    const id = typeof it.categoryId === "object" ? it.categoryId?._id : it.categoryId;
+    const category = categories.find((c) => c._id === id);
+    const label = category
+      ? category.grade
+        ? `${category.category} (${category.grade})`
+        : category.category
+      : typeof it.categoryId === "object" && it.categoryId
+      ? it.categoryId.grade
+        ? `${it.categoryId.category} (${it.categoryId.grade})`
+        : it.categoryId.category
+      : "—";
+    return { label, bricksCount: it.bricksCount, pricePerBrick: it.pricePerBrick, amount: it.amount };
+  });
 }
 
 export type PaymentStamp = "PAID" | "PARTIAL" | "DUE";
@@ -161,10 +198,19 @@ ${bodyHtml}
 // from the priced Invoice record below. Created from a Dispatch's own
 // detail page (see CreateChallanForm.tsx) as its own editable/deletable
 // record, not a live view of the dispatch.
-export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, categoryLabel: string, paymentStamp?: PaymentStamp) {
+export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, categories: BrickCategory[], paymentStamp?: PaymentStamp) {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `CH-${challan.sequenceNumber ?? "—"}`;
   const date = challan.challanDate ?? challan.createdAt;
+  const rows = resolveItemRows(challan.items, categories, { categoryId: challan.categoryId, bricksCount: challan.bricksCount });
+  const categoryLabel = rows.length > 1 ? `${rows.length} categories` : rows[0]?.label ?? "—";
+  const itemsTable =
+    rows.length > 1
+      ? `<table class="doc-items">
+          <thead><tr><th>#</th><th>Brick Category</th><th class="num">Bricks</th></tr></thead>
+          <tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.label)}</td><td class="num">${r.bricksCount.toLocaleString("en-IN")}</td></tr>`).join("")}</tbody>
+        </table>`
+      : "";
 
   const body = `
     <div class="doc-topbar"></div>
@@ -204,10 +250,11 @@ export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, catego
       <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(titleCase(challan.vehicleType) || "—")}</td></tr>
       <tr><td class="doc-table-label">Driver</td><td class="doc-table-value">${escapeHtml(challan.driverName || "—")}</td></tr>
       <tr><td class="doc-table-label">Driver mobile</td><td class="doc-table-value">${escapeHtml(challan.driverPhone || "—")}</td></tr>
-      <tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>
+      ${rows.length > 1 ? "" : `<tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>`}
       ${challan.placeOfSupply ? `<tr><td class="doc-table-label">Place of supply</td><td class="doc-table-value">${escapeHtml(challan.placeOfSupply)}</td></tr>` : ""}
       ${challan.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(challan.notes)}</td></tr>` : ""}
     </table>
+    ${itemsTable}
 
     <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED DELIVERY CHALLAN — NO PRICING ~</p>
     <div class="doc-sign-row">
@@ -222,10 +269,19 @@ export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, catego
 // Exit-authorization slip — its own editable/deletable record, distinct
 // from the ad-hoc printGatePass above (which reads straight off a
 // Dispatch with nothing saved). Same visual language, same accent.
-export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInfo, categoryLabel: string, paymentStamp?: PaymentStamp) {
+export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInfo, categories: BrickCategory[], paymentStamp?: PaymentStamp) {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `GP-${gatePass.sequenceNumber ?? "—"}`;
   const date = gatePass.gatePassDate ?? gatePass.createdAt;
+  const rows = resolveItemRows(gatePass.items, categories, { categoryId: gatePass.categoryId, bricksCount: gatePass.bricksCount });
+  const categoryLabel = rows.length > 1 ? `${rows.length} categories` : rows[0]?.label ?? "—";
+  const itemsTable =
+    rows.length > 1
+      ? `<table class="doc-items">
+          <thead><tr><th>#</th><th>Brick Category</th><th class="num">Bricks</th></tr></thead>
+          <tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(r.label)}</td><td class="num">${r.bricksCount.toLocaleString("en-IN")}</td></tr>`).join("")}</tbody>
+        </table>`
+      : "";
 
   const body = `
     <div class="doc-topbar"></div>
@@ -264,11 +320,12 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
       <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(titleCase(gatePass.vehicleType) || "—")}</td></tr>
       <tr><td class="doc-table-label">Driver</td><td class="doc-table-value">${escapeHtml(gatePass.driverName || "—")}</td></tr>
       <tr><td class="doc-table-label">Driver mobile</td><td class="doc-table-value">${escapeHtml(gatePass.driverPhone || "—")}</td></tr>
-      <tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>
+      ${rows.length > 1 ? "" : `<tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>`}
       <tr><td class="doc-table-label">Bricks loaded</td><td class="doc-table-value">${gatePass.bricksCount.toLocaleString("en-IN")}</td></tr>
       ${gatePass.placeOfSupply ? `<tr><td class="doc-table-label">Place of supply</td><td class="doc-table-value">${escapeHtml(gatePass.placeOfSupply)}</td></tr>` : ""}
       ${gatePass.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(gatePass.notes)}</td></tr>` : ""}
     </table>
+    ${itemsTable}
 
     <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED GATE PASS ~</p>
     <div class="doc-sign-row">
@@ -289,7 +346,7 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
 // `paymentStamp` is always shown — if the caller doesn't pass one (no
 // Customer resolvable), it falls back to a status computed purely from
 // this invoice's own paid/remaining amount.
-export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categoryLabel: string, customerOverallDue?: number, paymentStamp?: PaymentStamp) {
+export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categories: BrickCategory[], customerOverallDue?: number, paymentStamp?: PaymentStamp, fallbackLabel = "—") {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `INV-${invoice.sequenceNumber ?? "—"}`;
   const date = invoice.invoiceDate ?? invoice.createdAt;
@@ -298,15 +355,32 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
   const remainingOnThisInvoice = Math.max(0, Math.round((invoice.netAmount - amountPaidNow) * 100) / 100);
   const resolvedStamp: PaymentStamp = paymentStamp ?? (remainingOnThisInvoice <= 0 ? "PAID" : "PARTIAL");
 
+  const rawRows = resolveItemRows(invoice.items, categories, {
+    categoryId: invoice.categoryId,
+    bricksCount: invoice.bricksCount,
+    pricePerBrick: invoice.ratePerBrick,
+    amount: gross,
+  });
+  // A bricksCount=0 "Add Amount" invoice (see AddCustomerPaymentModal) has
+  // no real line item at all — falls back to one labeled placeholder row
+  // showing the full gross rather than an empty items table.
+  const rows = rawRows.length > 0 ? rawRows : [{ label: fallbackLabel, bricksCount: 0, amount: gross }];
+
   const itemRows = `
+    ${rows
+      .map((r, i) => {
+        const rowAmount = r.amount ?? (r.pricePerBrick != null ? r.bricksCount * r.pricePerBrick : gross);
+        return `
     <tr>
-      <td>01</td>
-      <td>${escapeHtml(categoryLabel)}</td>
-      <td>${invoice.ratePerBrick ? `₹${invoice.ratePerBrick.toLocaleString("en-IN", { maximumFractionDigits: 2 })}/NOS` : "—"}</td>
-      <td class="num">${invoice.bricksCount.toLocaleString("en-IN")}</td>
-      <td class="num">₹${formatINR(gross)}</td>
-      <td class="num">₹${formatINR(gross)}</td>
-    </tr>
+      <td>${String(i + 1).padStart(2, "0")}</td>
+      <td>${escapeHtml(r.label)}</td>
+      <td>${r.pricePerBrick ? `₹${r.pricePerBrick.toLocaleString("en-IN", { maximumFractionDigits: 2 })}/NOS` : "—"}</td>
+      <td class="num">${r.bricksCount.toLocaleString("en-IN")}</td>
+      <td class="num">₹${formatINR(rowAmount)}</td>
+      <td class="num">₹${formatINR(rowAmount)}</td>
+    </tr>`;
+      })
+      .join("")}
     ${
       invoice.discountAmount
         ? `<tr><td></td><td>Discount</td><td>—</td><td class="num">—</td><td class="num">—</td><td class="num">− ₹${formatINR(invoice.discountAmount)}</td></tr>`
@@ -530,6 +604,84 @@ export function printLedgerEntry(entry: LedgerEntry, recipientName: string, kiln
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`${isPaid ? "Payment Slip" : "Due Entry"} — ${recipientName}`, body, RECEIPT_ACCENT);
+}
+
+// A Machine/Vehicle's own profile printout — purchase details plus its
+// full installment payment history, so a paper copy carries the same
+// payment-summary numbers the profile page itself shows.
+export function printMachineRecord(machine: Machine, installments: MachineInstallmentPayment[], kiln: KilnPrintInfo, typeLabel: string) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const remainingDue = machine.remainingDue ?? 0;
+
+  const installmentRows = installments
+    .map(
+      (i, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${new Date(i.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+      <td>${escapeHtml(i.notes || "—")}</td>
+      <td class="num">₹${formatINR(i.amount)}</td>
+    </tr>`
+    )
+    .join("");
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Machine / Vehicle Record</span>
+        <p class="doc-number">${escapeHtml(machine.name)}</p>
+        <p class="doc-date">${escapeHtml(typeLabel)}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Purchased by</p>
+        <p class="doc-box-name">${escapeHtml(machine.purchasedByName || "—")}</p>
+        <p class="doc-box-detail">Phone: ${escapeHtml(machine.purchasedByPhone || "—")}</p>
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Remaining Due</p>
+        <p class="doc-total-amount">₹${formatINR(remainingDue)}</p>
+        <p class="doc-amount-words">Total Paid: ₹${formatINR(machine.totalPaid ?? 0)}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      <tr><td class="doc-table-label">Registration / identifier</td><td class="doc-table-value">${escapeHtml(machine.identifier || "—")}</td></tr>
+      <tr><td class="doc-table-label">Date of purchase</td><td class="doc-table-value">${machine.purchaseDate ? new Date(machine.purchaseDate).toLocaleDateString("en-IN") : "—"}</td></tr>
+      <tr><td class="doc-table-label">Price</td><td class="doc-table-value">${machine.price != null ? `₹${formatINR(machine.price)}` : "—"}</td></tr>
+      <tr><td class="doc-table-label">Guarantee / warranty</td><td class="doc-table-value">${escapeHtml(machine.warrantyDetails || "—")}</td></tr>
+      <tr><td class="doc-table-label">Installment tenure</td><td class="doc-table-value">${machine.tenureMonths ? `${machine.tenureMonths} months` : "—"}</td></tr>
+      ${machine.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(machine.notes)}</td></tr>` : ""}
+    </table>
+
+    ${
+      installments.length > 0
+        ? `<table class="doc-items">
+            <thead><tr><th>#</th><th>Date</th><th>Notes</th><th class="num">Amount</th></tr></thead>
+            <tbody>${installmentRows}</tbody>
+            <tfoot><tr><td colspan="3">Total Paid</td><td class="num">₹${formatINR(machine.totalPaid ?? 0)}</td></tr></tfoot>
+          </table>`
+        : ""
+    }
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED RECORD ~</p>
+    <div class="doc-sign-row doc-sign-row-single">
+      <div class="doc-sign-box">AUTHORISED SIGNATURE</div>
+    </div>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`Machine — ${machine.name}`, body, DIESEL_ACCENT);
 }
 
 // A single Expense record's own printout, from the Expense feature's

@@ -13,10 +13,40 @@ export const machines = mysqlTable("machines", {
   name: varchar("name", { length: 255 }).notNull(),
   type: varchar("type", { length: 50, enum: MACHINE_TYPES }).notNull(),
   identifier: varchar("identifier", { length: 255 }),
+  purchaseDate: dateColumn("purchaseDate"),
+  price: double("price"),
+  purchasedByName: varchar("purchasedByName", { length: 255 }),
+  purchasedByPhone: varchar("purchasedByPhone", { length: 255 }),
+  warrantyDetails: text("warrantyDetails"),
+  // What's been paid so far and what's still owed on `price` — updated on
+  // creation (the initial payment) and on every installment payment (see
+  // machine.service.ts's createInstallmentPayment). Independent of the
+  // per-installment-row history below, which is the itemized audit trail
+  // these two running totals are derived from.
+  totalPaid: double("totalPaid").default(0),
+  remainingDue: double("remainingDue").default(0),
+  // Installment period in months, admin-entered — purely informational
+  // (not used to schedule/remind), shown alongside totalPaid/remainingDue
+  // on the machine's profile.
+  tenureMonths: double("tenureMonths"),
   active: boolean("active").default(true),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnTypeIdx: index("machine_kiln_type_idx").on(t.kilnId, t.type) }));
+
+// One row per installment/EMI payment logged against a machine — separate
+// from the machine's own totalPaid/remainingDue running totals so the
+// admin can see exactly when and how much was paid each time, not just
+// the current balance.
+export const machineInstallmentPayments = mysqlTable("machine_installment_payments", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  machineId: varchar("machineId", { length: 64 }).notNull(),
+  amount: double("amount").notNull(),
+  date: dateColumn(),
+  notes: text("notes"),
+  createdAt: createdAtColumn(),
+}, (t) => ({ kilnMachineIdx: index("machineinstallment_kiln_machine_idx").on(t.kilnId, t.machineId) }));
 
 export const MACHINE_FUEL_TYPES = ["DIESEL", "PETROL", "ELECTRICITY"] as const;
 

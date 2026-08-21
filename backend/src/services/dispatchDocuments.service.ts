@@ -2,7 +2,9 @@ import { randomUUID } from "crypto";
 import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { challans, gatePasses, invoices, dispatches, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import type { BrickLineItem } from "../db/schema/_helpers";
 import { isDuplicateEntryError } from "./dispatch.service";
+import { summarizeItems } from "./brickLineItems.util";
 import { emitToKiln } from "../config/socket";
 
 type PaymentMode = (typeof DISPATCH_PAYMENT_MODES)[number];
@@ -53,13 +55,24 @@ export interface ChallanInput {
   customerPhone?: string;
   categoryId?: string;
   bricksCount: number;
+  // Multi-category breakdown (no pricing here, same as bricksCount above)
+  // — see BrickLineItem's doc comment in db/schema/_helpers.ts. When
+  // given, categoryId/bricksCount above are overridden with the aggregate.
+  items?: BrickLineItem[];
   placeOfSupply?: string;
   challanDate?: Date;
   notes?: string;
 }
 
-export async function createChallan(kilnId: string, input: ChallanInput) {
-  await assertDispatch(kilnId, input.dispatchId);
+function applyItemsAggregate<T extends { items?: BrickLineItem[]; categoryId?: string; bricksCount?: number }>(input: T): T {
+  if (!input.items || input.items.length === 0) return input;
+  const summary = summarizeItems(input.items);
+  return { ...input, items: summary.items, categoryId: summary.categoryId, bricksCount: summary.bricksCount };
+}
+
+export async function createChallan(kilnId: string, rawInput: ChallanInput) {
+  await assertDispatch(kilnId, rawInput.dispatchId);
+  const input = applyItemsAggregate(rawInput);
   const _id = randomUUID();
   try {
     await db.insert(challans).values({ ...input, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId });
@@ -87,9 +100,10 @@ export async function listChallans(kilnId: string, filter: string | ListChallans
   return db.select().from(challans).where(and(...conditions)).orderBy(desc(challans.createdAt));
 }
 
-export async function updateChallan(kilnId: string, id: string, input: Partial<Omit<ChallanInput, "dispatchId">>) {
+export async function updateChallan(kilnId: string, id: string, rawInput: Partial<Omit<ChallanInput, "dispatchId">>) {
   const existing = (await db.select().from(challans).where(and(eq(challans._id, id), eq(challans.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Challan not found in this kiln");
+  const input = applyItemsAggregate(rawInput);
   try {
     await db.update(challans).set(input).where(eq(challans._id, id));
   } catch (err) {
@@ -120,13 +134,18 @@ export interface GatePassInput {
   customerName: string;
   categoryId?: string;
   bricksCount: number;
+  // Multi-category breakdown (no pricing here, same as bricksCount above)
+  // — see BrickLineItem's doc comment in db/schema/_helpers.ts. When
+  // given, categoryId/bricksCount above are overridden with the aggregate.
+  items?: BrickLineItem[];
   placeOfSupply?: string;
   gatePassDate?: Date;
   notes?: string;
 }
 
-export async function createGatePass(kilnId: string, input: GatePassInput) {
-  await assertDispatch(kilnId, input.dispatchId);
+export async function createGatePass(kilnId: string, rawInput: GatePassInput) {
+  await assertDispatch(kilnId, rawInput.dispatchId);
+  const input = applyItemsAggregate(rawInput);
   const _id = randomUUID();
   try {
     await db.insert(gatePasses).values({ ...input, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId });
@@ -154,9 +173,10 @@ export async function listGatePasses(kilnId: string, filter: string | ListGatePa
   return db.select().from(gatePasses).where(and(...conditions)).orderBy(desc(gatePasses.createdAt));
 }
 
-export async function updateGatePass(kilnId: string, id: string, input: Partial<Omit<GatePassInput, "dispatchId">>) {
+export async function updateGatePass(kilnId: string, id: string, rawInput: Partial<Omit<GatePassInput, "dispatchId">>) {
   const existing = (await db.select().from(gatePasses).where(and(eq(gatePasses._id, id), eq(gatePasses.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Gate pass not found in this kiln");
+  const input = applyItemsAggregate(rawInput);
   try {
     await db.update(gatePasses).set(input).where(eq(gatePasses._id, id));
   } catch (err) {
@@ -190,6 +210,13 @@ export interface InvoiceInput {
   customerGstNumber?: string;
   categoryId?: string;
   bricksCount: number;
+  // Multi-category breakdown — see BrickLineItem's doc comment in
+  // db/schema/_helpers.ts. When given, categoryId/bricksCount above are
+  // overridden with the aggregate; ratePerBrick/grossAmount/netAmount
+  // below stay whatever the client computed and sent (same trust model
+  // this endpoint already used for the single-category case — the backend
+  // has never independently recomputed those from bricksCount x rate).
+  items?: BrickLineItem[];
   ratePerBrick?: number;
   grossAmount?: number;
   discountAmount?: number;
@@ -206,8 +233,9 @@ export interface InvoiceInput {
   notes?: string;
 }
 
-export async function createInvoice(kilnId: string, input: InvoiceInput) {
-  if (input.dispatchId) await assertDispatch(kilnId, input.dispatchId);
+export async function createInvoice(kilnId: string, rawInput: InvoiceInput) {
+  if (rawInput.dispatchId) await assertDispatch(kilnId, rawInput.dispatchId);
+  const input = applyItemsAggregate(rawInput);
   const _id = randomUUID();
   try {
     await db.insert(invoices).values({ ...input, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId });
@@ -252,9 +280,10 @@ export async function listInvoicesForCustomer(kilnId: string, customerId: string
   return rows;
 }
 
-export async function updateInvoice(kilnId: string, id: string, input: Partial<Omit<InvoiceInput, "dispatchId">>) {
+export async function updateInvoice(kilnId: string, id: string, rawInput: Partial<Omit<InvoiceInput, "dispatchId">>) {
   const existing = (await db.select().from(invoices).where(and(eq(invoices._id, id), eq(invoices.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Invoice not found in this kiln");
+  const input = applyItemsAggregate(rawInput);
   try {
     await db.update(invoices).set(input).where(eq(invoices._id, id));
   } catch (err) {

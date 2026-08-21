@@ -28,6 +28,21 @@ interface StaffDetailPageProps {
   onBack: () => void;
 }
 
+// Mirrors the backend's own attendance-eligibility rule (see
+// attendance.service.ts's assertAttendanceEligible) — a Supplier/Partner/
+// Customer(-legacy)/salary-less Fitter profile has no wage/attendance
+// concept at all, so showing an always-empty calendar and salary history
+// for them would just be confusing.
+function isWageEligible(person: Person) {
+  return (
+    person.type === "WORKER" ||
+    person.type === "HELPER" ||
+    person.type === "LABOUR_CONTRACTOR" ||
+    person.type === "THEKEDAR" ||
+    person.monthlySalary != null
+  );
+}
+
 const ADVANCE_CATEGORY_KEYS: Record<string, string> = {
   ADVANCE: "staff.advanceCategoryAdvance",
   KHARCHI: "staff.advanceCategoryKharchi",
@@ -463,10 +478,12 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <AttendanceCalendar personId={staffId} />
-        <SalarySlipHistory personId={staffId} />
-      </div>
+      {isWageEligible(staff) && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <AttendanceCalendar personId={staffId} />
+          <SalarySlipHistory personId={staffId} ledgerEntries={ledgerEntries} />
+        </div>
+      )}
 
       {staff.type === "DRIVER" && (
         <div className="mt-4">

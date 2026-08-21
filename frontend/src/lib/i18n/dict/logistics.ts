@@ -27,6 +27,7 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "brickLoading.bricksLoadedPlaceholder": { en: "Loaded brick count", hi: "लदी ईंटों की संख्या" },
   "brickLoading.categoryPlaceholder": { en: "Brick category", hi: "ईंट श्रेणी" },
   "brickLoading.categoryHeader": { en: "Category", hi: "श्रेणी" },
+  "brickLoading.multipleCategoriesLabel": { en: "{count} categories", hi: "{count} श्रेणियां" },
   "brickLoading.estimatedDispatchAmount": { en: "Estimated dispatch amount", hi: "अनुमानित डिस्पैच राशि" },
   "brickLoading.grossAmountLabel": { en: "Gross amount", hi: "कुल राशि" },
   "brickLoading.discountLabel": { en: "Discount", hi: "छूट" },

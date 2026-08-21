@@ -6,8 +6,9 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useUiStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
 import { formatDateTime } from "@/lib/utils";
-import { printChallanRecord } from "@/lib/printDocument";
+import { printChallanRecord, resolveItemRows } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
+import { LineItemsDetailTable } from "@/components/dispatch/BrickLineItemsEditor";
 import { CreateChallanForm } from "./CreateChallanForm";
 import type { BrickCategory, Challan } from "@/types";
 
@@ -19,13 +20,6 @@ function Field({ label, value }: { label: string; value?: string | number | null
       <p className="text-sm text-ink-primary">{value}</p>
     </div>
   );
-}
-
-function categoryLabelFor(categoryId: string | undefined, categories: BrickCategory[]) {
-  if (!categoryId) return "—";
-  const c = categories.find((cat) => cat._id === categoryId);
-  if (!c) return "—";
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
 }
 
 interface ChallanDetailPageProps {
@@ -58,8 +52,10 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
 
   async function handlePrint() {
     const { stamp } = await resolvePaymentInfo({ customerName: challan.customerName, remainingOnThisDoc: 0 });
-    printChallanRecord(challan, kilnInfo, categoryLabelFor(challan.categoryId, categories), stamp);
+    printChallanRecord(challan, kilnInfo, categories, stamp);
   }
+
+  const itemRows = resolveItemRows(challan.items, categories, { categoryId: challan.categoryId, bricksCount: challan.bricksCount });
 
   return (
     <div>
@@ -126,11 +122,16 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
           <Card className="lg:col-span-2">
             <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.dispatchDetailsSection")}</h4>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Field label={t("brickLoading.categoryHeader")} value={categoryLabelFor(challan.categoryId, categories)} />
+              {itemRows.length <= 1 && <Field label={t("brickLoading.categoryHeader")} value={itemRows[0]?.label ?? "—"} />}
               <Field label={t("brickLoading.bricksLoadedPlaceholder")} value={challan.bricksCount.toLocaleString("en-IN")} />
               <Field label={t("dispatch.vehicleNumberPlaceholder")} value={challan.vehicleNumber} />
               <Field label={t("dispatchDocs.placeOfSupplyPlaceholder")} value={challan.placeOfSupply} />
             </div>
+            {itemRows.length > 1 && (
+              <div className="mt-3">
+                <LineItemsDetailTable rows={itemRows} />
+              </div>
+            )}
           </Card>
 
           <Card className="lg:col-span-2">

@@ -333,9 +333,7 @@ async function main() {
         kilnId,
         vehicleType: randChoice(["TRUCK", "TRACTOR"] as const),
         vehicleNumber: driver.vehicleNumber || `HR-46-B-${randInt(1000, 9999)}`,
-        categoryId: seedCategory._id,
-        pricePerBrick: seedCategory.pricePerBrick ?? 7,
-        bricksCount: randInt(3000, 9000),
+        items: [{ categoryId: seedCategory._id, pricePerBrick: seedCategory.pricePerBrick ?? 7, bricksCount: randInt(3000, 9000) }],
         date: dateAtOffset(d),
       });
     }

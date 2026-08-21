@@ -8,17 +8,11 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
 import { GatePassDetailPage } from "@/components/dispatch/GatePassDetailPage";
+import { resolveItemRows } from "@/lib/printDocument";
 import type { BrickCategory, GatePassRecord } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
-
-function categoryLabelFor(categoryId: string | undefined, categories: BrickCategory[]) {
-  if (!categoryId) return "—";
-  const c = categories.find((cat) => cat._id === categoryId);
-  if (!c) return "—";
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
-}
 
 // Every Gate Pass ever generated from a Dispatch's detail page (see
 // CreateGatePassForm.tsx) — its own list now, independent of the Dispatch
@@ -96,16 +90,21 @@ export function GatePass() {
               </tr>
             </thead>
             <tbody>
-              {pagedEntries.map((e) => (
+              {pagedEntries.map((e) => {
+                const itemRows = resolveItemRows(e.items, categories, { categoryId: e.categoryId, bricksCount: e.bricksCount });
+                return (
                 <tr key={e._id} onClick={() => setOpenId(e._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
                   <td className="py-3 text-ink-primary hover:underline">GP-{e.sequenceNumber ?? "—"}</td>
                   <td className="py-3 text-ink-secondary">{e.gatePassDate ? new Date(e.gatePassDate).toLocaleDateString("en-IN") : "—"}</td>
                   <td className="py-3 text-ink-primary">{e.customerName}</td>
                   <td className="py-3 text-ink-secondary">{e.vehicleNumber ?? "—"}</td>
-                  <td className="py-3 text-ink-secondary">{categoryLabelFor(e.categoryId, categories)}</td>
+                  <td className="py-3 text-ink-secondary">
+                    {itemRows.length > 1 ? t("brickLoading.multipleCategoriesLabel", { count: itemRows.length }) : itemRows[0]?.label ?? "—"}
+                  </td>
                   <td className="py-3 tabular-nums text-ink-secondary">{e.bricksCount.toLocaleString("en-IN")}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />

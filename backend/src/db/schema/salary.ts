@@ -16,6 +16,12 @@ export const salarySlips = mysqlTable("salary_slips", {
   daysLate: double("daysLate").notNull(),
   grossSalary: double("grossSalary").notNull(),
   deductions: double("deductions").notNull(),
+  // Sum of this person's ADVANCE-category ledger entries dated within this
+  // slip's month, netted against grossSalary alongside `deductions` (see
+  // salary.service.ts's generateSalarySlip) — kept separate from
+  // `deductions` so the slip/profile can show "docked for absence" and
+  // "advance recovered" as distinct line items instead of one opaque total.
+  advanceDeducted: double("advanceDeducted").notNull().default(0),
   netSalary: double("netSalary").notNull(),
   pdfPathEn: varchar("pdfPathEn", { length: 512 }).notNull(),
   pdfPathHi: varchar("pdfPathHi", { length: 512 }).notNull(),

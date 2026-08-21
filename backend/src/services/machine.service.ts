@@ -1,23 +1,57 @@
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gt, gte, inArray } from "drizzle-orm";
 import { db } from "../db/client";
-import { machines, machineFuelLogs, machineMaintenanceLogs, MACHINE_TYPES } from "../db/schema";
+import { machines, machineFuelLogs, machineMaintenanceLogs, machineInstallmentPayments, MACHINE_TYPES } from "../db/schema";
 import { createExpense } from "./expense.service";
+import { findOrCreateExpenseType } from "./expenseType.service";
 import { emitToKiln } from "../config/socket";
 
 export type MachineType = (typeof MACHINE_TYPES)[number];
+
+// Every machine/vehicle purchase and installment payment gets auto-logged
+// under this one shared Expense Type (found-or-created once, reused for
+// every machine) — same "auto-log a cost that already lives on another
+// record as a first-class Expense" convention createMaintenanceLog below
+// already uses for MACHINERY_REPAIR, just via the modern expenseTypeId
+// path (see expense.ts schema's EXPENSE_CATEGORIES comment) rather than
+// the legacy fixed enum.
+const INSTALLMENT_EXPENSE_TYPE_NAME = "Installment";
 
 export interface CreateMachineInput {
   kilnId: string;
   name: string;
   type: MachineType;
   identifier?: string;
+  purchaseDate?: Date;
+  price?: number;
+  purchasedByName?: string;
+  purchasedByPhone?: string;
+  warrantyDetails?: string;
+  // The amount actually paid at purchase time — auto-logged as an
+  // Installment expense below (item 6's "initial purchasing amount...
+  // should also automatically be added to the overall Expenses").
+  totalPaid?: number;
+  tenureMonths?: number;
   notes?: string;
 }
 
 export async function createMachine(input: CreateMachineInput) {
   const _id = randomUUID();
-  await db.insert(machines).values({ ...input, _id });
+  const totalPaid = input.totalPaid ?? 0;
+  const remainingDue = Math.max(0, (input.price ?? 0) - totalPaid);
+  await db.insert(machines).values({ ...input, _id, totalPaid, remainingDue });
+
+  if (totalPaid > 0) {
+    const expenseType = await findOrCreateExpenseType(input.kilnId, INSTALLMENT_EXPENSE_TYPE_NAME);
+    await createExpense({
+      kilnId: input.kilnId,
+      expenseTypeId: expenseType._id,
+      amount: totalPaid,
+      notes: `Purchase: ${input.name}`,
+      date: input.purchaseDate,
+    });
+  }
+
   const machine = (await db.select().from(machines).where(eq(machines._id, _id)))[0]!;
   emitToKiln(input.kilnId, "machine:update", machine);
   return machine;
@@ -27,10 +61,93 @@ export async function listMachines(kilnId: string) {
   return await db.select().from(machines).where(and(eq(machines.kilnId, kilnId), eq(machines.active, true))).orderBy(asc(machines.name));
 }
 
+export async function getMachine(kilnId: string, machineId: string) {
+  return await assertMachineInKiln(kilnId, machineId);
+}
+
 async function assertMachineInKiln(kilnId: string, machineId: string) {
   const machine = (await db.select().from(machines).where(and(eq(machines._id, machineId), eq(machines.kilnId, kilnId))))[0];
   if (!machine) throw new Error("Referenced machine not found in this kiln");
   return machine;
+}
+
+export interface UpdateMachineInput {
+  name?: string;
+  type?: MachineType;
+  identifier?: string;
+  purchaseDate?: Date;
+  price?: number;
+  purchasedByName?: string;
+  purchasedByPhone?: string;
+  warrantyDetails?: string;
+  tenureMonths?: number;
+  notes?: string;
+  active?: boolean;
+}
+
+// Never touches totalPaid/remainingDue directly (those only ever move via
+// the initial purchase payment and createInstallmentPayment below) — this
+// is for correcting the machine's own descriptive/purchase-info fields, or
+// soft-deleting it (active: false), matching the same soft-delete
+// convention `people`/salary slips use elsewhere.
+export async function updateMachine(kilnId: string, machineId: string, input: UpdateMachineInput) {
+  await assertMachineInKiln(kilnId, machineId);
+  await db.update(machines).set(input).where(eq(machines._id, machineId));
+  const updated = (await db.select().from(machines).where(eq(machines._id, machineId)))[0]!;
+  emitToKiln(kilnId, "machine:update", updated);
+  return updated;
+}
+
+export interface CreateInstallmentPaymentInput {
+  kilnId: string;
+  machineId: string;
+  amount: number;
+  date?: Date;
+  notes?: string;
+}
+
+// Logs one EMI/installment payment against a machine, rolls it into that
+// machine's own running totalPaid/remainingDue, and auto-logs the same
+// amount as an Expense under the shared "Installment" expense type (item
+// 6) — same pattern as the purchase-time payment in createMachine above.
+export async function createInstallmentPayment(input: CreateInstallmentPaymentInput) {
+  const machine = await assertMachineInKiln(input.kilnId, input.machineId);
+  const _id = randomUUID();
+  await db.insert(machineInstallmentPayments).values({
+    _id,
+    kilnId: input.kilnId,
+    machineId: input.machineId,
+    amount: input.amount,
+    date: input.date,
+    notes: input.notes,
+  });
+
+  const newTotalPaid = (machine.totalPaid ?? 0) + input.amount;
+  const newRemainingDue = Math.max(0, (machine.price ?? 0) - newTotalPaid);
+  await db.update(machines).set({ totalPaid: newTotalPaid, remainingDue: newRemainingDue }).where(eq(machines._id, input.machineId));
+
+  const expenseType = await findOrCreateExpenseType(input.kilnId, INSTALLMENT_EXPENSE_TYPE_NAME);
+  await createExpense({
+    kilnId: input.kilnId,
+    expenseTypeId: expenseType._id,
+    amount: input.amount,
+    notes: `Installment: ${machine.name}`,
+    date: input.date,
+  });
+
+  const payment = (await db.select().from(machineInstallmentPayments).where(eq(machineInstallmentPayments._id, _id)))[0]!;
+  const updatedMachine = (await db.select().from(machines).where(eq(machines._id, input.machineId)))[0]!;
+  emitToKiln(input.kilnId, "machineInstallment:update", payment);
+  emitToKiln(input.kilnId, "machine:update", updatedMachine);
+  return { payment, machine: updatedMachine };
+}
+
+export async function listInstallmentPayments(kilnId: string, machineId: string) {
+  return await db
+    .select()
+    .from(machineInstallmentPayments)
+    .where(and(eq(machineInstallmentPayments.kilnId, kilnId), eq(machineInstallmentPayments.machineId, machineId)))
+    .orderBy(desc(machineInstallmentPayments.date));
 }
 
 export interface CreateFuelLogInput {

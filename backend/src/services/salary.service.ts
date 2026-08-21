@@ -4,7 +4,7 @@ import PDFDocument from "pdfkit";
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
-import { kilns, people, salarySlips } from "../db/schema";
+import { kilns, people, salarySlips, ledgerEntries } from "../db/schema";
 import { attendanceSummaryForMonth, MonthAttendanceSummary } from "./attendance.service";
 import { emitToKiln } from "../config/socket";
 
@@ -15,13 +15,33 @@ function daysInMonth(year: number, month: number) {
   return new Date(year, month, 0).getDate();
 }
 
+function monthDateRange(year: number, month: number) {
+  return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59, 999) };
+}
+
+// The Salary module's population: exactly who the Staff page/attendance
+// roster manages (MUNIM/CHOWKIDAR, plus office-flagged HELPER/DRIVER) —
+// NOT "anyone with monthlySalary set", which used to also sweep in
+// salaried Labour Contractors/Fitters that belong to (and are already
+// tracked from) the People page's own Labour/Thekedar tabs instead. Same
+// rule as attendance.service.ts's listAttendanceRoster, kept in sync
+// deliberately so "who gets a salary slip" and "who's on the daily
+// attendance roster" never drift apart.
+function isStaffPerson(person: { type: string; isOfficeStaff?: boolean | null }) {
+  return person.type === "MUNIM" || person.type === "CHOWKIDAR" || ((person.type === "HELPER" || person.type === "DRIVER") && !!person.isOfficeStaff);
+}
+
 // Absent/Half-day reduce pay proportionally against the monthly rate; Late
 // is tracked on the slip but doesn't reduce pay by default (see plan —
 // easy to change to a fixed penalty later if that's wrong for this kiln).
-function computeSalary(monthlySalary: number, year: number, month: number, summary: MonthAttendanceSummary) {
+// `advanceAmount` (ADVANCE-category ledger entries dated within this same
+// month — see generateSalarySlip) is netted separately from the
+// attendance-based `deductions` so the two can be shown as distinct line
+// items on the slip.
+function computeSalary(monthlySalary: number, year: number, month: number, summary: MonthAttendanceSummary, advanceAmount: number) {
   const dailyRate = monthlySalary / daysInMonth(year, month);
   const deductions = Math.round((summary.daysAbsent * dailyRate + summary.daysHalfDay * dailyRate * 0.5) * 100) / 100;
-  const netSalary = Math.round((monthlySalary - deductions) * 100) / 100;
+  const netSalary = Math.round((monthlySalary - deductions - advanceAmount) * 100) / 100;
   return { deductions, netSalary };
 }
 
@@ -43,6 +63,7 @@ interface SlipData {
   summary: MonthAttendanceSummary;
   grossSalary: number;
   deductions: number;
+  advanceDeducted: number;
   netSalary: number;
 }
 
@@ -116,7 +137,10 @@ function renderPdf(data: SlipData, filePath: string, lang: "en" | "hi"): Promise
     drawTable(
       [
         [t("Gross Salary", "सकल वेतन"), `Rs. ${data.grossSalary.toLocaleString("en-IN")}`],
-        [t("Deductions", "कटौती"), `Rs. ${data.deductions.toLocaleString("en-IN")}`],
+        [t("Deductions (Absence)", "कटौती (अनुपस्थिति)"), `Rs. ${data.deductions.toLocaleString("en-IN")}`],
+        ...(data.advanceDeducted > 0
+          ? [[t("Advance Deducted", "एडवांस काटा गया"), `Rs. ${data.advanceDeducted.toLocaleString("en-IN")}`] as [string, string]]
+          : []),
         [t("Net Salary", "कुल वेतन"), `Rs. ${data.netSalary.toLocaleString("en-IN")}`],
       ],
       { boldLastRow: true }
@@ -141,7 +165,27 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
   if (!person.monthlySalary) throw new Error("This person has no monthly salary set");
 
   const summary = await attendanceSummaryForMonth(kilnId, personId, year, monthNum);
-  const { deductions, netSalary } = computeSalary(person.monthlySalary, year, monthNum, summary);
+
+  // ADVANCE-category ledger entries dated within this slip's month — money
+  // already handed to this person this month, recovered against pay the
+  // same way a real payroll advance is settled at salary time.
+  const { start, end } = monthDateRange(year, monthNum);
+  const advanceRows = await db
+    .select()
+    .from(ledgerEntries)
+    .where(
+      and(
+        eq(ledgerEntries.kilnId, kilnId),
+        eq(ledgerEntries.personId, personId),
+        eq(ledgerEntries.direction, "PAID"),
+        eq(ledgerEntries.category, "ADVANCE"),
+        gte(ledgerEntries.date, start),
+        lte(ledgerEntries.date, end)
+      )
+    );
+  const advanceDeducted = Math.round(advanceRows.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
+
+  const { deductions, netSalary } = computeSalary(person.monthlySalary, year, monthNum, summary, advanceDeducted);
 
   const dir = path.join(SLIPS_DIR, kilnId, personId);
   fs.mkdirSync(dir, { recursive: true });
@@ -157,6 +201,7 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
     summary,
     grossSalary: person.monthlySalary,
     deductions,
+    advanceDeducted,
     netSalary,
   };
   await Promise.all([renderPdf(slipData, pdfPathEn, "en"), renderPdf(slipData, pdfPathHi, "hi")]);
@@ -178,6 +223,7 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
     daysLate: summary.daysLate,
     grossSalary: person.monthlySalary,
     deductions,
+    advanceDeducted,
     netSalary,
     pdfPathEn,
     pdfPathHi,
@@ -200,10 +246,11 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
 // current attendance data, never duplicated (unique index on personId+month).
 export async function runMonthlySalaryGeneration(month?: string) {
   const targetMonth = month ?? previousMonthString();
-  const salariedPeople = await db
-    .select({ _id: people._id, kilnId: people.kilnId })
+  const rows = await db
+    .select({ _id: people._id, kilnId: people.kilnId, type: people.type, isOfficeStaff: people.isOfficeStaff })
     .from(people)
     .where(and(isNotNull(people.monthlySalary), eq(people.active, true)));
+  const salariedPeople = rows.filter(isStaffPerson);
 
   const results: { personId: string; ok: boolean; error?: string }[] = [];
   for (const p of salariedPeople) {
@@ -221,10 +268,11 @@ export async function runMonthlySalaryGeneration(month?: string) {
 // cron sweep above which runs across every kiln in the system.
 export async function generateForKiln(kilnId: string, month?: string) {
   const targetMonth = month ?? previousMonthString();
-  const salariedPeople = await db
-    .select({ _id: people._id })
+  const rows = await db
+    .select({ _id: people._id, type: people.type, isOfficeStaff: people.isOfficeStaff })
     .from(people)
     .where(and(eq(people.kilnId, kilnId), isNotNull(people.monthlySalary), eq(people.active, true)));
+  const salariedPeople = rows.filter(isStaffPerson);
 
   const results: { personId: string; ok: boolean; error?: string }[] = [];
   for (const p of salariedPeople) {
@@ -247,14 +295,19 @@ export function currentMonthString(reference = new Date()) {
   return `${reference.getFullYear()}-${String(reference.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// Salary page: every salaried person in the kiln, with their slip for the
-// given month if one's been generated yet (so the UI can show
-// "generated"/"pending" per person without a second round trip).
+// Salary page: every Staff-page person in the kiln (see isStaffPerson —
+// exclusively MUNIM/CHOWKIDAR/office HELPER/DRIVER, not "anyone with
+// monthlySalary set"), with their slip for the given month if one's been
+// generated yet (so the UI can show "generated"/"pending" per person
+// without a second round trip). A staff member with no monthlySalary set
+// yet still shows (as permanently "pending" until one's set), matching
+// exactly who's visible on the Staff page itself.
 export async function listSalaryStatus(kilnId: string, month: string) {
-  const salariedPeople = await db
+  const rows = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), isNotNull(people.monthlySalary), eq(people.active, true)));
+    .where(and(eq(people.kilnId, kilnId), eq(people.active, true)));
+  const salariedPeople = rows.filter(isStaffPerson);
   if (salariedPeople.length === 0) return [];
 
   const personIds = salariedPeople.map((p) => p._id);
@@ -306,4 +359,35 @@ export async function getSlipFile(kilnId: string, slipId: string, lang: "en" | "
   const slip = (await db.select().from(salarySlips).where(and(eq(salarySlips._id, slipId), eq(salarySlips.kilnId, kilnId))))[0];
   if (!slip) throw new Error("Salary slip not found");
   return lang === "hi" ? slip.pdfPathHi : slip.pdfPathEn;
+}
+
+export interface UpdateSalarySlipInput {
+  deductions?: number;
+  advanceDeducted?: number;
+  netSalary?: number;
+}
+
+// A manual correction to an already-generated slip's final numbers — for
+// when the automatic attendance/advance-based calculation needs
+// overriding (a late attendance fix, a one-off adjustment the admin wants
+// to apply directly) rather than regenerating from scratch. Does not
+// re-render the PDF; the stored numbers are the source of truth shown on
+// the slip's profile-page entry, the PDF stays as originally generated.
+export async function updateSalarySlip(kilnId: string, slipId: string, input: UpdateSalarySlipInput) {
+  const existing = (await db.select().from(salarySlips).where(and(eq(salarySlips._id, slipId), eq(salarySlips.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Salary slip not found in this kiln");
+  await db.update(salarySlips).set(input).where(eq(salarySlips._id, slipId));
+  const updated = (await db.select().from(salarySlips).where(eq(salarySlips._id, slipId)))[0]!;
+  emitToKiln(kilnId, "salary:update", updated);
+  return updated;
+}
+
+export async function deleteSalarySlip(kilnId: string, slipId: string) {
+  const existing = (await db.select().from(salarySlips).where(and(eq(salarySlips._id, slipId), eq(salarySlips.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Salary slip not found in this kiln");
+  await db.delete(salarySlips).where(eq(salarySlips._id, slipId));
+  for (const p of [existing.pdfPathEn, existing.pdfPathHi]) {
+    fs.rm(p, { force: true }, () => {});
+  }
+  emitToKiln(kilnId, "salary:update", { _id: slipId, deleted: true });
 }

@@ -10,6 +10,14 @@ import {
 } from "../services/brickLoading.service";
 import { BRICK_VEHICLE_TYPES } from "../db/schema";
 
+// One row per brick category loaded on this trip — see BrickLineItem's
+// doc comment in db/schema/_helpers.ts.
+const lineItemSchema = z.object({
+  categoryId: z.string().optional(),
+  bricksCount: z.number().int().positive(),
+  pricePerBrick: z.number().min(0).optional(),
+});
+
 const createSchema = z.object({
   customerName: z.string().optional(),
   customerPhone: z.string().optional(),
@@ -19,14 +27,12 @@ const createSchema = z.object({
   tipAmount: z.number().min(0).optional(),
   vehicleType: z.enum(BRICK_VEHICLE_TYPES),
   vehicleNumber: z.string(),
-  bricksCount: z.number().int().positive(),
+  items: z.array(lineItemSchema).min(1),
   unloadedBricksCount: z.number().int().nonnegative().optional(),
   loadingLaborerCount: z.number().int().nonnegative().optional(),
   loadingRatePerThousand: z.number().min(0).optional(),
   unloadingLaborerCount: z.number().int().nonnegative().optional(),
   unloadingRatePerThousand: z.number().min(0).optional(),
-  categoryId: z.string(),
-  pricePerBrick: z.number().min(0),
   placeOfSupply: z.string().optional(),
   date: z.string().optional(),
   unloadingDate: z.string().optional(),
@@ -59,6 +65,7 @@ const updateSchema = z.object({
   driverPhone: z.string().optional(),
   vehicleType: z.enum(BRICK_VEHICLE_TYPES).optional(),
   vehicleNumber: z.string().optional(),
+  items: z.array(lineItemSchema).min(1).optional(),
   bricksCount: z.number().int().positive().optional(),
   unloadedBricksCount: z.number().int().nonnegative().optional(),
   loadingLaborerCount: z.number().int().nonnegative().optional(),

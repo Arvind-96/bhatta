@@ -2,9 +2,11 @@ import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
+import type { BrickLineItem } from "../db/schema/_helpers";
 import { addLedgerEntry } from "./ledger.service";
 import { deleteDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
 import { autoLogExpense } from "./expense.service";
+import { summarizeItems, itemsOrLegacyFallback, bricksByCategory } from "./brickLineItems.util";
 import { emitToKiln } from "../config/socket";
 
 export type BrickVehicleType = (typeof BRICK_VEHICLE_TYPES)[number];
@@ -19,16 +21,19 @@ export interface CreateBrickLoadingInput {
   tipAmount?: number;
   vehicleType: BrickVehicleType;
   vehicleNumber: string;
-  bricksCount: number;
+  // One row per brick category loaded on this trip — quantity + this
+  // trip's own admin-entered price (never defaulted from the category's
+  // own pricePerBrick, since price varies customer to customer). Almost
+  // always one row; more than one when a customer buys several categories
+  // in the same trip. `bricksCount`/`categoryId`/`pricePerBrick`/`amount`
+  // on the stored row become the aggregate across these — see
+  // BrickLineItem's doc comment in db/schema/_helpers.ts.
+  items: BrickLineItem[];
   unloadedBricksCount?: number;
   loadingLaborerCount?: number;
   loadingRatePerThousand?: number;
   unloadingLaborerCount?: number;
   unloadingRatePerThousand?: number;
-  categoryId: string;
-  // Admin-entered per trip -- never defaulted from the category's own
-  // pricePerBrick, since the price varies customer to customer.
-  pricePerBrick: number;
   placeOfSupply?: string;
   date?: Date;
   unloadingDate?: Date;
@@ -74,15 +79,20 @@ async function generateTripNumber(kilnId: string) {
 // picker (see createDispatch's loadingEntryId handling in
 // dispatch.service.ts), which is also what sets this row's dispatchId.
 export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
-  const category = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, input.categoryId), eq(brickCategories.kilnId, input.kilnId))))[0];
-  if (!category) throw new Error("Brick category not found in this kiln");
+  if (!input.items || input.items.length === 0) throw new Error("At least one brick category line item is required");
 
-  // Total Amount = Loaded Brick Count x THIS TRIP's admin-entered price —
-  // never the category's own default pricePerBrick; loading/unloading
-  // charges are tracked as entirely separate figures below, never folded
-  // into this one.
-  const finalAmount = Math.round(input.bricksCount * input.pricePerBrick * 100) / 100;
-  const loadingCharge = computeLaborCharge(input.bricksCount, input.loadingRatePerThousand);
+  const categoryIds = [...new Set(input.items.map((i) => i.categoryId).filter((id): id is string => !!id))];
+  const categoryRows = categoryIds.length
+    ? await db.select().from(brickCategories).where(and(inArray(brickCategories._id, categoryIds), eq(brickCategories.kilnId, input.kilnId)))
+    : [];
+  if (categoryRows.length !== categoryIds.length) throw new Error("One or more brick categories not found in this kiln");
+
+  // Total Amount = sum across every line item's own (bricksCount x THIS
+  // TRIP's admin-entered price) — never the category's own default
+  // pricePerBrick; loading/unloading charges are tracked as entirely
+  // separate figures below, never folded into this one.
+  const { items, bricksCount: totalBricksCount, categoryId: aggregateCategoryId, pricePerBrick: aggregatePricePerBrick, amount: finalAmount } = summarizeItems(input.items);
+  const loadingCharge = computeLaborCharge(totalBricksCount, input.loadingRatePerThousand);
   const unloadingCharge = computeLaborCharge(input.unloadedBricksCount, input.unloadingRatePerThousand);
 
   // Retry loop: two concurrent creates for the same kiln can both compute
@@ -108,14 +118,15 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
         tipAmount: input.tipAmount,
         vehicleType: input.vehicleType,
         vehicleNumber: input.vehicleNumber,
-        bricksCount: input.bricksCount,
+        bricksCount: totalBricksCount,
         unloadedBricksCount: input.unloadedBricksCount,
         loadingLaborerCount: input.loadingLaborerCount,
         loadingRatePerThousand: input.loadingRatePerThousand,
         unloadingLaborerCount: input.unloadingLaborerCount,
         unloadingRatePerThousand: input.unloadingRatePerThousand,
-        categoryId: input.categoryId,
-        pricePerBrick: input.pricePerBrick,
+        categoryId: aggregateCategoryId,
+        pricePerBrick: aggregatePricePerBrick,
+        items,
         placeOfSupply: input.placeOfSupply,
         loadingCharge,
         unloadingCharge,
@@ -134,15 +145,19 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
     throw lastError instanceof Error ? lastError : new Error("Failed to create loading entry: could not allocate a unique trip number");
   }
 
-  // The bricks physically left the yard on this trip — deduct from that
-  // category's stock the same way the Stock page's manual "loading out"
-  // flow does (createStockLoadingEntry), just without a separate
+  // The bricks physically left the yard on this trip — deduct from each
+  // loaded category's stock the same way the Stock page's manual "loading
+  // out" flow does (createStockLoadingEntry), just without a separate
   // stockLoadingEntries row, since this brickLoadingEntries row is already
-  // the audit trail for the same physical movement.
-  await db.update(brickCategories)
-    .set({ quantity: sql`${brickCategories.quantity} - ${input.bricksCount}` })
-    .where(eq(brickCategories._id, input.categoryId));
-  emitToKiln(input.kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, input.categoryId)))[0]);
+  // the audit trail for the same physical movement. One deduction per
+  // category line item, not just the aggregate.
+  for (const item of items) {
+    if (!item.categoryId) continue;
+    await db.update(brickCategories)
+      .set({ quantity: sql`${brickCategories.quantity} - ${item.bricksCount}` })
+      .where(eq(brickCategories._id, item.categoryId));
+    emitToKiln(input.kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, item.categoryId)))[0]);
+  }
 
   emitToKiln(input.kilnId, "brickLoading:update", entry);
 
@@ -166,6 +181,13 @@ export interface UpdateBrickLoadingInput {
   driverPhone?: string;
   vehicleType?: BrickVehicleType;
   vehicleNumber?: string;
+  // Full replacement of the trip's category breakdown — when provided,
+  // stock is corrected per-category by diffing against the trip's current
+  // items (or its legacy single-category fields, for a pre-existing row —
+  // see itemsOrLegacyFallback), and bricksCount/categoryId/pricePerBrick/
+  // amount below are recomputed as the new aggregate.
+  items?: BrickLineItem[];
+  // Legacy single-field edit path — only used when `items` is omitted.
   bricksCount?: number;
   unloadedBricksCount?: number;
   loadingLaborerCount?: number;
@@ -200,19 +222,26 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
 
   const oldTip = existing.tipAmount ?? 0;
 
+  let itemsUpdate: { items?: BrickLineItem[]; bricksCount?: number; categoryId?: string; pricePerBrick?: number; amount?: number } = {};
+  let newItems: BrickLineItem[] | undefined;
+  if (input.items) {
+    const summary = summarizeItems(input.items);
+    newItems = summary.items;
+    itemsUpdate = summary;
+  }
+
+  // Legacy single-field edit path — only applied when `items` wasn't sent.
   let amountUpdate: { amount?: number } = {};
-  if (input.bricksCount !== undefined || input.pricePerBrick !== undefined) {
+  if (!input.items && (input.bricksCount !== undefined || input.pricePerBrick !== undefined)) {
     const bricksCount = input.bricksCount ?? existing.bricksCount;
     const pricePerBrick = input.pricePerBrick ?? existing.pricePerBrick ?? 0;
     amountUpdate = { amount: Math.round(bricksCount * pricePerBrick * 100) / 100 };
   }
 
+  const effectiveBricksCount = itemsUpdate.bricksCount ?? input.bricksCount ?? existing.bricksCount;
   let chargeUpdate: { loadingCharge?: number; unloadingCharge?: number } = {};
-  if (input.bricksCount !== undefined || input.loadingRatePerThousand !== undefined) {
-    chargeUpdate.loadingCharge = computeLaborCharge(
-      input.bricksCount ?? existing.bricksCount,
-      input.loadingRatePerThousand ?? existing.loadingRatePerThousand ?? undefined
-    );
+  if (input.items || input.bricksCount !== undefined || input.loadingRatePerThousand !== undefined) {
+    chargeUpdate.loadingCharge = computeLaborCharge(effectiveBricksCount, input.loadingRatePerThousand ?? existing.loadingRatePerThousand ?? undefined);
   }
   if (input.unloadedBricksCount !== undefined || input.unloadingRatePerThousand !== undefined) {
     chargeUpdate.unloadingCharge = computeLaborCharge(
@@ -221,14 +250,30 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
     );
   }
 
-  await db.update(brickLoadingEntries).set({ ...input, ...amountUpdate, ...chargeUpdate }).where(eq(brickLoadingEntries._id, entryId));
+  await db.update(brickLoadingEntries).set({ ...input, ...itemsUpdate, ...amountUpdate, ...chargeUpdate }).where(eq(brickLoadingEntries._id, entryId));
   const updated = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId)))[0]!;
 
-  // A changed bricksCount means the original stock deduction (see
-  // createBrickLoadingEntry) is now off by the difference — correct the
-  // category's quantity by exactly that delta rather than re-deducting the
-  // new total, which would double-count the portion already applied.
-  if (input.bricksCount !== undefined && existing.categoryId) {
+  // Stock correction. Preferred path: a full `items` replacement diffs the
+  // old per-category totals against the new ones (old totals reconstructed
+  // from the trip's current items, or its legacy scalar fields for a row
+  // that predates this feature) and corrects each affected category by
+  // exactly its delta — never re-deducting the full new total, which would
+  // double-count the portion already applied. Legacy path (no `items`
+  // sent, just a bare bricksCount edit): same delta correction, single
+  // category, exactly as before.
+  if (newItems) {
+    const oldItems = itemsOrLegacyFallback(existing);
+    const oldByCategory = bricksByCategory(oldItems);
+    const newByCategory = bricksByCategory(newItems);
+    const allCategoryIds = new Set([...oldByCategory.keys(), ...newByCategory.keys()]);
+    for (const catId of allCategoryIds) {
+      const delta = (newByCategory.get(catId) ?? 0) - (oldByCategory.get(catId) ?? 0);
+      if (delta !== 0) {
+        await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${delta}` }).where(eq(brickCategories._id, catId));
+        emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, catId)))[0]);
+      }
+    }
+  } else if (input.bricksCount !== undefined && existing.categoryId) {
     const delta = input.bricksCount - existing.bricksCount;
     if (delta !== 0) {
       await db.update(brickCategories)
@@ -296,11 +341,14 @@ export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
 
   if (existing.dispatchId) {
     await deleteDispatch(kilnId, existing.dispatchId);
-  } else if (existing.categoryId) {
-    await db.update(brickCategories)
-      .set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` })
-      .where(eq(brickCategories._id, existing.categoryId));
-    emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)))[0]);
+  } else {
+    for (const item of itemsOrLegacyFallback(existing)) {
+      if (!item.categoryId) continue;
+      await db.update(brickCategories)
+        .set({ quantity: sql`${brickCategories.quantity} + ${item.bricksCount}` })
+        .where(eq(brickCategories._id, item.categoryId));
+      emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, item.categoryId)))[0]);
+    }
   }
 
   await db.delete(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId));
@@ -336,17 +384,23 @@ export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickL
     .orderBy(desc(brickLoadingEntries.date), desc(brickLoadingEntries.createdAt));
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const dispatchIds = [...new Set(rows.map((r) => r.dispatchId).filter((v): v is string => !!v))];
-  const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
+  const categoryIds = [
+    ...new Set([
+      ...rows.map((r) => r.categoryId).filter((v): v is string => !!v),
+      ...rows.flatMap((r) => (r.items ?? []).map((i) => i.categoryId).filter((v): v is string => !!v)),
+    ]),
+  ];
   const [driverRows, dispatchRows, categoryRows] = await Promise.all([
     driverIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, driverIds)) : [],
     dispatchIds.length ? db.select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName }).from(dispatches).where(inArray(dispatches._id, dispatchIds)) : [],
-    categoryIds.length ? db.select({ _id: brickCategories._id, category: brickCategories.category }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)) : [],
+    categoryIds.length ? db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)) : [],
   ]);
   const driverById = new Map(driverRows.map((d) => [d._id, d]));
   const dispatchById = new Map(dispatchRows.map((d) => [d._id, d]));
   const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
   return rows.map((r) => ({
     ...r,
+    items: r.items?.map((i) => ({ ...i, categoryId: i.categoryId ? categoryById.get(i.categoryId) ?? i.categoryId : i.categoryId })),
     driverId: r.driverId ? driverById.get(r.driverId) ?? r.driverId : undefined,
     dispatchId: r.dispatchId ? dispatchById.get(r.dispatchId) ?? r.dispatchId : r.dispatchId,
     categoryId: r.categoryId ? categoryById.get(r.categoryId) ?? r.categoryId : r.categoryId,

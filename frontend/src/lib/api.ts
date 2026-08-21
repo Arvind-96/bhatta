@@ -64,6 +64,7 @@ import type {
   MachineFuelLog,
   DamageFault,
   MachineFuelType,
+  MachineInstallmentPayment,
   MachineMaintenanceLog,
   MachineType,
   MoldingContractorSummary,
@@ -123,6 +124,16 @@ import type { ReportResult, ReportRunParams, DashboardSummary } from "@/types/re
 import { useAuthStore, type AuthUser, type UserKiln } from "@/store/auth.store";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+
+// The write-shape of a BrickLineItem row — categoryId is always a plain
+// id here (never the enriched object the read-shape `BrickLineItem` type
+// carries), used across brickLoading/dispatch/challans/gatePasses/invoices
+// create+update calls.
+export interface LineItemInput {
+  categoryId?: string;
+  bricksCount: number;
+  pricePerBrick?: number;
+}
 
 async function request<T>(path: string, options: RequestInit = {}, scoped = false): Promise<T> {
   const { token, activeKilnId } = useAuthStore.getState();
@@ -210,6 +221,7 @@ export const api = {
       customerPhone?: string;
       bricksCount?: number;
       amount?: number;
+      items?: LineItemInput[];
       driverName?: string;
       driverPhone?: string;
       transportCost?: number;
@@ -237,6 +249,7 @@ export const api = {
         grade: BrickGrade;
         bricksCount: number;
         amount: number;
+        items: LineItemInput[];
         driverId: string | null;
         transportCost: number;
         transportPaidBy: "OWNER" | "CUSTOMER";
@@ -269,6 +282,7 @@ export const api = {
       customerPhone?: string;
       categoryId?: string;
       bricksCount: number;
+      items?: LineItemInput[];
       placeOfSupply?: string;
       challanDate: string;
       notes?: string;
@@ -286,6 +300,7 @@ export const api = {
         customerPhone: string;
         categoryId: string;
         bricksCount: number;
+        items: LineItemInput[];
         placeOfSupply: string;
         challanDate: string;
         notes: string;
@@ -307,6 +322,7 @@ export const api = {
       customerName: string;
       categoryId?: string;
       bricksCount: number;
+      items?: LineItemInput[];
       placeOfSupply?: string;
       gatePassDate: string;
       notes?: string;
@@ -322,6 +338,7 @@ export const api = {
         customerName: string;
         categoryId: string;
         bricksCount: number;
+        items: LineItemInput[];
         placeOfSupply: string;
         gatePassDate: string;
         notes: string;
@@ -343,6 +360,7 @@ export const api = {
       customerGstNumber?: string;
       categoryId?: string;
       bricksCount: number;
+      items?: LineItemInput[];
       ratePerBrick?: number;
       grossAmount?: number;
       discountAmount?: number;
@@ -366,6 +384,7 @@ export const api = {
         customerGstNumber: string;
         categoryId: string;
         bricksCount: number;
+        items: LineItemInput[];
         ratePerBrick: number;
         grossAmount: number;
         discountAmount: number;
@@ -549,7 +568,11 @@ export const api = {
   salary: {
     status: (month: string) => get<SalaryStatusEntry[]>(`/salary?month=${month}`, true),
     generate: (month?: string) => post<{ month: string; generated: number; failed: unknown[] }>("/salary/generate", { month }, true),
+    generateForPerson: (personId: string, month: string) => post<SalarySlip>(`/salary/generate/${personId}`, { month }, true),
     forPerson: (personId: string) => get<SalarySlip[]>(`/salary/for-person/${personId}`, true),
+    update: (slipId: string, input: { deductions?: number; advanceDeducted?: number; netSalary?: number }) =>
+      patch<SalarySlip>(`/salary/${slipId}`, input, true),
+    remove: (slipId: string) => del(`/salary/${slipId}`, true),
     pdfUrl: (slipId: string, lang: "en" | "hi") => `${API_URL}/api/salary/${slipId}/pdf?lang=${lang}`,
   },
 
@@ -926,12 +949,10 @@ export const api = {
       tipAmount?: number;
       vehicleType: BrickVehicleType;
       vehicleNumber: string;
-      bricksCount: number;
+      items: LineItemInput[];
       unloadedBricksCount?: number;
       loadingRatePerThousand?: number;
       unloadingRatePerThousand?: number;
-      categoryId: string;
-      pricePerBrick: number;
       placeOfSupply?: string;
       date?: string;
       unloadingDate?: string;
@@ -946,6 +967,7 @@ export const api = {
         driverPhone: string;
         vehicleType: BrickVehicleType;
         vehicleNumber: string;
+        items: LineItemInput[];
         bricksCount: number;
         unloadedBricksCount: number;
         loadingRatePerThousand: number;
@@ -1232,8 +1254,42 @@ export const api = {
 
   machines: {
     list: () => get<Machine[]>("/machines", true),
-    create: (input: { name: string; type: MachineType; identifier?: string; notes?: string }) =>
-      post<Machine>("/machines", input, true),
+    get: (id: string) => get<Machine>(`/machines/${id}`, true),
+    create: (input: {
+      name: string;
+      type: MachineType;
+      identifier?: string;
+      purchaseDate?: string;
+      price?: number;
+      purchasedByName?: string;
+      purchasedByPhone?: string;
+      warrantyDetails?: string;
+      totalPaid?: number;
+      tenureMonths?: number;
+      notes?: string;
+    }) => post<Machine>("/machines", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        name: string;
+        type: MachineType;
+        identifier: string;
+        purchaseDate: string;
+        price: number;
+        purchasedByName: string;
+        purchasedByPhone: string;
+        warrantyDetails: string;
+        tenureMonths: number;
+        notes: string;
+        active: boolean;
+      }>
+    ) => patch<Machine>(`/machines/${id}`, input, true),
+    remove: (id: string) => del(`/machines/${id}`, true),
+    installments: {
+      list: (machineId: string) => get<MachineInstallmentPayment[]>(`/machines/${machineId}/installments`, true),
+      create: (machineId: string, input: { amount: number; date?: string; notes?: string }) =>
+        post<{ payment: MachineInstallmentPayment; machine: Machine }>(`/machines/${machineId}/installments`, input, true),
+    },
     fuelLogs: {
       list: (days = 30) => get<MachineFuelLog[]>(`/machines/fuel-logs?days=${days}`, true),
       create: (input: { machineId: string; fuelType: MachineFuelType; quantity: number; hoursRun?: number; notes?: string }) =>

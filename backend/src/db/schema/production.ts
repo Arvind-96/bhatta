@@ -1,5 +1,5 @@
 import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex, index, boolean } from "drizzle-orm/mysql-core";
-import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
+import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn } from "./_helpers";
 import { STACKING_STAGES } from "./people";
 
 export const GHER_STATUSES = ["EMPTY", "STACKING", "FIRING", "READY"] as const;
@@ -223,6 +223,13 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   // pricePerBrick is not used to price this trip (see pricePerBrick
   // above). See brickLoading.service.ts.
   categoryId: varchar("categoryId", { length: 64 }),
+  // Multi-category breakdown — one trip can now cover several brick
+  // categories at once. When set, this is the source of truth and
+  // categoryId/bricksCount/pricePerBrick/amount above become the
+  // aggregate (categoryId = first item's when >1, the rest summed) for
+  // every read path that doesn't yet know about `items`. See
+  // BrickLineItem's own doc comment in _helpers.ts.
+  items: itemsColumn(),
   dispatchId: varchar("dispatchId", { length: 64 }),
   // The delivery address for this trip's bricks (distinct from
   // customerAddress, the customer's own billing/contact address) — carried

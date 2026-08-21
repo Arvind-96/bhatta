@@ -2,11 +2,13 @@ import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { dispatches, people, brickCategories, brickLoadingEntries, kilns, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import type { BrickLineItem } from "../db/schema/_helpers";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
 import { createCustomer, findCustomerByName } from "./customer.service";
 import { autoLogExpense } from "./expense.service";
+import { summarizeItems, itemsOrLegacyFallback, bricksByCategory } from "./brickLineItems.util";
 import { emitToKiln } from "../config/socket";
 
 export type BrickGrade = (typeof BRICK_GRADES)[number];
@@ -114,6 +116,12 @@ export interface CreateDispatchInput {
   cashAmount?: number;
   onlineAmount?: number;
   categoryId?: string;
+  // Multi-category breakdown for a manually-created dispatch — see
+  // BrickLineItem's doc comment in db/schema/_helpers.ts. Ignored (and
+  // overridden) when `loadingEntryId` is given below, same as
+  // bricksCount/categoryId/amount — a trip-linked dispatch's items always
+  // come from the trip itself.
+  items?: BrickLineItem[];
   vehicleNumber?: string;
   vehicleType?: string;
   driverTipAmount?: number;
@@ -171,6 +179,9 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
       ...rawInput,
       bricksCount: loadingEntry.bricksCount,
       categoryId: loadingEntry.categoryId ?? undefined,
+      // The trip's own category breakdown, carried through wholesale —
+      // never trusted from the client, same as every other field here.
+      items: itemsOrLegacyFallback(loadingEntry),
       vehicleNumber: loadingEntry.vehicleNumber,
       vehicleType: loadingEntry.vehicleType,
       discountAmount: loadingEntry.discountAmount ?? undefined,
@@ -181,6 +192,15 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
       // pattern brickLoading.service.ts's own auto-dispatch call uses.
       amount: (loadingEntry.amount ?? 0) + (loadingEntry.discountAmount ?? 0),
     };
+  } else if (rawInput.items && rawInput.items.length > 0) {
+    // A manually-created multi-category dispatch — normalize `items` and
+    // let its own aggregate bricksCount/categoryId feed the rest of this
+    // function the same way a trip-linked one does (amount/discount stay
+    // whatever the admin typed at the top level, since Dispatch has no
+    // per-line price input the way Brick Loading does — items here just
+    // carry the category/quantity breakdown for the print/detail views).
+    const summary = summarizeItems(rawInput.items);
+    input = { ...rawInput, items: summary.items, bricksCount: summary.bricksCount, categoryId: summary.categoryId ?? rawInput.categoryId };
   }
 
   // Stock deduction is keyed by `grade`, an older fixed A1/JHAMA/PELA
@@ -359,6 +379,10 @@ export interface UpdateDispatchInput {
   cashAmount?: number;
   onlineAmount?: number;
   categoryId?: string | null;
+  // Full replacement of the category breakdown — only meaningful for a
+  // manually-created (non-trip-linked) dispatch; a trip-linked dispatch's
+  // items always come from the trip itself. See CreateDispatchInput.items.
+  items?: BrickLineItem[];
   vehicleNumber?: string;
   vehicleType?: string;
   driverTipAmount?: number;
@@ -390,6 +414,17 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
     "vehicleType", "driverTipAmount", "placeOfSupply",
   ] as const) {
     if (input[key] !== undefined) patch[key] = input[key];
+  }
+
+  // A full `items` replacement recomputes the aggregate bricksCount/
+  // categoryId the same way createDispatch does — only meaningful for a
+  // manual dispatch (a trip-linked one's items always come from the trip).
+  let newItemsSummary: ReturnType<typeof summarizeItems> | undefined;
+  if (input.items) {
+    newItemsSummary = summarizeItems(input.items);
+    patch.items = newItemsSummary.items;
+    patch.bricksCount = newItemsSummary.bricksCount;
+    patch.categoryId = newItemsSummary.categoryId ?? null;
   }
 
   // `amount` (if given) is the GROSS figure, same convention createDispatch
@@ -468,16 +503,18 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
   // Stock: correct the grade-bucket deduction by the exact delta rather
   // than re-deducting the new total, which would double-count. A grade
   // change moves the whole quantity from the old bucket to the new one.
-  const bricksCountChanged = input.bricksCount !== undefined && input.bricksCount !== existing.bricksCount;
+  const bricksCountChanged =
+    (input.bricksCount !== undefined && input.bricksCount !== existing.bricksCount) ||
+    (newItemsSummary !== undefined && newItemsSummary.bricksCount !== existing.bricksCount);
   const gradeChanged = input.grade !== undefined && input.grade !== existing.grade;
+  const newBricksCount = newItemsSummary?.bricksCount ?? input.bricksCount ?? existing.bricksCount;
   if (bricksCountChanged || gradeChanged) {
-    if (bricksCountChanged) {
+    if (input.bricksCount !== undefined && !newItemsSummary) {
       await db.update(dispatches).set({ bricksCount: input.bricksCount }).where(eq(dispatches._id, dispatchId));
     }
 
     const oldGrade = (existing.grade ?? "A1") as BrickGrade;
     const newGrade = (input.grade ?? existing.grade ?? "A1") as BrickGrade;
-    const newBricksCount = input.bricksCount ?? existing.bricksCount;
     if (oldGrade === newGrade) {
       const delta = newBricksCount - existing.bricksCount;
       if (delta !== 0) {
@@ -487,31 +524,32 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
       await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[oldGrade], quantity: existing.bricksCount });
       await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[newGrade], quantity: -newBricksCount });
     }
+  }
 
-    // Brick-Loading-linked dispatches keep a second, independent stock
-    // system (brickCategories.quantity) — correct that too, the same way
-    // updateBrickLoadingEntry corrects its own edits.
-    const categoryChanged = input.categoryId !== undefined && input.categoryId !== existing.categoryId;
-    if (bricksCountChanged || categoryChanged) {
-      const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
-      if (linkedEntry) {
-        const oldCategoryId = existing.categoryId;
-        const newCategoryId = input.categoryId !== undefined ? input.categoryId : existing.categoryId;
-        if (oldCategoryId && oldCategoryId === newCategoryId) {
-          const delta = newBricksCount - existing.bricksCount;
-          if (delta !== 0) {
-            await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${delta}` }).where(eq(brickCategories._id, oldCategoryId));
-            emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, oldCategoryId)))[0]);
-          }
-        } else {
-          if (oldCategoryId) {
-            await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` }).where(eq(brickCategories._id, oldCategoryId));
-            emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, oldCategoryId)))[0]);
-          }
-          if (newCategoryId) {
-            await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${newBricksCount}` }).where(eq(brickCategories._id, newCategoryId));
-            emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, newCategoryId)))[0]);
-          }
+  // Brick-Loading-linked dispatches keep a second, independent stock
+  // system (brickCategories.quantity) — correct that too, the same
+  // per-category delta-diff convention updateBrickLoadingEntry uses for
+  // its own edits (never re-deducting a full new total, which would
+  // double-count). `items` (old, reconstructed from legacy scalar fields
+  // when this row predates multi-category support) is diffed against
+  // whichever of `items`/`categoryId`/`bricksCount` the admin actually
+  // changed.
+  const categoryChanged = input.categoryId !== undefined && input.categoryId !== existing.categoryId;
+  if (bricksCountChanged || categoryChanged || newItemsSummary) {
+    const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
+    if (linkedEntry) {
+      const oldItems = itemsOrLegacyFallback(existing);
+      const newItems: BrickLineItem[] = newItemsSummary
+        ? newItemsSummary.items
+        : [{ categoryId: (input.categoryId !== undefined ? input.categoryId : existing.categoryId) ?? undefined, bricksCount: newBricksCount }];
+      const oldByCategory = bricksByCategory(oldItems);
+      const newByCategory = bricksByCategory(newItems);
+      const allCategoryIds = new Set([...oldByCategory.keys(), ...newByCategory.keys()]);
+      for (const catId of allCategoryIds) {
+        const delta = (newByCategory.get(catId) ?? 0) - (oldByCategory.get(catId) ?? 0);
+        if (delta !== 0) {
+          await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${delta}` }).where(eq(brickCategories._id, catId));
+          emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, catId)))[0]);
         }
       }
     }
@@ -560,16 +598,18 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
 
   const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (linkedEntry) {
-    // Restore by the DISPATCH's own current categoryId/bricksCount, not the
-    // loading entry's — updateDispatch above only ever corrects
+    // Restore by the DISPATCH's own current items/categoryId/bricksCount,
+    // not the loading entry's — updateDispatch above only ever corrects
     // brickCategories.quantity against the dispatch's own fields (it never
     // touches brickLoadingEntries), so those are what the stock was actually
     // last deducted against if this dispatch was edited after creation.
     // Using the loading entry's original (possibly stale) values here would
-    // restore the wrong category and/or the wrong quantity.
-    if (existing.categoryId) {
-      await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${existing.bricksCount}` }).where(eq(brickCategories._id, existing.categoryId));
-      emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, existing.categoryId)))[0]);
+    // restore the wrong category and/or the wrong quantity. One restore per
+    // category line item, not just the aggregate.
+    for (const item of itemsOrLegacyFallback(existing)) {
+      if (!item.categoryId) continue;
+      await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${item.bricksCount}` }).where(eq(brickCategories._id, item.categoryId));
+      emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, item.categoryId)))[0]);
     }
     await db.update(brickLoadingEntries).set({ dispatchId: null }).where(eq(brickLoadingEntries._id, linkedEntry._id));
     emitToKiln(kilnId, "brickLoading:update", (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, linkedEntry._id)))[0]);
@@ -602,7 +642,12 @@ export async function listDispatches(kilnId: string, days?: number) {
   const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone, address: people.address, gstNumber: people.gstNumber }).from(people).where(inArray(people._id, ids)) : [];
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
 
-  const categoryIds = [...new Set(rows.map((r) => r.categoryId).filter((v): v is string => !!v))];
+  const categoryIds = [
+    ...new Set([
+      ...rows.map((r) => r.categoryId).filter((v): v is string => !!v),
+      ...rows.flatMap((r) => (r.items ?? []).map((i) => i.categoryId).filter((v): v is string => !!v)),
+    ]),
+  ];
   const categoryRows = categoryIds.length
     ? await db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds))
     : [];
@@ -610,6 +655,7 @@ export async function listDispatches(kilnId: string, days?: number) {
 
   return rows.map((r) => ({
     ...r,
+    items: r.items?.map((i) => ({ ...i, categoryId: i.categoryId ? categoryById.get(i.categoryId) ?? i.categoryId : i.categoryId })),
     driverId: r.driverId ? personById.get(r.driverId) ?? r.driverId : r.driverId,
     customerId: r.customerId ? personById.get(r.customerId) ?? r.customerId : r.customerId,
     categoryId: r.categoryId ? categoryById.get(r.categoryId) ?? r.categoryId : r.categoryId,

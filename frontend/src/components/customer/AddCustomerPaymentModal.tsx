@@ -60,7 +60,7 @@ export function AddCustomerPaymentModal({ customer, currentDue, onClose, onSaved
         notes: notes || t("customer.advancePaymentDefaultNote"),
       });
       const { stamp, overallDue } = await resolvePaymentInfo({ customerId: customer._id, customerName: customer.name, remainingOnThisDoc: 0 });
-      printInvoiceRecord(row, kilnInfo, t("customer.advancePaymentCategoryLabel"), overallDue ?? remainingDueAfter, stamp);
+      printInvoiceRecord(row, kilnInfo, [], overallDue ?? remainingDueAfter, stamp, t("customer.advancePaymentCategoryLabel"));
       onSaved();
       onClose();
     } finally {

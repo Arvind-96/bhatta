@@ -7,6 +7,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { EditBrickLoadingEntryModal } from "@/components/dispatch/EditBrickLoadingEntryModal";
+import { BrickLineItemsEditor, emptyLineItemRow, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { BrickLoadingTripDetailPage } from "@/components/dispatch/BrickLoadingTripDetailPage";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
@@ -121,9 +122,7 @@ export function BrickLoading() {
     date: new Date().toISOString().slice(0, 10),
     loadingRatePerThousand: "",
     unloadingRatePerThousand: "",
-    categoryId: "",
-    pricePerBrick: "",
-    bricksCount: "",
+    items: [emptyLineItemRow()] as LineItemRow[],
     unloadedBricksCount: "",
     vehicleNumber: "",
     unloadingDate: "",
@@ -189,15 +188,14 @@ export function BrickLoading() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const validItems = form.items.filter((row) => row.categoryId && row.bricksCount);
     if (
       !form.customerName ||
       !form.customerPhone ||
       !form.driverName ||
       !form.driverPhone ||
       !form.vehicleNumber ||
-      !form.categoryId ||
-      !form.bricksCount ||
-      !form.pricePerBrick
+      validItems.length === 0
     )
       return;
     setLoading(true);
@@ -213,17 +211,19 @@ export function BrickLoading() {
         // safe default for the still-required DB column.
         vehicleType: "TRUCK",
         vehicleNumber: form.vehicleNumber,
-        bricksCount: Number(form.bricksCount),
+        items: validItems.map((row) => ({
+          categoryId: row.categoryId,
+          bricksCount: Number(row.bricksCount),
+          pricePerBrick: row.pricePerBrick ? Number(row.pricePerBrick) : undefined,
+        })),
         unloadedBricksCount: form.unloadedBricksCount ? Number(form.unloadedBricksCount) : undefined,
         loadingRatePerThousand: form.loadingRatePerThousand ? Number(form.loadingRatePerThousand) : undefined,
         unloadingRatePerThousand: form.unloadingRatePerThousand ? Number(form.unloadingRatePerThousand) : undefined,
-        categoryId: form.categoryId,
-        pricePerBrick: Number(form.pricePerBrick),
         placeOfSupply: form.placeOfSupply || undefined,
         date: form.date || undefined,
         unloadingDate: form.unloadingDate || undefined,
       });
-      setForm({ ...emptyForm, date: new Date().toISOString().slice(0, 10) });
+      setForm({ ...emptyForm, date: new Date().toISOString().slice(0, 10), items: [emptyLineItemRow()] });
       setShowForm(false);
       await refresh();
     } finally {
@@ -261,16 +261,16 @@ export function BrickLoading() {
     setShowCustomerSuggestions(false);
   }
 
-  const selectedCategory = categories.find((c) => c._id === form.categoryId);
-  // Total Amount = Loaded Brick Count x this trip's admin-entered price —
-  // deliberately never defaulted from the category's own pricePerBrick,
-  // since the price varies customer to customer; that default is only
-  // shown as a reference hint next to the input below.
-  const totalAmount = form.bricksCount && form.pricePerBrick ? Number(form.bricksCount) * Number(form.pricePerBrick) : 0;
+  // Total Amount = sum across every category row's (bricks x this trip's
+  // admin-entered price) — deliberately never defaulted from the category's
+  // own pricePerBrick, since the price varies customer to customer; that
+  // default is only shown as a reference hint next to each row's input.
+  const totalBricksAcrossItems = form.items.reduce((sum, row) => sum + (Number(row.bricksCount) || 0), 0);
+  const totalAmount = form.items.reduce((sum, row) => sum + (Number(row.bricksCount) || 0) * (Number(row.pricePerBrick) || 0), 0);
   // Total loading/unloading charge = brick count x rate per 1,000 bricks —
   // laborer count is no longer part of this formula.
   const totalLoadingCharge =
-    form.bricksCount && form.loadingRatePerThousand ? (Number(form.bricksCount) / 1000) * Number(form.loadingRatePerThousand) : 0;
+    totalBricksAcrossItems && form.loadingRatePerThousand ? (totalBricksAcrossItems / 1000) * Number(form.loadingRatePerThousand) : 0;
   const totalUnloadingCharge =
     form.unloadedBricksCount && form.unloadingRatePerThousand
       ? (Number(form.unloadedBricksCount) / 1000) * Number(form.unloadingRatePerThousand)
@@ -386,20 +386,7 @@ export function BrickLoading() {
 
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.loadingSection")}</p>
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  required
-                  value={form.categoryId}
-                  onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-                  className={inputClass}
-                >
-                  <option value="">{t("brickLoading.categoryPlaceholder")}</option>
-                  {categories.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.grade ? `${c.category} (${c.grade})` : c.category}
-                    </option>
-                  ))}
-                </select>
+              <div className="mb-2 grid grid-cols-2 gap-2">
                 <input
                   required
                   placeholder={t("brickLoading.vehicleNumber")}
@@ -408,41 +395,23 @@ export function BrickLoading() {
                   className={inputClass}
                 />
                 <input
-                  required
-                  type="number"
-                  placeholder={t("brickLoading.bricksLoadedPlaceholder")}
-                  value={form.bricksCount}
-                  onChange={(e) => setForm((f) => ({ ...f, bricksCount: e.target.value }))}
-                  className={inputClass}
-                />
-                <div className="flex flex-col gap-1">
-                  <input
-                    required
-                    type="number"
-                    step="0.01"
-                    placeholder={t("brickLoading.pricePerBrickPlaceholder")}
-                    value={form.pricePerBrick}
-                    onChange={(e) => setForm((f) => ({ ...f, pricePerBrick: e.target.value }))}
-                    className={inputClass}
-                  />
-                  {selectedCategory && (
-                    <span className="text-xs text-ink-muted">
-                      {t("brickLoading.categoryDefaultPriceHint", { amount: formatINR(selectedCategory.pricePerBrick) })}
-                    </span>
-                  )}
-                </div>
-                <input
                   type="number"
                   placeholder={t("brickLoading.loadingRatePlaceholder")}
                   value={form.loadingRatePerThousand}
                   onChange={(e) => setForm((f) => ({ ...f, loadingRatePerThousand: e.target.value }))}
                   className={inputClass}
                 />
-                <label className="flex flex-col gap-1">
+                <label className="col-span-2 flex flex-col gap-1">
                   <span className="text-xs text-ink-muted">{t("brickLoading.loadingDateLabel")}</span>
                   <DateInput required value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
                 </label>
               </div>
+
+              <BrickLineItemsEditor
+                items={form.items}
+                onChange={(items) => setForm((f) => ({ ...f, items }))}
+                categories={categories}
+              />
 
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <div className="rounded-xl border border-series-1/30 bg-series-1/5 px-3 py-2">
@@ -546,7 +515,13 @@ export function BrickLoading() {
                       {entry.vehicleType === "TRUCK" ? "🚚" : "🚜"} {entry.vehicleNumber}
                     </td>
                     <td className="py-3 text-ink-secondary">
-                      {category ? (category.grade ? `${category.category} (${category.grade})` : category.category) : "—"}
+                      {entry.items && entry.items.length > 1
+                        ? t("brickLoading.multipleCategoriesLabel", { count: entry.items.length })
+                        : category
+                        ? category.grade
+                          ? `${category.category} (${category.grade})`
+                          : category.category
+                        : "—"}
                     </td>
                     <td className="py-3 tabular-nums text-ink-secondary">{entry.bricksCount.toLocaleString("en-IN")}</td>
                     <td className="py-3 tabular-nums text-ink-secondary">{entry.amount ? `₹${formatINR(entry.amount)}` : "—"}</td>

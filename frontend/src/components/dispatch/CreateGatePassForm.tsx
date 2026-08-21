@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { printGatePassRecord } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
+import { BrickLineItemsEditor, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, Dispatch as DispatchEntry, GatePassRecord } from "@/types";
 
 const inputClass =
@@ -23,12 +24,6 @@ interface CreateGatePassFormProps {
   onSaved: () => void;
 }
 
-function categoryLabelFor(categoryId: string, categories: BrickCategory[]) {
-  const c = categories.find((cat) => cat._id === categoryId);
-  if (!c) return "—";
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
-}
-
 // The vehicle exit-authorization slip, its own saved record (see
 // CreateChallanForm.tsx's doc comment for why this is a separate row
 // instead of a live view of the dispatch).
@@ -39,15 +34,13 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
-  const dispatchCategoryId = dispatch ? (typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id ?? "" : dispatch.categoryId ?? "") : "";
   const [sequenceNumber, setSequenceNumber] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
   const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch?.vehicleType ?? "");
   const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch?.driverName ?? "");
   const [driverPhone, setDriverPhone] = useState(existing?.driverPhone ?? dispatch?.driverPhone ?? "");
   const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch?.customerName ?? "");
-  const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
-  const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
+  const [items, setItems] = useState<LineItemRow[]>(lineItemRowsFrom(existing ?? dispatch ?? { bricksCount: 0 }));
   const [placeOfSupply, setPlaceOfSupply] = useState(existing?.placeOfSupply ?? dispatch?.placeOfSupply ?? "");
   const [gatePassDate, setGatePassDate] = useState((existing?.gatePassDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
   const [notes, setNotes] = useState(existing?.notes ?? "");
@@ -61,8 +54,11 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+    if (validItems.length === 0) return;
     setSaving(true);
     try {
+      const lineItems = validItems.map((row) => ({ categoryId: row.categoryId, bricksCount: Number(row.bricksCount) }));
       const payload = {
         sequenceNumber: sequenceNumber ? Number(sequenceNumber) : undefined,
         vehicleNumber: vehicleNumber || undefined,
@@ -70,15 +66,16 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
         driverName: driverName || undefined,
         driverPhone: driverPhone || undefined,
         customerName,
-        categoryId: categoryId || undefined,
-        bricksCount: Number(bricksCount),
+        categoryId: lineItems[0].categoryId || undefined,
+        bricksCount: lineItems.reduce((sum, i) => sum + i.bricksCount, 0),
+        items: lineItems,
         placeOfSupply: placeOfSupply || undefined,
         gatePassDate,
         notes: notes || undefined,
       };
       const row = existing ? await api.gatePasses.update(existing._id, payload) : await api.gatePasses.create({ dispatchId: dispatch!._id, ...payload });
       const { stamp } = await resolvePaymentInfo({ customerName, remainingOnThisDoc: 0 });
-      printGatePassRecord(row, kilnInfo, categoryLabelFor(categoryId, categories), stamp);
+      printGatePassRecord(row, kilnInfo, categories, stamp);
       onSaved();
     } finally {
       setSaving(false);
@@ -115,15 +112,9 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
           <option value="TRUCK">{t("brickLoading.truck")}</option>
           <option value="TRACTOR">{t("brickLoading.tractor")}</option>
         </select>
-        <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={inputClass}>
-          <option value="">{t("brickLoading.categoryPlaceholder")}</option>
-          {categories.map((c) => (
-            <option key={c._id} value={c._id}>
-              {c.grade ? `${c.category} (${c.grade})` : c.category}
-            </option>
-          ))}
-        </select>
-        <input required type="number" placeholder={t("brickLoading.bricksLoadedPlaceholder")} value={bricksCount} onChange={(e) => setBricksCount(e.target.value)} className={inputClass} />
+        <div className="col-span-2">
+          <BrickLineItemsEditor items={items} onChange={setItems} categories={categories} pricingEnabled={false} />
+        </div>
         <input placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")} value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} className={inputClass} />
         <label className="flex flex-col gap-1">
           <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>

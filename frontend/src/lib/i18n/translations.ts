@@ -57,7 +57,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "nav.fuel": { en: "Fuel", hi: "ईंधन" },
   "nav.inventory": { en: "Inventory", hi: "इन्वेंटरी" },
   "nav.stock": { en: "Stock", hi: "स्टॉक" },
-  "nav.fleet": { en: "Fleet & Machines", hi: "वाहन व मशीन" },
+  "nav.fleet": { en: "Machine and Vehicle", hi: "मशीन व वाहन" },
   "nav.staff": { en: "Staff", hi: "स्टाफ" },
   "nav.salary": { en: "Salary", hi: "वेतन" },
   "nav.attendance": { en: "Attendance", hi: "हाज़िरी" },

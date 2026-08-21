@@ -7,8 +7,9 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { formatDateTime, formatINR } from "@/lib/utils";
-import { printChallanRecord, printGatePassRecord, printInvoiceRecord } from "@/lib/printDocument";
+import { printChallanRecord, printGatePassRecord, printInvoiceRecord, resolveItemRows } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
+import { LineItemsDetailTable } from "@/components/dispatch/BrickLineItemsEditor";
 import { CreateChallanForm } from "./CreateChallanForm";
 import { CreateGatePassForm } from "./CreateGatePassForm";
 import { CreateInvoiceForm } from "./CreateInvoiceForm";
@@ -22,13 +23,6 @@ function Field({ label, value }: { label: string; value?: string | number | null
       <p className="text-sm text-ink-primary">{value}</p>
     </div>
   );
-}
-
-function categoryLabelFor(categoryId: string | undefined, categories: BrickCategory[]) {
-  if (!categoryId) return "—";
-  const c = categories.find((cat) => cat._id === categoryId);
-  if (!c) return "—";
-  return c.grade ? `${c.category} (${c.grade})` : c.category;
 }
 
 interface DispatchDetailPageProps {
@@ -144,19 +138,20 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
 
   async function printChallan(c: Challan) {
     const { stamp } = await resolvePaymentInfo({ customerName: c.customerName, remainingOnThisDoc: 0 });
-    printChallanRecord(c, kilnInfo, categoryLabelFor(c.categoryId, categories), stamp);
+    printChallanRecord(c, kilnInfo, categories, stamp);
   }
   async function printGatePass(g: GatePassRecord) {
     const { stamp } = await resolvePaymentInfo({ customerName: g.customerName, remainingOnThisDoc: 0 });
-    printGatePassRecord(g, kilnInfo, categoryLabelFor(g.categoryId, categories), stamp);
+    printGatePassRecord(g, kilnInfo, categories, stamp);
   }
   async function printInvoice(i: Invoice) {
     const remainingOnThisDoc = Math.max(0, Math.round((i.netAmount - (i.amountPaidNow ?? i.netAmount)) * 100) / 100);
     const { stamp, overallDue } = await resolvePaymentInfo({ customerId: i.customerId, customerName: i.customerName, remainingOnThisDoc });
-    printInvoiceRecord(i, kilnInfo, categoryLabelFor(i.categoryId, categories), overallDue, stamp);
+    printInvoiceRecord(i, kilnInfo, categories, overallDue, stamp);
   }
 
   const driver = dispatch.driverName || (typeof dispatch.driverId === "object" ? dispatch.driverId?.name : undefined);
+  const itemRows = resolveItemRows(dispatch.items, categories, { categoryId: dispatch.categoryId, bricksCount: dispatch.bricksCount });
 
   return (
     <div>
@@ -209,12 +204,17 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
           <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.dispatchDetailsSection")}</h4>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Field label={t("common.vehicle")} value={dispatch.vehicleNumber} />
-            <Field label={t("brickLoading.categoryHeader")} value={categoryLabelFor(typeof dispatch.categoryId === "object" ? dispatch.categoryId?._id : dispatch.categoryId, categories)} />
+            {itemRows.length <= 1 && <Field label={t("brickLoading.categoryHeader")} value={itemRows[0]?.label ?? "—"} />}
             <Field label={t("dispatch.bricksHeader")} value={dispatch.bricksCount.toLocaleString("en-IN")} />
             <Field label={t("common.amount")} value={`₹${formatINR(dispatch.amount)}`} />
             <Field label={t("common.paymentMode")} value={dispatch.paymentMode ?? undefined} />
             <Field label={t("dispatch.transportCostPlaceholder")} value={dispatch.transportCost ? `₹${formatINR(dispatch.transportCost)}` : undefined} />
           </div>
+          {itemRows.length > 1 && (
+            <div className="mt-3">
+              <LineItemsDetailTable rows={itemRows} />
+            </div>
+          )}
         </Card>
 
         <Card className="lg:col-span-2">

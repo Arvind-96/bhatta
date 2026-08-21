@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { varchar, datetime } from "drizzle-orm/mysql-core";
+import { varchar, datetime, json } from "drizzle-orm/mysql-core";
 
 // Every table's PK is `_id VARCHAR` (not `id`) so a plain `SELECT *` already
 // matches the JSON shape the frontend has always received from Mongoose —
@@ -29,4 +29,23 @@ export function createdAtColumn() {
 
 export function dateColumn(name = "date") {
   return datetime(name, { mode: "date" }).$defaultFn(() => new Date());
+}
+
+// Shared across brick_loading_entries, dispatches, challans, gate_passes,
+// and invoices' `items` JSON columns — one transaction can now cover
+// several brick categories at once. `pricePerBrick`/`amount` are unused on
+// Challan/Gate Pass (no pricing there, same as the single-category scalar
+// fields they sit alongside). Populated on every new record going forward;
+// NULL on every row created before this existed — every read path that
+// doesn't know about `items` keeps working off the pre-existing scalar
+// columns, which stay populated as the aggregate (sum) across `items`.
+export interface BrickLineItem {
+  categoryId?: string;
+  bricksCount: number;
+  pricePerBrick?: number;
+  amount?: number;
+}
+
+export function itemsColumn() {
+  return json("items").$type<BrickLineItem[]>();
 }

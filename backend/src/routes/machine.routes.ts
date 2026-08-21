@@ -2,10 +2,15 @@ import { Router } from "express";
 import {
   create,
   createFuelLog,
+  createInstallment,
   createMaintenance,
+  get,
   list,
   listFuelLogs,
+  listInstallments,
   listMaintenance,
+  remove,
+  update,
 } from "../controllers/machine.controller";
 import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
@@ -19,3 +24,8 @@ machineRouter.post("/fuel-logs", asyncHandler(createFuelLog));
 machineRouter.get("/fuel-logs", asyncHandler(listFuelLogs));
 machineRouter.post("/maintenance", asyncHandler(createMaintenance));
 machineRouter.get("/maintenance", asyncHandler(listMaintenance));
+machineRouter.get("/:id", asyncHandler(get));
+machineRouter.patch("/:id", asyncHandler(update));
+machineRouter.delete("/:id", asyncHandler(remove));
+machineRouter.post("/:id/installments", asyncHandler(createInstallment));
+machineRouter.get("/:id/installments", asyncHandler(listInstallments));

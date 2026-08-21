@@ -11,6 +11,7 @@ import { AddLabourModal } from "@/components/people/AddLabourModal";
 import { LabourSessionSection } from "@/components/people/LabourSessionSection";
 import { AddWorkEntryModal } from "@/components/people/AddWorkEntryModal";
 import { EditWorkEntryModal } from "@/components/people/EditWorkEntryModal";
+import { AttendanceCalendar } from "@/components/staff/AttendanceCalendar";
 import { PersonAvatar } from "@/components/people/PersonAvatar";
 import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
 import { ProfileViewField } from "@/components/people/ProfileViewField";
@@ -432,6 +433,10 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
             </div>
           </div>
         </Card>
+
+        <div className="lg:col-span-2">
+          <AttendanceCalendar personId={thekedarId} />
+        </div>
 
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">

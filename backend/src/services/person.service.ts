@@ -3,7 +3,8 @@ import fs from "fs";
 import path from "path";
 import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
-import { people, ledgerEntries, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
+import { people, ledgerEntries, customers, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
+import { getCustomerDetail } from "./customer.service";
 import { emitToKiln } from "../config/socket";
 
 export type PersonType = (typeof PERSON_TYPES)[number];
@@ -352,35 +353,41 @@ export async function listPaymentsDue(kilnId: string) {
   return results.sort((a, b) => b.amountDue - a.amountDue);
 }
 
-// The sell-side mirror of listOutstandingAdvances: same balance formula,
-// same "flag it before it becomes a bad debt" purpose, but here a positive
-// balance means the *customer* owes the kiln (a sale on credit that
-// outpaced payments) rather than the kiln owing them. daysPending is
-// measured from their oldest still-unpaid sale, which is what actually
-// determines collection urgency, not just the total amount.
+// The sell-side mirror of listOutstandingAdvances: same "flag it before it
+// becomes a bad debt" purpose, but here a positive balance means the
+// *customer* owes the kiln (a sale on credit that outpaced payments)
+// rather than the kiln owing them. Real sales/billing runs through the
+// dedicated `customers`/`invoices` tables (Dispatch/Invoice flow), NOT
+// `people`/`ledgerEntries` — this used to query `people.type = "CUSTOMER"`,
+// a legacy/essentially-unused concept predating the Customer feature, which
+// silently made this always read ~empty. Reuses getCustomerDetail's exact
+// balance formula (customer.service.ts) so this can never drift from what
+// a Customer's own profile page shows. daysPending is measured from the
+// oldest invoice that still isn't fully paid.
 export async function customerCreditAging(kilnId: string) {
-  const customers = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER")));
+  const customerRows = await db.select().from(customers).where(eq(customers.kilnId, kilnId));
 
   const results = [];
-  for (const person of customers) {
-    const entries = await db
-      .select()
-      .from(ledgerEntries)
-      .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, person._id)))
-      .orderBy(asc(ledgerEntries.date));
-    const balance = Math.round(entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0) * 100) / 100;
-    if (balance <= 0) continue;
+  for (const customer of customerRows) {
+    const detail = await getCustomerDetail(kilnId, customer._id);
+    if (detail.totalDue <= 0) continue;
 
-    const oldestUnpaidSale = entries.find((e) => e.direction === "DUE");
-    const daysPending = oldestUnpaidSale
-      ? Math.floor((Date.now() - oldestUnpaidSale.date!.getTime()) / (1000 * 60 * 60 * 24))
-      : 0;
+    // invoices come back newest-first (see listInvoicesForCustomer) — the
+    // oldest still-unpaid one is what actually determines urgency.
+    const oldestUnpaidInvoice = [...detail.invoices]
+      .reverse()
+      .find((inv) => inv.bricksCount > 0 && (inv.amountPaidNow ?? inv.netAmount) < inv.netAmount);
+    const oldestUnpaidDate = oldestUnpaidInvoice ? new Date(oldestUnpaidInvoice.invoiceDate ?? oldestUnpaidInvoice.createdAt ?? Date.now()) : undefined;
+    const daysPending = oldestUnpaidDate ? Math.floor((Date.now() - oldestUnpaidDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
 
     results.push({
-      person,
-      outstandingCredit: balance,
+      person: { _id: customer._id, name: customer.name, phone: customer.phones?.[0] },
+      outstandingCredit: detail.totalDue,
       daysPending,
-      overLimit: person.creditLimit != null && balance > person.creditLimit,
+      // `customers` carries no per-customer credit-limit field (unlike the
+      // legacy `people.creditLimit`) — always false until/unless that's
+      // added to the Customer model.
+      overLimit: false,
     });
   }
 

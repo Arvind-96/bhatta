@@ -57,4 +57,8 @@ export const dispatchDocumentsDict: Record<string, Record<Locale, string>> = {
   "dispatchDocs.numberHeader": { en: "Number", hi: "नंबर" },
   "dispatchDocs.totalInvoicedLabel": { en: "Total invoiced", hi: "कुल इनवॉइस राशि" },
   "dispatchDocs.totalInvoicesLabel": { en: "Invoices", hi: "इनवॉइस" },
+  "dispatchDocs.categoryEntryLabel": { en: "Category {index}", hi: "श्रेणी {index}" },
+  "dispatchDocs.addAnotherCategory": { en: "+ Add another brick category", hi: "+ एक और ईंट श्रेणी जोड़ें" },
+  "dispatchDocs.lineItemsTotalLabel": { en: "Total (all categories)", hi: "कुल (सभी श्रेणियां)" },
+  "dispatchDocs.rateHeader": { en: "Rate", hi: "दर" },
 };

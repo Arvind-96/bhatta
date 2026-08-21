@@ -12,6 +12,7 @@ import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddWorkEntryModal } from "@/components/people/AddWorkEntryModal";
 import { EditWorkEntryModal } from "@/components/people/EditWorkEntryModal";
+import { AttendanceCalendar } from "@/components/staff/AttendanceCalendar";
 import { PersonAvatar } from "@/components/people/PersonAvatar";
 import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
 import { ProfileViewField } from "@/components/people/ProfileViewField";
@@ -539,6 +540,10 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
             </div>
           </div>
         </Card>
+
+        <div className="lg:col-span-2">
+          <AttendanceCalendar personId={labourId} />
+        </div>
 
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">

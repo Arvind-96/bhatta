@@ -1,5 +1,5 @@
 import { double, int, json, mysqlTable, varchar, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
-import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
+import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn } from "./_helpers";
 import { LEDGER_PAYMENT_MODES } from "./people";
 
 export const BRICK_GRADES = ["A1", "JHAMA", "PELA"] as const;
@@ -43,6 +43,9 @@ export const dispatches = mysqlTable("dispatches", {
   // automatically on dispatches auto-created from a Brick Loading trip;
   // left null on manually-created dispatches.
   categoryId: varchar("categoryId", { length: 64 }),
+  // Multi-category breakdown — see BrickLineItem's doc comment in
+  // _helpers.ts. categoryId/bricksCount/amount above stay the aggregate.
+  items: itemsColumn(),
   // Print-only fields for the Gate Pass/Challan — auto-populated from the
   // originating brickLoadingEntries row when this dispatch was created by
   // the Brick Loading auto-sync; otherwise settable directly on a manual
@@ -111,6 +114,9 @@ export const challans = mysqlTable("challans", {
   customerPhone: varchar("customerPhone", { length: 255 }),
   categoryId: varchar("categoryId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
+  // Multi-category breakdown (no pricing here, same as categoryId/
+  // bricksCount above) — see BrickLineItem's doc comment in _helpers.ts.
+  items: itemsColumn(),
   placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   challanDate: dateColumn("challanDate"),
   notes: text("notes"),
@@ -132,6 +138,9 @@ export const gatePasses = mysqlTable("gate_passes", {
   customerName: varchar("customerName", { length: 255 }).notNull(),
   categoryId: varchar("categoryId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
+  // Multi-category breakdown (no pricing here, same as categoryId/
+  // bricksCount above) — see BrickLineItem's doc comment in _helpers.ts.
+  items: itemsColumn(),
   placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   gatePassDate: dateColumn("gatePassDate"),
   notes: text("notes"),
@@ -164,6 +173,10 @@ export const invoices = mysqlTable("invoices", {
   customerGstNumber: varchar("customerGstNumber", { length: 255 }),
   categoryId: varchar("categoryId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
+  // Multi-category breakdown — see BrickLineItem's doc comment in
+  // _helpers.ts. categoryId/bricksCount/ratePerBrick/grossAmount/netAmount
+  // stay the aggregate for every read path that doesn't yet know `items`.
+  items: itemsColumn(),
   ratePerBrick: double("ratePerBrick"),
   grossAmount: double("grossAmount"),
   discountAmount: double("discountAmount"),

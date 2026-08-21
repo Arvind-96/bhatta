@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,8 @@ import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR } from "@/lib/utils";
-import type { BrickLoadingEntry } from "@/types";
+import { BrickLineItemsEditor, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import type { BrickCategory, BrickLoadingEntry } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -19,13 +20,13 @@ interface EditBrickLoadingEntryModalProps {
 
 // Full admin edit — mirrors every field on the Log Trip form (see
 // BrickLoading.tsx) so a trip can be corrected the same way it was
-// entered. Category can't be changed here (that would also need to move
-// stock between categories) — bricksCount/unloadedBricksCount/rate edits
-// recompute the stored Total Amount/Total Loading Charge/Total Unloading
-// Charge server-side. Changing tipAmount (Driver Reward) never silently
-// rewrites what was already posted to a driver's ledger for legacy
-// entries that still carry a driverId — the backend posts a correction
-// entry for the difference instead.
+// entered, including which categories/quantities/prices make up the
+// trip — editing this re-diffs and corrects `brickCategories.quantity`
+// per category server-side (see updateBrickLoadingEntry). Changing
+// tipAmount (Driver Reward) never silently rewrites what was already
+// posted to a driver's ledger for legacy entries that still carry a
+// driverId — the backend posts a correction entry for the difference
+// instead.
 export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBrickLoadingEntryModalProps) {
   const [customerName, setCustomerName] = useState(entry.customerName ?? "");
   const [customerPhone, setCustomerPhone] = useState(entry.customerPhone ?? "");
@@ -34,8 +35,8 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   const [driverPhone, setDriverPhone] = useState(entry.driverPhone ?? "");
   const [tipAmount, setTipAmount] = useState(String(entry.tipAmount ?? 0));
   const [vehicleNumber, setVehicleNumber] = useState(entry.vehicleNumber);
-  const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
-  const [pricePerBrick, setPricePerBrick] = useState(entry.pricePerBrick != null ? String(entry.pricePerBrick) : "");
+  const [items, setItems] = useState<LineItemRow[]>(lineItemRowsFrom(entry));
+  const [categories, setCategories] = useState<BrickCategory[]>([]);
   const [unloadedBricksCount, setUnloadedBricksCount] = useState(entry.unloadedBricksCount ? String(entry.unloadedBricksCount) : "");
   const [loadingRatePerThousand, setLoadingRatePerThousand] = useState(entry.loadingRatePerThousand ? String(entry.loadingRatePerThousand) : "");
   const [unloadingRatePerThousand, setUnloadingRatePerThousand] = useState(
@@ -48,8 +49,14 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   const { t } = useTranslation();
   const hasDriver = !!entry.driverId;
 
+  useEffect(() => {
+    api.brickCategories.list().then(setCategories).catch(console.error);
+  }, []);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+    if (validItems.length === 0) return;
     setSaving(true);
     try {
       await api.brickLoading.update(entry._id, {
@@ -59,8 +66,11 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
         driverName: driverName || undefined,
         driverPhone: driverPhone || undefined,
         vehicleNumber,
-        bricksCount: Number(bricksCount),
-        pricePerBrick: pricePerBrick ? Number(pricePerBrick) : undefined,
+        items: validItems.map((row) => ({
+          categoryId: row.categoryId,
+          bricksCount: Number(row.bricksCount),
+          pricePerBrick: row.pricePerBrick ? Number(row.pricePerBrick) : undefined,
+        })),
         unloadedBricksCount: unloadedBricksCount ? Number(unloadedBricksCount) : undefined,
         loadingRatePerThousand: loadingRatePerThousand ? Number(loadingRatePerThousand) : undefined,
         unloadingRatePerThousand: unloadingRatePerThousand ? Number(unloadingRatePerThousand) : undefined,
@@ -143,29 +153,12 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
 
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.loadingSection")}</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="mb-2 grid grid-cols-2 gap-2">
               <input
                 required
                 placeholder={t("brickLoading.vehicleNumber")}
                 value={vehicleNumber}
                 onChange={(e) => setVehicleNumber(e.target.value)}
-                className={inputClass}
-              />
-              <input
-                required
-                type="number"
-                placeholder={t("brickLoading.bricksLoadedPlaceholder")}
-                value={bricksCount}
-                onChange={(e) => setBricksCount(e.target.value)}
-                className={inputClass}
-              />
-              <input
-                required
-                type="number"
-                step="0.01"
-                placeholder={t("brickLoading.pricePerBrickPlaceholder")}
-                value={pricePerBrick}
-                onChange={(e) => setPricePerBrick(e.target.value)}
                 className={inputClass}
               />
               <input
@@ -175,11 +168,12 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 onChange={(e) => setLoadingRatePerThousand(e.target.value)}
                 className={inputClass}
               />
-              <label className="flex flex-col gap-1">
+              <label className="col-span-2 flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("brickLoading.loadingDateLabel")}</span>
                 <DateInput required value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
               </label>
             </div>
+            <BrickLineItemsEditor items={items} onChange={setItems} categories={categories} />
             {entry.amount != null && (
               <p className="mt-2 text-sm text-ink-muted">
                 {t("brickLoading.totalAmountLabel")}: <span className="font-semibold text-ink-primary">₹{formatINR(entry.amount)}</span>

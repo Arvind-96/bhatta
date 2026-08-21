@@ -5,6 +5,15 @@ import { createDispatch, deleteDispatch, dispatchTotals, listDispatches, recordD
 import { BRICK_GRADES, DISPATCH_PAYMENT_MODES as PAYMENT_MODES } from "../db/schema";
 import { validateCashOnlineSplit } from "../utils/paymentSplit";
 
+// One row per brick category on this dispatch — see BrickLineItem's doc
+// comment in db/schema/_helpers.ts. Ignored (and overridden) when
+// `loadingEntryId` is set, same as bricksCount/categoryId/amount.
+const lineItemSchema = z.object({
+  categoryId: z.string().optional(),
+  bricksCount: z.number().int().positive(),
+  pricePerBrick: z.number().min(0).optional(),
+});
+
 const createSchema = z
   .object({
     customerName: z.string(),
@@ -17,6 +26,7 @@ const createSchema = z
     // authoritatively from that trip row and ignores whatever's sent here.
     bricksCount: z.number().int().min(0).optional(),
     amount: z.number().min(0).optional(),
+    items: z.array(lineItemSchema).optional(),
     driverId: z.string().optional(),
     driverName: z.string().optional(),
     driverPhone: z.string().optional(),
@@ -37,6 +47,7 @@ const createSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.loadingEntryId) return;
+    if (data.items && data.items.length > 0) return;
     if (!data.bricksCount || data.bricksCount <= 0) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "bricksCount is required", path: ["bricksCount"] });
     }
@@ -91,6 +102,7 @@ const updateSchema = z
     cashAmount: z.number().min(0).optional(),
     onlineAmount: z.number().min(0).optional(),
     categoryId: z.string().nullable().optional(),
+    items: z.array(lineItemSchema).optional(),
     vehicleNumber: z.string().optional(),
     vehicleType: z.string().optional(),
     driverTipAmount: z.number().min(0).optional(),

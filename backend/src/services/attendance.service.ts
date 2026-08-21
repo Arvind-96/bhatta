@@ -14,17 +14,23 @@ export interface MarkAttendanceInput {
   wageAmount?: number;
 }
 
-// Eligible for attendance marking: WORKER/HELPER (piece-rate) plus anyone
-// with a monthlySalary set — not a fixed type list,
-// since which types actually carry a monthly salary varies by kiln (this
-// deployment's real data includes salaried FITTERs, for instance) and the
-// Salary module needs attendance for exactly that same "has monthlySalary"
-// population.
+// Eligible for attendance marking: WORKER/HELPER (piece-rate),
+// LABOUR_CONTRACTOR/THEKEDAR (thekedars — often paid PER_THOUSAND, so no
+// monthlySalary to fall back on), plus anyone with a monthlySalary set —
+// not a fixed type list, since which types actually carry a monthly
+// salary varies by kiln (this deployment's real data includes salaried
+// FITTERs, for instance) and the Salary module needs attendance for
+// exactly that same "has monthlySalary" population.
 async function assertAttendanceEligible(kilnId: string, personId: string) {
   const person = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!person) throw new Error("Person not found in this kiln");
-  const eligible = person.type === "WORKER" || person.type === "HELPER" || person.monthlySalary != null;
-  if (!eligible) throw new Error("This person isn't eligible for attendance tracking (no monthly salary, not a worker/helper)");
+  const eligible =
+    person.type === "WORKER" ||
+    person.type === "HELPER" ||
+    person.type === "LABOUR_CONTRACTOR" ||
+    person.type === "THEKEDAR" ||
+    person.monthlySalary != null;
+  if (!eligible) throw new Error("This person isn't eligible for attendance tracking (no monthly salary, not a worker/helper/thekedar)");
   return person;
 }
 
