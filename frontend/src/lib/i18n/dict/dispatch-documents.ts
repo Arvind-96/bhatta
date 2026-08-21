@@ -26,6 +26,8 @@ export const dispatchDocumentsDict: Record<string, Record<Locale, string>> = {
     en: "Auto-suggested from the sequence — clear it to save without a number; the same number will be suggested next time.",
     hi: "क्रम से स्वतः सुझाया गया — बिना नंबर के सहेजने के लिए इसे खाली करें; अगली बार वही नंबर फिर सुझाया जाएगा।",
   },
+  "dispatchDocs.placeOfSupplyPlaceholder": { en: "Place of supply (delivery address)", hi: "आपूर्ति का स्थान (डिलीवरी पता)" },
+  "dispatchDocs.transactionDateRequiredHint": { en: "The actual date this happened", hi: "जिस तारीख को यह हुआ" },
   "dispatchDocs.ratePerBrickPlaceholder": { en: "Rate per brick (₹)", hi: "प्रति ईंट दर (₹)" },
   "dispatchDocs.challansListTitle": { en: "Challans created", hi: "बनाए गए चालान" },
   "dispatchDocs.gatePassesListTitle": { en: "Gate passes created", hi: "बनाए गए गेट पास" },

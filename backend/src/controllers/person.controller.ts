@@ -79,7 +79,7 @@ const ledgerSchema = z
     direction: z.enum(["DUE", "PAID"]),
     amount: z.number().positive(),
     reason: z.string(),
-    date: z.string().optional(),
+    date: z.string().min(1, "Transaction date is required"),
     paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
     cashAmount: z.number().min(0).optional(),
     onlineAmount: z.number().min(0).optional(),

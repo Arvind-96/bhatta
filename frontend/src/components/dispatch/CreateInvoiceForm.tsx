@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { printInvoiceRecord } from "@/lib/printDocument";
+import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { formatINR } from "@/lib/utils";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import type { BrickCategory, Customer, Dispatch as DispatchEntry, Invoice, PaymentMode } from "@/types";
@@ -90,6 +91,7 @@ export function CreateInvoiceForm({
   const [cashAmount, setCashAmount] = useState(existing?.cashAmount != null ? String(existing.cashAmount) : "");
   const [onlineAmount, setOnlineAmount] = useState(existing?.onlineAmount != null ? String(existing.onlineAmount) : "");
   const [invoiceDate, setInvoiceDate] = useState((existing?.invoiceDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
+  const [placeOfSupply, setPlaceOfSupply] = useState(existing?.placeOfSupply ?? dispatch?.placeOfSupply ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -176,11 +178,22 @@ export function CreateInvoiceForm({
         paymentMode,
         cashAmount: paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
         onlineAmount: paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
-        invoiceDate: invoiceDate || undefined,
+        placeOfSupply: placeOfSupply || undefined,
+        invoiceDate,
         notes: notes || undefined,
       };
       const row = existing ? await api.invoices.update(existing._id, payload) : await api.invoices.create({ dispatchId: dispatch?._id, ...payload });
-      printInvoiceRecord(row, kilnInfo, categoryLabelFor(categoryId, categories), overallDueAfter);
+      // Resolved fresh, post-save, rather than reusing the pre-submit
+      // overallDueAfter preview — this invoice is already persisted by now,
+      // so api.customers.detail() already reflects it, giving an accurate
+      // print on both a brand-new invoice AND an edit (the old preview only
+      // ever covered the "new" case).
+      const { stamp, overallDue } = await resolvePaymentInfo({
+        customerId: row.customerId || selectedCustomerId || undefined,
+        customerName,
+        remainingOnThisDoc: Math.max(0, Math.round((row.netAmount - (row.amountPaidNow ?? row.netAmount)) * 100) / 100),
+      });
+      printInvoiceRecord(row, kilnInfo, categoryLabelFor(categoryId, categories), overallDue, stamp);
       onSaved();
     } finally {
       setSaving(false);
@@ -260,7 +273,16 @@ export function CreateInvoiceForm({
           onChange={(e) => setAmountPaidNow(e.target.value)}
           className={inputClass}
         />
-        <DateInput value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className={inputClass} />
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+          <DateInput required value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className={inputClass} />
+        </label>
+        <input
+          placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")}
+          value={placeOfSupply}
+          onChange={(e) => setPlaceOfSupply(e.target.value)}
+          className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+        />
 
         <div className="col-span-2 grid grid-cols-2 gap-2">
           <div className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-center">

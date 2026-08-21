@@ -101,7 +101,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
         direction: form.direction,
         amount: Number(form.amount),
         reason: form.reason,
-        date: form.date || undefined,
+        date: form.date,
         paymentMode: form.direction === "PAID" ? form.paymentMode : undefined,
         cashAmount: usingSplit ? Number(form.cashAmount) : undefined,
         onlineAmount: usingSplit ? Number(form.onlineAmount) : undefined,
@@ -322,6 +322,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                   className="h-11 flex-1 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
                 />
                 <DateInput
+                  required
                   aria-label={t("common.transactionDate")}
                   value={form.date}
                   onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}

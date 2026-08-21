@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { formatDateTime, formatINR } from "@/lib/utils";
 import { printChallanRecord, printGatePassRecord, printInvoiceRecord } from "@/lib/printDocument";
+import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { CreateChallanForm } from "./CreateChallanForm";
 import { CreateGatePassForm } from "./CreateGatePassForm";
 import { CreateInvoiceForm } from "./CreateInvoiceForm";
@@ -141,6 +142,20 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
     await refreshDocs();
   }
 
+  async function printChallan(c: Challan) {
+    const { stamp } = await resolvePaymentInfo({ customerName: c.customerName, remainingOnThisDoc: 0 });
+    printChallanRecord(c, kilnInfo, categoryLabelFor(c.categoryId, categories), stamp);
+  }
+  async function printGatePass(g: GatePassRecord) {
+    const { stamp } = await resolvePaymentInfo({ customerName: g.customerName, remainingOnThisDoc: 0 });
+    printGatePassRecord(g, kilnInfo, categoryLabelFor(g.categoryId, categories), stamp);
+  }
+  async function printInvoice(i: Invoice) {
+    const remainingOnThisDoc = Math.max(0, Math.round((i.netAmount - (i.amountPaidNow ?? i.netAmount)) * 100) / 100);
+    const { stamp, overallDue } = await resolvePaymentInfo({ customerId: i.customerId, customerName: i.customerName, remainingOnThisDoc });
+    printInvoiceRecord(i, kilnInfo, categoryLabelFor(i.categoryId, categories), overallDue, stamp);
+  }
+
   const driver = dispatch.driverName || (typeof dispatch.driverId === "object" ? dispatch.driverId?.name : undefined);
 
   return (
@@ -177,6 +192,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
             <Field label={t("brickLoading.customerNamePlaceholder")} value={dispatch.customerName} />
             <Field label={t("brickLoading.customerPhonePlaceholder")} value={dispatch.customerPhone} />
             <Field label={t("brickLoading.customerAddressPlaceholder")} value={dispatch.customerAddress} />
+            <Field label={t("dispatchDocs.placeOfSupplyPlaceholder")} value={dispatch.placeOfSupply} />
           </div>
         </Card>
 
@@ -310,7 +326,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
                     <p className="text-sm text-ink-muted">{c.bricksCount.toLocaleString("en-IN")} {t("brickLoading.bricksUnit")} · {c.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => printChallanRecord(c, kilnInfo, categoryLabelFor(c.categoryId, categories))} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
+                    <button onClick={() => printChallan(c)} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
                       <Printer className="h-3.5 w-3.5" /> {t("common.print")}
                     </button>
                     <button onClick={() => { closeForms(); setEditingChallan(c); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">
@@ -337,7 +353,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
                     <p className="text-sm text-ink-muted">{g.bricksCount.toLocaleString("en-IN")} {t("brickLoading.bricksUnit")} · {g.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => printGatePassRecord(g, kilnInfo, categoryLabelFor(g.categoryId, categories))} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
+                    <button onClick={() => printGatePass(g)} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
                       <Printer className="h-3.5 w-3.5" /> {t("common.print")}
                     </button>
                     <button onClick={() => { closeForms(); setEditingGatePass(g); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">
@@ -364,7 +380,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
                     <p className="text-sm text-ink-muted">₹{formatINR(i.netAmount)} · {i.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => printInvoiceRecord(i, kilnInfo, categoryLabelFor(i.categoryId, categories))} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
+                    <button onClick={() => printInvoice(i)} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
                       <Printer className="h-3.5 w-3.5" /> {t("common.print")}
                     </button>
                     <button onClick={() => { closeForms(); setEditingInvoice(i); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">

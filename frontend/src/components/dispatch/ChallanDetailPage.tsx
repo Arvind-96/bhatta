@@ -5,7 +5,9 @@ import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useUiStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
+import { formatDateTime } from "@/lib/utils";
 import { printChallanRecord } from "@/lib/printDocument";
+import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { CreateChallanForm } from "./CreateChallanForm";
 import type { BrickCategory, Challan } from "@/types";
 
@@ -54,6 +56,11 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
     onDeleted();
   }
 
+  async function handlePrint() {
+    const { stamp } = await resolvePaymentInfo({ customerName: challan.customerName, remainingOnThisDoc: 0 });
+    printChallanRecord(challan, kilnInfo, categoryLabelFor(challan.categoryId, categories), stamp);
+  }
+
   return (
     <div>
       <button onClick={onBack} className="mb-3 flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink-primary">
@@ -67,10 +74,13 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
             <p className="text-sm text-ink-muted">
               {challan.challanDate ? new Date(challan.challanDate).toLocaleDateString("en-IN") : "—"}
             </p>
+            <p className="text-xs text-ink-muted/70">
+              {t("common.entryDateTime")}: {formatDateTime(challan.createdAt)}
+            </p>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => printChallanRecord(challan, kilnInfo, categoryLabelFor(challan.categoryId, categories))}
+              onClick={handlePrint}
               className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
             >
               <Printer className="h-3.5 w-3.5" /> {t("common.print")}
@@ -119,6 +129,7 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
               <Field label={t("brickLoading.categoryHeader")} value={categoryLabelFor(challan.categoryId, categories)} />
               <Field label={t("brickLoading.bricksLoadedPlaceholder")} value={challan.bricksCount.toLocaleString("en-IN")} />
               <Field label={t("dispatch.vehicleNumberPlaceholder")} value={challan.vehicleNumber} />
+              <Field label={t("dispatchDocs.placeOfSupplyPlaceholder")} value={challan.placeOfSupply} />
             </div>
           </Card>
 

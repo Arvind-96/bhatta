@@ -34,7 +34,8 @@ const challanSchema = z.object({
   customerPhone: z.string().optional(),
   categoryId: z.string().optional(),
   bricksCount: z.number().int().positive(),
-  challanDate: z.string().optional(),
+  placeOfSupply: z.string().optional(),
+  challanDate: z.string().min(1, "Transaction date is required"),
   notes: z.string().optional(),
 });
 const challanUpdateSchema = challanSchema.omit({ dispatchId: true }).partial();
@@ -70,7 +71,8 @@ const gatePassSchema = z.object({
   customerName: z.string(),
   categoryId: z.string().optional(),
   bricksCount: z.number().int().positive(),
-  gatePassDate: z.string().optional(),
+  placeOfSupply: z.string().optional(),
+  gatePassDate: z.string().min(1, "Transaction date is required"),
   notes: z.string().optional(),
 });
 const gatePassUpdateSchema = gatePassSchema.omit({ dispatchId: true }).partial();
@@ -117,7 +119,8 @@ const invoiceSchema = z.object({
   paymentMode: z.enum(DISPATCH_PAYMENT_MODES).optional(),
   cashAmount: z.number().min(0).optional(),
   onlineAmount: z.number().min(0).optional(),
-  invoiceDate: z.string().optional(),
+  placeOfSupply: z.string().optional(),
+  invoiceDate: z.string().min(1, "Transaction date is required"),
   notes: z.string().optional(),
 });
 const invoiceUpdateSchema = invoiceSchema.omit({ dispatchId: true }).partial();

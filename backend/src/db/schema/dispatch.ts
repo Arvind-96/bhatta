@@ -54,6 +54,11 @@ export const dispatches = mysqlTable("dispatches", {
   // = net"); `amount` above is already the net, post-discount figure so
   // every downstream revenue total keeps working unchanged.
   discountAmount: double("discountAmount"),
+  // The delivery address for this dispatch's bricks — auto-filled
+  // (editable) from a linked Brick Loading trip's own placeOfSupply,
+  // otherwise settable directly. Carried onto any Challan/Gate
+  // Pass/Invoice generated from this dispatch.
+  placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   notes: text("notes"),
   dispatchedOn: dateColumn("dispatchedOn"),
   localId: varchar("localId", { length: 64 }),
@@ -106,6 +111,7 @@ export const challans = mysqlTable("challans", {
   customerPhone: varchar("customerPhone", { length: 255 }),
   categoryId: varchar("categoryId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
+  placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   challanDate: dateColumn("challanDate"),
   notes: text("notes"),
   createdAt: createdAtColumn(),
@@ -126,6 +132,7 @@ export const gatePasses = mysqlTable("gate_passes", {
   customerName: varchar("customerName", { length: 255 }).notNull(),
   categoryId: varchar("categoryId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
+  placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   gatePassDate: dateColumn("gatePassDate"),
   notes: text("notes"),
   createdAt: createdAtColumn(),
@@ -171,6 +178,7 @@ export const invoices = mysqlTable("invoices", {
   paymentMode: varchar("paymentMode", { length: 50, enum: DISPATCH_PAYMENT_MODES }),
   cashAmount: double("cashAmount"),
   onlineAmount: double("onlineAmount"),
+  placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   invoiceDate: dateColumn("invoiceDate"),
   notes: text("notes"),
   createdAt: createdAtColumn(),

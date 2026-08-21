@@ -29,6 +29,7 @@ export interface CreateBrickLoadingInput {
   // Admin-entered per trip -- never defaulted from the category's own
   // pricePerBrick, since the price varies customer to customer.
   pricePerBrick: number;
+  placeOfSupply?: string;
   date?: Date;
   unloadingDate?: Date;
 }
@@ -115,6 +116,7 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
         unloadingRatePerThousand: input.unloadingRatePerThousand,
         categoryId: input.categoryId,
         pricePerBrick: input.pricePerBrick,
+        placeOfSupply: input.placeOfSupply,
         loadingCharge,
         unloadingCharge,
         amount: finalAmount,
@@ -173,6 +175,7 @@ export interface UpdateBrickLoadingInput {
   // Admin-entered per trip — never defaulted from the category's own
   // pricePerBrick.
   pricePerBrick?: number;
+  placeOfSupply?: string;
   notes?: string;
   date?: Date;
   unloadingDate?: Date;

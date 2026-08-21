@@ -216,6 +216,7 @@ export const api = {
       vehicleType?: string;
       driverTipAmount?: number;
       discountAmount?: number;
+      placeOfSupply?: string;
       notes?: string;
       loadingEntryId?: string;
       paymentMode?: PaymentMode;
@@ -245,6 +246,7 @@ export const api = {
         vehicleType: string;
         driverTipAmount: number;
         discountAmount: number;
+        placeOfSupply: string;
       }>
     ) => patch<Dispatch>(`/dispatch/${id}`, input, true),
     remove: (id: string) => del<void>(`/dispatch/${id}`, true),
@@ -265,7 +267,8 @@ export const api = {
       customerPhone?: string;
       categoryId?: string;
       bricksCount: number;
-      challanDate?: string;
+      placeOfSupply?: string;
+      challanDate: string;
       notes?: string;
     }) => post<Challan>("/challans", input, true),
     update: (
@@ -281,6 +284,7 @@ export const api = {
         customerPhone: string;
         categoryId: string;
         bricksCount: number;
+        placeOfSupply: string;
         challanDate: string;
         notes: string;
       }>
@@ -301,7 +305,8 @@ export const api = {
       customerName: string;
       categoryId?: string;
       bricksCount: number;
-      gatePassDate?: string;
+      placeOfSupply?: string;
+      gatePassDate: string;
       notes?: string;
     }) => post<GatePassRecord>("/gate-passes", input, true),
     update: (
@@ -315,6 +320,7 @@ export const api = {
         customerName: string;
         categoryId: string;
         bricksCount: number;
+        placeOfSupply: string;
         gatePassDate: string;
         notes: string;
       }>
@@ -343,7 +349,8 @@ export const api = {
       paymentMode?: PaymentMode;
       cashAmount?: number;
       onlineAmount?: number;
-      invoiceDate?: string;
+      placeOfSupply?: string;
+      invoiceDate: string;
       notes?: string;
     }) => post<Invoice>("/invoices", input, true),
     update: (
@@ -365,6 +372,7 @@ export const api = {
         paymentMode: PaymentMode;
         cashAmount: number;
         onlineAmount: number;
+        placeOfSupply: string;
         invoiceDate: string;
         notes: string;
       }>
@@ -447,7 +455,7 @@ export const api = {
         cashAmount?: number;
         onlineAmount?: number;
         category?: LedgerCategory;
-        date?: string;
+        date: string;
       }
     ) => post<LedgerEntry>(`/people/${id}/ledger`, input, true),
     listLedger: (id: string) => get<LedgerEntry[]>(`/people/${id}/ledger`, true),
@@ -919,6 +927,7 @@ export const api = {
       unloadingRatePerThousand?: number;
       categoryId: string;
       pricePerBrick: number;
+      placeOfSupply?: string;
       date?: string;
       unloadingDate?: string;
     }) => post<BrickLoadingEntry>("/brick-loading", input, true),
@@ -938,6 +947,7 @@ export const api = {
         unloadingRatePerThousand: number;
         pricePerBrick: number;
         tipAmount: number;
+        placeOfSupply: string;
         date: string;
         unloadingDate: string;
         notes: string;

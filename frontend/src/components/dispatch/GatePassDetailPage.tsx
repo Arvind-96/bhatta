@@ -5,7 +5,9 @@ import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useUiStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
+import { formatDateTime } from "@/lib/utils";
 import { printGatePassRecord } from "@/lib/printDocument";
+import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { CreateGatePassForm } from "./CreateGatePassForm";
 import type { BrickCategory, GatePassRecord } from "@/types";
 
@@ -51,6 +53,11 @@ export function GatePassDetailPage({ gatePass, categories, onBack, onDeleted }: 
     onDeleted();
   }
 
+  async function handlePrint() {
+    const { stamp } = await resolvePaymentInfo({ customerName: gatePass.customerName, remainingOnThisDoc: 0 });
+    printGatePassRecord(gatePass, kilnInfo, categoryLabelFor(gatePass.categoryId, categories), stamp);
+  }
+
   return (
     <div>
       <button onClick={onBack} className="mb-3 flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink-primary">
@@ -64,10 +71,13 @@ export function GatePassDetailPage({ gatePass, categories, onBack, onDeleted }: 
             <p className="text-sm text-ink-muted">
               {gatePass.gatePassDate ? new Date(gatePass.gatePassDate).toLocaleDateString("en-IN") : "—"}
             </p>
+            <p className="text-xs text-ink-muted/70">
+              {t("common.entryDateTime")}: {formatDateTime(gatePass.createdAt)}
+            </p>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => printGatePassRecord(gatePass, kilnInfo, categoryLabelFor(gatePass.categoryId, categories))}
+              onClick={handlePrint}
               className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
             >
               <Printer className="h-3.5 w-3.5" /> {t("common.print")}
@@ -113,6 +123,7 @@ export function GatePassDetailPage({ gatePass, categories, onBack, onDeleted }: 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Field label={t("brickLoading.categoryHeader")} value={categoryLabelFor(gatePass.categoryId, categories)} />
               <Field label={t("brickLoading.bricksLoadedPlaceholder")} value={gatePass.bricksCount.toLocaleString("en-IN")} />
+              <Field label={t("dispatchDocs.placeOfSupplyPlaceholder")} value={gatePass.placeOfSupply} />
             </div>
           </Card>
 

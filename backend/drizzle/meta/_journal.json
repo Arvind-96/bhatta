@@ -120,6 +120,13 @@
       "when": 1787229482441,
       "tag": "0016_bright_typhoid_mary",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1787290264907,
+      "tag": "0017_quick_chronomancer",
+      "breakpoints": true
     }
   ]
 }

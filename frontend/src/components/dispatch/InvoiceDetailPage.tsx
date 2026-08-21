@@ -5,8 +5,9 @@ import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useUiStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
-import { formatINR } from "@/lib/utils";
+import { formatDateTime, formatINR } from "@/lib/utils";
 import { printInvoiceRecord } from "@/lib/printDocument";
+import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { CreateInvoiceForm } from "./CreateInvoiceForm";
 import type { BrickCategory, Invoice } from "@/types";
 
@@ -52,6 +53,12 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
     onDeleted();
   }
 
+  async function handlePrint() {
+    const remainingOnThisDoc = Math.max(0, Math.round((invoice.netAmount - (invoice.amountPaidNow ?? invoice.netAmount)) * 100) / 100);
+    const { stamp, overallDue } = await resolvePaymentInfo({ customerId: invoice.customerId, customerName: invoice.customerName, remainingOnThisDoc });
+    printInvoiceRecord(invoice, kilnInfo, categoryLabelFor(invoice.categoryId, categories), overallDue, stamp);
+  }
+
   return (
     <div>
       <button onClick={onBack} className="mb-3 flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink-primary">
@@ -65,10 +72,13 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
             <p className="text-sm text-ink-muted">
               {invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString("en-IN") : "—"} · ₹{formatINR(invoice.netAmount)}
             </p>
+            <p className="text-xs text-ink-muted/70">
+              {t("common.entryDateTime")}: {formatDateTime(invoice.createdAt)}
+            </p>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => printInvoiceRecord(invoice, kilnInfo, categoryLabelFor(invoice.categoryId, categories))}
+              onClick={handlePrint}
               className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
             >
               <Printer className="h-3.5 w-3.5" /> {t("common.print")}
@@ -110,6 +120,7 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
               <Field label={t("brickLoading.bricksLoadedPlaceholder")} value={invoice.bricksCount.toLocaleString("en-IN")} />
               <Field label={t("dispatchDocs.ratePerBrickPlaceholder")} value={invoice.ratePerBrick != null ? `₹${invoice.ratePerBrick}` : undefined} />
               <Field label={t("dispatch.discountPlaceholder")} value={invoice.discountAmount ? `₹${formatINR(invoice.discountAmount)}` : undefined} />
+              <Field label={t("dispatchDocs.placeOfSupplyPlaceholder")} value={invoice.placeOfSupply} />
             </div>
           </Card>
 

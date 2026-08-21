@@ -30,8 +30,9 @@ const createSchema = z
     vehicleType: z.string().optional(),
     driverTipAmount: z.number().min(0).optional(),
     discountAmount: z.number().min(0).optional(),
+    placeOfSupply: z.string().optional(),
     notes: z.string().optional(),
-    dispatchedOn: z.string().optional(),
+    dispatchedOn: z.string().min(1, "Transaction date is required"),
     loadingEntryId: z.string().optional(),
   })
   .superRefine((data, ctx) => {
@@ -94,6 +95,7 @@ const updateSchema = z
     vehicleType: z.string().optional(),
     driverTipAmount: z.number().min(0).optional(),
     discountAmount: z.number().min(0).optional(),
+    placeOfSupply: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.amount === undefined) return;

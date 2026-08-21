@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { printGatePassRecord } from "@/lib/printDocument";
+import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import type { BrickCategory, Dispatch as DispatchEntry, GatePassRecord } from "@/types";
 
 const inputClass =
@@ -47,6 +48,7 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
   const [customerName, setCustomerName] = useState(existing?.customerName ?? dispatch?.customerName ?? "");
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
   const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
+  const [placeOfSupply, setPlaceOfSupply] = useState(existing?.placeOfSupply ?? dispatch?.placeOfSupply ?? "");
   const [gatePassDate, setGatePassDate] = useState((existing?.gatePassDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
@@ -70,11 +72,13 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
         customerName,
         categoryId: categoryId || undefined,
         bricksCount: Number(bricksCount),
-        gatePassDate: gatePassDate || undefined,
+        placeOfSupply: placeOfSupply || undefined,
+        gatePassDate,
         notes: notes || undefined,
       };
       const row = existing ? await api.gatePasses.update(existing._id, payload) : await api.gatePasses.create({ dispatchId: dispatch!._id, ...payload });
-      printGatePassRecord(row, kilnInfo, categoryLabelFor(categoryId, categories));
+      const { stamp } = await resolvePaymentInfo({ customerName, remainingOnThisDoc: 0 });
+      printGatePassRecord(row, kilnInfo, categoryLabelFor(categoryId, categories), stamp);
       onSaved();
     } finally {
       setSaving(false);
@@ -120,7 +124,11 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
           ))}
         </select>
         <input required type="number" placeholder={t("brickLoading.bricksLoadedPlaceholder")} value={bricksCount} onChange={(e) => setBricksCount(e.target.value)} className={inputClass} />
-        <DateInput value={gatePassDate} onChange={(e) => setGatePassDate(e.target.value)} className={inputClass} />
+        <input placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")} value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} className={inputClass} />
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+          <DateInput required value={gatePassDate} onChange={(e) => setGatePassDate(e.target.value)} className={inputClass} />
+        </label>
         <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1" />
         <Button type="submit" disabled={saving} className="col-span-2">
           {existing ? t("dispatchDocs.saveAndReprintGatePass") : t("dispatchDocs.generateGatePass")}

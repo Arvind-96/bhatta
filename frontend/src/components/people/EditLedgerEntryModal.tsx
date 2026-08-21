@@ -141,6 +141,7 @@ export function EditLedgerEntryModal({ entry, onClose }: EditLedgerEntryModalPro
               className={cn(inputClass, "flex-1")}
             />
             <DateInput
+              required
               aria-label={t("common.transactionDate")}
               value={date}
               onChange={(e) => setDate(e.target.value)}

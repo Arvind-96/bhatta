@@ -64,6 +64,7 @@ function emptyForm() {
     amount: "",
     discountAmount: "",
     categoryId: "",
+    placeOfSupply: "",
     notes: "",
     transportCost: "",
     paymentMode: "CASH" as PaymentMode,
@@ -170,6 +171,17 @@ export function Dispatch() {
       amount: trip.amount != null ? String(trip.amount) : "",
       discountAmount: trip.discountAmount != null ? String(trip.discountAmount) : "",
       categoryId,
+      // These, unlike the fields above, are never backend-overridden for a
+      // linked trip — just a starting point the admin can still edit freely.
+      customerName: trip.customerName || f.customerName,
+      customerPhone: trip.customerPhone || f.customerPhone,
+      customerAddress: trip.customerAddress || f.customerAddress,
+      driverName: trip.driverName || f.driverName,
+      driverPhone: trip.driverPhone || f.driverPhone,
+      driverTipAmount: trip.tipAmount != null ? String(trip.tipAmount) : f.driverTipAmount,
+      placeOfSupply: trip.placeOfSupply || f.placeOfSupply,
+      notes: trip.notes || f.notes,
+      dispatchedOn: trip.date ? trip.date.slice(0, 10) : f.dispatchedOn,
     }));
   }
 
@@ -208,6 +220,7 @@ export function Dispatch() {
         driverPhone: form.driverPhone || undefined,
         driverTipAmount: form.driverTipAmount ? Number(form.driverTipAmount) : undefined,
         transportCost: form.transportCost ? Number(form.transportCost) : undefined,
+        placeOfSupply: form.placeOfSupply || undefined,
         notes: form.notes || undefined,
         paymentMode: form.paymentMode,
         cashAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.cashAmount) : undefined,
@@ -425,12 +438,20 @@ export function Dispatch() {
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
                 <DateInput
+                  required
                   value={form.dispatchedOn}
                   onChange={(e) => setForm((f) => ({ ...f, dispatchedOn: e.target.value }))}
                   className={inputClass}
                 />
               </label>
             </div>
+
+            <input
+              placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")}
+              value={form.placeOfSupply}
+              onChange={(e) => setForm((f) => ({ ...f, placeOfSupply: e.target.value }))}
+              className={cn(inputClass, "w-full")}
+            />
 
             <div className="grid grid-cols-2 gap-2">
               <input

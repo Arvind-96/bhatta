@@ -53,6 +53,7 @@ export interface ChallanInput {
   customerPhone?: string;
   categoryId?: string;
   bricksCount: number;
+  placeOfSupply?: string;
   challanDate?: Date;
   notes?: string;
 }
@@ -110,6 +111,7 @@ export interface GatePassInput {
   customerName: string;
   categoryId?: string;
   bricksCount: number;
+  placeOfSupply?: string;
   gatePassDate?: Date;
   notes?: string;
 }
@@ -181,6 +183,7 @@ export interface InvoiceInput {
   paymentMode?: PaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
+  placeOfSupply?: string;
   invoiceDate?: Date;
   notes?: string;
 }

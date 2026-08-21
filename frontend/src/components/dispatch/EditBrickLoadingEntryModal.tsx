@@ -177,7 +177,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
               />
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-ink-muted">{t("brickLoading.loadingDateLabel")}</span>
-                <DateInput value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+                <DateInput required value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
               </label>
             </div>
             {entry.amount != null && (

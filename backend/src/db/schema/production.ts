@@ -215,6 +215,11 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   // above). See brickLoading.service.ts.
   categoryId: varchar("categoryId", { length: 64 }),
   dispatchId: varchar("dispatchId", { length: 64 }),
+  // The delivery address for this trip's bricks (distinct from
+  // customerAddress, the customer's own billing/contact address) — carried
+  // forward (editable) onto the Dispatch it's linked to, and from there
+  // onto any Challan/Gate Pass/Invoice generated from that dispatch.
+  placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   // Loading Date (existing `date` column, unrenamed to avoid a data
   // migration -- every historical row's `date` already meant this).
   date: dateColumn(),

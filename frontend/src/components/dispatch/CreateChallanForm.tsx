@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { printChallanRecord } from "@/lib/printDocument";
+import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import type { BrickCategory, Challan, Dispatch as DispatchEntry } from "@/types";
 
 const inputClass =
@@ -54,6 +55,7 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
   const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? dispatch?.customerPhone ?? "");
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? dispatchCategoryId);
   const [bricksCount, setBricksCount] = useState(String(existing?.bricksCount ?? dispatch?.bricksCount ?? ""));
+  const [placeOfSupply, setPlaceOfSupply] = useState(existing?.placeOfSupply ?? dispatch?.placeOfSupply ?? "");
   const [challanDate, setChallanDate] = useState((existing?.challanDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
@@ -83,11 +85,13 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
         customerPhone: customerPhone || undefined,
         categoryId: categoryId || undefined,
         bricksCount: Number(bricksCount),
-        challanDate: challanDate || undefined,
+        placeOfSupply: placeOfSupply || undefined,
+        challanDate,
         notes: notes || undefined,
       };
       const row = existing ? await api.challans.update(existing._id, payload) : await api.challans.create({ dispatchId: dispatch!._id, ...payload });
-      printChallanRecord(row, kilnInfo, categoryLabelFor(categoryId, categories));
+      const { stamp } = await resolvePaymentInfo({ customerName, remainingOnThisDoc: 0 });
+      printChallanRecord(row, kilnInfo, categoryLabelFor(categoryId, categories), stamp);
       onSaved();
     } finally {
       setSaving(false);
@@ -135,7 +139,11 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
           ))}
         </select>
         <input required type="number" placeholder={t("brickLoading.bricksLoadedPlaceholder")} value={bricksCount} onChange={(e) => setBricksCount(e.target.value)} className={inputClass} />
-        <DateInput value={challanDate} onChange={(e) => setChallanDate(e.target.value)} className={inputClass} />
+        <input placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")} value={placeOfSupply} onChange={(e) => setPlaceOfSupply(e.target.value)} className={inputClass} />
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+          <DateInput required value={challanDate} onChange={(e) => setChallanDate(e.target.value)} className={inputClass} />
+        </label>
         <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1" />
         <Button type="submit" disabled={saving} className="col-span-2">
           {existing ? t("dispatchDocs.saveAndReprintChallan") : t("dispatchDocs.generateChallan")}

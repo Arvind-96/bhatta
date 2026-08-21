@@ -123,6 +123,10 @@ export interface CreateDispatchInput {
   // this. Manual dispatch creation may also pass this for display, in
   // which case the same netting applies.
   discountAmount?: number;
+  // Editable even when auto-filled from a linked loading trip (unlike
+  // bricksCount/categoryId/vehicleNumber/vehicleType/discountAmount/amount
+  // below, which the loadingEntryId branch always overrides).
+  placeOfSupply?: string;
   notes?: string;
   dispatchedOn?: Date;
   // When given, this dispatch is created FROM an existing, not-yet-linked
@@ -358,6 +362,7 @@ export interface UpdateDispatchInput {
   vehicleNumber?: string;
   vehicleType?: string;
   driverTipAmount?: number;
+  placeOfSupply?: string;
 }
 
 // Corrects a dispatch after the fact (wrong customer, wrong amount, wrong
@@ -382,7 +387,7 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
   for (const key of [
     "customerName", "grade", "driverId", "transportCost", "transportPaidBy",
     "paymentMode", "cashAmount", "onlineAmount", "categoryId", "vehicleNumber",
-    "vehicleType", "driverTipAmount",
+    "vehicleType", "driverTipAmount", "placeOfSupply",
   ] as const) {
     if (input[key] !== undefined) patch[key] = input[key];
   }

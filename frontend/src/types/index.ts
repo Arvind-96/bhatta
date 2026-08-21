@@ -48,6 +48,7 @@ export interface Dispatch {
   vehicleType?: string;
   driverTipAmount?: number;
   discountAmount?: number;
+  placeOfSupply?: string;
   notes?: string;
   dispatchedOn: string;
   createdAt: string;
@@ -66,6 +67,7 @@ export interface Challan {
   customerPhone?: string;
   categoryId?: string;
   bricksCount: number;
+  placeOfSupply?: string;
   challanDate?: string;
   notes?: string;
   createdAt: string;
@@ -82,6 +84,7 @@ export interface GatePassRecord {
   customerName: string;
   categoryId?: string;
   bricksCount: number;
+  placeOfSupply?: string;
   gatePassDate?: string;
   notes?: string;
   createdAt: string;
@@ -106,6 +109,7 @@ export interface Invoice {
   paymentMode?: PaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
+  placeOfSupply?: string;
   invoiceDate?: string;
   notes?: string;
   createdAt: string;
@@ -139,6 +143,7 @@ export interface CustomerDetail {
   invoices: Invoice[];
   totalPaid: number;
   totalDue: number;
+  isNewCustomer: boolean;
 }
 
 export interface DispatchTotals {
@@ -1018,6 +1023,7 @@ export interface BrickLoadingEntry {
   amount?: number;
   categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;
   pricePerBrick?: number;
+  placeOfSupply?: string;
   dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
   date: string;
   unloadingDate?: string;

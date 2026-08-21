@@ -54,6 +54,10 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
         customerPhone: trip.customerPhone ?? undefined,
         driverName: trip.driverName ?? undefined,
         driverPhone: trip.driverPhone ?? undefined,
+        // driverTipAmount deliberately omitted — the trip's own tipAmount
+        // already auto-logged a "Driver Reward / Inam" expense when this
+        // trip was created; sending it again here would double-log it.
+        placeOfSupply: trip.placeOfSupply ?? undefined,
         loadingEntryId: trip._id,
         dispatchedOn: trip.date,
       });
@@ -119,6 +123,7 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
             <Field label={t("brickLoading.customerNamePlaceholder")} value={trip.customerName} />
             <Field label={t("brickLoading.customerPhonePlaceholder")} value={trip.customerPhone} />
             <Field label={t("brickLoading.customerAddressPlaceholder")} value={trip.customerAddress} />
+            <Field label={t("dispatchDocs.placeOfSupplyPlaceholder")} value={trip.placeOfSupply} />
           </div>
         </Card>
 

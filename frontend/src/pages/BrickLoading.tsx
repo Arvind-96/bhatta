@@ -127,6 +127,7 @@ export function BrickLoading() {
     unloadedBricksCount: "",
     vehicleNumber: "",
     unloadingDate: "",
+    placeOfSupply: "",
   };
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
@@ -218,6 +219,7 @@ export function BrickLoading() {
         unloadingRatePerThousand: form.unloadingRatePerThousand ? Number(form.unloadingRatePerThousand) : undefined,
         categoryId: form.categoryId,
         pricePerBrick: Number(form.pricePerBrick),
+        placeOfSupply: form.placeOfSupply || undefined,
         date: form.date || undefined,
         unloadingDate: form.unloadingDate || undefined,
       });
@@ -346,6 +348,12 @@ export function BrickLoading() {
                   onChange={(e) => setForm((f) => ({ ...f, customerAddress: e.target.value }))}
                   className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
                 />
+                <input
+                  placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")}
+                  value={form.placeOfSupply}
+                  onChange={(e) => setForm((f) => ({ ...f, placeOfSupply: e.target.value }))}
+                  className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+                />
               </div>
             </div>
 
@@ -432,7 +440,7 @@ export function BrickLoading() {
                 />
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-ink-muted">{t("brickLoading.loadingDateLabel")}</span>
-                  <DateInput value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
+                  <DateInput required value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
                 </label>
               </div>
 

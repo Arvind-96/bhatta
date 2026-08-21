@@ -81,7 +81,16 @@ export async function getCustomerDetail(kilnId: string, customerId: string) {
   totalPaid = Math.round(totalPaid * 100) / 100;
   totalDue = Math.round(totalDue * 100) / 100;
 
-  return { customer, invoices: invoiceRows, totalPaid, totalDue };
+  // "New" = no history at all before/aside from whatever's being printed
+  // right now — no opening balance, and at most the one invoice currently
+  // being generated (an invoice already saved by the time this is called
+  // for a print). Used to choose between the "Partial Paid"/"Amount Due"
+  // print stamps: a genuinely new customer who under-pays reads as
+  // "Partial Paid", while an existing tracked customer with any due reads
+  // as "Amount Due" even if this specific bill was paid in full.
+  const isNewCustomer = customer.openingPaid === 0 && customer.openingDue === 0 && invoiceRows.length <= 1;
+
+  return { customer, invoices: invoiceRows, totalPaid, totalDue, isNewCustomer };
 }
 
 export async function updateCustomer(kilnId: string, customerId: string, input: Partial<CustomerInput>) {

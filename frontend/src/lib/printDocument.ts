@@ -31,6 +31,26 @@ function kilnLogoLetter(kilnName: string) {
   return kilnName.trim().charAt(0).toUpperCase() || "B";
 }
 
+// "TRUCK" -> "Truck" — print-only formatting, never touches the stored
+// value (still the free-form/enum string used everywhere else in the app).
+function titleCase(value?: string | null) {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+export type PaymentStamp = "PAID" | "PARTIAL" | "DUE";
+
+// The circular badge from the reference invoice layout — reused across
+// Gate Pass/Challan/Invoice, just swapping color/label per status. Always
+// rendered as the first child of a `.doc-totalbox` (position: relative),
+// which anchors it to the box's top-left corner.
+function stampHtml(status?: PaymentStamp) {
+  if (!status) return "";
+  if (status === "PAID") return `<div class="doc-stamp doc-stamp-paid"><span>THANK YOU</span><span>PAID</span></div>`;
+  if (status === "PARTIAL") return `<div class="doc-stamp doc-stamp-partial"><span>PARTIAL</span><span>PAID</span></div>`;
+  return `<div class="doc-stamp doc-stamp-due"><span>AMOUNT</span><span>DUE</span></div>`;
+}
+
 export interface KilnPrintInfo {
   name: string;
   location?: string;
@@ -67,9 +87,12 @@ const DOCUMENT_STYLES = `
   .doc-total-label { font-size: 13px; color: #444; margin: 0; }
   .doc-total-amount { font-size: 24px; font-weight: 800; margin: 2px 0; color: var(--doc-accent); }
   .doc-amount-words { font-size: 12px; font-style: italic; color: #666; margin: 0; }
-  .doc-stamp { position: absolute; top: -10px; left: -12px; width: 66px; height: 66px; border-radius: 50%; border: 2.5px dashed #1f8a4c; color: #1f8a4c; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotate(-14deg); font-weight: 800; text-align: center; line-height: 1.1; }
+  .doc-stamp { position: absolute; top: -10px; left: -12px; width: 66px; height: 66px; border-radius: 50%; border: 2.5px dashed; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotate(-14deg); font-weight: 800; text-align: center; line-height: 1.1; }
   .doc-stamp span:first-child { font-size: 8px; letter-spacing: 0.5px; }
-  .doc-stamp span:last-child { font-size: 12px; }
+  .doc-stamp span:last-child { font-size: 11px; }
+  .doc-stamp-paid { border-color: #1f8a4c; color: #1f8a4c; }
+  .doc-stamp-partial { border-color: #b8860b; color: #b8860b; }
+  .doc-stamp-due { border-color: #c0392b; color: #c0392b; }
   table.doc-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 18px; border: 1px solid #e5e0d8; border-radius: 10px; overflow: hidden; }
   table.doc-table td { padding: 9px 12px; font-size: 13.5px; border-bottom: 1px solid #efece5; }
   table.doc-table tr:last-child td { border-bottom: none; }
@@ -138,7 +161,7 @@ ${bodyHtml}
 // from the priced Invoice record below. Created from a Dispatch's own
 // detail page (see CreateChallanForm.tsx) as its own editable/deletable
 // record, not a live view of the dispatch.
-export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, categoryLabel: string) {
+export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, categoryLabel: string, paymentStamp?: PaymentStamp) {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `CH-${challan.sequenceNumber ?? "—"}`;
   const date = challan.challanDate ?? challan.createdAt;
@@ -169,6 +192,7 @@ export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, catego
         <p class="doc-box-detail">Phone: ${escapeHtml(challan.customerPhone || "—")}</p>
       </div>
       <div class="doc-totalbox">
+        ${stampHtml(paymentStamp)}
         <p class="doc-total-label">Bricks</p>
         <p class="doc-total-amount">${challan.bricksCount.toLocaleString("en-IN")}</p>
         <p class="doc-amount-words">${escapeHtml(categoryLabel)}</p>
@@ -177,10 +201,11 @@ export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, catego
 
     <table class="doc-table">
       <tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(challan.vehicleNumber || "—")}</td></tr>
-      <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(challan.vehicleType || "—")}</td></tr>
+      <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(titleCase(challan.vehicleType) || "—")}</td></tr>
       <tr><td class="doc-table-label">Driver</td><td class="doc-table-value">${escapeHtml(challan.driverName || "—")}</td></tr>
       <tr><td class="doc-table-label">Driver mobile</td><td class="doc-table-value">${escapeHtml(challan.driverPhone || "—")}</td></tr>
       <tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>
+      ${challan.placeOfSupply ? `<tr><td class="doc-table-label">Place of supply</td><td class="doc-table-value">${escapeHtml(challan.placeOfSupply)}</td></tr>` : ""}
       ${challan.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(challan.notes)}</td></tr>` : ""}
     </table>
 
@@ -197,7 +222,7 @@ export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, catego
 // Exit-authorization slip — its own editable/deletable record, distinct
 // from the ad-hoc printGatePass above (which reads straight off a
 // Dispatch with nothing saved). Same visual language, same accent.
-export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInfo, categoryLabel: string) {
+export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInfo, categoryLabel: string, paymentStamp?: PaymentStamp) {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `GP-${gatePass.sequenceNumber ?? "—"}`;
   const date = gatePass.gatePassDate ?? gatePass.createdAt;
@@ -227,6 +252,7 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
         <p class="doc-box-name">${escapeHtml(gatePass.customerName)}</p>
       </div>
       <div class="doc-totalbox">
+        ${stampHtml(paymentStamp)}
         <p class="doc-total-label">Bricks loaded</p>
         <p class="doc-total-amount">${gatePass.bricksCount.toLocaleString("en-IN")}</p>
         <p class="doc-amount-words">${escapeHtml(categoryLabel)}</p>
@@ -235,11 +261,12 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
 
     <table class="doc-table">
       <tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(gatePass.vehicleNumber || "—")}</td></tr>
-      <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(gatePass.vehicleType || "—")}</td></tr>
+      <tr><td class="doc-table-label">Vehicle type</td><td class="doc-table-value">${escapeHtml(titleCase(gatePass.vehicleType) || "—")}</td></tr>
       <tr><td class="doc-table-label">Driver</td><td class="doc-table-value">${escapeHtml(gatePass.driverName || "—")}</td></tr>
       <tr><td class="doc-table-label">Driver mobile</td><td class="doc-table-value">${escapeHtml(gatePass.driverPhone || "—")}</td></tr>
       <tr><td class="doc-table-label">Brick type / grade</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>
       <tr><td class="doc-table-label">Bricks loaded</td><td class="doc-table-value">${gatePass.bricksCount.toLocaleString("en-IN")}</td></tr>
+      ${gatePass.placeOfSupply ? `<tr><td class="doc-table-label">Place of supply</td><td class="doc-table-value">${escapeHtml(gatePass.placeOfSupply)}</td></tr>` : ""}
       ${gatePass.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(gatePass.notes)}</td></tr>` : ""}
     </table>
 
@@ -258,15 +285,18 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
 // never looks like the delivery-note Challan above. `customerOverallDue`
 // is the linked Customer's total remaining due AFTER this invoice/payment
 // (i.e. already reflects it) — passed by callers that have a Customer
-// loaded (CreateInvoiceForm, AddCustomerPaymentModal); omitted when
-// printing an invoice with no linked Customer.
-export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categoryLabel: string, customerOverallDue?: number) {
+// loaded; omitted when printing an invoice with no linked Customer.
+// `paymentStamp` is always shown — if the caller doesn't pass one (no
+// Customer resolvable), it falls back to a status computed purely from
+// this invoice's own paid/remaining amount.
+export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categoryLabel: string, customerOverallDue?: number, paymentStamp?: PaymentStamp) {
   const logoLetter = kilnLogoLetter(kiln.name);
   const number = `INV-${invoice.sequenceNumber ?? "—"}`;
   const date = invoice.invoiceDate ?? invoice.createdAt;
   const gross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);
   const amountPaidNow = invoice.amountPaidNow ?? invoice.netAmount;
   const remainingOnThisInvoice = Math.max(0, Math.round((invoice.netAmount - amountPaidNow) * 100) / 100);
+  const resolvedStamp: PaymentStamp = paymentStamp ?? (remainingOnThisInvoice <= 0 ? "PAID" : "PARTIAL");
 
   const itemRows = `
     <tr>
@@ -313,6 +343,7 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
         <p class="doc-box-detail">GSTIN: ${invoice.customerGstNumber ? escapeHtml(invoice.customerGstNumber) : ""}</p>
       </div>
       <div class="doc-totalbox">
+        ${stampHtml(resolvedStamp)}
         <p class="doc-total-label">Total amount</p>
         <p class="doc-total-amount">₹${formatINR(invoice.netAmount)}</p>
         <p class="doc-amount-words">${escapeHtml(amountInWords(invoice.netAmount))}</p>
@@ -345,10 +376,11 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
           : ""
       }
       ${
-        customerOverallDue != null
-          ? `<tr><td class="doc-table-label">Customer's overall remaining due</td><td class="doc-table-value">₹${formatINR(Math.abs(customerOverallDue))}</td></tr>`
+        customerOverallDue != null && customerOverallDue > 0
+          ? `<tr><td class="doc-table-label">Customer's overall remaining due</td><td class="doc-table-value">₹${formatINR(customerOverallDue)}</td></tr>`
           : ""
       }
+      ${invoice.placeOfSupply ? `<tr><td class="doc-table-label">Place of supply</td><td class="doc-table-value">${escapeHtml(invoice.placeOfSupply)}</td></tr>` : ""}
     </table>
 
     ${invoice.notes ? `<table class="doc-table"><tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(invoice.notes)}</td></tr></table>` : ""}
@@ -398,7 +430,7 @@ export function printPaymentReceipt(receipt: PaymentReceipt, recipientName: stri
         ${receipt.paymentMode ? `<p class="doc-box-detail">${escapeHtml(paymentModeLabel(receipt))}</p>` : ""}
       </div>
       <div class="doc-totalbox">
-        ${isFullySettled ? `<div class="doc-stamp"><span>THANK YOU</span><span>PAID</span></div>` : ""}
+        ${isFullySettled ? stampHtml("PAID") : ""}
         <p class="doc-total-label">Amount paid</p>
         <p class="doc-total-amount">₹${formatINR(receipt.amountPaid)}</p>
         <p class="doc-amount-words">${escapeHtml(amountInWords(receipt.amountPaid))}</p>
@@ -488,7 +520,6 @@ export function printLedgerEntry(entry: LedgerEntry, recipientName: string, kiln
     <table class="doc-table">
       <tr><td class="doc-table-label">Category</td><td class="doc-table-value">${escapeHtml(categoryLabel)}</td></tr>
       <tr><td class="doc-table-label">Reason</td><td class="doc-table-value">${escapeHtml(entry.reason)}</td></tr>
-      <tr><td class="doc-table-label">Entered on</td><td class="doc-table-value">${new Date(entry.createdAt).toLocaleString("en-IN")}</td></tr>
     </table>
 
     <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED SLIP ~</p>
@@ -542,7 +573,6 @@ export function printExpenseRecord(expense: Expense, expenseTypeName: string, ki
     <table class="doc-table">
       ${expense.quantity != null ? `<tr><td class="doc-table-label">Quantity</td><td class="doc-table-value">${expense.quantity.toLocaleString("en-IN")}</td></tr>` : ""}
       <tr><td class="doc-table-label">Transaction date</td><td class="doc-table-value">${new Date(expense.date).toLocaleDateString("en-IN")}</td></tr>
-      <tr><td class="doc-table-label">System entry date</td><td class="doc-table-value">${new Date(expense.createdAt).toLocaleString("en-IN")}</td></tr>
       ${dueAfter != null ? `<tr><td class="doc-table-label">${expenseTypeName} — remaining due</td><td class="doc-table-value">₹${formatINR(Math.max(0, dueAfter))}</td></tr>` : ""}
       ${expense.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(expense.notes)}</td></tr>` : ""}
     </table>
@@ -599,7 +629,6 @@ export function printDieselEntry(entry: VehicleDieselEntry, vehicleName: string,
       ${entry.lastMeterReading != null ? `<tr><td class="doc-table-label">Today's last meter reading</td><td class="doc-table-value">${entry.lastMeterReading.toLocaleString("en-IN")}</td></tr>` : ""}
       ${distanceSinceLastFill != null ? `<tr><td class="doc-table-label">Distance since last fill</td><td class="doc-table-value">${distanceSinceLastFill.toLocaleString("en-IN")}</td></tr>` : ""}
       ${entry.costAmount != null ? `<tr><td class="doc-table-label">Cost</td><td class="doc-table-value">₹${formatINR(entry.costAmount)}</td></tr>` : ""}
-      <tr><td class="doc-table-label">Entered on</td><td class="doc-table-value">${new Date(entry.createdAt).toLocaleString("en-IN")}</td></tr>
       ${entry.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(entry.notes)}</td></tr>` : ""}
     </table>
 

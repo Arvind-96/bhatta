@@ -79,7 +79,7 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
         direction: "PAID",
         amount: Number(amount),
         reason: reason.trim() || title,
-        date: date || undefined,
+        date,
         paymentMode,
         cashAmount: paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
         onlineAmount: paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
@@ -127,7 +127,7 @@ export function QuickLedgerModal({ person, category, onClose, onSaved }: QuickLe
           />
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
-            <DateInput value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+            <DateInput required value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
           </label>
           <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as LedgerPaymentMode)} className={inputClass}>
             <option value="CASH">{t("people.cash")}</option>

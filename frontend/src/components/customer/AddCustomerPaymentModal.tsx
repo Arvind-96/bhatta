@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR } from "@/lib/utils";
 import { printInvoiceRecord } from "@/lib/printDocument";
+import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import type { Customer, PaymentMode } from "@/types";
 
 const inputClass =
@@ -55,10 +56,11 @@ export function AddCustomerPaymentModal({ customer, currentDue, onClose, onSaved
         netAmount: paidAmount,
         amountPaidNow: paidAmount,
         paymentMode,
-        invoiceDate: paymentDate || undefined,
+        invoiceDate: paymentDate,
         notes: notes || t("customer.advancePaymentDefaultNote"),
       });
-      printInvoiceRecord(row, kilnInfo, t("customer.advancePaymentCategoryLabel"), remainingDueAfter);
+      const { stamp, overallDue } = await resolvePaymentInfo({ customerId: customer._id, customerName: customer.name, remainingOnThisDoc: 0 });
+      printInvoiceRecord(row, kilnInfo, t("customer.advancePaymentCategoryLabel"), overallDue ?? remainingDueAfter, stamp);
       onSaved();
       onClose();
     } finally {
@@ -82,7 +84,7 @@ export function AddCustomerPaymentModal({ customer, currentDue, onClose, onSaved
             <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
             <option value="UPI">{t("dispatch.paymentUpi")}</option>
           </select>
-          <DateInput value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass} />
+          <DateInput required value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className={inputClass} />
           <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
 
           <div className="rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-3">
