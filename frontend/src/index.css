@@ -171,3 +171,15 @@ textarea:focus-visible {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Remove the number-input spin buttons app-wide — with them present, an
+   accidental mouse-wheel scroll over a focused number field silently
+   changes its value instead of scrolling the page. */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
