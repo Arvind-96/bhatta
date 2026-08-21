@@ -221,7 +221,7 @@ export function Nikasi() {
   const [showAddOperator, setShowAddOperator] = useState(false);
   const [showAddThekedar, setShowAddThekedar] = useState(false);
   const [editingEntry, setEditingEntry] = useState<NikasiEntry | null>(null);
-  const [form, setForm] = useState({ gherId: "", gangId: "", bricksCount: "", damagedCount: "", notes: "" });
+  const [form, setForm] = useState({ gherId: "", gangId: "", bricksCount: "", damagedCount: "", damageFault: "", notes: "" });
   const [loading, setLoading] = useState(false);
   const [periodTotals, setPeriodTotals] = useState<NikasiPeriodTotals | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -270,9 +270,10 @@ export function Nikasi() {
         gangId: form.gangId,
         bricksCount: Number(form.bricksCount),
         damagedCount: form.damagedCount ? Number(form.damagedCount) : undefined,
+        damageFault: form.damagedCount && form.damageFault ? (form.damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         notes: form.notes || undefined,
       });
-      setForm({ gherId: "", gangId: "", bricksCount: "", damagedCount: "", notes: "" });
+      setForm({ gherId: "", gangId: "", bricksCount: "", damagedCount: "", damageFault: "", notes: "" });
       setShowForm(false);
       await refresh();
     } finally {
@@ -403,6 +404,18 @@ export function Nikasi() {
               onChange={(e) => setForm((f) => ({ ...f, damagedCount: e.target.value }))}
               className={inputClass}
             />
+            {Number(form.damagedCount) > 0 && (
+              <select
+                value={form.damageFault}
+                onChange={(e) => setForm((f) => ({ ...f, damageFault: e.target.value }))}
+                className={inputClass}
+              >
+                <option value="">{t("production.damageFaultPlaceholder")}</option>
+                <option value="LABOURER">{t("reports.damageFault.LABOURER")}</option>
+                <option value="CONTRACTOR">{t("reports.damageFault.CONTRACTOR")}</option>
+                <option value="OTHER">{t("reports.damageFault.OTHER")}</option>
+              </select>
+            )}
             <input
               placeholder={t("common.notesOptional")}
               value={form.notes}

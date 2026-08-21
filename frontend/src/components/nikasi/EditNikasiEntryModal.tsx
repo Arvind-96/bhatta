@@ -23,6 +23,7 @@ export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntr
   const { t } = useTranslation();
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
   const [damagedCount, setDamagedCount] = useState(entry.damagedCount ? String(entry.damagedCount) : "");
+  const [damageFault, setDamageFault] = useState(entry.damageFault ?? "");
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -34,6 +35,7 @@ export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntr
       await api.nikasi.update(entry._id, {
         bricksCount: Number(bricksCount),
         damagedCount: damagedCount ? Number(damagedCount) : 0,
+        damageFault: damagedCount && damageFault ? (damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         notes: notes || undefined,
       });
       onSaved();
@@ -82,6 +84,14 @@ export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntr
             onChange={(e) => setDamagedCount(e.target.value)}
             className={inputClass}
           />
+          {Number(damagedCount) > 0 && (
+            <select value={damageFault} onChange={(e) => setDamageFault(e.target.value)} className={inputClass}>
+              <option value="">{t("production.damageFaultPlaceholder")}</option>
+              <option value="LABOURER">{t("reports.damageFault.LABOURER")}</option>
+              <option value="CONTRACTOR">{t("reports.damageFault.CONTRACTOR")}</option>
+              <option value="OTHER">{t("reports.damageFault.OTHER")}</option>
+            </select>
+          )}
           <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
           <div className="flex gap-2">
             <button

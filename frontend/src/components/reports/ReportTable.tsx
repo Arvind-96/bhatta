@@ -1,6 +1,8 @@
 import { useTranslation } from "@/hooks/useTranslation";
-import { formatINR } from "@/lib/utils";
+import { formatINR, cn } from "@/lib/utils";
 import type { ReportResult } from "@/types/reports";
+
+export type RowHighlight = "warning" | "critical" | undefined;
 
 function formatCell(value: string | number | null, format: ReportResult["columns"][number]["format"]) {
   if (value == null || value === "") return "—";
@@ -14,7 +16,10 @@ function formatCell(value: string | number | null, format: ReportResult["columns
 
 // Fully generic: renders whatever columns/rows/totals the backend sent for
 // the currently selected report — no per-report-type rendering code here.
-export function ReportTable({ result }: { result: ReportResult }) {
+// `rowHighlight`, when supplied, is a pure function of one row supplied per
+// selected report (see getRowHighlight in Reports.tsx) — kept out of this
+// component so the highlight rules stay per-report, not hardcoded here.
+export function ReportTable({ result, rowHighlight }: { result: ReportResult; rowHighlight?: (row: ReportResult["rows"][number]) => RowHighlight }) {
   const { t } = useTranslation();
 
   if (result.rows.length === 0) {
@@ -34,15 +39,25 @@ export function ReportTable({ result }: { result: ReportResult }) {
           </tr>
         </thead>
         <tbody>
-          {result.rows.map((row, ri) => (
-            <tr key={ri} className="border-b border-border/60 last:border-0">
-              {result.columns.map((c, i) => (
-                <td key={c.key} className={`py-2 pr-3 text-ink-secondary ${i > 0 && c.format !== "text" ? "text-right tabular-nums" : ""}`}>
-                  {formatCell(row[c.key], c.format)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {result.rows.map((row, ri) => {
+            const highlight = rowHighlight?.(row);
+            return (
+              <tr
+                key={ri}
+                className={cn(
+                  "border-b border-border/60 last:border-0",
+                  highlight === "critical" && "border-l-4 border-l-status-critical bg-status-critical/5",
+                  highlight === "warning" && "border-l-4 border-l-status-warning bg-status-warning/5"
+                )}
+              >
+                {result.columns.map((c, i) => (
+                  <td key={c.key} className={`py-2 pr-3 text-ink-secondary ${i > 0 && c.format !== "text" ? "text-right tabular-nums" : ""}`}>
+                    {formatCell(row[c.key], c.format)}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
         {result.totals && (
           <tfoot>

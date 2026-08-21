@@ -6,12 +6,15 @@ import { addLedgerEntry } from "./ledger.service";
 import { assertPersonOfType } from "./person.service";
 import { emitToKiln } from "../config/socket";
 
+export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
+
 export interface CreateMoldingInput {
   kilnId: string;
   workerId: string;
   bricksCount: number;
   ratePerThousand: number;
   damagedCount?: number;
+  damageFault?: DamageFault;
   date?: Date;
   washedOut?: boolean;
   notes?: string;
@@ -71,6 +74,7 @@ export interface UpdateMoldingInput {
   bricksCount?: number;
   ratePerThousand?: number;
   damagedCount?: number;
+  damageFault?: DamageFault;
   washedOut?: boolean;
   notes?: string;
 }

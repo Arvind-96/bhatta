@@ -4,6 +4,12 @@ import { STACKING_STAGES } from "./people";
 
 export const GHER_STATUSES = ["EMPTY", "STACKING", "FIRING", "READY"] as const;
 
+// Who's responsible for a damage count logged on a Molding/Stacking/Nikasi
+// entry — admin-set, optional (most entries have no damage at all). Kept as
+// a single shared enum across all three tables rather than per-table
+// variants since the meaning is identical everywhere it appears.
+export const DAMAGE_FAULT_OPTIONS = ["LABOURER", "CONTRACTOR", "OTHER"] as const;
+
 export const ghers = mysqlTable("ghers", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
@@ -22,6 +28,7 @@ export const moldingEntries = mysqlTable("molding_entries", {
   bricksCount: int("bricksCount").notNull(),
   ratePerThousand: double("ratePerThousand").notNull(),
   damagedCount: int("damagedCount").default(0),
+  damageFault: varchar("damageFault", { length: 50, enum: DAMAGE_FAULT_OPTIONS }),
   date: dateColumn(),
   washedOut: boolean("washedOut").default(false),
   notes: text("notes"),
@@ -39,6 +46,7 @@ export const stackingEntries = mysqlTable("stacking_entries", {
   stage: varchar("stage", { length: 50, enum: STACKING_STAGES }),
   bricksCount: int("bricksCount").notNull(),
   damageCount: int("damageCount").default(0),
+  damageFault: varchar("damageFault", { length: 50, enum: DAMAGE_FAULT_OPTIONS }),
   ratePerThousand: double("ratePerThousand"),
   qualityRating: varchar("qualityRating", { length: 50, enum: STACKING_QUALITY }).default("GOOD"),
   mode: varchar("mode", { length: 50, enum: STACKING_MODES }),
@@ -125,6 +133,7 @@ export const nikasiEntries = mysqlTable("nikasi_entries", {
   gangId: varchar("gangId", { length: 64 }).notNull(),
   bricksCount: int("bricksCount").notNull(),
   damagedCount: int("damagedCount").default(0),
+  damageFault: varchar("damageFault", { length: 50, enum: DAMAGE_FAULT_OPTIONS }),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DateInput } from "@/components/ui/date-input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useTranslation } from "@/hooks/useTranslation";
-import { usePersonTypeMeta, PERSON_TYPES } from "@/components/people/personTypes";
+import { usePersonTypeMeta, useWorkTypeLabels, PERSON_TYPES } from "@/components/people/personTypes";
 import { cn } from "@/lib/utils";
 import type { ReportDefinitionMeta, ReportGroupBy, ReportRunParams } from "@/types/reports";
 import type { Customer, ExpenseType, KilnVehicle, Person } from "@/types";
@@ -43,6 +43,9 @@ function presetRange(preset: Exclude<Preset, "custom">): { from: string; to: str
 }
 
 const GROUP_BY_OPTIONS: ReportGroupBy[] = ["none", "day", "week", "month", "quarter", "year"];
+const LEDGER_CATEGORIES = ["WAGE", "COMMISSION", "SALARY", "TIP", "ADVANCE", "KHARCHI", "MEDICAL", "FESTIVAL", "SALE", "SOIL", "SAND", "FUEL", "FARE", "OTHER"] as const;
+const WORK_TYPES = ["PATHAI", "BHARAI_TRANSPORT", "PAKAYI", "NIKASI", "LOADING", "BHARAI_CHAMBER_STACKING", "TUDI", "RAWAS", "BELDAR"] as const;
+const DAMAGE_FAULT_OPTIONS = ["LABOURER", "CONTRACTOR", "OTHER"] as const;
 
 interface ReportFilterBarProps {
   definition: ReportDefinitionMeta;
@@ -63,6 +66,7 @@ interface ReportFilterBarProps {
 export function ReportFilterBar({ definition, params, onChange, onGenerate, loading, people, customers, vehicles, expenseTypes }: ReportFilterBarProps) {
   const { t } = useTranslation();
   const personTypeMeta = usePersonTypeMeta();
+  const workTypeLabels = useWorkTypeLabels();
   const [preset, setPreset] = useState<Preset>("thisMonth");
 
   // Pre-fill a sensible default range as soon as a report is selected, so
@@ -79,6 +83,7 @@ export function ReportFilterBar({ definition, params, onChange, onGenerate, load
   }
 
   const drivers = people.filter((p) => p.type === "DRIVER");
+  const contractors = people.filter((p) => p.type === "LABOUR_CONTRACTOR");
 
   return (
     <div className="space-y-3 rounded-2xl border border-border bg-ink-primary/[0.02] p-4">
@@ -152,6 +157,101 @@ export function ReportFilterBar({ definition, params, onChange, onGenerate, load
                 </option>
               ))}
             </select>
+          </label>
+        )}
+
+        {definition.filters.includes("workType") && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("people.workType")}</span>
+            <select
+              value={params.workType ?? ""}
+              onChange={(e) => onChange({ ...params, workType: e.target.value || undefined })}
+              className={selectClass}
+            >
+              <option value="">{t("reports.filter.all")}</option>
+              {WORK_TYPES.map((wt) => (
+                <option key={wt} value={wt}>
+                  {workTypeLabels[wt]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {definition.filters.includes("status") && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("reports.filter.status")}</span>
+            <select
+              value={params.status ?? ""}
+              onChange={(e) => onChange({ ...params, status: e.target.value || undefined })}
+              className={selectClass}
+            >
+              <option value="">{t("reports.filter.all")}</option>
+              <option value="ACTIVE">{t("reports.status.active")}</option>
+              <option value="ABSCONDED">{t("reports.status.absconded")}</option>
+            </select>
+          </label>
+        )}
+
+        {definition.filters.includes("ledgerCategory") && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("reports.filter.ledgerCategory")}</span>
+            <select
+              value={params.category ?? ""}
+              onChange={(e) => onChange({ ...params, category: e.target.value || undefined })}
+              className={selectClass}
+            >
+              <option value="">{t("reports.filter.all")}</option>
+              {LEDGER_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {t(`reports.ledgerCategory.${c}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {definition.filters.includes("contractor") && (
+          <label className="flex min-w-[220px] flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("reports.filter.contractor")}</span>
+            <SearchableSelect
+              value={params.contractorId ?? ""}
+              onChange={(v) => onChange({ ...params, contractorId: v || undefined })}
+              options={contractors.map((p) => ({ value: p._id, label: p.name, sublabel: p.phone ?? undefined }))}
+              placeholder={t("reports.filter.all")}
+            />
+          </label>
+        )}
+
+        {definition.filters.includes("damageFault") && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("reports.col.damageFault")}</span>
+            <select
+              value={params.damageFault ?? ""}
+              onChange={(e) => onChange({ ...params, damageFault: e.target.value || undefined })}
+              className={selectClass}
+            >
+              <option value="">{t("reports.filter.all")}</option>
+              {DAMAGE_FAULT_OPTIONS.map((f) => (
+                <option key={f} value={f}>
+                  {t(`reports.damageFault.${f}`)}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {definition.filters.includes("damageThreshold") && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("reports.filter.damageThreshold")}</span>
+            <input
+              type="number"
+              min={0}
+              value={params.damageThreshold ?? ""}
+              onChange={(e) => onChange({ ...params, damageThreshold: e.target.value ? Number(e.target.value) : undefined })}
+              placeholder="20"
+              className={cn(selectClass, "w-28")}
+            />
           </label>
         )}
 

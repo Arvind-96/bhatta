@@ -118,13 +118,16 @@ const molding: ReportDefinition = {
   titleKey: "reports.title.molding",
   async run(kilnId, filters) {
     const rows = await listMoldingEntries(kilnId, { workerId: filters.personId, from: filters.from, to: filters.to });
-    const detail = rows.map((r) => ({
-      date: r.date ? r.date.toISOString() : null,
-      worker: refName(r.workerId),
-      bricksCount: r.bricksCount,
-      damagedCount: r.damagedCount ?? 0,
-      wage: round2(r.washedOut ? 0 : (r.bricksCount / 1000) * r.ratePerThousand),
-    }));
+    const detail = rows
+      .filter((r) => !filters.damageFault || r.damageFault === filters.damageFault)
+      .map((r) => ({
+        date: r.date ? r.date.toISOString() : null,
+        worker: refName(r.workerId),
+        bricksCount: r.bricksCount,
+        damagedCount: r.damagedCount ?? 0,
+        damageFault: r.damageFault ?? "",
+        wage: round2(r.washedOut ? 0 : (r.bricksCount / 1000) * r.ratePerThousand),
+      }));
     const { rows: outRows, columns } = groupedOrDetail(
       filters.groupBy,
       detail,
@@ -141,6 +144,7 @@ const molding: ReportDefinition = {
         { key: "worker", labelKey: "reports.col.worker", format: "text" },
         { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
         { key: "damagedCount", labelKey: "reports.col.damagedCount", format: "number" },
+        { key: "damageFault", labelKey: "reports.col.damageFault", format: "text" },
         { key: "wage", labelKey: "reports.col.wage", format: "currency" },
       ]
     );
@@ -159,14 +163,17 @@ const stacking: ReportDefinition = {
   titleKey: "reports.title.stacking",
   async run(kilnId, filters) {
     const rows = await listStackingEntries(kilnId, { gangId: filters.personId, from: filters.from, to: filters.to });
-    const detail = rows.map((r) => ({
-      date: r.date ? r.date.toISOString() : null,
-      gang: refName(r.gangId),
-      gher: typeof r.gherId === "object" && r.gherId ? String((r.gherId as { number?: number }).number ?? "") : String(r.gherId ?? ""),
-      stage: r.stage ?? "",
-      bricksCount: r.bricksCount,
-      damageCount: r.damageCount ?? 0,
-    }));
+    const detail = rows
+      .filter((r) => !filters.damageFault || r.damageFault === filters.damageFault)
+      .map((r) => ({
+        date: r.date ? r.date.toISOString() : null,
+        gang: refName(r.gangId),
+        gher: typeof r.gherId === "object" && r.gherId ? String((r.gherId as { number?: number }).number ?? "") : String(r.gherId ?? ""),
+        stage: r.stage ?? "",
+        bricksCount: r.bricksCount,
+        damageCount: r.damageCount ?? 0,
+        damageFault: r.damageFault ?? "",
+      }));
     const { rows: outRows, columns } = groupedOrDetail(
       filters.groupBy,
       detail,

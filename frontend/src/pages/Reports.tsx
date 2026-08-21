@@ -10,12 +10,13 @@ import { usePersonTypeMeta, useWorkTypeLabels } from "@/components/people/person
 import { formatINR } from "@/lib/utils";
 import { ReportRail } from "@/components/reports/ReportRail";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
-import { ReportTable } from "@/components/reports/ReportTable";
+import { ReportTable, RowHighlight } from "@/components/reports/ReportTable";
+import { ContractorGroupedTable } from "@/components/reports/ContractorGroupedTable";
 import { REPORT_DEFINITIONS } from "@/lib/reportDefinitions";
 import { printReportTable } from "@/lib/printDocument";
 import { buildReportWorkbookBlob, downloadExcelFile, shareExcelFile } from "@/lib/exportExcel";
 import type { Person, PersonFullReport, Customer, KilnVehicle, ExpenseType } from "@/types";
-import type { ReportResult, ReportRunParams } from "@/types/reports";
+import type { ReportResult, ReportRunParams, DashboardSummary } from "@/types/reports";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-border bg-ink-primary/5 pl-10 pr-3.5 text-sm text-ink-primary outline-none transition-shadow focus:ring-2 focus:ring-series-1";
@@ -417,6 +418,7 @@ function ReportsWorkspace() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<KilnVehicle[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
+  const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [params, setParams] = useState<ReportRunParams>({});
@@ -430,6 +432,7 @@ function ReportsWorkspace() {
     api.customers.list().then(setCustomers).catch(console.error);
     api.kilnVehicles.list().then(setVehicles).catch(console.error);
     api.expenseTypes.list().then(setExpenseTypes).catch(console.error);
+    api.reports.dashboardSummary().then(setDashboard).catch(console.error);
   }, [activeKilnId]);
 
   const definition = REPORT_DEFINITIONS.find((d) => d.key === selectedKey);
@@ -439,6 +442,31 @@ function ReportsWorkspace() {
     setParams({});
     setResult(null);
     setError(null);
+  }
+
+  // Drill-down from a dashboard category card straight into the filtered
+  // Labour/Contractor/Staff report — the admin never has to hunt for the
+  // right report + set the filter by hand.
+  function drillIntoCategory(category: string) {
+    setSelectedKey("labourLedger");
+    setParams({ category });
+    setResult(null);
+    setError(null);
+  }
+
+  function getRowHighlight(row: ReportResult["rows"][number]): RowHighlight {
+    if (!definition) return undefined;
+    if (["molding", "stacking", "nikasi"].includes(definition.key) && params.damageThreshold != null) {
+      const damaged = Number(row.damagedCount ?? row.damageCount ?? 0);
+      if (damaged > params.damageThreshold) return "critical";
+    }
+    if (definition.key === "labourLedger" && (!params.groupBy || params.groupBy === "none")) {
+      if (row.direction === "DUE" && typeof row.date === "string") {
+        const daysPending = Math.floor((Date.now() - new Date(row.date).getTime()) / 86400000);
+        if (daysPending > 7) return "warning";
+      }
+    }
+    return undefined;
   }
 
   async function generate() {
@@ -493,15 +521,18 @@ function ReportsWorkspace() {
   }
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row">
-      <ReportRail selectedKey={selectedKey} onSelect={selectReport} />
+    <div className="space-y-4">
+      {dashboard && <DashboardCards dashboard={dashboard} onCategoryClick={drillIntoCategory} />}
 
-      <div className="min-w-0 flex-1 space-y-4">
-        {!definition && (
-          <Card>
-            <p className="py-10 text-center text-sm text-ink-muted">{t("reports.workspace.selectPrompt")}</p>
-          </Card>
-        )}
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <ReportRail selectedKey={selectedKey} onSelect={selectReport} />
+
+        <div className="min-w-0 flex-1 space-y-4">
+          {!definition && (
+            <Card>
+              <p className="py-10 text-center text-sm text-ink-muted">{t("reports.workspace.selectPrompt")}</p>
+            </Card>
+          )}
 
         {definition && (
           <>
@@ -558,12 +589,120 @@ function ReportsWorkspace() {
                     </button>
                   </div>
                 </div>
-                <ReportTable result={result} />
+
+                {definition.key === "labourLedger" && params.personId && !params.contractorId && result.totals && (
+                  <div className="mb-3 flex items-center justify-between rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-3">
+                    <span className="text-sm font-medium text-ink-secondary">{t("reports.workspace.payableToday")}</span>
+                    <span className={`text-lg font-bold tabular-nums ${result.totals.netAmount > 0 ? "text-status-critical" : "text-status-good"}`}>
+                      ₹{formatINR(Math.abs(result.totals.netAmount))} {result.totals.netAmount > 0 ? t("reports.workspace.owedByKiln") : t("reports.workspace.advanceHeld")}
+                    </span>
+                  </div>
+                )}
+
+                {result.productionSummary && (result.productionSummary.bricksCount > 0 || result.productionSummary.damagedCount > 0) && (
+                  <div className="mb-3 flex flex-wrap gap-4 rounded-xl border border-border bg-ink-primary/[0.02] px-4 py-3 text-sm">
+                    <span className="text-ink-muted">{t("reports.workspace.everyBrick")}:</span>
+                    <span className="font-semibold tabular-nums text-ink-primary">
+                      {result.productionSummary.bricksCount.toLocaleString("en-IN")} {t("reports.col.bricksCount")}
+                    </span>
+                    {result.productionSummary.damagedCount > 0 && (
+                      <span className="font-semibold tabular-nums text-status-critical">
+                        {result.productionSummary.damagedCount.toLocaleString("en-IN")} {t("reports.col.damagedCount")}
+                      </span>
+                    )}
+                    {result.productionSummary.byModule.map((m) => (
+                      <span key={m.module} className="text-xs text-ink-muted">
+                        {t(`reports.title.${m.module}`)}: {m.bricksCount.toLocaleString("en-IN")}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {result.groups ? <ContractorGroupedTable groups={result.groups} /> : <ReportTable result={result} rowHighlight={getRowHighlight} />}
               </Card>
             )}
           </>
-        )}
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+// Always-visible "single centralized dashboard" strip at the top of the
+// Reports workspace — pulled from GET /reports/dashboard-summary, itself
+// built from the same balance functions Overview/Salary/Customer pages
+// already use, so these numbers can never drift from what those pages show.
+function DashboardCards({ dashboard, onCategoryClick }: { dashboard: DashboardSummary; onCategoryClick: (category: string) => void }) {
+  const { t } = useTranslation();
+  const cards: { labelKey: string; value: string; tone?: "critical" | "good" | "warning" }[] = [
+    { labelKey: "reports.dashboard.totalPendingDues", value: `₹${formatINR(dashboard.totalPendingDues)}`, tone: dashboard.totalPendingDues > 0 ? "critical" : "good" },
+    { labelKey: "reports.dashboard.totalOutstandingAdvances", value: `₹${formatINR(dashboard.totalOutstandingAdvances)}`, tone: dashboard.totalOutstandingAdvances > 0 ? "warning" : undefined },
+    { labelKey: "reports.dashboard.totalCustomerDue", value: `₹${formatINR(dashboard.totalCustomerDue)}`, tone: dashboard.totalCustomerDue > 0 ? "critical" : "good" },
+    { labelKey: "reports.dashboard.bricksDamagedThisWeek", value: dashboard.bricksDamagedThisWeek.toLocaleString("en-IN"), tone: dashboard.bricksDamagedThisWeek > 0 ? "warning" : undefined },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {cards.map((c) => (
+          <Card key={c.labelKey}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t(c.labelKey)}</p>
+            <p
+              className={`mt-1 text-xl font-bold tabular-nums ${
+                c.tone === "critical" ? "text-status-critical" : c.tone === "warning" ? "text-status-warning" : c.tone === "good" ? "text-status-good" : "text-ink-primary"
+              }`}
+            >
+              {c.value}
+            </p>
+          </Card>
+        ))}
+      </div>
+
+      {dashboard.categoryBreakdownThisMonth.length > 0 && (
+        <Card>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("reports.dashboard.categoryBreakdown")}</p>
+          <div className="flex flex-wrap gap-2">
+            {dashboard.categoryBreakdownThisMonth.map((c) => (
+              <button
+                key={c.category}
+                type="button"
+                onClick={() => onCategoryClick(c.category)}
+                className="rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-ink-primary/5"
+              >
+                <span className="block text-xs text-ink-muted">{t(`reports.ledgerCategory.${c.category}`)}</span>
+                <span className="font-semibold tabular-nums text-ink-primary">₹{formatINR(c.paid)}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {(dashboard.topPendingDues.length > 0 || dashboard.salaryStatusThisMonth.totalStaff > 0) && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {dashboard.topPendingDues.length > 0 && (
+            <Card>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("reports.dashboard.topPendingDues")}</p>
+              <div className="space-y-1.5">
+                {dashboard.topPendingDues.map((p) => (
+                  <div key={p.personId} className="flex items-center justify-between text-sm">
+                    <span className="text-ink-secondary">{p.name}</span>
+                    <span className="font-semibold tabular-nums text-status-critical">₹{formatINR(p.amountDue)}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+          {dashboard.salaryStatusThisMonth.totalStaff > 0 && (
+            <Card>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("reports.dashboard.salaryStatus")}</p>
+              <p className="text-sm text-ink-secondary">
+                {t("reports.dashboard.salaryGenerated", { count: dashboard.salaryStatusThisMonth.generated })} · {t("reports.dashboard.salaryPending", { count: dashboard.salaryStatusThisMonth.pending })}
+              </p>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }

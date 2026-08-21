@@ -81,7 +81,13 @@ export async function listLedgerForPerson(kilnId: string, personId: string) {
 
 export interface ListLedgerForKilnFilter {
   personId?: string;
+  // A whole gang at once (a contractor + everyone linked to them) — see
+  // person.service.ts's resolveContractorGang. Combined with personId via
+  // OR (either matches) rather than replacing it, so a caller can pass
+  // just one or the other.
+  personIds?: string[];
   personType?: (typeof PERSON_TYPES)[number];
+  category?: (typeof LEDGER_CATEGORIES)[number];
   from?: Date;
   to?: Date;
 }
@@ -93,6 +99,8 @@ export interface ListLedgerForKilnFilter {
 export async function listLedgerForKiln(kilnId: string, filter: ListLedgerForKilnFilter = {}) {
   const conditions = [eq(ledgerEntries.kilnId, kilnId)];
   if (filter.personId) conditions.push(eq(ledgerEntries.personId, filter.personId));
+  if (filter.personIds && filter.personIds.length > 0) conditions.push(inArray(ledgerEntries.personId, filter.personIds));
+  if (filter.category) conditions.push(eq(ledgerEntries.category, filter.category));
   if (filter.from) conditions.push(gte(ledgerEntries.date, filter.from));
   if (filter.to) conditions.push(lte(ledgerEntries.date, filter.to));
 

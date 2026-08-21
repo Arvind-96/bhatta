@@ -25,6 +25,7 @@ export function EditMoldingEntryModal({ entry, onClose, onSaved }: EditMoldingEn
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
   const [ratePerThousand, setRatePerThousand] = useState(String(entry.ratePerThousand));
   const [damagedCount, setDamagedCount] = useState(entry.damagedCount ? String(entry.damagedCount) : "");
+  const [damageFault, setDamageFault] = useState(entry.damageFault ?? "");
   const [washedOut, setWashedOut] = useState(entry.washedOut ?? false);
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
@@ -38,6 +39,7 @@ export function EditMoldingEntryModal({ entry, onClose, onSaved }: EditMoldingEn
         bricksCount: Number(bricksCount),
         ratePerThousand: Number(ratePerThousand),
         damagedCount: damagedCount ? Number(damagedCount) : 0,
+        damageFault: damagedCount && damageFault ? (damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         washedOut,
         notes: notes || undefined,
       });
@@ -95,6 +97,14 @@ export function EditMoldingEntryModal({ entry, onClose, onSaved }: EditMoldingEn
             onChange={(e) => setDamagedCount(e.target.value)}
             className={inputClass}
           />
+          {Number(damagedCount) > 0 && (
+            <select value={damageFault} onChange={(e) => setDamageFault(e.target.value)} className={`col-span-2 ${inputClass}`}>
+              <option value="">{t("production.damageFaultPlaceholder")}</option>
+              <option value="LABOURER">{t("reports.damageFault.LABOURER")}</option>
+              <option value="CONTRACTOR">{t("reports.damageFault.CONTRACTOR")}</option>
+              <option value="OTHER">{t("reports.damageFault.OTHER")}</option>
+            </select>
+          )}
           <label className="flex items-center gap-2 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary">
             <input type="checkbox" checked={washedOut} onChange={(e) => setWashedOut(e.target.checked)} />
             {t("molding.washedOutByRain")}

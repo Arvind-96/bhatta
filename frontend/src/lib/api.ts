@@ -62,6 +62,7 @@ import type {
   LoadingEntry,
   Machine,
   MachineFuelLog,
+  DamageFault,
   MachineFuelType,
   MachineMaintenanceLog,
   MachineType,
@@ -118,7 +119,7 @@ import type {
   SandDelivery,
   SandDeliveryTractorEntry,
 } from "@/types";
-import type { ReportResult, ReportRunParams } from "@/types/reports";
+import type { ReportResult, ReportRunParams, DashboardSummary } from "@/types/reports";
 import { useAuthStore, type AuthUser, type UserKiln } from "@/store/auth.store";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
@@ -796,6 +797,7 @@ export const api = {
       bricksCount: number;
       ratePerThousand: number;
       damagedCount?: number;
+      damageFault?: DamageFault;
       washedOut?: boolean;
       notes?: string;
     }) => post<MoldingEntry>("/molding", input, true),
@@ -804,7 +806,7 @@ export const api = {
     contractorSummary: () => get<MoldingContractorSummary>("/molding/contractor-summary", true),
     update: (
       id: string,
-      input: Partial<{ bricksCount: number; ratePerThousand: number; damagedCount: number; washedOut: boolean; notes: string }>
+      input: Partial<{ bricksCount: number; ratePerThousand: number; damagedCount: number; damageFault: DamageFault; washedOut: boolean; notes: string }>
     ) => patch<MoldingEntry>(`/molding/${id}`, input, true),
     remove: (id: string) => del<void>(`/molding/${id}`, true),
   },
@@ -843,6 +845,7 @@ export const api = {
       stage: StackingStage;
       bricksCount: number;
       damageCount?: number;
+      damageFault?: DamageFault;
       qualityRating?: StackingEntry["qualityRating"];
       mode?: StackingMode;
       tractorNumber?: string;
@@ -855,6 +858,7 @@ export const api = {
         stage: StackingStage;
         bricksCount: number;
         damageCount: number;
+        damageFault: DamageFault;
         qualityRating: StackingEntry["qualityRating"];
         mode: StackingMode;
         tractorNumber: string;
@@ -895,9 +899,9 @@ export const api = {
   nikasi: {
     list: (filter: { gangId?: string } = {}) =>
       get<NikasiEntry[]>(`/nikasi${filter.gangId ? `?gangId=${filter.gangId}` : ""}`, true),
-    create: (input: { gherId: string; gangId: string; bricksCount: number; damagedCount?: number; notes?: string }) =>
+    create: (input: { gherId: string; gangId: string; bricksCount: number; damagedCount?: number; damageFault?: DamageFault; notes?: string }) =>
       post<NikasiEntry>("/nikasi", input, true),
-    update: (id: string, input: Partial<{ bricksCount: number; damagedCount: number; notes: string }>) =>
+    update: (id: string, input: Partial<{ bricksCount: number; damagedCount: number; damageFault: DamageFault; notes: string }>) =>
       patch<NikasiEntry>(`/nikasi/${id}`, input, true),
     remove: (id: string) => del<void>(`/nikasi/${id}`, true),
     operatorSummary: () => get<NikasiOperatorSummary>("/nikasi/operator-summary", true),
@@ -1277,8 +1281,14 @@ export const api = {
       if (params.vehicleId) q.set("vehicleId", params.vehicleId);
       if (params.driverId) q.set("driverId", params.driverId);
       if (params.category) q.set("category", params.category);
+      if (params.contractorId) q.set("contractorId", params.contractorId);
+      if (params.damageFault) q.set("damageFault", params.damageFault);
+      if (params.damageThreshold != null) q.set("damageThreshold", String(params.damageThreshold));
+      if (params.workType) q.set("workType", params.workType);
+      if (params.status) q.set("status", params.status);
       const qs = q.toString();
       return get<ReportResult>(`/reports/${key}${qs ? `?${qs}` : ""}`, true);
     },
+    dashboardSummary: () => get<DashboardSummary>("/reports/dashboard-summary", true),
   },
 };

@@ -10,7 +10,7 @@ import {
   tractorFleetSummary,
   updateStackingEntry,
 } from "../services/stacking.service";
-import { STACKING_QUALITY, STACKING_MODES, STACKING_STAGES } from "../db/schema";
+import { STACKING_QUALITY, STACKING_MODES, STACKING_STAGES, DAMAGE_FAULT_OPTIONS } from "../db/schema";
 
 const createSchema = z.object({
   gherId: z.string(),
@@ -18,6 +18,7 @@ const createSchema = z.object({
   stage: z.enum(STACKING_STAGES),
   bricksCount: z.number().int().positive(),
   damageCount: z.number().int().min(0).optional(),
+  damageFault: z.enum(DAMAGE_FAULT_OPTIONS).optional(),
   qualityRating: z.enum(STACKING_QUALITY).optional(),
   mode: z.enum(STACKING_MODES).optional(),
   tractorNumber: z.string().optional(),
@@ -50,6 +51,7 @@ const updateSchema = z.object({
   stage: z.enum(STACKING_STAGES).optional(),
   bricksCount: z.number().int().positive().optional(),
   damageCount: z.number().int().min(0).optional(),
+  damageFault: z.enum(DAMAGE_FAULT_OPTIONS).optional(),
   qualityRating: z.enum(STACKING_QUALITY).optional(),
   mode: z.enum(STACKING_MODES).optional(),
   tractorNumber: z.string().optional(),

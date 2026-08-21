@@ -150,7 +150,7 @@ export function Molding() {
   const [openContractorId, setOpenContractorId] = useState<string | null>(null);
   const [openWorkerId, setOpenWorkerId] = useState<string | null>(null);
   const [showAddThekedar, setShowAddThekedar] = useState(false);
-  const [form, setForm] = useState({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", washedOut: false });
+  const [form, setForm] = useState({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", damageFault: "", washedOut: false });
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -209,9 +209,10 @@ export function Molding() {
         bricksCount: Number(form.bricksCount),
         ratePerThousand: Number(form.ratePerThousand),
         damagedCount: form.damagedCount ? Number(form.damagedCount) : undefined,
+        damageFault: form.damagedCount && form.damageFault ? (form.damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         washedOut: form.washedOut,
       });
-      setForm({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", washedOut: false });
+      setForm({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", damageFault: "", washedOut: false });
       setShowForm(false);
       await refresh();
     } finally {
@@ -332,6 +333,18 @@ export function Molding() {
               onChange={(e) => setForm((f) => ({ ...f, damagedCount: e.target.value }))}
               className={cn(inputClass, "col-span-2")}
             />
+            {Number(form.damagedCount) > 0 && (
+              <select
+                value={form.damageFault}
+                onChange={(e) => setForm((f) => ({ ...f, damageFault: e.target.value }))}
+                className={cn(inputClass, "col-span-2")}
+              >
+                <option value="">{t("production.damageFaultPlaceholder")}</option>
+                <option value="LABOURER">{t("reports.damageFault.LABOURER")}</option>
+                <option value="CONTRACTOR">{t("reports.damageFault.CONTRACTOR")}</option>
+                <option value="OTHER">{t("reports.damageFault.OTHER")}</option>
+              </select>
+            )}
             <label className="col-span-2 flex items-center gap-2 text-sm text-ink-secondary">
               <input
                 type="checkbox"

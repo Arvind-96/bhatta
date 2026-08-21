@@ -8,10 +8,10 @@ export const REPORT_DEFINITIONS: ReportDefinitionMeta[] = [
   // Production
   { key: "soil", group: "production", labelKey: "reports.title.soil", filters: ["person"] },
   { key: "sand", group: "production", labelKey: "reports.title.sand", filters: ["person"] },
-  { key: "molding", group: "production", labelKey: "reports.title.molding", filters: ["person"] },
-  { key: "stacking", group: "production", labelKey: "reports.title.stacking", filters: ["person"] },
+  { key: "molding", group: "production", labelKey: "reports.title.molding", filters: ["person", "damageFault", "damageThreshold"] },
+  { key: "stacking", group: "production", labelKey: "reports.title.stacking", filters: ["person", "damageFault", "damageThreshold"] },
   { key: "firing", group: "production", labelKey: "reports.title.firing", filters: ["person"] },
-  { key: "nikasi", group: "production", labelKey: "reports.title.nikasi", filters: ["person"] },
+  { key: "nikasi", group: "production", labelKey: "reports.title.nikasi", filters: ["person", "damageFault", "damageThreshold"] },
   { key: "brickLoading", group: "production", labelKey: "reports.title.brickLoading", filters: ["driver"] },
 
   // Trade & Billing
@@ -28,7 +28,8 @@ export const REPORT_DEFINITIONS: ReportDefinitionMeta[] = [
   { key: "inventory", group: "resources", labelKey: "reports.title.inventory", filters: [] },
 
   // Admin
-  { key: "labourLedger", group: "admin", labelKey: "reports.title.labourLedger", filters: ["personType", "person"] },
+  { key: "labourLedger", group: "admin", labelKey: "reports.title.labourLedger", filters: ["personType", "workType", "status", "person", "contractor", "ledgerCategory"] },
+  { key: "labourByContractor", group: "admin", labelKey: "reports.title.labourByContractor", filters: ["workType", "status", "contractor"] },
   { key: "salary", group: "admin", labelKey: "reports.title.salary", filters: ["person"] },
 ];
 

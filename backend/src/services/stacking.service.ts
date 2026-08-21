@@ -9,6 +9,8 @@ import { emitToKiln } from "../config/socket";
 export type StackingMode = (typeof STACKING_MODES)[number];
 export type StackingStage = (typeof STACKING_STAGES)[number];
 
+export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
+
 export interface CreateStackingInput {
   kilnId: string;
   gherId: string;
@@ -16,6 +18,7 @@ export interface CreateStackingInput {
   stage: StackingStage;
   bricksCount: number;
   damageCount?: number;
+  damageFault?: DamageFault;
   qualityRating?: "GOOD" | "AVERAGE" | "POOR";
   mode?: StackingMode;
   tractorNumber?: string;
@@ -50,6 +53,7 @@ export interface UpdateStackingInput {
   stage?: StackingStage;
   bricksCount?: number;
   damageCount?: number;
+  damageFault?: DamageFault;
   qualityRating?: "GOOD" | "AVERAGE" | "POOR";
   mode?: StackingMode;
   tractorNumber?: string;

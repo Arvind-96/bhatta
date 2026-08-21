@@ -11,11 +11,14 @@ import {
   updateNikasiEntry,
 } from "../services/nikasi.service";
 
+const damageFaultSchema = z.enum(["LABOURER", "CONTRACTOR", "OTHER"]);
+
 const createSchema = z.object({
   gherId: z.string(),
   gangId: z.string(),
   bricksCount: z.number().int().positive(),
   damagedCount: z.number().int().nonnegative().optional(),
+  damageFault: damageFaultSchema.optional(),
   date: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -41,6 +44,7 @@ export async function list(req: AuthedRequest, res: Response) {
 const updateSchema = z.object({
   bricksCount: z.number().int().positive().optional(),
   damagedCount: z.number().int().nonnegative().optional(),
+  damageFault: damageFaultSchema.optional(),
   notes: z.string().optional(),
 });
 

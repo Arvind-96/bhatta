@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { reportRegistry, ReportFilters } from "../services/reports";
+import { dashboardSummary } from "../services/reports/dashboard";
 import { ReportGroupBy } from "../utils/reportPeriod";
 
 const GROUP_BY_VALUES: ReportGroupBy[] = ["none", "day", "week", "month", "quarter", "year"];
@@ -39,6 +40,11 @@ export async function runReport(req: AuthedRequest, res: Response) {
     vehicleId: str(req.query.vehicleId),
     driverId: str(req.query.driverId),
     category: str(req.query.category),
+    contractorId: str(req.query.contractorId),
+    damageFault: str(req.query.damageFault),
+    damageThreshold: req.query.damageThreshold ? Number(req.query.damageThreshold) : undefined,
+    workType: str(req.query.workType),
+    status: str(req.query.status),
   };
 
   const result = await definition.run(req.kiln!.id, filters);
@@ -47,4 +53,9 @@ export async function runReport(req: AuthedRequest, res: Response) {
 
 export async function listReportKeys(_req: AuthedRequest, res: Response) {
   res.json(Array.from(reportRegistry.keys()));
+}
+
+export async function dashboardSummaryHandler(req: AuthedRequest, res: Response) {
+  const result = await dashboardSummary(req.kiln!.id);
+  res.json(result);
 }

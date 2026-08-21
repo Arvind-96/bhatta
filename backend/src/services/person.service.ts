@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
 import { people, ledgerEntries, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
@@ -138,6 +138,46 @@ export async function listPeople(kilnId: string, type?: PersonType) {
   if (type && type !== "LANDOWNER") return rows;
   const serials = await computeLandownerSerials(kilnId);
   return rows.map((r) => (r.type === "LANDOWNER" ? { ...r, landownerSerial: serials.get(r._id) ?? r.landownerSerial } : r));
+}
+
+// Everyone linked to a LABOUR_CONTRACTOR across every module they might be
+// linked through — a worker's "reports to" contractor can be set via any
+// of contractorId (Pathai/general), bharaiContractorId (stacking),
+// nikasiContractorId, or pakayiContractorId (firing), so this unions all
+// four rather than assuming one. Returns the contractor's own id first,
+// then their gang — the direct data source for "all laborers under
+// Contractor X" reports and rollups.
+export async function resolveContractorGang(kilnId: string, contractorId: string): Promise<string[]> {
+  const rows = await db
+    .select({ _id: people._id })
+    .from(people)
+    .where(
+      and(
+        eq(people.kilnId, kilnId),
+        or(
+          eq(people.contractorId, contractorId),
+          eq(people.bharaiContractorId, contractorId),
+          eq(people.nikasiContractorId, contractorId),
+          eq(people.pakayiContractorId, contractorId)
+        )
+      )
+    );
+  return [contractorId, ...rows.map((r) => r._id)];
+}
+
+// Profile-level filtering for reports — narrows the person pool by any
+// combination of type/workType/status before the report resolves which
+// ledger/production rows to pull, so the admin can filter "every specific
+// field" that actually distinguishes one laborer/contractor from another
+// (their role, work type, and whether they're still active) rather than
+// just picking one person by name at a time.
+export async function findPeopleIds(kilnId: string, filter: { type?: PersonType; workType?: WorkType; status?: "ACTIVE" | "ABSCONDED" } = {}): Promise<string[]> {
+  const conditions = [eq(people.kilnId, kilnId)];
+  if (filter.type) conditions.push(eq(people.type, filter.type));
+  if (filter.workType) conditions.push(eq(people.workType, filter.workType));
+  if (filter.status) conditions.push(eq(people.status, filter.status));
+  const rows = await db.select({ _id: people._id }).from(people).where(and(...conditions));
+  return rows.map((r) => r._id);
 }
 
 export async function getBalance(kilnId: string, personId: string) {

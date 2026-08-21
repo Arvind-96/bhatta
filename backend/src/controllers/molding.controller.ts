@@ -11,11 +11,14 @@ import {
   updateMoldingEntry,
 } from "../services/molding.service";
 
+const damageFaultSchema = z.enum(["LABOURER", "CONTRACTOR", "OTHER"]);
+
 const createSchema = z.object({
   workerId: z.string(),
   bricksCount: z.number().int().positive(),
   ratePerThousand: z.number().positive(),
   damagedCount: z.number().int().nonnegative().optional(),
+  damageFault: damageFaultSchema.optional(),
   date: z.string().optional(),
   washedOut: z.boolean().optional(),
   notes: z.string().optional(),
@@ -59,6 +62,7 @@ const updateSchema = z.object({
   bricksCount: z.number().int().positive().optional(),
   ratePerThousand: z.number().positive().optional(),
   damagedCount: z.number().int().nonnegative().optional(),
+  damageFault: damageFaultSchema.optional(),
   washedOut: z.boolean().optional(),
   notes: z.string().optional(),
 });

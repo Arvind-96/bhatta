@@ -393,6 +393,7 @@ export function Stacking() {
     gangId: "",
     bricksCount: "",
     damageCount: "",
+    damageFault: "",
     qualityRating: "GOOD" as StackingEntry["qualityRating"],
     mode: "" as "" | StackingMode,
     tractorNumber: "",
@@ -464,6 +465,7 @@ export function Stacking() {
         stage: form.stage,
         bricksCount: Number(form.bricksCount),
         damageCount: form.damageCount ? Number(form.damageCount) : undefined,
+        damageFault: form.damageCount && form.damageFault ? (form.damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         qualityRating: form.qualityRating,
         mode: form.mode || undefined,
         tractorNumber: form.mode === "TRACTOR" ? form.tractorNumber || undefined : undefined,
@@ -475,6 +477,7 @@ export function Stacking() {
         gangId: "",
         bricksCount: "",
         damageCount: "",
+        damageFault: "",
         qualityRating: "GOOD",
         mode: "",
         tractorNumber: "",
@@ -629,6 +632,18 @@ export function Stacking() {
               onChange={(e) => setForm((f) => ({ ...f, damageCount: e.target.value }))}
               className={inputClass}
             />
+            {Number(form.damageCount) > 0 && (
+              <select
+                value={form.damageFault}
+                onChange={(e) => setForm((f) => ({ ...f, damageFault: e.target.value }))}
+                className={inputClass}
+              >
+                <option value="">{t("production.damageFaultPlaceholder")}</option>
+                <option value="LABOURER">{t("reports.damageFault.LABOURER")}</option>
+                <option value="CONTRACTOR">{t("reports.damageFault.CONTRACTOR")}</option>
+                <option value="OTHER">{t("reports.damageFault.OTHER")}</option>
+              </select>
+            )}
             <select
               value={form.qualityRating}
               onChange={(e) => setForm((f) => ({ ...f, qualityRating: e.target.value as StackingEntry["qualityRating"] }))}

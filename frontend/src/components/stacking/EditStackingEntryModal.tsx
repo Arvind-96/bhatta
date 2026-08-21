@@ -25,6 +25,7 @@ export function EditStackingEntryModal({ entry, onClose, onSaved }: EditStacking
   const { t } = useTranslation();
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
   const [damageCount, setDamageCount] = useState(String(entry.damageCount));
+  const [damageFault, setDamageFault] = useState(entry.damageFault ?? "");
   const [stage, setStage] = useState<"" | StackingStage>(entry.stage ?? "");
   const [qualityRating, setQualityRating] = useState(entry.qualityRating);
   const [mode, setMode] = useState<"" | "BUGGI" | "TRACTOR">(entry.mode ?? "");
@@ -41,6 +42,7 @@ export function EditStackingEntryModal({ entry, onClose, onSaved }: EditStacking
       await api.stacking.update(entry._id, {
         bricksCount: Number(bricksCount),
         damageCount: Number(damageCount),
+        damageFault: Number(damageCount) > 0 && damageFault ? (damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         stage: stage || undefined,
         qualityRating,
         mode: mode || undefined,
@@ -93,6 +95,14 @@ export function EditStackingEntryModal({ entry, onClose, onSaved }: EditStacking
             onChange={(e) => setDamageCount(e.target.value)}
             className={inputClass}
           />
+          {Number(damageCount) > 0 && (
+            <select value={damageFault} onChange={(e) => setDamageFault(e.target.value)} className={cn(inputClass, "col-span-2")}>
+              <option value="">{t("production.damageFaultPlaceholder")}</option>
+              <option value="LABOURER">{t("reports.damageFault.LABOURER")}</option>
+              <option value="CONTRACTOR">{t("reports.damageFault.CONTRACTOR")}</option>
+              <option value="OTHER">{t("reports.damageFault.OTHER")}</option>
+            </select>
+          )}
           <select value={stage} onChange={(e) => setStage(e.target.value as "" | StackingStage)} className={inputClass}>
             <option value="">{t("stacking.stageNotSet")}</option>
             <option value="TRANSPORT">{t("stacking.stage1TransportShort")}</option>

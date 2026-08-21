@@ -8,12 +8,39 @@ export interface ReportColumn {
   format: ReportColumnFormat;
 }
 
+export interface ProductionSummary {
+  bricksCount: number;
+  damagedCount: number;
+  byModule: { module: string; bricksCount: number; damagedCount: number }[];
+}
+
+export interface ContractorRollupGroup {
+  contractorId: string;
+  contractorName: string;
+  totalDue: number;
+  totalPaid: number;
+  netAmount: number;
+  bricksCount: number;
+  damagedCount: number;
+  laborerCount: number;
+  laborers: { personId: string; name: string; type: string; totalDue: number; totalPaid: number; netAmount: number; bricksCount: number; damagedCount: number }[];
+}
+
 export interface ReportResult {
   reportKey: string;
   titleKey: string;
   columns: ReportColumn[];
   rows: Record<string, string | number | null>[];
   totals?: Record<string, number>;
+  // "Every brick" alongside "every penny" — attached only when a report is
+  // scoped to exactly one person or one contractor's gang (see
+  // productionTotals.ts). Additive/optional so the flat-table contract
+  // every other report relies on is unaffected.
+  productionSummary?: ProductionSummary;
+  // The hierarchical contractor->laborers view (labourByContractor only) —
+  // `rows` above is a flattened version of the same data for Print/Excel;
+  // the on-screen collapsible view reads this instead.
+  groups?: ContractorRollupGroup[];
 }
 
 export interface ReportFilters {
@@ -26,6 +53,11 @@ export interface ReportFilters {
   vehicleId?: string;
   driverId?: string;
   category?: string;
+  contractorId?: string;
+  damageFault?: string;
+  damageThreshold?: number;
+  workType?: string;
+  status?: string;
 }
 
 export type ReportRunner = (kilnId: string, filters: ReportFilters) => Promise<ReportResult>;

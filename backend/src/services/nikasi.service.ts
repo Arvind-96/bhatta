@@ -6,12 +6,15 @@ import { assertPersonOfType } from "./person.service";
 import { assertGherInKiln } from "./gher.service";
 import { emitToKiln } from "../config/socket";
 
+export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
+
 export interface CreateNikasiInput {
   kilnId: string;
   gherId: string;
   gangId: string;
   bricksCount: number;
   damagedCount?: number;
+  damageFault?: DamageFault;
   date?: Date;
   notes?: string;
 }
@@ -37,6 +40,7 @@ export async function createNikasiEntry(input: CreateNikasiInput) {
 export interface UpdateNikasiInput {
   bricksCount?: number;
   damagedCount?: number;
+  damageFault?: DamageFault;
   notes?: string;
 }
 

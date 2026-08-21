@@ -6,6 +6,11 @@ import type { Locale } from "../translations";
 // StackingContractorDetailPage. Merged into the main dictionary by
 // translations.ts.
 export const moldingStackingDict: Record<string, Record<Locale, string>> = {
+  // Shared across Molding.tsx, Stacking.tsx, and Nikasi.tsx's damage-fault
+  // pickers — one definition, looked up globally regardless of which dict
+  // file it lives in.
+  "production.damageFaultPlaceholder": { en: "Whose fault was the damage? (optional)", hi: "नुकसान किसकी गलती से हुआ? (वैकल्पिक)" },
+
   // ---- pages/Molding.tsx ----
   "molding.contractorWiseProduction": { en: "Thekedar-wise (contractor) production", hi: "ठेकेदार-वार पथाई उत्पादन" },
   "molding.contractorWiseHint": {

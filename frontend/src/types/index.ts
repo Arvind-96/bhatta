@@ -667,12 +667,15 @@ export interface ExpenseTypeDetail {
   totalDue: number;
 }
 
+export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
+
 export interface MoldingEntry {
   _id: string;
   workerId: { _id: string; name: string } | string;
   bricksCount: number;
   ratePerThousand: number;
   damagedCount?: number;
+  damageFault?: DamageFault;
   date: string;
   washedOut: boolean;
   notes?: string;
@@ -779,6 +782,7 @@ export interface StackingEntry {
   stage?: StackingStage;
   bricksCount: number;
   damageCount: number;
+  damageFault?: DamageFault;
   ratePerThousand?: number;
   qualityRating: StackingQuality;
   mode?: StackingMode;
@@ -885,6 +889,7 @@ export interface NikasiEntry {
   gangId: { _id: string; name: string; type: PersonType } | string;
   bricksCount: number;
   damagedCount?: number;
+  damageFault?: DamageFault;
   date: string;
   notes?: string;
 }
