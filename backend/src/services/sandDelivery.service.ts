@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { sandDeliveries, sandContracts, SandDeliveryTractorEntry } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
@@ -193,11 +193,15 @@ export async function deleteSandDelivery(kilnId: string, entryId: string) {
 export interface ListSandDeliveryFilter {
   sandContractorId?: string;
   contractId?: string;
+  from?: Date;
+  to?: Date;
 }
 
 export async function listSandDeliveries(kilnId: string, filter: ListSandDeliveryFilter = {}) {
   const conditions = [eq(sandDeliveries.kilnId, kilnId)];
   if (filter.sandContractorId) conditions.push(eq(sandDeliveries.sandContractorId, filter.sandContractorId));
   if (filter.contractId) conditions.push(eq(sandDeliveries.contractId, filter.contractId));
+  if (filter.from) conditions.push(gte(sandDeliveries.date, filter.from));
+  if (filter.to) conditions.push(lte(sandDeliveries.date, filter.to));
   return await db.select().from(sandDeliveries).where(and(...conditions)).orderBy(desc(sandDeliveries.date));
 }

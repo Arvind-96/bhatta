@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { inventoryItems, suppliedItems } from "../db/schema";
 import { emitToKiln } from "../config/socket";
@@ -34,6 +34,23 @@ export async function listInventoryItems(kilnId: string) {
     .groupBy(suppliedItems.itemId);
   const usedByItemId = new Map(usedRows.map((r) => [r.itemId, r.used]));
   return items.map((item) => ({ ...item, usedQuantity: usedByItemId.get(item._id) ?? 0 }));
+}
+
+// Same shape as listInventoryItems' all-time usedQuantity, but scoped to a
+// date range — the Inventory report's "used this period" column, alongside
+// the item's live (all-time) remaining quantity.
+export async function listInventoryItemsForPeriod(kilnId: string, filter: { from?: Date; to?: Date } = {}) {
+  const items = await db.select().from(inventoryItems).where(eq(inventoryItems.kilnId, kilnId)).orderBy(asc(inventoryItems.name));
+  const conditions = [eq(suppliedItems.kilnId, kilnId)];
+  if (filter.from) conditions.push(gte(suppliedItems.date, filter.from));
+  if (filter.to) conditions.push(lte(suppliedItems.date, filter.to));
+  const usedRows = await db
+    .select({ itemId: suppliedItems.itemId, used: sql<number>`sum(${suppliedItems.quantity})` })
+    .from(suppliedItems)
+    .where(and(...conditions))
+    .groupBy(suppliedItems.itemId);
+  const usedByItemId = new Map(usedRows.map((r) => [r.itemId, r.used]));
+  return items.map((item) => ({ ...item, usedInPeriod: usedByItemId.get(item._id) ?? 0 }));
 }
 
 export interface UpdateInventoryItemInput {

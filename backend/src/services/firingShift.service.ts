@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { firingShifts, people, ledgerEntries, ghers } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
@@ -50,12 +50,20 @@ export async function createFiringShift(input: CreateShiftInput) {
 export interface ListFiringShiftFilter {
   days?: number;
   fitterId?: string;
+  from?: Date;
+  to?: Date;
 }
 
 export async function listFiringShifts(kilnId: string, filter: ListFiringShiftFilter = {}) {
-  const since = new Date();
-  since.setDate(since.getDate() - (filter.days ?? 14));
-  const conditions = [eq(firingShifts.kilnId, kilnId), gte(firingShifts.date, since)];
+  const conditions = [eq(firingShifts.kilnId, kilnId)];
+  if (filter.from || filter.to) {
+    if (filter.from) conditions.push(gte(firingShifts.date, filter.from));
+    if (filter.to) conditions.push(lte(firingShifts.date, filter.to));
+  } else {
+    const since = new Date();
+    since.setDate(since.getDate() - (filter.days ?? 14));
+    conditions.push(gte(firingShifts.date, since));
+  }
   if (filter.fitterId) conditions.push(eq(firingShifts.fitterId, filter.fitterId));
 
   const rows = await db.select().from(firingShifts).where(and(...conditions)).orderBy(desc(firingShifts.date));

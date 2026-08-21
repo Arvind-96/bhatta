@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { challans, gatePasses, invoices, dispatches, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import { isDuplicateEntryError } from "./dispatch.service";
@@ -72,9 +72,18 @@ export async function createChallan(kilnId: string, input: ChallanInput) {
   return row;
 }
 
-export async function listChallans(kilnId: string, dispatchId?: string) {
+export interface ListChallansFilter {
+  dispatchId?: string;
+  from?: Date;
+  to?: Date;
+}
+
+export async function listChallans(kilnId: string, filter: string | ListChallansFilter = {}) {
+  const f: ListChallansFilter = typeof filter === "string" ? { dispatchId: filter } : filter;
   const conditions = [eq(challans.kilnId, kilnId)];
-  if (dispatchId) conditions.push(eq(challans.dispatchId, dispatchId));
+  if (f.dispatchId) conditions.push(eq(challans.dispatchId, f.dispatchId));
+  if (f.from) conditions.push(gte(challans.challanDate, f.from));
+  if (f.to) conditions.push(lte(challans.challanDate, f.to));
   return db.select().from(challans).where(and(...conditions)).orderBy(desc(challans.createdAt));
 }
 
@@ -130,9 +139,18 @@ export async function createGatePass(kilnId: string, input: GatePassInput) {
   return row;
 }
 
-export async function listGatePasses(kilnId: string, dispatchId?: string) {
+export interface ListGatePassesFilter {
+  dispatchId?: string;
+  from?: Date;
+  to?: Date;
+}
+
+export async function listGatePasses(kilnId: string, filter: string | ListGatePassesFilter = {}) {
+  const f: ListGatePassesFilter = typeof filter === "string" ? { dispatchId: filter } : filter;
   const conditions = [eq(gatePasses.kilnId, kilnId)];
-  if (dispatchId) conditions.push(eq(gatePasses.dispatchId, dispatchId));
+  if (f.dispatchId) conditions.push(eq(gatePasses.dispatchId, f.dispatchId));
+  if (f.from) conditions.push(gte(gatePasses.gatePassDate, f.from));
+  if (f.to) conditions.push(lte(gatePasses.gatePassDate, f.to));
   return db.select().from(gatePasses).where(and(...conditions)).orderBy(desc(gatePasses.createdAt));
 }
 
@@ -202,9 +220,20 @@ export async function createInvoice(kilnId: string, input: InvoiceInput) {
   return row;
 }
 
-export async function listInvoices(kilnId: string, dispatchId?: string) {
+export interface ListInvoicesFilter {
+  dispatchId?: string;
+  customerId?: string;
+  from?: Date;
+  to?: Date;
+}
+
+export async function listInvoices(kilnId: string, filter: string | ListInvoicesFilter = {}) {
+  const f: ListInvoicesFilter = typeof filter === "string" ? { dispatchId: filter } : filter;
   const conditions = [eq(invoices.kilnId, kilnId)];
-  if (dispatchId) conditions.push(eq(invoices.dispatchId, dispatchId));
+  if (f.dispatchId) conditions.push(eq(invoices.dispatchId, f.dispatchId));
+  if (f.customerId) conditions.push(eq(invoices.customerId, f.customerId));
+  if (f.from) conditions.push(gte(invoices.invoiceDate, f.from));
+  if (f.to) conditions.push(lte(invoices.invoiceDate, f.to));
   return db.select().from(invoices).where(and(...conditions)).orderBy(desc(invoices.createdAt));
 }
 

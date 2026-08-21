@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { workEntries, people, ledgerEntries, WORK_TYPES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
@@ -136,12 +136,16 @@ export async function deleteWorkEntry(kilnId: string, entryId: string) {
 export interface ListWorkEntryFilter {
   personId?: string;
   workType?: WorkType;
+  from?: Date;
+  to?: Date;
 }
 
 export async function listWorkEntries(kilnId: string, filter: ListWorkEntryFilter = {}) {
   const conditions = [eq(workEntries.kilnId, kilnId)];
   if (filter.personId) conditions.push(eq(workEntries.personId, filter.personId));
   if (filter.workType) conditions.push(eq(workEntries.workType, filter.workType));
+  if (filter.from) conditions.push(gte(workEntries.date, filter.from));
+  if (filter.to) conditions.push(lte(workEntries.date, filter.to));
 
   const rows = await db.select().from(workEntries).where(and(...conditions)).orderBy(desc(workEntries.date));
   const personIds = [...new Set(rows.map((r) => r.personId))];

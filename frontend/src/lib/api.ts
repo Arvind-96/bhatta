@@ -118,6 +118,7 @@ import type {
   SandDelivery,
   SandDeliveryTractorEntry,
 } from "@/types";
+import type { ReportResult, ReportRunParams } from "@/types/reports";
 import { useAuthStore, type AuthUser, type UserKiln } from "@/store/auth.store";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
@@ -1262,5 +1263,22 @@ export const api = {
         `/compare/${module}?fromA=${rangeA.from}&toA=${rangeA.to}&fromB=${rangeB.from}&toB=${rangeB.to}`,
         true
       ),
+  },
+
+  reports: {
+    run: (key: string, params: ReportRunParams = {}) => {
+      const q = new URLSearchParams();
+      if (params.from) q.set("from", params.from);
+      if (params.to) q.set("to", params.to);
+      if (params.groupBy) q.set("groupBy", params.groupBy);
+      if (params.personId) q.set("personId", params.personId);
+      if (params.personType) q.set("personType", params.personType);
+      if (params.customerId) q.set("customerId", params.customerId);
+      if (params.vehicleId) q.set("vehicleId", params.vehicleId);
+      if (params.driverId) q.set("driverId", params.driverId);
+      if (params.category) q.set("category", params.category);
+      const qs = q.toString();
+      return get<ReportResult>(`/reports/${key}${qs ? `?${qs}` : ""}`, true);
+    },
   },
 };

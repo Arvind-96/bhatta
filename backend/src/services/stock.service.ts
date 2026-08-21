@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { stockEntries } from "../db/schema";
 import { emitToKiln } from "../config/socket";
@@ -39,6 +39,22 @@ export async function recordStockEntry(input: CreateStockInput) {
 
   emitToKiln(input.kilnId, "stock:update", entry);
   return entry;
+}
+
+export interface ListStockEntriesFilter {
+  itemName?: string;
+  from?: Date;
+  to?: Date;
+}
+
+// The Stock report's movement log — contrast with getStockSnapshot below,
+// which is the unbounded all-time running total, not date-scoped.
+export async function listStockEntries(kilnId: string, filter: ListStockEntriesFilter = {}) {
+  const conditions = [eq(stockEntries.kilnId, kilnId)];
+  if (filter.itemName) conditions.push(eq(stockEntries.itemName, filter.itemName));
+  if (filter.from) conditions.push(gte(stockEntries.recordedOn, filter.from));
+  if (filter.to) conditions.push(lte(stockEntries.recordedOn, filter.to));
+  return db.select().from(stockEntries).where(and(...conditions)).orderBy(desc(stockEntries.recordedOn));
 }
 
 export async function getStockSnapshot(kilnId: string) {

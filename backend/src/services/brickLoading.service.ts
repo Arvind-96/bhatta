@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
 import { addLedgerEntry } from "./ledger.service";
@@ -310,6 +310,8 @@ export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
 export interface ListBrickLoadingFilter {
   driverId?: string;
   days?: number;
+  from?: Date;
+  to?: Date;
 }
 
 export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickLoadingFilter = {}) {
@@ -320,6 +322,8 @@ export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickL
     since.setDate(since.getDate() - filter.days);
     conditions.push(gte(brickLoadingEntries.date, since));
   }
+  if (filter.from) conditions.push(gte(brickLoadingEntries.date, filter.from));
+  if (filter.to) conditions.push(lte(brickLoadingEntries.date, filter.to));
 
   // Most recent first: `date` is the primary business ordering, but two
   // trips logged the same day sort by actual entry order (createdAt) as a

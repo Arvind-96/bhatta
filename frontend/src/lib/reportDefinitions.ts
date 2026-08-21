@@ -1,0 +1,40 @@
+import type { ReportDefinitionMeta } from "@/types/reports";
+
+// One entry per report type — the only per-report frontend config needed.
+// Table rendering itself is fully generic off the backend's own `columns`;
+// this just tells the filter bar which widgets to show (date range +
+// groupBy are available to every report, so they're not listed here).
+export const REPORT_DEFINITIONS: ReportDefinitionMeta[] = [
+  // Production
+  { key: "soil", group: "production", labelKey: "reports.title.soil", filters: ["person"] },
+  { key: "sand", group: "production", labelKey: "reports.title.sand", filters: ["person"] },
+  { key: "molding", group: "production", labelKey: "reports.title.molding", filters: ["person"] },
+  { key: "stacking", group: "production", labelKey: "reports.title.stacking", filters: ["person"] },
+  { key: "firing", group: "production", labelKey: "reports.title.firing", filters: ["person"] },
+  { key: "nikasi", group: "production", labelKey: "reports.title.nikasi", filters: ["person"] },
+  { key: "brickLoading", group: "production", labelKey: "reports.title.brickLoading", filters: ["driver"] },
+
+  // Trade & Billing
+  { key: "customers", group: "trade", labelKey: "reports.title.customers", filters: ["customer"] },
+  { key: "invoices", group: "trade", labelKey: "reports.title.invoices", filters: ["customer"] },
+  { key: "gatePasses", group: "trade", labelKey: "reports.title.gatePasses", filters: [] },
+  { key: "challans", group: "trade", labelKey: "reports.title.challans", filters: [] },
+  { key: "expenses", group: "trade", labelKey: "reports.title.expenses", filters: ["expenseCategory"] },
+
+  // Resources
+  { key: "vehicles", group: "resources", labelKey: "reports.title.vehicles", filters: ["vehicle"] },
+  { key: "diesel", group: "resources", labelKey: "reports.title.diesel", filters: ["vehicle", "driver"] },
+  { key: "stock", group: "resources", labelKey: "reports.title.stock", filters: [] },
+  { key: "inventory", group: "resources", labelKey: "reports.title.inventory", filters: [] },
+
+  // Admin
+  { key: "labourLedger", group: "admin", labelKey: "reports.title.labourLedger", filters: ["personType", "person"] },
+  { key: "salary", group: "admin", labelKey: "reports.title.salary", filters: ["person"] },
+];
+
+export const REPORT_GROUP_LABEL_KEYS: Record<string, string> = {
+  production: "nav.group.production",
+  trade: "nav.group.trade",
+  resources: "nav.group.resources",
+  admin: "nav.group.admin",
+};

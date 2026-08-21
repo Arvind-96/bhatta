@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { nikasiEntries, people, ledgerEntries, ghers } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
@@ -66,12 +66,16 @@ export async function deleteNikasiEntry(kilnId: string, entryId: string) {
 export interface ListNikasiFilter {
   gherId?: string;
   gangId?: string;
+  from?: Date;
+  to?: Date;
 }
 
 export async function listNikasiEntries(kilnId: string, filter: ListNikasiFilter = {}) {
   const conditions = [eq(nikasiEntries.kilnId, kilnId)];
   if (filter.gherId) conditions.push(eq(nikasiEntries.gherId, filter.gherId));
   if (filter.gangId) conditions.push(eq(nikasiEntries.gangId, filter.gangId));
+  if (filter.from) conditions.push(gte(nikasiEntries.date, filter.from));
+  if (filter.to) conditions.push(lte(nikasiEntries.date, filter.to));
 
   const rows = await db.select().from(nikasiEntries).where(and(...conditions));
   const gangIds = [...new Set(rows.map((r) => r.gangId))];

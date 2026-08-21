@@ -836,3 +836,80 @@ export function printSandContract(contract: SandContract, contractorName: string
   `;
   openPrintWindow(`Sand Contract ${contract.contractNumber}`, body, CONTRACT_ACCENT);
 }
+
+const REPORT_ACCENT = `:root { --doc-accent: #2f6f5e; --doc-accent-soft: #5fa38f; --doc-accent-tint: #eef7f4; }`;
+
+export interface PrintableReportColumn {
+  key: string;
+  label: string;
+  format: "date" | "currency" | "number" | "text";
+}
+
+function formatReportCell(value: string | number | null, format: PrintableReportColumn["format"]) {
+  if (value == null || value === "") return "—";
+  if (format === "date" && typeof value === "string") {
+    return new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  if (format === "currency" && typeof value === "number") return `₹${formatINR(value)}`;
+  if (format === "number" && typeof value === "number") return value.toLocaleString("en-IN");
+  return escapeHtml(String(value));
+}
+
+// A generic tabular report printout — variable columns/rows, unlike every
+// other function in this file which prints one fixed-shape business
+// document. Reuses the same table/box CSS classes as the rest of
+// DOCUMENT_STYLES so it reads as part of the same visual family.
+export function printReportTable(
+  kiln: KilnPrintInfo,
+  title: string,
+  filterSummaryLines: string[],
+  columns: PrintableReportColumn[],
+  rows: Record<string, string | number | null>[],
+  totals?: Record<string, number>
+) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const headerCells = columns.map((c) => `<th${c.format === "currency" || c.format === "number" ? ' class="num"' : ""}>${escapeHtml(c.label)}</th>`).join("");
+  const bodyRows =
+    rows
+      .map((row) => `<tr>${columns.map((c) => `<td${c.format === "currency" || c.format === "number" ? ' class="num"' : ""}>${formatReportCell(row[c.key], c.format)}</td>`).join("")}</tr>`)
+      .join("") || `<tr><td colspan="${columns.length}">No records for this filter.</td></tr>`;
+  const totalsRow = totals
+    ? `<tfoot><tr>${columns
+        .map((c, i) => {
+          if (i === 0) return `<td>Total</td>`;
+          const v = totals[c.key];
+          return `<td class="num">${v != null ? formatReportCell(v, c.format === "text" ? "number" : c.format) : ""}</td>`;
+        })
+        .join("")}</tr></tfoot>`
+    : "";
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Report</span>
+        <p class="doc-number">${escapeHtml(title)}</p>
+        <p class="doc-date">Generated: ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    ${filterSummaryLines.length ? `<p class="doc-summary-line">${filterSummaryLines.map(escapeHtml).join(" &middot; ")}</p>` : ""}
+
+    <table class="doc-items">
+      <thead><tr>${headerCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+      ${totalsRow}
+    </table>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED REPORT ~</p>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(title, body, REPORT_ACCENT);
+}

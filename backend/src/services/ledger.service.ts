@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/client";
-import { ledgerEntries, people, LEDGER_PAYMENT_MODES, LEDGER_CATEGORIES } from "../db/schema";
+import { ledgerEntries, people, LEDGER_PAYMENT_MODES, LEDGER_CATEGORIES, PERSON_TYPES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
 export type LedgerPaymentMode = (typeof LEDGER_PAYMENT_MODES)[number];
@@ -77,6 +77,39 @@ export async function listLedgerForPerson(kilnId: string, personId: string) {
     .from(ledgerEntries)
     .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, personId)))
     .orderBy(desc(ledgerEntries.date));
+}
+
+export interface ListLedgerForKilnFilter {
+  personId?: string;
+  personType?: (typeof PERSON_TYPES)[number];
+  from?: Date;
+  to?: Date;
+}
+
+// Kiln-wide ledger query (contrast with listLedgerForPerson above, which
+// requires a personId) — the direct data source for the Labour/Contractor/
+// Staff report, so the admin can pull "everyone's kharchi this week" as
+// easily as "just this one labourer's."
+export async function listLedgerForKiln(kilnId: string, filter: ListLedgerForKilnFilter = {}) {
+  const conditions = [eq(ledgerEntries.kilnId, kilnId)];
+  if (filter.personId) conditions.push(eq(ledgerEntries.personId, filter.personId));
+  if (filter.from) conditions.push(gte(ledgerEntries.date, filter.from));
+  if (filter.to) conditions.push(lte(ledgerEntries.date, filter.to));
+
+  let personIdsOfType: Set<string> | undefined;
+  if (filter.personType) {
+    const rows = await db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, filter.personType)));
+    personIdsOfType = new Set(rows.map((r) => r._id));
+    if (personIdsOfType.size === 0) return [];
+    conditions.push(inArray(ledgerEntries.personId, Array.from(personIdsOfType)));
+  }
+
+  const rows = await db.select().from(ledgerEntries).where(and(...conditions)).orderBy(desc(ledgerEntries.date));
+  const personIds = [...new Set(rows.map((r) => r.personId))];
+  if (personIds.length === 0) return rows;
+  const peopleRows = await db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, personIds));
+  const personById = new Map(peopleRows.map((p) => [p._id, p]));
+  return rows.map((r) => ({ ...r, personId: personById.get(r.personId) ?? r.personId }));
 }
 
 export async function contractLedgerBalance(kilnId: string, contractId: string) {

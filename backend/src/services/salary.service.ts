@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
 import { randomUUID } from "crypto";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
 import { kilns, people, salarySlips } from "../db/schema";
 import { attendanceSummaryForMonth, MonthAttendanceSummary } from "./attendance.service";
@@ -268,6 +268,30 @@ export async function listSalaryStatus(kilnId: string, month: string) {
     person: { _id: p._id, name: p.name, designation: p.designation ?? p.type, monthlySalary: p.monthlySalary },
     slip: slipByPerson.get(p._id) ?? null,
   }));
+}
+
+export interface ListSalarySlipsForKilnFilter {
+  personId?: string;
+  from?: Date;
+  to?: Date;
+}
+
+// Kiln-wide across every staff member's slips, optionally scoped to one
+// person and/or a month range (month is compared as its first-of-month
+// date, since `month` is stored as a plain "YYYY-MM" string) — contrast
+// with listSalaryStatus above, which is always scoped to exactly one month.
+export async function listSalarySlipsForKiln(kilnId: string, filter: ListSalarySlipsForKilnFilter = {}) {
+  const conditions = [eq(salarySlips.kilnId, kilnId)];
+  if (filter.personId) conditions.push(eq(salarySlips.personId, filter.personId));
+  if (filter.from) conditions.push(gte(salarySlips.month, `${filter.from.getFullYear()}-${String(filter.from.getMonth() + 1).padStart(2, "0")}`));
+  if (filter.to) conditions.push(lte(salarySlips.month, `${filter.to.getFullYear()}-${String(filter.to.getMonth() + 1).padStart(2, "0")}`));
+
+  const rows = await db.select().from(salarySlips).where(and(...conditions)).orderBy(desc(salarySlips.month));
+  const personIds = [...new Set(rows.map((r) => r.personId))];
+  if (personIds.length === 0) return rows;
+  const peopleRows = await db.select({ _id: people._id, name: people.name, designation: people.designation, type: people.type }).from(people).where(inArray(people._id, personIds));
+  const personById = new Map(peopleRows.map((p) => [p._id, p]));
+  return rows.map((r) => ({ ...r, personId: personById.get(r.personId) ?? r.personId }));
 }
 
 export async function listSlipsForPerson(kilnId: string, personId: string) {

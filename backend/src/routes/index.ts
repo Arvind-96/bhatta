@@ -49,6 +49,7 @@ import { paymentReceiptRouter } from "./paymentReceipt.routes";
 import { financialOverviewRouter } from "./financialOverview.routes";
 import { salaryRouter } from "./salary.routes";
 import { compareRouter } from "./compare.routes";
+import { reportsRouter } from "./reports.routes";
 
 export const apiRouter = Router();
 
@@ -104,3 +105,4 @@ apiRouter.use("/payment-receipts", paymentReceiptRouter);
 apiRouter.use("/financial-overview", financialOverviewRouter);
 apiRouter.use("/salary", salaryRouter);
 apiRouter.use("/compare", compareRouter);
+apiRouter.use("/reports", reportsRouter);

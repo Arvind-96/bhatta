@@ -2,12 +2,20 @@ import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { usePersonTypeMeta, useWorkTypeLabels } from "@/components/people/personTypes";
 import { formatINR } from "@/lib/utils";
-import type { Person, PersonFullReport } from "@/types";
+import { ReportRail } from "@/components/reports/ReportRail";
+import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
+import { ReportTable } from "@/components/reports/ReportTable";
+import { REPORT_DEFINITIONS } from "@/lib/reportDefinitions";
+import { printReportTable } from "@/lib/printDocument";
+import { buildReportWorkbookBlob, downloadExcelFile, shareExcelFile } from "@/lib/exportExcel";
+import type { Person, PersonFullReport, Customer, KilnVehicle, ExpenseType } from "@/types";
+import type { ReportResult, ReportRunParams } from "@/types/reports";
 
 const inputClass =
   "h-11 w-full rounded-xl border border-border bg-ink-primary/5 pl-10 pr-3.5 text-sm text-ink-primary outline-none transition-shadow focus:ring-2 focus:ring-series-1";
@@ -34,7 +42,7 @@ function SectionCard({ title, count, children }: { title: string; count?: number
 // actually returned for that person (see report.service.ts — the section
 // list is type/workType-driven, so a customer never shows a "work
 // entries" section and a labourer never shows a "dispatches" section).
-export function Reports() {
+function PersonLookupPanel() {
   const { t } = useTranslation();
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const [allPeople, setAllPeople] = useState<Person[]>([]);
@@ -389,6 +397,192 @@ export function Reports() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// The cross-entity reporting engine: pick any of the 18 report types from
+// the left rail, filter it (date range/preset, groupBy, and whichever
+// entity pickers that report declares), generate it, then view on screen,
+// print, or export to Excel (download or share). Table rendering is fully
+// generic off the backend's own `columns` — see ReportTable.
+function ReportsWorkspace() {
+  const { t } = useTranslation();
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
+
+  const [people, setPeople] = useState<Person[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [vehicles, setVehicles] = useState<KilnVehicle[]>([]);
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
+
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [params, setParams] = useState<ReportRunParams>({});
+  const [result, setResult] = useState<ReportResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    api.people.list().then(setPeople).catch(console.error);
+    api.customers.list().then(setCustomers).catch(console.error);
+    api.kilnVehicles.list().then(setVehicles).catch(console.error);
+    api.expenseTypes.list().then(setExpenseTypes).catch(console.error);
+  }, [activeKilnId]);
+
+  const definition = REPORT_DEFINITIONS.find((d) => d.key === selectedKey);
+
+  function selectReport(key: string) {
+    setSelectedKey(key);
+    setParams({});
+    setResult(null);
+    setError(null);
+  }
+
+  async function generate() {
+    if (!definition) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.reports.run(definition.key, params);
+      setResult(res);
+    } catch (err) {
+      setError((err as Error).message);
+      setResult(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function filterSummaryLines(): string[] {
+    const lines: string[] = [];
+    if (params.from || params.to) lines.push(`${params.from ?? "…"} – ${params.to ?? "…"}`);
+    if (params.groupBy && params.groupBy !== "none") lines.push(t(`reports.groupBy.${params.groupBy}`));
+    return lines;
+  }
+
+  function handlePrint() {
+    if (!result || !definition) return;
+    printReportTable(
+      kilnInfo,
+      t(definition.labelKey),
+      filterSummaryLines(),
+      result.columns.map((c) => ({ key: c.key, label: t(c.labelKey), format: c.format })),
+      result.rows,
+      result.totals
+    );
+  }
+
+  function columnLabels() {
+    if (!result) return {};
+    return Object.fromEntries(result.columns.map((c) => [c.key, t(c.labelKey)]));
+  }
+
+  function handleDownloadExcel() {
+    if (!result || !definition) return;
+    const blob = buildReportWorkbookBlob(result.columns, result.rows, result.totals, columnLabels(), t(definition.labelKey));
+    downloadExcelFile(blob, `${definition.key}-report.xlsx`);
+  }
+
+  async function handleShareExcel() {
+    if (!result || !definition) return;
+    const blob = buildReportWorkbookBlob(result.columns, result.rows, result.totals, columnLabels(), t(definition.labelKey));
+    await shareExcelFile(blob, `${definition.key}-report.xlsx`);
+  }
+
+  return (
+    <div className="flex flex-col gap-4 lg:flex-row">
+      <ReportRail selectedKey={selectedKey} onSelect={selectReport} />
+
+      <div className="min-w-0 flex-1 space-y-4">
+        {!definition && (
+          <Card>
+            <p className="py-10 text-center text-sm text-ink-muted">{t("reports.workspace.selectPrompt")}</p>
+          </Card>
+        )}
+
+        {definition && (
+          <>
+            <ReportFilterBar
+              key={definition.key}
+              definition={definition}
+              params={params}
+              onChange={setParams}
+              onGenerate={generate}
+              loading={loading}
+              people={people}
+              customers={customers}
+              vehicles={vehicles}
+              expenseTypes={expenseTypes}
+            />
+
+            {error && (
+              <Card>
+                <p className="text-sm text-status-critical">{error}</p>
+              </Card>
+            )}
+
+            {loading && (
+              <Card>
+                <p className="py-8 text-center text-sm text-ink-muted">{t("common.loading")}</p>
+              </Card>
+            )}
+
+            {!loading && result && (
+              <Card>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-base font-semibold text-ink-primary">{t(definition.labelKey)}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePrint}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+                    >
+                      {t("reports.action.print")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadExcel}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+                    >
+                      {t("reports.action.downloadExcel")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleShareExcel}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+                    >
+                      {t("reports.action.shareExcel")}
+                    </button>
+                  </div>
+                </div>
+                <ReportTable result={result} />
+              </Card>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function Reports() {
+  const { t } = useTranslation();
+  const [mode, setMode] = useState<"personLookup" | "workspace">("personLookup");
+
+  return (
+    <div className="space-y-4">
+      <SegmentedTabs
+        options={[
+          { value: "personLookup", label: t("reports.tab.personLookup") },
+          { value: "workspace", label: t("reports.tab.workspace") },
+        ]}
+        value={mode}
+        onChange={setMode}
+      />
+      {mode === "personLookup" ? <PersonLookupPanel /> : <ReportsWorkspace />}
     </div>
   );
 }

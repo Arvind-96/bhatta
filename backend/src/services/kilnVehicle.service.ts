@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, desc, eq, gte, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, ne } from "drizzle-orm";
 import { db } from "../db/client";
 import { kilnVehicles, vehicleDieselEntries, people, LEDGER_PAYMENT_MODES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
@@ -118,6 +118,9 @@ export async function updateDieselEntry(kilnId: string, entryId: string, input: 
 export interface ListDieselEntriesFilter {
   days?: number;
   driverId?: string;
+  vehicleId?: string;
+  from?: Date;
+  to?: Date;
 }
 
 export async function listDieselEntries(kilnId: string, filter: ListDieselEntriesFilter = {}) {
@@ -127,7 +130,10 @@ export async function listDieselEntries(kilnId: string, filter: ListDieselEntrie
     since.setDate(since.getDate() - filter.days);
     conditions.push(gte(vehicleDieselEntries.date, since));
   }
+  if (filter.from) conditions.push(gte(vehicleDieselEntries.date, filter.from));
+  if (filter.to) conditions.push(lte(vehicleDieselEntries.date, filter.to));
   if (filter.driverId) conditions.push(eq(vehicleDieselEntries.driverId, filter.driverId));
+  if (filter.vehicleId) conditions.push(eq(vehicleDieselEntries.vehicleId, filter.vehicleId));
   const rows = await db.select().from(vehicleDieselEntries).where(and(...conditions)).orderBy(desc(vehicleDieselEntries.date));
 
   const vehicleIds = [...new Set(rows.map((r) => r.vehicleId))];
@@ -151,6 +157,41 @@ export async function deleteDieselEntry(kilnId: string, entryId: string) {
   await db.delete(vehicleDieselEntries).where(eq(vehicleDieselEntries._id, entryId));
   emitToKiln(kilnId, "vehicleDiesel:update", { _id: entryId, deleted: true });
   return existing;
+}
+
+// Per-vehicle rollup for a date range — the Vehicles report's data source
+// (contrast with listDieselEntries above, which is the Diesel report's raw
+// detail log over the same underlying table).
+export async function vehicleDieselSummary(kilnId: string, filter: { from?: Date; to?: Date } = {}) {
+  const conditions = [eq(vehicleDieselEntries.kilnId, kilnId)];
+  if (filter.from) conditions.push(gte(vehicleDieselEntries.date, filter.from));
+  if (filter.to) conditions.push(lte(vehicleDieselEntries.date, filter.to));
+
+  const [vehicles, entries] = await Promise.all([
+    db.select().from(kilnVehicles).where(eq(kilnVehicles.kilnId, kilnId)).orderBy(asc(kilnVehicles.type), asc(kilnVehicles.name)),
+    db.select().from(vehicleDieselEntries).where(and(...conditions)),
+  ]);
+
+  const entriesByVehicle = new Map<string, typeof entries>();
+  for (const e of entries) {
+    if (!entriesByVehicle.has(e.vehicleId)) entriesByVehicle.set(e.vehicleId, []);
+    entriesByVehicle.get(e.vehicleId)!.push(e);
+  }
+
+  return vehicles.map((v) => {
+    const vEntries = entriesByVehicle.get(v._id) ?? [];
+    const totalLiters = vEntries.reduce((sum, e) => sum + e.quantityLiters, 0);
+    const meterReadings = vEntries.map((e) => e.initialMeterReading).filter((m): m is number => m != null);
+    const distanceCovered = meterReadings.length >= 2 ? Math.max(...meterReadings) - Math.min(...meterReadings) : 0;
+    return {
+      vehicleId: v._id,
+      vehicleName: v.name,
+      vehicleType: v.type,
+      fillUpCount: vEntries.length,
+      totalLiters,
+      distanceCovered,
+    };
+  });
 }
 
 // The Stock page's diesel-usage-at-a-glance — how much diesel went into
