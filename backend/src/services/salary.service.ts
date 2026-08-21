@@ -19,16 +19,29 @@ function monthDateRange(year: number, month: number) {
   return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59, 999) };
 }
 
-// The Salary module's population: exactly who the Staff page/attendance
-// roster manages (MUNIM/CHOWKIDAR, plus office-flagged HELPER/DRIVER) —
-// NOT "anyone with monthlySalary set", which used to also sweep in
-// salaried Labour Contractors/Fitters that belong to (and are already
-// tracked from) the People page's own Labour/Thekedar tabs instead. Same
-// rule as attendance.service.ts's listAttendanceRoster, kept in sync
-// deliberately so "who gets a salary slip" and "who's on the daily
-// attendance roster" never drift apart.
+// The Salary module's population: exactly who the Staff page (Staff.tsx)
+// itself lists — MUNIM/CHOWKIDAR, office-flagged HELPER, every DRIVER, and
+// the types folded in from the removed People > Other tab (SUPPLIER/
+// PARTNER/FITTER/CUSTOMER) — NOT "anyone with monthlySalary set" (which
+// used to also sweep in salaried Labour Contractors/Thekedars/piece-rate
+// Workers, who belong to the People page's own Labour/Thekedar tabs and
+// are paid via the ledger/WorkEntry system, not "Salary"). Kept in sync
+// with Staff.tsx's own fetch list deliberately — every type shown there
+// must stay eligible here too, or a salaried person visible on the Staff
+// page silently stops receiving automatic monthly payroll (this
+// previously happened when this rule was scoped to the older, narrower
+// attendance-roster definition instead of Staff.tsx's actual population).
 function isStaffPerson(person: { type: string; isOfficeStaff?: boolean | null }) {
-  return person.type === "MUNIM" || person.type === "CHOWKIDAR" || ((person.type === "HELPER" || person.type === "DRIVER") && !!person.isOfficeStaff);
+  return (
+    person.type === "MUNIM" ||
+    person.type === "CHOWKIDAR" ||
+    (person.type === "HELPER" && !!person.isOfficeStaff) ||
+    person.type === "DRIVER" ||
+    person.type === "SUPPLIER" ||
+    person.type === "PARTNER" ||
+    person.type === "FITTER" ||
+    person.type === "CUSTOMER"
+  );
 }
 
 // Absent/Half-day reduce pay proportionally against the monthly rate; Late

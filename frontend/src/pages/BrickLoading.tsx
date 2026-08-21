@@ -7,7 +7,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { EditBrickLoadingEntryModal } from "@/components/dispatch/EditBrickLoadingEntryModal";
-import { BrickLineItemsEditor, emptyLineItemRow, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { BrickLoadingTripDetailPage } from "@/components/dispatch/BrickLoadingTripDetailPage";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
@@ -188,7 +188,7 @@ export function BrickLoading() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const validItems = form.items.filter((row) => row.categoryId && row.bricksCount);
+    const validItems = form.items.filter(isValidLineItemRow);
     if (
       !form.customerName ||
       !form.customerPhone ||

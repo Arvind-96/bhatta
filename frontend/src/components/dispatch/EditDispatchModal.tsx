@@ -6,7 +6,7 @@ import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
-import { BrickLineItemsEditor, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, PaymentMode, Person } from "@/types";
 
 const inputClass =
@@ -69,7 +69,7 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
     if (customer) setCustomerName(customer.name);
   }
 
-  const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+  const validItems = items.filter(isValidLineItemRow);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

@@ -10,7 +10,7 @@ import { printInvoiceRecord } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { formatINR } from "@/lib/utils";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
-import { BrickLineItemsEditor, emptyLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, Customer, Dispatch as DispatchEntry, Invoice, PaymentMode } from "@/types";
 
 const inputClass =
@@ -136,7 +136,7 @@ export function CreateInvoiceForm({
     };
   }, [selectedCustomerId, existing]);
 
-  const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+  const validItems = items.filter(isValidLineItemRow);
   const bricksCount = validItems.reduce((sum, row) => sum + (Number(row.bricksCount) || 0), 0);
   const gross = validItems.reduce((sum, row) => sum + (Number(row.bricksCount) || 0) * (Number(row.pricePerBrick) || 0), 0);
   const net = Math.max(0, gross - (Number(discountAmount) || 0));

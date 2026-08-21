@@ -19,6 +19,18 @@ export function emptyLineItemRow(): LineItemRow {
   return { categoryId: "", bricksCount: "", pricePerBrick: "" };
 }
 
+// A row is only submittable once it has a category AND a bricksCount that
+// parses to a positive number — checked with Number(...) > 0 rather than
+// a bare truthy check on the string, since `"0"` is a non-empty (truthy)
+// string that would otherwise pass a plain `row.bricksCount` check and
+// only get rejected later by the backend's `positive()` validation,
+// turning a catchable input mistake into a confusing failed save. Shared
+// by every form/modal that submits a `LineItemRow[]` so the same rule
+// can't drift between them.
+export function isValidLineItemRow(row: LineItemRow): boolean {
+  return !!row.categoryId && Number(row.bricksCount) > 0;
+}
+
 // Seeds row state from any record carrying the new `items` array — falling
 // back to the pre-existing single categoryId/bricksCount/pricePerBrick
 // scalars for a record created before this feature. Shared by every form
@@ -75,8 +87,14 @@ export function BrickLineItemsEditor({ items, onChange, categories, pricingEnabl
     return category.grade ? `${category.category} (${category.grade})` : category.category;
   }
 
-  const totalBricks = items.reduce((sum, row) => sum + (Number(row.bricksCount) || 0), 0);
-  const totalAmount = items.reduce((sum, row) => sum + (Number(row.bricksCount) || 0) * (Number(row.pricePerBrick) || 0), 0);
+  // Filtered to the same "actually submittable" rows every consuming form
+  // uses (isValidLineItemRow) — a half-filled row (category picked but no
+  // quantity yet, or vice versa) is excluded here so this footer never
+  // shows a different total than what a form's own separate "Total
+  // Amount"/net display computes from the same `items` array.
+  const validRows = items.filter(isValidLineItemRow);
+  const totalBricks = validRows.reduce((sum, row) => sum + (Number(row.bricksCount) || 0), 0);
+  const totalAmount = validRows.reduce((sum, row) => sum + (Number(row.bricksCount) || 0) * (Number(row.pricePerBrick) || 0), 0);
 
   if (readOnly) {
     return (

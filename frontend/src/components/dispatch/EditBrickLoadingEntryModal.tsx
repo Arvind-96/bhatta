@@ -6,7 +6,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR } from "@/lib/utils";
-import { BrickLineItemsEditor, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, BrickLoadingEntry } from "@/types";
 
 const inputClass =
@@ -55,7 +55,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+    const validItems = items.filter(isValidLineItemRow);
     if (validItems.length === 0) return;
     setSaving(true);
     try {

@@ -369,7 +369,15 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
   const itemRows = `
     ${rows
       .map((r, i) => {
-        const rowAmount = r.amount ?? (r.pricePerBrick != null ? r.bricksCount * r.pricePerBrick : gross);
+        // Falls back to 0 (not `gross`) when a row has neither a stored
+        // `amount` nor its own `pricePerBrick` — that only happens for a
+        // genuinely price-less row within a real multi-item array (the
+        // admin left that category's price blank), where `gross` would
+        // wrongly duplicate the whole invoice's total onto one row. The
+        // legitimate single-legacy-row case never hits this branch: its
+        // `amount` is already set to `gross` by resolveItemRows's own
+        // fallback parameter above.
+        const rowAmount = r.amount ?? (r.pricePerBrick != null ? r.bricksCount * r.pricePerBrick : 0);
         return `
     <tr>
       <td>${String(i + 1).padStart(2, "0")}</td>

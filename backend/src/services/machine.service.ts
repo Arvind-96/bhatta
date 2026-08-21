@@ -85,14 +85,22 @@ export interface UpdateMachineInput {
   active?: boolean;
 }
 
-// Never touches totalPaid/remainingDue directly (those only ever move via
-// the initial purchase payment and createInstallmentPayment below) — this
-// is for correcting the machine's own descriptive/purchase-info fields, or
+// Never touches totalPaid directly (that only ever moves via the initial
+// purchase payment and createInstallmentPayment below) — this is for
+// correcting the machine's own descriptive/purchase-info fields, or
 // soft-deleting it (active: false), matching the same soft-delete
-// convention `people`/salary slips use elsewhere.
+// convention `people`/salary slips use elsewhere. `remainingDue` IS
+// recomputed here when `price` changes, though — otherwise a later price
+// correction (e.g. a data-entry fix) would leave remainingDue silently
+// stale against the new price until the next installment payment happened
+// to touch it.
 export async function updateMachine(kilnId: string, machineId: string, input: UpdateMachineInput) {
-  await assertMachineInKiln(kilnId, machineId);
-  await db.update(machines).set(input).where(eq(machines._id, machineId));
+  const existing = await assertMachineInKiln(kilnId, machineId);
+  const patch: UpdateMachineInput & { remainingDue?: number } = { ...input };
+  if (input.price !== undefined) {
+    patch.remainingDue = Math.max(0, input.price - (existing.totalPaid ?? 0));
+  }
+  await db.update(machines).set(patch).where(eq(machines._id, machineId));
   const updated = (await db.select().from(machines).where(eq(machines._id, machineId)))[0]!;
   emitToKiln(kilnId, "machine:update", updated);
   return updated;

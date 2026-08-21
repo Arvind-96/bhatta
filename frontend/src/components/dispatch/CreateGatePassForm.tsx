@@ -8,7 +8,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { printGatePassRecord } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
-import { BrickLineItemsEditor, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, Dispatch as DispatchEntry, GatePassRecord } from "@/types";
 
 const inputClass =
@@ -54,7 +54,7 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const validItems = items.filter((row) => row.categoryId && row.bricksCount);
+    const validItems = items.filter(isValidLineItemRow);
     if (validItems.length === 0) return;
     setSaving(true);
     try {

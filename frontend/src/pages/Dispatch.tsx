@@ -15,7 +15,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import { DispatchDetailPage } from "@/components/dispatch/DispatchDetailPage";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
-import { BrickLineItemsEditor, emptyLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, PaymentMode, Person } from "@/types";
 
 const inputClass =
@@ -225,7 +225,7 @@ export function Dispatch() {
         items: tripLocked
           ? undefined
           : form.items
-              .filter((row) => row.categoryId && row.bricksCount)
+              .filter(isValidLineItemRow)
               .map((row) => ({
                 categoryId: row.categoryId,
                 bricksCount: Number(row.bricksCount),

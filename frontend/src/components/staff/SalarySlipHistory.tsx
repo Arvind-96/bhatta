@@ -67,7 +67,11 @@ export function SalarySlipHistory({ personId, ledgerEntries }: SalarySlipHistory
   useKilnEvent("salary:update", () => refreshSlips());
   useKilnEvent("attendance:update", () => refreshAttendance());
 
-  const daysPresent = days.filter((d) => d.status !== "ABSENT").length;
+  // Matches attendance.service.ts's attendanceSummaryForMonth exactly
+  // (PRESENT/LATE count as present, HALF_DAY is its own separate bucket,
+  // counted in neither) — so this live preview never disagrees with the
+  // numbers the slip itself shows once generated.
+  const daysPresent = days.filter((d) => d.status === "PRESENT" || d.status === "LATE").length;
   const daysAbsent = days.filter((d) => d.status === "ABSENT").length;
   const advanceThisMonth = ledgerEntries
     .filter((e) => e.direction === "PAID" && e.category === "ADVANCE" && e.date.slice(0, 7) === cursorMonth)
