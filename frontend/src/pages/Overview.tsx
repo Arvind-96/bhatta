@@ -195,6 +195,7 @@ function SeasonSummaryCard() {
   useKilnEvent("dispatch:update", () => refresh());
   useKilnEvent("expense:update", () => refresh());
   useKilnEvent("ledger:update", () => refresh());
+  useKilnEvent("invoice:update", () => refresh());
 
   if (!summary) return null;
 
