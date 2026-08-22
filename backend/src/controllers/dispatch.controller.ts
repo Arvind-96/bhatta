@@ -92,10 +92,14 @@ const updateSchema = z
   .object({
     customerName: z.string().optional(),
     customerId: z.string().nullable().optional(),
+    customerAddress: z.string().optional(),
+    customerPhone: z.string().optional(),
     grade: z.enum(BRICK_GRADES).optional(),
     bricksCount: z.number().int().positive().optional(),
     amount: z.number().positive().optional(),
     driverId: z.string().nullable().optional(),
+    driverName: z.string().optional(),
+    driverPhone: z.string().optional(),
     transportCost: z.number().min(0).optional(),
     transportPaidBy: z.enum(["OWNER", "CUSTOMER"]).optional(),
     paymentMode: z.enum(PAYMENT_MODES).optional(),
@@ -108,6 +112,8 @@ const updateSchema = z
     driverTipAmount: z.number().min(0).optional(),
     discountAmount: z.number().min(0).optional(),
     placeOfSupply: z.string().optional(),
+    notes: z.string().optional(),
+    dispatchedOn: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.amount === undefined) return;
@@ -163,7 +169,10 @@ export async function adjustment(req: AuthedRequest, res: Response) {
 
 export async function update(req: AuthedRequest, res: Response) {
   const input = updateSchema.parse(req.body);
-  const dispatch = await updateDispatch(req.kiln!.id, req.params.id, input);
+  const dispatch = await updateDispatch(req.kiln!.id, req.params.id, {
+    ...input,
+    dispatchedOn: input.dispatchedOn ? new Date(input.dispatchedOn) : undefined,
+  });
   res.json(dispatch);
 }
 

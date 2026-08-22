@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -23,46 +24,54 @@ interface EditDispatchModalProps {
 // it, so one modal is correct rather than three. Never rewrites the
 // original ledger DUE or stock deduction; the backend posts a correction
 // for exactly the delta instead (see dispatch.service.ts:updateDispatch),
-// same convention as EditPaymentReceiptModal.
+// same convention as EditPaymentReceiptModal. Field set mirrors the Log
+// Dispatch create form (Dispatch.tsx) exactly — driverName/driverPhone are
+// free text there (not a driverId picker), so this matches rather than
+// falling back to the older Person-linked driver select.
 export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchModalProps) {
   const { t } = useTranslation();
   const [customers, setCustomers] = useState<Person[]>([]);
-  const [drivers, setDrivers] = useState<Person[]>([]);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
 
   const initialCustomerId = typeof dispatch.customerId === "object" ? dispatch.customerId?._id ?? "" : dispatch.customerId ?? "";
-  const initialDriverId = typeof dispatch.driverId === "object" ? dispatch.driverId?._id ?? "" : dispatch.driverId ?? "";
   const grossAmount = dispatch.amount + (dispatch.discountAmount ?? 0);
 
   const [customerId, setCustomerId] = useState(initialCustomerId);
   const [customerName, setCustomerName] = useState(dispatch.customerName);
+  const [customerAddress, setCustomerAddress] = useState(dispatch.customerAddress ?? "");
+  const [customerPhone, setCustomerPhone] = useState(dispatch.customerPhone ?? "");
   const [grade, setGrade] = useState<BrickGrade>(dispatch.grade);
   const [items, setItems] = useState<LineItemRow[]>(lineItemRowsFrom(dispatch));
   const [amount, setAmount] = useState(String(grossAmount));
   const [discountAmount, setDiscountAmount] = useState(dispatch.discountAmount ? String(dispatch.discountAmount) : "");
-  const [driverId, setDriverId] = useState(initialDriverId);
+  const [driverName, setDriverName] = useState(dispatch.driverName ?? "");
+  const [driverPhone, setDriverPhone] = useState(dispatch.driverPhone ?? "");
   const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ?? "");
   const [vehicleType, setVehicleType] = useState(dispatch.vehicleType ?? "");
   const [driverTipAmount, setDriverTipAmount] = useState(dispatch.driverTipAmount ? String(dispatch.driverTipAmount) : "");
   const [transportCost, setTransportCost] = useState(dispatch.transportCost ? String(dispatch.transportCost) : "");
   const [transportPaidBy, setTransportPaidBy] = useState<"OWNER" | "CUSTOMER">(dispatch.transportPaidBy ?? "OWNER");
+  const [placeOfSupply, setPlaceOfSupply] = useState(dispatch.placeOfSupply ?? "");
+  const [notes, setNotes] = useState(dispatch.notes ?? "");
+  const [dispatchedOn, setDispatchedOn] = useState((dispatch.dispatchedOn ?? "").slice(0, 10));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    Promise.all([api.people.list("CUSTOMER"), api.people.list("DRIVER"), api.brickCategories.list()]).then(
-      ([customerData, driverData, categoryData]) => {
-        setCustomers(customerData);
-        setDrivers(driverData);
-        setCategories(categoryData);
-      }
-    );
+    Promise.all([api.people.list("CUSTOMER"), api.brickCategories.list()]).then(([customerData, categoryData]) => {
+      setCustomers(customerData);
+      setCategories(categoryData);
+    });
   }, []);
 
   function handleCustomerSelect(id: string) {
     const customer = customers.find((c) => c._id === id);
     setCustomerId(id);
-    if (customer) setCustomerName(customer.name);
+    if (customer) {
+      setCustomerName(customer.name);
+      setCustomerPhone(customer.phone ?? customerPhone);
+      setCustomerAddress(customer.address ?? customerAddress);
+    }
   }
 
   const validItems = items.filter(isValidLineItemRow);
@@ -80,6 +89,8 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
       await api.dispatch.update(dispatch._id, {
         customerName,
         customerId: customerId || null,
+        customerAddress: customerAddress || undefined,
+        customerPhone: customerPhone || undefined,
         grade,
         items: validItems.map((row) => ({
           categoryId: row.categoryId,
@@ -88,12 +99,16 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
         })),
         amount: Number(amount),
         discountAmount: discountAmount ? Number(discountAmount) : 0,
-        driverId: driverId || null,
+        driverName: driverName || undefined,
+        driverPhone: driverPhone || undefined,
         vehicleNumber: vehicleNumber || undefined,
         vehicleType: vehicleType || undefined,
         driverTipAmount: driverTipAmount ? Number(driverTipAmount) : undefined,
         transportCost: transportCost ? Number(transportCost) : undefined,
         transportPaidBy: transportCost ? transportPaidBy : undefined,
+        placeOfSupply: placeOfSupply || undefined,
+        notes: notes || undefined,
+        dispatchedOn: dispatchedOn || undefined,
       });
       onSaved();
       onClose();
@@ -136,6 +151,18 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
             }}
             className={inputClass}
           />
+          <input
+            placeholder={t("dispatch.clientPhonePlaceholder")}
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+            className={inputClass}
+          />
+          <input
+            placeholder={t("dispatch.clientAddressPlaceholder")}
+            value={customerAddress}
+            onChange={(e) => setCustomerAddress(e.target.value)}
+            className={inputClass}
+          />
           <select value={grade} onChange={(e) => setGrade(e.target.value as BrickGrade)} className={inputClass}>
             <option value="A1">{t("dispatch.gradeA1")}</option>
             <option value="JHAMA">{t("dispatch.gradeJhama")}</option>
@@ -165,14 +192,18 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
               <span className="font-semibold text-ink-primary">₹{formatINR(Math.max(0, Number(amount) - Number(discountAmount)))}</span>
             </p>
           )}
-          <select value={driverId} onChange={(e) => setDriverId(e.target.value)} className={inputClass}>
-            <option value="">{t("dispatch.driverOptional")}</option>
-            {drivers.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name} {d.vehicleNumber ? `— ${d.vehicleNumber}` : ""}
-              </option>
-            ))}
-          </select>
+          <input
+            placeholder={t("dispatch.driverNamePlaceholder")}
+            value={driverName}
+            onChange={(e) => setDriverName(e.target.value)}
+            className={inputClass}
+          />
+          <input
+            placeholder={t("dispatch.driverPhonePlaceholder")}
+            value={driverPhone}
+            onChange={(e) => setDriverPhone(e.target.value)}
+            className={inputClass}
+          />
           <input
             placeholder={t("dispatch.driverTipPlaceholder")}
             type="number"
@@ -191,6 +222,16 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
             <option value="TRUCK">{t("brickLoading.truck")}</option>
             <option value="TRACTOR">{t("brickLoading.tractor")}</option>
           </select>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("common.transactionDate")}</span>
+            <DateInput required value={dispatchedOn} onChange={(e) => setDispatchedOn(e.target.value)} className={inputClass} />
+          </label>
+          <input
+            placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")}
+            value={placeOfSupply}
+            onChange={(e) => setPlaceOfSupply(e.target.value)}
+            className={inputClass}
+          />
           <input
             type="number"
             placeholder={t("dispatch.transportCostPlaceholder")}
@@ -208,6 +249,12 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
               <option value="CUSTOMER">{t("dispatch.transportPaidByCustomer")}</option>
             </select>
           )}
+          <input
+            placeholder={t("dispatch.notesPlaceholder")}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+          />
           {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
           <Button type="submit" disabled={saving} className="col-span-2">
             {t("common.saveChanges")}

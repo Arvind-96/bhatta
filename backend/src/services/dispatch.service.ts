@@ -370,11 +370,15 @@ export async function recordDeliveryAdjustment(kilnId: string, dispatchId: strin
 export interface UpdateDispatchInput {
   customerName?: string;
   customerId?: string | null;
+  customerAddress?: string;
+  customerPhone?: string;
   grade?: BrickGrade;
   bricksCount?: number;
   amount?: number;
   discountAmount?: number;
   driverId?: string | null;
+  driverName?: string;
+  driverPhone?: string;
   transportCost?: number;
   transportPaidBy?: "OWNER" | "CUSTOMER";
   paymentMode?: PaymentMode;
@@ -389,6 +393,8 @@ export interface UpdateDispatchInput {
   vehicleType?: string;
   driverTipAmount?: number;
   placeOfSupply?: string;
+  notes?: string;
+  dispatchedOn?: Date;
 }
 
 // Corrects a dispatch after the fact (wrong customer, wrong amount, wrong
@@ -411,9 +417,10 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
 
   const patch: Record<string, unknown> = {};
   for (const key of [
-    "customerName", "grade", "driverId", "transportCost", "transportPaidBy",
+    "customerName", "customerAddress", "customerPhone", "grade", "driverId",
+    "driverName", "driverPhone", "transportCost", "transportPaidBy",
     "paymentMode", "cashAmount", "onlineAmount", "categoryId", "vehicleNumber",
-    "vehicleType", "driverTipAmount", "placeOfSupply",
+    "vehicleType", "driverTipAmount", "placeOfSupply", "notes", "dispatchedOn",
   ] as const) {
     if (input[key] !== undefined) patch[key] = input[key];
   }

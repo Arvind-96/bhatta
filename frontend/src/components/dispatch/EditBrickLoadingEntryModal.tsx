@@ -44,10 +44,10 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   );
   const [date, setDate] = useState(entry.date.slice(0, 10));
   const [unloadingDate, setUnloadingDate] = useState(entry.unloadingDate ? entry.unloadingDate.slice(0, 10) : "");
+  const [placeOfSupply, setPlaceOfSupply] = useState(entry.placeOfSupply ?? "");
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
   const { t } = useTranslation();
-  const hasDriver = !!entry.driverId;
 
   useEffect(() => {
     api.brickCategories.list().then(setCategories).catch(console.error);
@@ -74,9 +74,10 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
         unloadedBricksCount: unloadedBricksCount ? Number(unloadedBricksCount) : undefined,
         loadingRatePerThousand: loadingRatePerThousand ? Number(loadingRatePerThousand) : undefined,
         unloadingRatePerThousand: unloadingRatePerThousand ? Number(unloadingRatePerThousand) : undefined,
-        ...(hasDriver ? { tipAmount: tipAmount ? Number(tipAmount) : 0 } : {}),
+        tipAmount: tipAmount ? Number(tipAmount) : 0,
         date: date || undefined,
         unloadingDate: unloadingDate || undefined,
+        placeOfSupply: placeOfSupply || undefined,
         notes: notes || undefined,
       });
       onSaved();
@@ -121,6 +122,12 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 onChange={(e) => setCustomerAddress(e.target.value)}
                 className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
               />
+              <input
+                placeholder={t("dispatchDocs.placeOfSupplyPlaceholder")}
+                value={placeOfSupply}
+                onChange={(e) => setPlaceOfSupply(e.target.value)}
+                className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+              />
             </div>
           </div>
 
@@ -139,15 +146,13 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 onChange={(e) => setDriverPhone(e.target.value)}
                 className={inputClass}
               />
-              {hasDriver && (
-                <input
-                  type="number"
-                  placeholder={t("brickLoading.driverRewardPlaceholder")}
-                  value={tipAmount}
-                  onChange={(e) => setTipAmount(e.target.value)}
-                  className={inputClass}
-                />
-              )}
+              <input
+                type="number"
+                placeholder={t("brickLoading.driverRewardPlaceholder")}
+                value={tipAmount}
+                onChange={(e) => setTipAmount(e.target.value)}
+                className={inputClass}
+              />
             </div>
           </div>
 

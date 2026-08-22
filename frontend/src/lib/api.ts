@@ -246,11 +246,15 @@ export const api = {
       input: Partial<{
         customerName: string;
         customerId: string | null;
+        customerAddress: string;
+        customerPhone: string;
         grade: BrickGrade;
         bricksCount: number;
         amount: number;
         items: LineItemInput[];
         driverId: string | null;
+        driverName: string;
+        driverPhone: string;
         transportCost: number;
         transportPaidBy: "OWNER" | "CUSTOMER";
         paymentMode: PaymentMode;
@@ -262,6 +266,8 @@ export const api = {
         driverTipAmount: number;
         discountAmount: number;
         placeOfSupply: string;
+        notes: string;
+        dispatchedOn: string;
       }>
     ) => patch<Dispatch>(`/dispatch/${id}`, input, true),
     remove: (id: string) => del<void>(`/dispatch/${id}`, true),

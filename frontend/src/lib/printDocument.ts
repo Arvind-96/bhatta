@@ -523,6 +523,25 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
       </div>
     </div>
 
+    <table class="doc-table">
+      ${invoice.vehicleNumber ? `<tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(invoice.vehicleNumber)}</td></tr>` : ""}
+      ${invoice.paymentMode ? `<tr><td class="doc-table-label">Payment mode</td><td class="doc-table-value">${escapeHtml(paymentModeLabel(invoice))}</td></tr>` : ""}
+      <tr><td class="doc-table-label">Amount paying now</td><td class="doc-table-value">₹${formatINR(amountPaidNow)}</td></tr>
+      ${
+        remainingOnThisInvoice > 0
+          ? `<tr><td class="doc-table-label">Remaining on this invoice</td><td class="doc-table-value">₹${formatINR(remainingOnThisInvoice)}</td></tr>`
+          : ""
+      }
+      ${
+        customerOverallDue != null && customerOverallDue > 0
+          ? `<tr><td class="doc-table-label">Customer's overall remaining due</td><td class="doc-table-value">₹${formatINR(customerOverallDue)}</td></tr>`
+          : ""
+      }
+      ${invoice.placeOfSupply ? `<tr><td class="doc-table-label">Place of supply</td><td class="doc-table-value">${escapeHtml(invoice.placeOfSupply)}</td></tr>` : ""}
+    </table>
+
+    ${invoice.notes ? `<table class="doc-table"><tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(invoice.notes)}</td></tr></table>` : ""}
+
     <table class="doc-items">
       <thead>
         <tr><th>#</th><th>Item Details</th><th>Price/Unit</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Total</th></tr>
@@ -544,25 +563,6 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
       <p class="doc-footer-words">${escapeHtml(amountInWords(invoice.netAmount))}</p>
     </div>`
     }
-
-    <table class="doc-table">
-      ${invoice.vehicleNumber ? `<tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(invoice.vehicleNumber)}</td></tr>` : ""}
-      ${invoice.paymentMode ? `<tr><td class="doc-table-label">Payment mode</td><td class="doc-table-value">${escapeHtml(paymentModeLabel(invoice))}</td></tr>` : ""}
-      <tr><td class="doc-table-label">Amount paying now</td><td class="doc-table-value">₹${formatINR(amountPaidNow)}</td></tr>
-      ${
-        remainingOnThisInvoice > 0
-          ? `<tr><td class="doc-table-label">Remaining on this invoice</td><td class="doc-table-value">₹${formatINR(remainingOnThisInvoice)}</td></tr>`
-          : ""
-      }
-      ${
-        customerOverallDue != null && customerOverallDue > 0
-          ? `<tr><td class="doc-table-label">Customer's overall remaining due</td><td class="doc-table-value">₹${formatINR(customerOverallDue)}</td></tr>`
-          : ""
-      }
-      ${invoice.placeOfSupply ? `<tr><td class="doc-table-label">Place of supply</td><td class="doc-table-value">${escapeHtml(invoice.placeOfSupply)}</td></tr>` : ""}
-    </table>
-
-    ${invoice.notes ? `<table class="doc-table"><tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(invoice.notes)}</td></tr></table>` : ""}
 
     ${
       hasGst
