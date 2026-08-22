@@ -22,6 +22,11 @@ export const dispatchDocumentsDict: Record<string, Record<Locale, string>> = {
   "dispatchDocs.saveAndReprintInvoice": { en: "Save & reprint invoice", hi: "इनवॉइस सहेजें व दोबारा प्रिंट करें" },
   "dispatchDocs.gstNumberPlaceholder": { en: "GST number (optional)", hi: "जीएसटी नंबर (वैकल्पिक)" },
   "dispatchDocs.customerStateCodePlaceholder": { en: "Customer State Code (e.g. RJ-08)", hi: "ग्राहक स्टेट कोड (जैसे RJ-08)" },
+  "dispatchDocs.adminStateCodeLabel": { en: "Your (Bhatta's) State Code", hi: "आपका (भट्ठे का) स्टेट कोड" },
+  "dispatchDocs.adminStateCodeMissing": {
+    en: "Not set — add it in Settings to show it on the printed invoice.",
+    hi: "सेट नहीं है — प्रिंट किए गए इनवॉइस पर दिखाने के लिए इसे सेटिंग्स में जोड़ें।",
+  },
   "dispatchDocs.gstDetailsSection": { en: "GST Details", hi: "जीएसटी विवरण" },
   "dispatchDocs.gstDetailsHint": {
     en: "Optional — leave blank for a plain invoice with no tax breakdown. Set a rate to show CGST/SGST or IGST on the printed invoice.",

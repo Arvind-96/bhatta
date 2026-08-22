@@ -280,6 +280,17 @@ export function CreateInvoiceForm({
         <input placeholder={t("dispatchDocs.customerStateCodePlaceholder")} value={customerStateCode} onChange={(e) => setCustomerStateCode(e.target.value)} className={inputClass} />
         <input placeholder={t("dispatch.vehicleNumberPlaceholder")} value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className={inputClass} />
 
+        {/* Read-only — set once in Settings, auto-fetched onto every new
+            invoice from there (see kilnInfo.stateCode above) and printed
+            in the header next to the GSTIN. Shown here so the admin can
+            see/confirm it's actually configured before printing. */}
+        <div className="col-span-2 flex items-center justify-between rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
+          <span className="text-xs text-ink-muted">{t("dispatchDocs.adminStateCodeLabel")}</span>
+          <span className={activeKiln?.stateCode ? "text-sm font-semibold text-ink-primary" : "text-xs text-status-warning"}>
+            {activeKiln?.stateCode || t("dispatchDocs.adminStateCodeMissing")}
+          </span>
+        </div>
+
         {!existing && selectedCustomerId && customerCurrentDue != null && (
           <div className="col-span-2 grid grid-cols-2 gap-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
             <div className="text-center">
