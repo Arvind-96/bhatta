@@ -113,8 +113,17 @@ export interface KilnPrintInfo {
 // distinct accent while sharing every other rule.
 const DOCUMENT_STYLES = `
   @page { margin: 10mm 11mm; }
-  .doc-topbar, .doc-bottombar { height: 6px; background: linear-gradient(90deg, var(--doc-accent), var(--doc-accent-soft)); margin: -32px -32px 14px; }
-  .doc-bottombar { margin: 16px -32px -32px; }
+  /* Deliberately NOT bled past the page edge with a negative margin —
+     that trick assumed a specific print margin, but the browser's own
+     print dialog (margin: "None"/"Minimum"/"Default", entirely outside
+     this app's control) can override @page, and with a zero print
+     margin a negative margin here has nothing left to bleed into: it
+     pushes this bar (and the header right after it) above the visible
+     page entirely, cutting off the top of the invoice. A plain
+     same-width bar inside the normal content flow can never do that,
+     regardless of what margin the user's browser ends up printing with. */
+  .doc-topbar, .doc-bottombar { height: 6px; background: linear-gradient(90deg, var(--doc-accent), var(--doc-accent-soft)); margin: 0 0 14px; border-radius: 3px; }
+  .doc-bottombar { margin: 16px 0 0; }
   .doc-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   .doc-brand { display: flex; gap: 10px; align-items: flex-start; }
   .doc-logo { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; background: var(--doc-accent); color: #fff; font-weight: 800; font-size: 17px; flex-shrink: 0; box-shadow: 0 2px 6px color-mix(in srgb, var(--doc-accent) 45%, transparent); }
@@ -134,9 +143,14 @@ const DOCUMENT_STYLES = `
   .doc-total-label { font-size: 12.5px; color: #444; margin: 0; }
   .doc-total-amount { font-size: 22px; font-weight: 800; margin: 2px 0; color: var(--doc-accent); }
   .doc-amount-words { font-size: 11.5px; font-style: italic; color: #666; margin: 0; }
-  .doc-stamp { position: absolute; top: -10px; left: -12px; width: 60px; height: 60px; border-radius: 50%; border: 2.5px dashed; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotate(-14deg); font-weight: 800; text-align: center; line-height: 1.1; }
-  .doc-stamp span:first-child { font-size: 7px; letter-spacing: 0.5px; }
-  .doc-stamp span:last-child { font-size: 10px; }
+  /* A classic two-ring rubber-stamp look (Invoice only — see printChallan/
+     GatePassRecord, which no longer render one at all) — an outer solid
+     ring plus a second outline ring with a gap, currentColor throughout so
+     the three status variants below only need to set border/outline/text
+     color once each. */
+  .doc-stamp { position: absolute; top: -14px; left: -16px; width: 70px; height: 70px; border-radius: 50%; border: 2px solid; outline: 1.25px solid; outline-offset: 3px; outline-color: currentColor; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; transform: rotate(-12deg); font-weight: 800; text-align: center; line-height: 1.15; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }
+  .doc-stamp span:first-child { font-size: 7.5px; letter-spacing: 0.6px; text-transform: uppercase; }
+  .doc-stamp span:last-child { font-size: 12px; letter-spacing: 0.8px; text-transform: uppercase; }
   .doc-stamp-paid { border-color: #1f8a4c; color: #1f8a4c; }
   .doc-stamp-partial { border-color: #b8860b; color: #b8860b; }
   .doc-stamp-due { border-color: #c0392b; color: #c0392b; }
@@ -279,7 +293,6 @@ export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, catego
         <p class="doc-box-detail">Phone: ${escapeHtml(challan.customerPhone || "—")}</p>
       </div>
       <div class="doc-totalbox">
-        ${stampHtml(paymentStamp)}
         <p class="doc-total-label">Bricks</p>
         <p class="doc-total-amount">${challan.bricksCount.toLocaleString("en-IN")}</p>
         <p class="doc-amount-words">${escapeHtml(categoryLabel)}</p>
@@ -349,7 +362,6 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
         <p class="doc-box-name">${escapeHtml(gatePass.customerName)}</p>
       </div>
       <div class="doc-totalbox">
-        ${stampHtml(paymentStamp)}
         <p class="doc-total-label">Bricks loaded</p>
         <p class="doc-total-amount">${gatePass.bricksCount.toLocaleString("en-IN")}</p>
         <p class="doc-amount-words">${escapeHtml(categoryLabel)}</p>
@@ -491,7 +503,6 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
         <span class="doc-badge">${kiln.gstNumber ? "GST Invoice" : "Invoice"}</span>
         <p class="doc-number">${escapeHtml(number)}</p>
         <p class="doc-date">Invoice Date: ${new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
-        ${invoice.paymentMode ? `<p class="doc-summary-line">${escapeHtml(paymentModeLabel(invoice))}: ₹${formatINR(invoice.netAmount)}</p>` : ""}
       </div>
     </div>
 
@@ -553,8 +564,6 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
 
     ${invoice.notes ? `<table class="doc-table"><tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(invoice.notes)}</td></tr></table>` : ""}
 
-    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED INVOICE ~</p>
-
     ${
       hasGst
         ? `
@@ -609,6 +618,7 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
     }
 
     <p class="doc-thanks">Thank you for the business.</p>
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED INVOICE ~</p>
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`Invoice ${number}`, body, INVOICE_RECORD_ACCENT);
