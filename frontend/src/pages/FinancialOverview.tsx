@@ -119,6 +119,7 @@ export function FinancialOverview() {
   useKilnEvent("ledger:update", () => refresh());
   useKilnEvent("fuelPurchase:update", () => refresh());
   useKilnEvent("vehicleDiesel:update", () => refresh());
+  useKilnEvent("invoice:update", () => refresh());
 
   async function viewCustomRange() {
     if (!range.from || !range.to) return;

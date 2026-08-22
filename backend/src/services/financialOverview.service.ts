@@ -127,15 +127,32 @@ async function currentPosition(kilnId: string) {
   };
 }
 
+// This kiln operates in India (IST, UTC+5:30) but the VPS/Node process may
+// run in any timezone (currently UTC) — using `new Date(); setHours(...)`
+// would silently compute the day/period boundary in whatever timezone the
+// SERVER happens to be in, not the business's own calendar day. IST is 5.5
+// hours ahead of UTC, so entries logged just after IST midnight (already
+// "today" to the admin) can still carry yesterday's UTC date — this
+// converts "now" to its IST wall-clock date/time first, zeroes the
+// time-of-day there, then converts that IST midnight back to the real UTC
+// instant it corresponds to, so the boundary always matches the business's
+// actual calendar day regardless of server timezone.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+function istStartOfDay(date: Date): Date {
+  const istNow = new Date(date.getTime() + IST_OFFSET_MS);
+  istNow.setUTCHours(0, 0, 0, 0);
+  return new Date(istNow.getTime() - IST_OFFSET_MS);
+}
+
 export async function financialOverview(kilnId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthAgo = new Date();
-  monthAgo.setDate(monthAgo.getDate() - 30);
-  const yearAgo = new Date();
-  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  const now = new Date();
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(now.getFullYear() - 1);
+
+  const startOfDay = istStartOfDay(now);
+  const weekAgo = istStartOfDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+  const monthAgo = istStartOfDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+  const yearAgo = istStartOfDay(oneYearAgo);
 
   const [today, week, month, year, position] = await Promise.all([
     flowForRange(kilnId, startOfDay),

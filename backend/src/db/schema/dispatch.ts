@@ -350,6 +350,12 @@ export const expenses = mysqlTable("expenses", {
   soilTripId: varchar("soilTripId", { length: 64 }),
   incidentId: varchar("incidentId", { length: 64 }),
   dispatchId: varchar("dispatchId", { length: 64 }),
+  // Set only for the three auto-logged rows a Brick Loading trip creates
+  // (Driver Reward/Inam, Loading Charge, Unloading Charge) — lets
+  // deleteBrickLoadingEntry find and remove exactly those rows again,
+  // instead of the free-text `notes` string ("Trip #12") being the only
+  // link back to the trip.
+  brickLoadingEntryId: varchar("brickLoadingEntryId", { length: 64 }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDateIdx: index("expense_kiln_date_idx").on(t.kilnId, t.date),

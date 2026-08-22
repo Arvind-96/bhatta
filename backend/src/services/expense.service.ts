@@ -21,6 +21,7 @@ export interface CreateExpenseInput {
   soilTripId?: string;
   incidentId?: string;
   dispatchId?: string;
+  brickLoadingEntryId?: string;
 }
 
 export async function createExpense(input: CreateExpenseInput) {
@@ -46,10 +47,17 @@ export async function createExpense(input: CreateExpenseInput) {
 // createBrickLoadingEntry and dispatch.service.ts createDispatch, the only
 // two call sites. Silently no-ops for a zero/missing amount so callers
 // don't need their own guard.
-export async function autoLogExpense(kilnId: string, typeName: string, amount: number | null | undefined, date: Date | undefined, notes: string) {
+export async function autoLogExpense(
+  kilnId: string,
+  typeName: string,
+  amount: number | null | undefined,
+  date: Date | undefined,
+  notes: string,
+  links: { dispatchId?: string; brickLoadingEntryId?: string } = {}
+) {
   if (!amount || amount <= 0) return;
   const expenseType = await findOrCreateExpenseType(kilnId, typeName);
-  await createExpense({ kilnId, expenseTypeId: expenseType._id, amount, date, notes });
+  await createExpense({ kilnId, expenseTypeId: expenseType._id, amount, date, notes, ...links });
 }
 
 export interface UpdateExpenseInput {

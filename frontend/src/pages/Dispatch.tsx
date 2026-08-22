@@ -122,8 +122,12 @@ export function Dispatch() {
   // (createDispatch rejects it server-side too) — so it's excluded from the
   // picker entirely rather than shown and then failing on submit. Already
   // sorted latest-first by the backend (listBrickLoadingEntries orders
-  // desc(date)).
-  const unlinkedTrips = loadingTrips.filter((t) => !t.dispatchId);
+  // desc(date)) — re-sorted here too as a belt-and-suspenders guarantee so
+  // the picker never silently depends on that staying true.
+  const unlinkedTrips = loadingTrips
+    .filter((t) => !t.dispatchId)
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const selectedTrip = unlinkedTrips.find((t) => t._id === form.loadingEntryId);
   const tripLocked = !!form.loadingEntryId;
   const totalBricksFromItems = form.items.reduce((sum, row) => sum + (Number(row.bricksCount) || 0), 0);

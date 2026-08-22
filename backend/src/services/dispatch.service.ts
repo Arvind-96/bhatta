@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { dispatches, people, brickCategories, brickLoadingEntries, kilns, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import { dispatches, people, brickCategories, brickLoadingEntries, kilns, challans, gatePasses, invoices, expenses, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem } from "../db/schema/_helpers";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
@@ -312,7 +312,7 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
   // loading trip (that trip already logs its own tip separately), but
   // BrickLoadingTripDetailPage's "Add to Dispatch" never sends
   // driverTipAmount, so that path is safe by construction.
-  await autoLogExpense(input.kilnId, "Driver Reward / Inam", dispatch.driverTipAmount, dispatchedOn, `Dispatch ${dispatch.slipNumber}`);
+  await autoLogExpense(input.kilnId, "Driver Reward / Inam", dispatch.driverTipAmount, dispatchedOn, `Dispatch ${dispatch.slipNumber}`, { dispatchId: dispatch._id });
 
   return dispatch;
 }
@@ -569,7 +569,9 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
 // trip — the separate brickCategories.quantity deduction that flow makes,
 // un-linking that loading entry (dispatchId -> null) rather than leaving it
 // dangling. The loading entry itself is never deleted; the physical
-// loading trip is a real, separate record.
+// loading trip is a real, separate record. Also deletes every Challan/
+// Gate Pass/Invoice/Expense generated FROM this dispatch (see below) —
+// nothing about this dispatch is left behind anywhere in the system.
 export async function deleteDispatch(kilnId: string, dispatchId: string) {
   const existing = (await db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Dispatch not found in this kiln");
@@ -615,6 +617,40 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
     }
     await db.update(brickLoadingEntries).set({ dispatchId: null }).where(eq(brickLoadingEntries._id, linkedEntry._id));
     emitToKiln(kilnId, "brickLoading:update", (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, linkedEntry._id)))[0]);
+  }
+
+  // Every Challan/Gate Pass/Invoice/Expense generated FROM this dispatch is
+  // meaningless once it's gone — delete them too rather than leaving them
+  // orphaned (pointing at a dispatchId that no longer exists). Invoices
+  // don't post to the ledger or any stock table (customer balance is
+  // derived live from the invoices table itself, see customer.service.ts),
+  // and Challan/Gate Pass are plain documents with no side effects of their
+  // own, so a plain delete + the same "{_id, deleted:true}" socket event
+  // their own dedicated delete functions already emit is enough — inlined
+  // here (not calling deleteChallan/deleteGatePass/deleteInvoice directly)
+  // since dispatchDocuments.service.ts already imports from this file,
+  // and importing back would create a circular dependency.
+  const [linkedChallans, linkedGatePasses, linkedInvoices, linkedExpenses] = await Promise.all([
+    db.select({ _id: challans._id }).from(challans).where(and(eq(challans.dispatchId, dispatchId), eq(challans.kilnId, kilnId))),
+    db.select({ _id: gatePasses._id }).from(gatePasses).where(and(eq(gatePasses.dispatchId, dispatchId), eq(gatePasses.kilnId, kilnId))),
+    db.select({ _id: invoices._id }).from(invoices).where(and(eq(invoices.dispatchId, dispatchId), eq(invoices.kilnId, kilnId))),
+    db.select({ _id: expenses._id }).from(expenses).where(and(eq(expenses.dispatchId, dispatchId), eq(expenses.kilnId, kilnId))),
+  ]);
+  for (const row of linkedChallans) {
+    await db.delete(challans).where(eq(challans._id, row._id));
+    emitToKiln(kilnId, "challan:update", { _id: row._id, deleted: true });
+  }
+  for (const row of linkedGatePasses) {
+    await db.delete(gatePasses).where(eq(gatePasses._id, row._id));
+    emitToKiln(kilnId, "gatePass:update", { _id: row._id, deleted: true });
+  }
+  for (const row of linkedInvoices) {
+    await db.delete(invoices).where(eq(invoices._id, row._id));
+    emitToKiln(kilnId, "invoice:update", { _id: row._id, deleted: true });
+  }
+  for (const row of linkedExpenses) {
+    await db.delete(expenses).where(eq(expenses._id, row._id));
+    emitToKiln(kilnId, "expense:update", { _id: row._id, deleted: true });
   }
 
   await db.delete(dispatches).where(eq(dispatches._id, dispatchId));

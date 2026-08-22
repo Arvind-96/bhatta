@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, BRICK_VEHICLE_TYPES } from "../db/schema";
+import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, expenses, BRICK_VEHICLE_TYPES } from "../db/schema";
 import type { BrickLineItem } from "../db/schema/_helpers";
 import { addLedgerEntry } from "./ledger.service";
 import { deleteDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
@@ -166,9 +166,9 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   // own Expense the moment the trip is created, under a fixed type name so
   // they always land in the same Expense Type bucket (see
   // expense.service.ts's autoLogExpense; no-ops for a zero/unset amount).
-  await autoLogExpense(input.kilnId, "Driver Reward / Inam", entry.tipAmount, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`);
-  await autoLogExpense(input.kilnId, "Loading Charge", entry.loadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`);
-  await autoLogExpense(input.kilnId, "Unloading Charge", entry.unloadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`);
+  await autoLogExpense(input.kilnId, "Driver Reward / Inam", entry.tipAmount, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, { brickLoadingEntryId: entry._id });
+  await autoLogExpense(input.kilnId, "Loading Charge", entry.loadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, { brickLoadingEntryId: entry._id });
+  await autoLogExpense(input.kilnId, "Unloading Charge", entry.unloadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, { brickLoadingEntryId: entry._id });
 
   return entry;
 }
@@ -324,6 +324,8 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
 //     also restore the category here, or the quantity would be double-credited.
 //   - unlinked (no dispatchId, e.g. the category had no price set): nothing
 //     else will restore it, so this function does it directly.
+// Also deletes this trip's own auto-logged Expense rows (see below) and,
+// via deleteDispatch when linked, everything that dispatch generated too.
 export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
   const existing = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick loading entry not found in this kiln");
@@ -340,6 +342,8 @@ export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
   }
 
   if (existing.dispatchId) {
+    // Cascades Challan/Gate Pass/Invoice/dispatch-level Expense too — see
+    // deleteDispatch's own doc comment in dispatch.service.ts.
     await deleteDispatch(kilnId, existing.dispatchId);
   } else {
     for (const item of itemsOrLegacyFallback(existing)) {
@@ -349,6 +353,16 @@ export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
         .where(eq(brickCategories._id, item.categoryId));
       emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, item.categoryId)))[0]);
     }
+  }
+
+  // The three auto-logged Expense rows this trip created at creation time
+  // (Driver Reward/Inam, Loading Charge, Unloading Charge — see
+  // createBrickLoadingEntry) — found via brickLoadingEntryId, the real FK
+  // set at creation for exactly this purpose.
+  const linkedExpenses = await db.select({ _id: expenses._id }).from(expenses).where(and(eq(expenses.brickLoadingEntryId, entryId), eq(expenses.kilnId, kilnId)));
+  for (const row of linkedExpenses) {
+    await db.delete(expenses).where(eq(expenses._id, row._id));
+    emitToKiln(kilnId, "expense:update", { _id: row._id, deleted: true });
   }
 
   await db.delete(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId));
