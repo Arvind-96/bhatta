@@ -172,6 +172,25 @@ textarea:focus-visible {
   }
 }
 
+/* Global mandatory-field affordance, app-wide: once the admin has
+   attempted to submit (or already touched) a required input/select/
+   textarea that's still empty or otherwise invalid, its border turns red
+   — so every one of this app's many forms shows exactly which field is
+   blocking the save, without each form needing its own per-field error
+   UI. :user-invalid (not :invalid) deliberately — it only matches after
+   user interaction/a submit attempt, so a freshly-opened form with empty
+   required fields never shows red before the admin has done anything. */
+input:user-invalid,
+select:user-invalid,
+textarea:user-invalid {
+  border-color: var(--status-critical) !important;
+}
+input:user-invalid:focus-visible,
+select:user-invalid:focus-visible,
+textarea:user-invalid:focus-visible {
+  outline-color: var(--status-critical);
+}
+
 /* Remove the number-input spin buttons app-wide — with them present, an
    accidental mouse-wheel scroll over a focused number field silently
    changes its value instead of scrolling the page. */

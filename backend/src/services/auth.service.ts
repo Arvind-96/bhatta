@@ -67,6 +67,12 @@ async function listMemberships(userId: string) {
         dayShiftStart: kiln?.dayShiftStart ?? "08:00",
         dayShiftEnd: kiln?.dayShiftEnd ?? "18:00",
         gstNumber: kiln?.gstNumber ?? undefined,
+        stateCode: kiln?.stateCode ?? undefined,
+        bankAccountNumber: kiln?.bankAccountNumber ?? undefined,
+        bankName: kiln?.bankName ?? undefined,
+        bankIfscCode: kiln?.bankIfscCode ?? undefined,
+        signaturePath: kiln?.signaturePath ?? undefined,
+        defaultTermsAndConditions: kiln?.defaultTermsAndConditions ?? undefined,
         needsSetup: await needsSetup(m.kilnId, kiln?.onboardedAt),
       };
     })
@@ -151,6 +157,12 @@ export async function defaultKilnPublicInfo() {
     dayShiftStart: kiln.dayShiftStart ?? "08:00",
     dayShiftEnd: kiln.dayShiftEnd ?? "18:00",
     gstNumber: kiln.gstNumber ?? undefined,
+    stateCode: kiln.stateCode ?? undefined,
+    bankAccountNumber: kiln.bankAccountNumber ?? undefined,
+    bankName: kiln.bankName ?? undefined,
+    bankIfscCode: kiln.bankIfscCode ?? undefined,
+    signaturePath: kiln.signaturePath ?? undefined,
+    defaultTermsAndConditions: kiln.defaultTermsAndConditions ?? undefined,
     needsSetup: await needsSetup(kiln._id, kiln.onboardedAt),
   };
 }

@@ -176,8 +176,14 @@ export function CreateInvoiceForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (validItems.length === 0) return;
-    if (isPaymentSplitMismatched(paymentMode, net, cashAmount, onlineAmount)) {
-      setFormError(t("payment.splitMismatch", { total: net.toLocaleString("en-IN") }));
+    // Validated against effectivePaidNow (what's actually being collected
+    // right now), not the invoice's full net total — a customer paying
+    // only part of the bill via a Cash+Online split must still be able to
+    // save the invoice, with the rest automatically becoming due (see
+    // amountPaidNow's own handling below). Requiring the split to sum to
+    // the FULL net amount would block exactly that partial-payment case.
+    if (isPaymentSplitMismatched(paymentMode, effectivePaidNow, cashAmount, onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: effectivePaidNow.toLocaleString("en-IN") }));
       return;
     }
     setFormError("");
@@ -338,7 +344,7 @@ export function CreateInvoiceForm({
         {paymentMode === "CASH_AND_ONLINE" && (
           <div className="col-span-2">
             <PaymentSplitFields
-              totalAmount={net}
+              totalAmount={effectivePaidNow}
               cashAmount={cashAmount}
               onlineAmount={onlineAmount}
               onCashAmountChange={setCashAmount}

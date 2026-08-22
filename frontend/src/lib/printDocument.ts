@@ -112,76 +112,87 @@ export interface KilnPrintInfo {
 // document type below so Gate Pass/Challan/Receipt each get their own
 // distinct accent while sharing every other rule.
 const DOCUMENT_STYLES = `
-  .doc-topbar, .doc-bottombar { height: 7px; background: linear-gradient(90deg, var(--doc-accent), var(--doc-accent-soft)); margin: -32px -32px 20px; }
-  .doc-bottombar { margin: 24px -32px -32px; }
+  @page { margin: 10mm 11mm; }
+  .doc-topbar, .doc-bottombar { height: 6px; background: linear-gradient(90deg, var(--doc-accent), var(--doc-accent-soft)); margin: -32px -32px 14px; }
+  .doc-bottombar { margin: 16px -32px -32px; }
   .doc-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   .doc-brand { display: flex; gap: 10px; align-items: flex-start; }
   .doc-logo { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 6px; background: var(--doc-accent); color: #fff; font-weight: 800; font-size: 17px; flex-shrink: 0; box-shadow: 0 2px 6px color-mix(in srgb, var(--doc-accent) 45%, transparent); }
-  .doc-kiln-name { font-size: 23px; font-weight: 800; margin: 0 0 2px; color: #1a1a1a; }
-  .doc-address { font-size: 13px; color: #444; margin: 0; line-height: 1.4; }
-  .doc-phone { font-size: 13px; color: #444; font-style: italic; margin: 4px 0 0; }
-  .doc-gst { font-size: 13px; color: #444; margin: 2px 0 0; }
+  .doc-kiln-name { font-size: 21px; font-weight: 800; margin: 0 0 2px; color: #1a1a1a; }
+  .doc-address { font-size: 12.5px; color: #444; margin: 0; line-height: 1.35; }
+  .doc-phone { font-size: 12.5px; color: #444; font-style: italic; margin: 3px 0 0; }
+  .doc-gst { font-size: 12.5px; color: #444; margin: 1px 0 0; }
   .doc-meta { text-align: right; }
-  .doc-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--doc-accent); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
-  .doc-number { font-size: 21px; font-weight: 800; margin: 0 0 4px; color: #1a1a1a; }
-  .doc-date, .doc-summary-line { font-size: 13px; color: #444; margin: 2px 0; }
-  .doc-box { display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; padding: 16px; border: 1px solid color-mix(in srgb, var(--doc-accent) 35%, #eee); border-radius: 12px; background: var(--doc-accent-tint); }
-  .doc-box-label { font-size: 12px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 4px; }
-  .doc-box-name { font-size: 16px; font-weight: 700; margin: 0; color: #1a1a1a; }
-  .doc-box-detail { font-size: 13px; color: #444; margin: 2px 0 0; }
+  .doc-badge { display: inline-block; padding: 3px 12px; border-radius: 999px; background: var(--doc-accent); color: #fff; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 5px; }
+  .doc-number { font-size: 19px; font-weight: 800; margin: 0 0 3px; color: #1a1a1a; }
+  .doc-date, .doc-summary-line { font-size: 12.5px; color: #444; margin: 1px 0; }
+  .doc-box { display: flex; justify-content: space-between; gap: 16px; margin-top: 12px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--doc-accent) 35%, #eee); border-radius: 12px; background: var(--doc-accent-tint); break-inside: avoid; }
+  .doc-box-label { font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 3px; }
+  .doc-box-name { font-size: 15px; font-weight: 700; margin: 0; color: #1a1a1a; }
+  .doc-box-detail { font-size: 12.5px; color: #444; margin: 2px 0 0; }
   .doc-totalbox { text-align: right; position: relative; min-width: 150px; }
-  .doc-total-label { font-size: 13px; color: #444; margin: 0; }
-  .doc-total-amount { font-size: 24px; font-weight: 800; margin: 2px 0; color: var(--doc-accent); }
-  .doc-amount-words { font-size: 12px; font-style: italic; color: #666; margin: 0; }
-  .doc-stamp { position: absolute; top: -10px; left: -12px; width: 66px; height: 66px; border-radius: 50%; border: 2.5px dashed; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotate(-14deg); font-weight: 800; text-align: center; line-height: 1.1; }
-  .doc-stamp span:first-child { font-size: 8px; letter-spacing: 0.5px; }
-  .doc-stamp span:last-child { font-size: 11px; }
+  .doc-total-label { font-size: 12.5px; color: #444; margin: 0; }
+  .doc-total-amount { font-size: 22px; font-weight: 800; margin: 2px 0; color: var(--doc-accent); }
+  .doc-amount-words { font-size: 11.5px; font-style: italic; color: #666; margin: 0; }
+  .doc-stamp { position: absolute; top: -10px; left: -12px; width: 60px; height: 60px; border-radius: 50%; border: 2.5px dashed; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: rotate(-14deg); font-weight: 800; text-align: center; line-height: 1.1; }
+  .doc-stamp span:first-child { font-size: 7px; letter-spacing: 0.5px; }
+  .doc-stamp span:last-child { font-size: 10px; }
   .doc-stamp-paid { border-color: #1f8a4c; color: #1f8a4c; }
   .doc-stamp-partial { border-color: #b8860b; color: #b8860b; }
   .doc-stamp-due { border-color: #c0392b; color: #c0392b; }
-  table.doc-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 18px; border: 1px solid #e5e0d8; border-radius: 10px; overflow: hidden; }
-  table.doc-table td { padding: 9px 12px; font-size: 13.5px; border-bottom: 1px solid #efece5; }
+  table.doc-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 12px; border: 1px solid #e5e0d8; border-radius: 10px; overflow: hidden; break-inside: avoid; }
+  table.doc-table td { padding: 6px 12px; font-size: 13px; border-bottom: 1px solid #efece5; }
   table.doc-table tr:last-child td { border-bottom: none; }
   table.doc-table tr:nth-child(even) { background: var(--doc-accent-tint); }
   table.doc-table td.doc-table-label { color: #777; width: 42%; }
   table.doc-table td.doc-table-value { font-weight: 600; color: #1a1a1a; }
-  table.doc-items { width: 100%; border-collapse: collapse; margin-top: 18px; }
-  table.doc-items th { background: var(--doc-accent); color: #fff; padding: 9px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  table.doc-items { width: 100%; border-collapse: collapse; margin-top: 12px; break-inside: avoid; }
+  table.doc-items th { background: var(--doc-accent); color: #fff; padding: 7px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
   table.doc-items th:first-child { border-top-left-radius: 8px; }
   table.doc-items th:last-child { border-top-right-radius: 8px; }
-  table.doc-items td { padding: 9px 8px; border-bottom: 1px solid #eee; font-size: 13.5px; }
+  table.doc-items td { padding: 7px 8px; border-bottom: 1px solid #eee; font-size: 13px; }
   table.doc-items td.num, table.doc-items th.num { text-align: right; }
   table.doc-items tfoot td { font-weight: 700; border-top: 2px solid var(--doc-accent); border-bottom: none; }
-  .doc-footer-total { text-align: right; margin-top: 18px; }
-  .doc-footer-total .big { font-size: 24px; font-weight: 800; display: block; color: var(--doc-accent); }
+  .doc-footer-total { text-align: right; margin-top: 12px; }
+  .doc-footer-total .big { font-size: 22px; font-weight: 800; display: block; color: var(--doc-accent); }
   .doc-footer-words { text-align: right; font-size: 13px; font-style: italic; color: #666; margin: 2px 0 0; }
-  .doc-digital-note { text-align: center; font-size: 12px; color: #888; margin-top: 26px; letter-spacing: 0.03em; }
-  .doc-sign-row { margin-top: 34px; display: flex; justify-content: space-between; gap: 12px; }
+  .doc-digital-note { text-align: center; font-size: 11.5px; color: #888; margin-top: 14px; letter-spacing: 0.03em; }
+  .doc-sign-row { margin-top: 22px; display: flex; justify-content: space-between; gap: 12px; break-inside: avoid; }
   .doc-sign-row.doc-sign-row-single { justify-content: flex-end; }
   .doc-sign-box { flex: 1; text-align: center; border-top: 1.5px solid #bbb; padding-top: 6px; font-size: 12px; color: #555; font-weight: 600; }
   .doc-sign-row-single .doc-sign-box { flex: none; width: 220px; }
-  .doc-thanks { font-size: 13px; color: #444; margin-top: 22px; text-align: center; }
+  .doc-thanks { font-size: 12.5px; color: #444; margin-top: 12px; text-align: center; }
   /* GST invoice bottom section (printInvoiceRecord, only when the admin
      has set a GST rate on the invoice — see its own doc comment) —
      replicates the reference paper invoice book's layout: Amount in
      Words + Bank Details on the left, the tax breakdown table on the
-     right, then Terms & Conditions + signature block below. */
-  .doc-gst-bottom { display: flex; justify-content: space-between; gap: 20px; margin-top: 18px; align-items: flex-start; }
-  .doc-gst-bottom-left { flex: 1; min-width: 0; }
-  .doc-words-label { font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 4px; }
-  .doc-words-value { font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 0 0 12px; }
-  .doc-bank-details p { font-size: 12px; color: #444; margin: 2px 0; }
-  table.doc-tax-table { width: 100%; min-width: 220px; border-collapse: collapse; font-size: 13px; }
-  table.doc-tax-table td { padding: 6px 8px; border-bottom: 1px solid #eee; }
+     right, then Terms & Conditions + signature block below. A plain HTML
+     table (not flex) for both rows below — Chromium's print-to-PDF engine
+     mis-lays-out a flex row that straddles a page break (each flex child's
+     text collapses word-by-word into a sliver of its own track, visibly
+     overlapping the sibling column); a <table> row breaks far more
+     predictably, and break-inside:avoid plus the tighter spacing above
+     keeps this whole section on one page in the first place. */
+  table.doc-gst-bottom { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 12px; break-inside: avoid; }
+  table.doc-gst-bottom td { vertical-align: top; padding: 0; }
+  td.doc-gst-bottom-left { width: 60%; padding-right: 18px; }
+  td.doc-gst-bottom-right { width: 40%; }
+  .doc-words-label { font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 3px; }
+  .doc-words-value { font-size: 13px; font-weight: 700; color: #1a1a1a; margin: 0 0 8px; }
+  .doc-bank-details p { font-size: 11.5px; color: #444; margin: 1px 0; }
+  table.doc-tax-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.doc-tax-table td { padding: 4px 8px; border-bottom: 1px solid #eee; }
   table.doc-tax-table td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
-  table.doc-tax-table tr.doc-tax-total td { font-weight: 800; border-top: 2px solid var(--doc-accent); border-bottom: none; font-size: 14px; }
-  .doc-certify { text-align: right; font-size: 11px; color: #888; margin: 8px 0 0; font-style: italic; }
-  .doc-terms { font-size: 11px; color: #555; flex: 1; }
+  table.doc-tax-table tr.doc-tax-total td { font-weight: 800; border-top: 2px solid var(--doc-accent); border-bottom: none; font-size: 13.5px; }
+  .doc-certify { text-align: right; font-size: 11px; color: #888; margin: 6px 0 0; font-style: italic; }
+  table.doc-terms-signature { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 14px; break-inside: avoid; }
+  table.doc-terms-signature td { vertical-align: top; padding: 0; }
+  td.doc-terms { width: 60%; padding-right: 18px; font-size: 11px; color: #555; }
   .doc-terms p.doc-terms-title { margin: 0 0 4px; font-weight: 700; color: #1a1a1a; }
-  .doc-terms-body { margin: 0; white-space: pre-line; line-height: 1.5; }
-  .doc-signature-block { flex: none; width: 220px; text-align: center; }
+  .doc-terms-body { margin: 0; white-space: pre-line; line-height: 1.45; }
+  td.doc-signature-block { width: 40%; text-align: center; }
   .doc-for-kiln { font-weight: 700; margin: 0 0 4px; color: #1a1a1a; }
-  .doc-signature-img { display: block; height: 50px; max-width: 180px; object-fit: contain; margin: 4px auto; }
+  .doc-signature-img { display: block; height: 46px; max-width: 170px; object-fit: contain; margin: 4px auto; }
   @media print { .doc-topbar, .doc-bottombar { -webkit-print-color-adjust: exact; print-color-adjust: exact; } table.doc-items th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } table.doc-table tr:nth-child(even) { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .doc-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 `;
 
@@ -513,11 +524,15 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
       </tfoot>
     </table>
 
-    <div class="doc-footer-total">
+    ${
+      hasGst
+        ? ""
+        : `<div class="doc-footer-total">
       <span>Total amount</span>
       <span class="big">₹${formatINR(invoice.netAmount)}</span>
       <p class="doc-footer-words">${escapeHtml(amountInWords(invoice.netAmount))}</p>
-    </div>
+    </div>`
+    }
 
     <table class="doc-table">
       ${invoice.vehicleNumber ? `<tr><td class="doc-table-label">Vehicle number</td><td class="doc-table-value">${escapeHtml(invoice.vehicleNumber)}</td></tr>` : ""}
@@ -543,10 +558,10 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
     ${
       hasGst
         ? `
-    <div class="doc-gst-bottom">
-      <div class="doc-gst-bottom-left">
+    <table class="doc-gst-bottom"><tr>
+      <td class="doc-gst-bottom-left">
         <p class="doc-words-label">Amount in Words</p>
-        <p class="doc-words-value">${escapeHtml(amountInWords(invoice.netAmount))} Only</p>
+        <p class="doc-words-value">${escapeHtml(amountInWords(invoice.netAmount))}</p>
         ${
           hasBankDetails
             ? `<div class="doc-bank-details">
@@ -556,7 +571,8 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
               </div>`
             : ""
         }
-      </div>
+      </td>
+      <td class="doc-gst-bottom-right">
       <table class="doc-tax-table">
         <tr><td>Amount Before Tax</td><td>₹${formatINR(invoice.netAmount)}</td></tr>
         <tr><td>Add: CGST @ ${cgstRate}%</td><td>₹${formatINR(cgstAmount)}</td></tr>
@@ -565,24 +581,25 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
         <tr class="doc-tax-total"><td>Total Amount After Tax</td><td>₹${formatINR(totalAfterTax)}</td></tr>
         <tr class="doc-tax-total"><td>Invoice Total (Round off)</td><td>₹${invoiceTotalRounded.toLocaleString("en-IN")}</td></tr>
       </table>
-    </div>
+      </td>
+    </tr></table>
     <p class="doc-certify">Certified that the particulars given above are true &amp; correct</p>
 
-    <div class="doc-sign-row">
-      ${
-        invoice.termsAndConditions
-          ? `<div class="doc-terms">
-              <p class="doc-terms-title">Terms &amp; Conditions:</p>
-              <p class="doc-terms-body">${escapeHtml(invoice.termsAndConditions)}</p>
-            </div>`
-          : `<div class="doc-terms"></div>`
-      }
-      <div class="doc-signature-block">
+    <table class="doc-terms-signature"><tr>
+      <td class="doc-terms">
+        ${
+          invoice.termsAndConditions
+            ? `<p class="doc-terms-title">Terms &amp; Conditions:</p>
+              <p class="doc-terms-body">${escapeHtml(invoice.termsAndConditions)}</p>`
+            : ""
+        }
+      </td>
+      <td class="doc-signature-block">
         <p class="doc-for-kiln">For ${escapeHtml(kiln.name)}</p>
         ${kiln.signatureDataUri ? `<img class="doc-signature-img" src="${kiln.signatureDataUri}" alt="" />` : ""}
         <p>Authorised Signatory</p>
-      </div>
-    </div>
+      </td>
+    </tr></table>
     `
         : `
     <div class="doc-sign-row doc-sign-row-single">
