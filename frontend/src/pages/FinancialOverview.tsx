@@ -228,9 +228,11 @@ export function FinancialOverview() {
                 [
                   { flowKey: "moneyIn", splitKey: "cash", label: t("financialOverview.moneyInCash"), tone: "text-status-good" },
                   { flowKey: "moneyIn", splitKey: "online", label: t("financialOverview.moneyInOnline"), tone: "text-status-good" },
+                  { flowKey: "moneyIn", splitKey: "unspecified", label: t("financialOverview.moneyInUnspecified"), tone: "text-ink-muted" },
                   { flowKey: "moneyIn", splitKey: "total", label: t("financialOverview.moneyInTotal"), tone: "text-status-good" },
                   { flowKey: "moneyOut", splitKey: "cash", label: t("financialOverview.moneyOutCash"), tone: "text-status-critical" },
                   { flowKey: "moneyOut", splitKey: "online", label: t("financialOverview.moneyOutOnline"), tone: "text-status-critical" },
+                  { flowKey: "moneyOut", splitKey: "unspecified", label: t("financialOverview.moneyOutUnspecified"), tone: "text-ink-muted" },
                   { flowKey: "moneyOut", splitKey: "total", label: t("financialOverview.moneyOutTotal"), tone: "text-status-critical" },
                 ] as const
               ).map((row) => (

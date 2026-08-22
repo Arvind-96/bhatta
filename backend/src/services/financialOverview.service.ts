@@ -5,29 +5,48 @@ import { listPaymentsDue, customerCreditAging } from "./person.service";
 
 // Splits a set of money-flow rows into cash vs. online, for the Financial
 // Overview's payment-method breakdown. CASH_AND_ONLINE rows split
-// precisely using their own recorded cashAmount/onlineAmount; every other
-// mode (BANK/UPI/GST_INVOICE) counts fully as "online"; CASH counts fully
-// as "cash". A row with no paymentMode recorded at all (legacy data, or an
-// optional field left blank) contributes to neither bucket — cash+online
-// is a best-effort breakdown, `total` (computed elsewhere) stays the only
-// number guaranteed to add up to everything.
+// proportionally to their own recorded cashAmount:onlineAmount ratio,
+// scaled to `amountOf(row)` rather than trusting the recorded amounts
+// outright — an invoice's cashAmount/onlineAmount are entered against its
+// full netAmount at creation time, but amountOf(row) (amountPaidNow) can be
+// less on a partially-paid invoice, so scaling keeps cash+online exactly
+// equal to what this row actually contributes to the period's total
+// instead of overcounting by the still-due remainder. Every other mode
+// (BANK/UPI/GST_INVOICE) counts fully as "online"; CASH counts fully as
+// "cash". A row with no paymentMode recorded at all (legacy data, or an
+// optional field left blank) contributes to neither bucket, surfacing
+// instead as `unspecified` — cash+online+unspecified always equals `total`
+// exactly (up to paise-level rounding), so the breakdown never silently
+// falls short of the total shown elsewhere.
 function splitByPaymentMode<T extends { paymentMode?: string | null; cashAmount?: number | null; onlineAmount?: number | null }>(
   rows: T[],
   amountOf: (row: T) => number
 ) {
   let cash = 0;
   let online = 0;
+  let total = 0;
   for (const row of rows) {
+    const amount = amountOf(row);
+    total += amount;
     if (row.paymentMode === "CASH_AND_ONLINE") {
-      cash += row.cashAmount ?? 0;
-      online += row.onlineAmount ?? 0;
+      const recordedCash = row.cashAmount ?? 0;
+      const recordedOnline = row.onlineAmount ?? 0;
+      const recordedTotal = recordedCash + recordedOnline;
+      if (recordedTotal > 0) {
+        cash += (recordedCash / recordedTotal) * amount;
+        online += (recordedOnline / recordedTotal) * amount;
+      }
     } else if (row.paymentMode === "CASH") {
-      cash += amountOf(row);
+      cash += amount;
     } else if (row.paymentMode) {
-      online += amountOf(row);
+      online += amount;
     }
   }
-  return { cash: Math.round(cash * 100) / 100, online: Math.round(online * 100) / 100 };
+  const roundedCash = Math.round(cash * 100) / 100;
+  const roundedOnline = Math.round(online * 100) / 100;
+  const roundedTotal = Math.round(total * 100) / 100;
+  const unspecified = Math.round((roundedTotal - roundedCash - roundedOnline) * 100) / 100;
+  return { cash: roundedCash, online: roundedOnline, unspecified };
 }
 
 // One period's cash-flow snapshot: everything that actually moved, in one
@@ -97,6 +116,7 @@ async function flowForRange(kilnId: string, since: Date, until?: Date) {
   const moneyOutSplit = {
     cash: Math.round(outSplits.reduce((sum, s) => sum + s.cash, 0) * 100) / 100,
     online: Math.round(outSplits.reduce((sum, s) => sum + s.online, 0) * 100) / 100,
+    unspecified: Math.round(outSplits.reduce((sum, s) => sum + s.unspecified, 0) * 100) / 100,
   };
 
   return {
@@ -107,8 +127,8 @@ async function flowForRange(kilnId: string, since: Date, until?: Date) {
     fuelExpense: fuelCosts,
     dieselExpense: dieselCosts,
     breakdown: { expenses: expenseCosts, fuel: fuelCosts, diesel: dieselCosts, otherPayments },
-    moneyIn: { cash: moneyInSplit.cash, online: moneyInSplit.online, total: moneyReceived },
-    moneyOut: { cash: moneyOutSplit.cash, online: moneyOutSplit.online, total: moneySpent },
+    moneyIn: { cash: moneyInSplit.cash, online: moneyInSplit.online, unspecified: moneyInSplit.unspecified, total: moneyReceived },
+    moneyOut: { cash: moneyOutSplit.cash, online: moneyOutSplit.online, unspecified: moneyOutSplit.unspecified, total: moneySpent },
   };
 }
 

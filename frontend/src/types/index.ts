@@ -1405,6 +1405,10 @@ export interface SeasonFinancialSummary {
 export interface PaymentMethodSplit {
   cash: number;
   online: number;
+  // Portion of `total` from rows with no payment mode recorded at all —
+  // cash + online + unspecified always equals total exactly (up to
+  // paise-level rounding).
+  unspecified: number;
   total: number;
 }
 
