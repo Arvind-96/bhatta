@@ -19,8 +19,14 @@ const customers: ReportDefinition = {
 
     const rows = await Promise.all(
       scoped.map(async (c) => {
+        // Both totals sum every invoice in the period, brick sale or
+        // 0-brick advance/adjustment (see AddCustomerPaymentModal.tsx) alike
+        // — invoicedThisPeriod used to skip 0-brick rows while
+        // paidThisPeriod counted them, so an advance payment made
+        // dueThisPeriod go negative for that customer even though nothing
+        // was actually overpaid.
         const invoices = await listInvoices(kilnId, { customerId: c._id, from: filters.from, to: filters.to });
-        const invoicedThisPeriod = round2(invoices.reduce((s, i) => s + (i.bricksCount > 0 ? i.netAmount : 0), 0));
+        const invoicedThisPeriod = round2(invoices.reduce((s, i) => s + i.netAmount, 0));
         const paidThisPeriod = round2(invoices.reduce((s, i) => s + (i.amountPaidNow ?? i.netAmount), 0));
         return {
           customer: c.name,

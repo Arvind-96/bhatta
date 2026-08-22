@@ -1,0 +1,1 @@
+ALTER TABLE `customers` ADD CONSTRAINT `customer_kiln_name_unique` UNIQUE(`kilnId`,`name`);

@@ -26,7 +26,16 @@ export interface CustomerInput {
   openingDue?: number;
 }
 
+// A second customer with the same name (case-insensitive) would make
+// listInvoicesForCustomer's customerId-IS-NULL name-fallback match
+// ambiguous — a legacy invoice with no customerId would match both
+// profiles and double-count its paid/due on each. Checked here (not just
+// left to the DB's own unique index below) so the admin gets a clear
+// message instead of a raw constraint-violation error.
 export async function createCustomer(kilnId: string, input: CustomerInput) {
+  const existing = await findCustomerByName(kilnId, input.name);
+  if (existing) throw new Error(`A customer named "${input.name.trim()}" already exists in this kiln — use that profile instead of creating a duplicate.`);
+
   const _id = randomUUID();
   await db.insert(customers).values({ ...input, _id, kilnId });
   const row = (await db.select().from(customers).where(eq(customers._id, _id)))[0]!;

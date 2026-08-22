@@ -249,6 +249,12 @@ export const customers = mysqlTable("customers", {
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnIdx: index("customer_kiln_idx").on(t.kilnId),
+  // Backstop for createCustomer's own findCustomerByName check below —
+  // same pattern as expenseTypes' kilnNameUnique. Two customers sharing a
+  // name in one kiln would make listInvoicesForCustomer's customerId-IS-
+  // NULL name-fallback match ambiguous, double-counting a legacy invoice's
+  // paid/due on both profiles.
+  kilnNameUnique: uniqueIndex("customer_kiln_name_unique").on(t.kilnId, t.name),
 }));
 
 export const stockEntries = mysqlTable("stock_entries", {
