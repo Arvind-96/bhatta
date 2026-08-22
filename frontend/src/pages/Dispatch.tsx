@@ -14,9 +14,8 @@ import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import { DispatchDetailPage } from "@/components/dispatch/DispatchDetailPage";
-import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
-import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, PaymentMode, Person } from "@/types";
+import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -64,9 +63,6 @@ function emptyForm() {
     placeOfSupply: "",
     notes: "",
     transportCost: "",
-    paymentMode: "CASH" as PaymentMode,
-    cashAmount: "",
-    onlineAmount: "",
     dispatchedOn: new Date().toISOString().slice(0, 10),
   };
 }
@@ -207,14 +203,6 @@ export function Dispatch() {
       setFormError(t("dispatch.discountExceedsAmount"));
       return;
     }
-    // A linked trip's `amount` is already the net, post-discount figure
-    // (see handleTripSelect) — only a manual entry's amount is the
-    // pre-discount gross that still needs discountAmount subtracted.
-    const netAmount = tripLocked ? Number(form.amount) || 0 : (Number(form.amount) || 0) - (Number(form.discountAmount) || 0);
-    if (isPaymentSplitMismatched(form.paymentMode, netAmount, form.cashAmount, form.onlineAmount)) {
-      setFormError(t("payment.splitMismatch", { total: netAmount.toLocaleString("en-IN") }));
-      return;
-    }
     setFormError("");
     setLoading(true);
     try {
@@ -243,9 +231,6 @@ export function Dispatch() {
         transportCost: form.transportCost ? Number(form.transportCost) : undefined,
         placeOfSupply: form.placeOfSupply || undefined,
         notes: form.notes || undefined,
-        paymentMode: form.paymentMode,
-        cashAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.cashAmount) : undefined,
-        onlineAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.onlineAmount) : undefined,
         dispatchedOn: form.dispatchedOn || undefined,
       });
       setForm(emptyForm());
@@ -404,28 +389,6 @@ export function Dispatch() {
                 className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
               />
             </div>
-
-            <select
-              value={form.paymentMode}
-              onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value as PaymentMode }))}
-              className={inputClass}
-            >
-              <option value="CASH">{t("dispatch.paymentCash")}</option>
-              <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
-              <option value="UPI">{t("dispatch.paymentUpi")}</option>
-              <option value="GST_INVOICE">{t("dispatch.paymentGstInvoice")}</option>
-              <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
-            </select>
-            {form.paymentMode === "CASH_AND_ONLINE" && (
-              <PaymentSplitFields
-                totalAmount={Math.max(0, tripLocked ? Number(form.amount) || 0 : (Number(form.amount) || 0) - (Number(form.discountAmount) || 0))}
-                cashAmount={form.cashAmount}
-                onlineAmount={form.onlineAmount}
-                onCashAmountChange={(v) => setForm((f) => ({ ...f, cashAmount: v }))}
-                onOnlineAmountChange={(v) => setForm((f) => ({ ...f, onlineAmount: v }))}
-                inputClassName={inputClass}
-              />
-            )}
 
             <div className="grid grid-cols-2 gap-2">
               <input

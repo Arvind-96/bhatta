@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
-import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
-import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, PaymentMode, Person } from "@/types";
+import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -47,9 +46,6 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
   const [driverTipAmount, setDriverTipAmount] = useState(dispatch.driverTipAmount ? String(dispatch.driverTipAmount) : "");
   const [transportCost, setTransportCost] = useState(dispatch.transportCost ? String(dispatch.transportCost) : "");
   const [transportPaidBy, setTransportPaidBy] = useState<"OWNER" | "CUSTOMER">(dispatch.transportPaidBy ?? "OWNER");
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>(dispatch.paymentMode ?? "CASH");
-  const [cashAmount, setCashAmount] = useState(dispatch.cashAmount != null ? String(dispatch.cashAmount) : "");
-  const [onlineAmount, setOnlineAmount] = useState(dispatch.onlineAmount != null ? String(dispatch.onlineAmount) : "");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -74,13 +70,8 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!customerName || validItems.length === 0 || !amount) return;
-    const netAmount = Number(amount) - (Number(discountAmount) || 0);
     if (Number(discountAmount) > Number(amount)) {
       setFormError(t("dispatch.discountExceedsAmount"));
-      return;
-    }
-    if (isPaymentSplitMismatched(paymentMode, netAmount, cashAmount, onlineAmount)) {
-      setFormError(t("payment.splitMismatch", { total: netAmount.toLocaleString("en-IN") }));
       return;
     }
     setFormError("");
@@ -103,9 +94,6 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
         driverTipAmount: driverTipAmount ? Number(driverTipAmount) : undefined,
         transportCost: transportCost ? Number(transportCost) : undefined,
         transportPaidBy: transportCost ? transportPaidBy : undefined,
-        paymentMode,
-        cashAmount: paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
-        onlineAmount: paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
       });
       onSaved();
       onClose();
@@ -153,23 +141,6 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
             <option value="JHAMA">{t("dispatch.gradeJhama")}</option>
             <option value="PELA">{t("dispatch.gradePela")}</option>
           </select>
-          <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as PaymentMode)} className={inputClass}>
-            <option value="CASH">{t("dispatch.paymentCash")}</option>
-            <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
-            <option value="UPI">{t("dispatch.paymentUpi")}</option>
-            <option value="GST_INVOICE">{t("dispatch.paymentGstInvoice")}</option>
-            <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
-          </select>
-          {paymentMode === "CASH_AND_ONLINE" && (
-            <PaymentSplitFields
-              totalAmount={Math.max(0, (Number(amount) || 0) - (Number(discountAmount) || 0))}
-              cashAmount={cashAmount}
-              onlineAmount={onlineAmount}
-              onCashAmountChange={setCashAmount}
-              onOnlineAmountChange={setOnlineAmount}
-              inputClassName={inputClass}
-            />
-          )}
           <div className="col-span-2">
             <BrickLineItemsEditor items={items} onChange={setItems} categories={categories} />
           </div>
