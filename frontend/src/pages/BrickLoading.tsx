@@ -4,12 +4,13 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { DateInput } from "@/components/ui/date-input";
-import { cn, formatDateTime, formatINR } from "@/lib/utils";
+import { cn, formatDateTime, formatINR, formatVehicleNumber } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { EditBrickLoadingEntryModal } from "@/components/dispatch/EditBrickLoadingEntryModal";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
 import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 import { BrickLoadingTripDetailPage } from "@/components/dispatch/BrickLoadingTripDetailPage";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
@@ -17,7 +18,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, Customer, Person, LaborPaymentMode } from "@/types";
+import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, BrickVehicleType, Customer, Person, LaborPaymentMode } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -136,6 +137,7 @@ export function BrickLoading() {
     items: [emptyLineItemRow()] as LineItemRow[],
     unloadedBricksCount: "",
     vehicleNumber: "",
+    vehicleType: "TRUCK" as BrickVehicleType,
     unloadingDate: "",
     placeOfSupply: "",
   };
@@ -235,9 +237,7 @@ export function BrickLoading() {
         tipPaymentMode: form.tipPaymentMode || undefined,
         tipCashAmount: form.tipPaymentMode === "CASH_AND_ONLINE" ? Number(form.tipCashAmount) : undefined,
         tipOnlineAmount: form.tipPaymentMode === "CASH_AND_ONLINE" ? Number(form.tipOnlineAmount) : undefined,
-        // Vehicle type isn't collected on this form anymore -- TRUCK is a
-        // safe default for the still-required DB column.
-        vehicleType: "TRUCK",
+        vehicleType: form.vehicleType,
         vehicleNumber: form.vehicleNumber,
         items: validItems.map((row) => ({
           categoryId: row.categoryId,
@@ -290,7 +290,7 @@ export function BrickLoading() {
       customerAddress: c.addresses[0] ?? f.customerAddress,
       driverName: c.drivers[0]?.name ?? f.driverName,
       driverPhone: c.drivers[0]?.phone ?? f.driverPhone,
-      vehicleNumber: c.vehicles[0]?.vehicleNumber ?? f.vehicleNumber,
+      vehicleNumber: c.vehicles[0]?.vehicleNumber ? formatVehicleNumber(c.vehicles[0].vehicleNumber) : f.vehicleNumber,
     }));
     setShowCustomerSuggestions(false);
   }
@@ -433,13 +433,22 @@ export function BrickLoading() {
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.loadingSection")}</p>
               <div className="mb-2 grid grid-cols-2 gap-2">
-                <input
+                <VehicleNumberInput
                   required
                   placeholder={t("brickLoading.vehicleNumber")}
                   value={form.vehicleNumber}
-                  onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
+                  onChange={(value) => setForm((f) => ({ ...f, vehicleNumber: value }))}
                   className={inputClass}
                 />
+                <select
+                  required
+                  value={form.vehicleType}
+                  onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value as BrickVehicleType }))}
+                  className={inputClass}
+                >
+                  <option value="TRUCK">{t("brickLoading.truck")}</option>
+                  <option value="TRACTOR">{t("brickLoading.tractor")}</option>
+                </select>
                 <input
                   type="number"
                   placeholder={t("brickLoading.loadingRatePlaceholder")}

@@ -4,6 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
+import { formatVehicleNumber } from "@/lib/utils";
 import type { Customer } from "@/types";
 
 const inputClass =
@@ -26,7 +28,11 @@ export function AddCustomerForm({ existing, onClose, onSaved }: AddCustomerFormP
   const [phones, setPhones] = useState<string[]>(existing?.phones?.length ? existing.phones : [""]);
   const [addresses, setAddresses] = useState<string[]>(existing?.addresses?.length ? existing.addresses : [""]);
   const [drivers, setDrivers] = useState(existing?.drivers?.length ? existing.drivers : [{ name: "", phone: "", address: "" }]);
-  const [vehicles, setVehicles] = useState(existing?.vehicles?.length ? existing.vehicles : [{ vehicleType: "TRUCK", vehicleNumber: "" }]);
+  const [vehicles, setVehicles] = useState(
+    existing?.vehicles?.length
+      ? existing.vehicles.map((v) => ({ ...v, vehicleNumber: formatVehicleNumber(v.vehicleNumber) }))
+      : [{ vehicleType: "TRUCK", vehicleNumber: "" }]
+  );
   const [openingPaid, setOpeningPaid] = useState(existing ? String(existing.openingPaid) : "");
   const [openingDue, setOpeningDue] = useState(existing ? String(existing.openingDue) : "");
   const [saving, setSaving] = useState(false);
@@ -159,10 +165,10 @@ export function AddCustomerForm({ existing, onClose, onSaved }: AddCustomerFormP
                 <option value="TRUCK">{t("brickLoading.truck")}</option>
                 <option value="TRACTOR">{t("brickLoading.tractor")}</option>
               </select>
-              <input
+              <VehicleNumberInput
                 placeholder={t("dispatch.vehicleNumberPlaceholder")}
                 value={vehicle.vehicleNumber}
-                onChange={(e) => setVehicles((v) => v.map((x, j) => (j === i ? { ...x, vehicleNumber: e.target.value } : x)))}
+                onChange={(value) => setVehicles((v) => v.map((x, j) => (j === i ? { ...x, vehicleNumber: value } : x)))}
                 className={inputClass + " flex-1"}
               />
               {vehicles.length > 1 && (

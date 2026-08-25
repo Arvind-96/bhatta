@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Pagination, usePagination } from "@/components/ui/pagination";
-import { cn, formatINR } from "@/lib/utils";
+import { cn, formatINR, formatVehicleNumber } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 import type { FuelEfficiency, FuelLog, FuelPurchase, FuelType, Gher, Person, SimplePaymentMode, SupplierFuelBalance } from "@/types";
 
 const inputClass =
@@ -230,7 +231,7 @@ function EditFuelPurchaseModal({
 }) {
   const { t } = useTranslation();
   const [fuelType, setFuelType] = useState(purchase.fuelType);
-  const [vehicleNumber, setVehicleNumber] = useState(purchase.vehicleNumber ?? "");
+  const [vehicleNumber, setVehicleNumber] = useState(purchase.vehicleNumber ? formatVehicleNumber(purchase.vehicleNumber) : "");
   const [invoicedWeightKg, setInvoicedWeightKg] = useState(String(purchase.invoicedWeightKg));
   const [actualWeightKg, setActualWeightKg] = useState(String(purchase.actualWeightKg));
   const [amount, setAmount] = useState(String(purchase.amount));
@@ -288,10 +289,10 @@ function EditFuelPurchaseModal({
               </option>
             ))}
           </select>
-          <input
+          <VehicleNumberInput
             placeholder={t("fuel.transportVehicleNumber")}
             value={vehicleNumber}
-            onChange={(e) => setVehicleNumber(e.target.value)}
+            onChange={setVehicleNumber}
             className={cn(inputClass, "col-span-2")}
           />
           <input
@@ -468,10 +469,10 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                 </option>
               ))}
             </select>
-            <input
+            <VehicleNumberInput
               placeholder={t("fuel.transportVehicleNumber")}
               value={form.vehicleNumber}
-              onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
+              onChange={(value) => setForm((f) => ({ ...f, vehicleNumber: value }))}
               className={cn(inputClass, "col-span-2")}
             />
             <input

@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
-import { formatINR } from "@/lib/utils";
+import { formatINR, formatVehicleNumber } from "@/lib/utils";
 import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
 import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
-import type { BrickCategory, BrickLoadingEntry, LaborPaymentMode } from "@/types";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
+import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, LaborPaymentMode } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -42,7 +43,8 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   const [tipPaymentMode, setTipPaymentMode] = useState<LaborPaymentMode | "">(entry.tipPaymentMode ?? "");
   const [tipCashAmount, setTipCashAmount] = useState(entry.tipCashAmount != null ? String(entry.tipCashAmount) : "");
   const [tipOnlineAmount, setTipOnlineAmount] = useState(entry.tipOnlineAmount != null ? String(entry.tipOnlineAmount) : "");
-  const [vehicleNumber, setVehicleNumber] = useState(entry.vehicleNumber);
+  const [vehicleNumber, setVehicleNumber] = useState(formatVehicleNumber(entry.vehicleNumber));
+  const [vehicleType, setVehicleType] = useState<BrickVehicleType>(entry.vehicleType ?? "TRUCK");
   const [items, setItems] = useState<LineItemRow[]>(lineItemRowsFrom(entry));
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const [unloadedBricksCount, setUnloadedBricksCount] = useState(entry.unloadedBricksCount ? String(entry.unloadedBricksCount) : "");
@@ -103,6 +105,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
         driverName: driverName || undefined,
         driverPhone: driverPhone || undefined,
         vehicleNumber,
+        vehicleType,
         items: validItems.map((row) => ({
           categoryId: row.categoryId,
           bricksCount: Number(row.bricksCount),
@@ -217,13 +220,22 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.loadingSection")}</p>
             <div className="mb-2 grid grid-cols-2 gap-2">
-              <input
+              <VehicleNumberInput
                 required
                 placeholder={t("brickLoading.vehicleNumber")}
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
+                onChange={setVehicleNumber}
                 className={inputClass}
               />
+              <select
+                required
+                value={vehicleType}
+                onChange={(e) => setVehicleType(e.target.value as BrickVehicleType)}
+                className={inputClass}
+              >
+                <option value="TRUCK">{t("brickLoading.truck")}</option>
+                <option value="TRACTOR">{t("brickLoading.tractor")}</option>
+              </select>
               <input
                 type="number"
                 placeholder={t("brickLoading.loadingRatePlaceholder")}

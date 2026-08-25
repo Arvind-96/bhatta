@@ -8,8 +8,9 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { printInvoiceRecord } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
-import { formatINR } from "@/lib/utils";
+import { formatINR, formatVehicleNumber } from "@/lib/utils";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type { BrickCategory, Customer, Dispatch as DispatchEntry, Invoice, PaymentMode } from "@/types";
 
@@ -97,7 +98,9 @@ export function CreateInvoiceForm({
   // Auto-filled from the originating Dispatch's own vehicleNumber (still
   // editable) — same "snapshot, then independently editable" convention as
   // customerAddress/customerPhone above.
-  const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
+  const [vehicleNumber, setVehicleNumber] = useState(
+    existing?.vehicleNumber ? formatVehicleNumber(existing.vehicleNumber) : dispatch?.vehicleNumber ? formatVehicleNumber(dispatch.vehicleNumber) : ""
+  );
   const [gstRatePercent, setGstRatePercent] = useState(existing?.gstRatePercent != null ? String(existing.gstRatePercent) : "");
   const [gstType, setGstType] = useState<"CGST_SGST" | "IGST">(existing?.gstType ?? "CGST_SGST");
   const [termsAndConditions, setTermsAndConditions] = useState(existing?.termsAndConditions ?? activeKiln?.defaultTermsAndConditions ?? "");
@@ -278,7 +281,7 @@ export function CreateInvoiceForm({
         <input placeholder={t("brickLoading.customerAddressPlaceholder")} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} className={inputClass} />
         <input placeholder={t("dispatchDocs.gstNumberPlaceholder")} value={customerGstNumber} onChange={(e) => setCustomerGstNumber(e.target.value)} className={inputClass} />
         <input placeholder={t("dispatchDocs.customerStateCodePlaceholder")} value={customerStateCode} onChange={(e) => setCustomerStateCode(e.target.value)} className={inputClass} />
-        <input placeholder={t("dispatch.vehicleNumberPlaceholder")} value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className={inputClass} />
+        <VehicleNumberInput placeholder={t("dispatch.vehicleNumberPlaceholder")} value={vehicleNumber} onChange={setVehicleNumber} className={inputClass} />
 
         {/* Read-only — set once in Settings, auto-fetched onto every new
             invoice from there (see kilnInfo.stateCode above) and printed

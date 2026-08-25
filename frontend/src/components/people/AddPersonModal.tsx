@@ -8,6 +8,7 @@ import type { PayType, Person, PersonType, ShiftType, StackingStage, WorkType } 
 import { usePersonTypeMeta, useWorkTypeLabels, PERSON_TYPES } from "./personTypes";
 import { useTranslation } from "@/hooks/useTranslation";
 import { PhotoCaptureInput } from "./PhotoCaptureInput";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 
 interface AddPersonModalProps {
   defaultType: PersonType;
@@ -368,10 +369,10 @@ export function AddPersonModal({
 
           {type === "DRIVER" && (
             <>
-              <input
+              <VehicleNumberInput
                 placeholder={t("people.vehicleTractorNumber")}
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value)}
+                onChange={setVehicleNumber}
                 className={inputClass}
               />
               <input

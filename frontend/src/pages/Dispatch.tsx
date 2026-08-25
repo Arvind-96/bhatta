@@ -17,6 +17,7 @@ import { DispatchDetailPage } from "@/components/dispatch/DispatchDetailPage";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
 import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, LaborPaymentMode, Person } from "@/types";
 
 const inputClass =
@@ -341,10 +342,10 @@ export function Dispatch() {
             />
 
             <div className="grid grid-cols-2 gap-2">
-              <input
+              <VehicleNumberInput
                 placeholder={t("dispatch.vehicleNumberPlaceholder")}
                 value={form.vehicleNumber}
-                onChange={(e) => setForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
+                onChange={(value) => setForm((f) => ({ ...f, vehicleNumber: value }))}
                 disabled={tripLocked}
                 className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
               />

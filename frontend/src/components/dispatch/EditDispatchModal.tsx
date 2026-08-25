@@ -3,12 +3,13 @@ import { X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
-import { cn, formatINR } from "@/lib/utils";
+import { cn, formatINR, formatVehicleNumber } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
 import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, LaborPaymentMode, Person } from "@/types";
 
 const inputClass =
@@ -48,7 +49,7 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
   const [discountAmount, setDiscountAmount] = useState(dispatch.discountAmount ? String(dispatch.discountAmount) : "");
   const [driverName, setDriverName] = useState(dispatch.driverName ?? "");
   const [driverPhone, setDriverPhone] = useState(dispatch.driverPhone ?? "");
-  const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ?? "");
+  const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ? formatVehicleNumber(dispatch.vehicleNumber) : "");
   const [vehicleType, setVehicleType] = useState(dispatch.vehicleType ?? "");
   const [driverTipAmount, setDriverTipAmount] = useState(dispatch.driverTipAmount ? String(dispatch.driverTipAmount) : "");
   const [driverTipPaymentMode, setDriverTipPaymentMode] = useState<LaborPaymentMode | "">(dispatch.driverTipPaymentMode ?? "");
@@ -237,10 +238,10 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
               inputClassName={inputClass}
             />
           )}
-          <input
+          <VehicleNumberInput
             placeholder={t("dispatch.vehicleNumberPlaceholder")}
             value={vehicleNumber}
-            onChange={(e) => setVehicleNumber(e.target.value)}
+            onChange={setVehicleNumber}
             className={inputClass}
           />
           <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} className={inputClass}>

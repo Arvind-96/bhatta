@@ -14,6 +14,16 @@ export function formatINR(amount: number): string {
   return Math.round(amount).toLocaleString("en-IN");
 }
 
+// Enforces the required XX-XX-XX-XXXX vehicle-number format (e.g.
+// "MH-12-AB-1234") as the admin types: uppercases, strips anything that
+// isn't a letter/digit, then re-inserts dashes every 2 characters (capped
+// at 10 alphanumeric characters total, matching the format's 4 groups).
+export function formatVehicleNumber(raw: string): string {
+  const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+  const groups = [clean.slice(0, 2), clean.slice(2, 4), clean.slice(4, 6), clean.slice(6, 10)];
+  return groups.filter(Boolean).join("-");
+}
+
 // The "System Entry Date" shown next to a record's own (admin-editable)
 // transaction date — always includes the time, since it's meant to show
 // exactly when the entry was created, not just which day.

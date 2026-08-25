@@ -8,6 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 import { OperatorDetailPage } from "./OperatorDetailPage";
 import { EditStackingEntryModal } from "./EditStackingEntryModal";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -288,10 +289,10 @@ export function StackingContractorDetailPage({ contractorId, onBack }: StackingC
                 className={inputClass}
               />
               {vehicleForm.vehicleType === "TRACTOR" ? (
-                <input
+                <VehicleNumberInput
                   placeholder={t("stacking.tractorNumberPlaceholder")}
                   value={vehicleForm.vehicleNumber}
-                  onChange={(e) => setVehicleForm((f) => ({ ...f, vehicleNumber: e.target.value }))}
+                  onChange={(value) => setVehicleForm((f) => ({ ...f, vehicleNumber: value }))}
                   className={cn(inputClass, "col-span-2")}
                 />
               ) : (

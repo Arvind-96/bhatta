@@ -9,6 +9,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { printChallanRecord } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
+import { formatVehicleNumber } from "@/lib/utils";
 import type { BrickCategory, Challan, Dispatch as DispatchEntry } from "@/types";
 
 const inputClass =
@@ -40,7 +42,9 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
   const kilnInfo = { name: activeKiln?.name ?? "Bhatta Cloud", location: activeKiln?.location, phone: activeKiln?.phone, gstNumber: activeKiln?.gstNumber };
 
   const [sequenceNumber, setSequenceNumber] = useState("");
-  const [vehicleNumber, setVehicleNumber] = useState(existing?.vehicleNumber ?? dispatch?.vehicleNumber ?? "");
+  const [vehicleNumber, setVehicleNumber] = useState(
+    existing?.vehicleNumber ? formatVehicleNumber(existing.vehicleNumber) : dispatch?.vehicleNumber ? formatVehicleNumber(dispatch.vehicleNumber) : ""
+  );
   const [vehicleType, setVehicleType] = useState(existing?.vehicleType ?? dispatch?.vehicleType ?? "");
   const [driverName, setDriverName] = useState(existing?.driverName ?? dispatch?.driverName ?? "");
   const [driverPhone, setDriverPhone] = useState(existing?.driverPhone ?? dispatch?.driverPhone ?? "");
@@ -121,7 +125,7 @@ export function CreateChallanForm({ dispatch, categories, existing, onClose, onS
         <input placeholder={t("brickLoading.customerAddressPlaceholder")} value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1" />
         <input placeholder={t("brickLoading.driverNamePlaceholder")} value={driverName} onChange={(e) => setDriverName(e.target.value)} className={inputClass} />
         <input placeholder={t("brickLoading.driverPhonePlaceholder")} value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} className={inputClass} />
-        <input placeholder={t("dispatch.vehicleNumberPlaceholder")} value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className={inputClass} />
+        <VehicleNumberInput placeholder={t("dispatch.vehicleNumberPlaceholder")} value={vehicleNumber} onChange={setVehicleNumber} className={inputClass} />
         <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} className={inputClass}>
           <option value="">{t("dispatch.vehicleTypePlaceholder")}</option>
           <option value="TRUCK">{t("brickLoading.truck")}</option>

@@ -1,4 +1,4 @@
-import { Flame, LayoutGrid, Layers, CalendarCheck, Settings as SettingsIcon, Thermometer, Truck, Users, UserSquare2, Hammer, PackageCheck, Wrench, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, FileText, Receipt, Wallet, Fuel as FuelIcon, Boxes, Warehouse, PieChart, Banknote, FileSearch, GitCompare, Mountain, X } from "lucide-react";
+import { Flame, LayoutGrid, Layers, CalendarCheck, Settings as SettingsIcon, Thermometer, Truck, Users, UserSquare2, Hammer, PackageCheck, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, FileText, Receipt, Wallet, Fuel as FuelIcon, Boxes, Warehouse, PieChart, Banknote, FileSearch, GitCompare, Mountain, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KilnSwitcher } from "./KilnSwitcher";
 import { useUiStore, type AppView } from "@/store/ui.store";
@@ -42,7 +42,6 @@ export const navItems: { key: string; icon: typeof LayoutGrid; view: AppView; gr
 
   { key: "nav.inventory", icon: Boxes, view: "inventory", group: "nav.group.resources" },
   { key: "nav.stock", icon: Warehouse, view: "stock", group: "nav.group.resources" },
-  { key: "nav.fleet", icon: Wrench, view: "fleet", group: "nav.group.resources" },
 
   { key: "nav.staff", icon: UserCog, view: "staff", group: "nav.group.admin" },
   { key: "nav.salary", icon: Banknote, view: "salary", group: "nav.group.admin" },
