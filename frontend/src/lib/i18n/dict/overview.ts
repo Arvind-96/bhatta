@@ -104,4 +104,8 @@ export const overviewDict: Record<string, Record<Locale, string>> = {
   "financialOverview.from": { en: "From", hi: "से" },
   "financialOverview.to": { en: "To", hi: "तक" },
   "financialOverview.viewReport": { en: "View report", hi: "रिपोर्ट देखें" },
+  "financialOverview.moneyInOutChart": { en: "Money in vs. money out", hi: "आय बनाम व्यय" },
+  "financialOverview.moneyInOutChartSubtitle": { en: "Today, this week, month, and year, side by side", hi: "आज, इस सप्ताह, महीने और वर्ष की तुलना" },
+  "financialOverview.paymentMixChart": { en: "How money came in", hi: "आय किस माध्यम से आई" },
+  "financialOverview.paymentMixChartSubtitle": { en: "Cash vs. online split for the selected period", hi: "चयनित अवधि के लिए नकद बनाम ऑनलाइन विभाजन" },
 };

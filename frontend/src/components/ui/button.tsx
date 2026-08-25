@@ -8,7 +8,12 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "gradient-brand text-white shadow-glow-1 hover:shadow-glow-1-lg hover:-translate-y-0.5 active:translate-y-0",
+          "btn-shine gradient-brand text-white shadow-glow-1 hover:shadow-glow-1-lg hover:-translate-y-0.5 active:translate-y-0",
+        // Reserved for the single highest-stakes action on a screen (e.g.
+        // "Generate Invoice") — the electric secondary accent, never used
+        // as a resting/default color so it stays a signal, not wallpaper.
+        accent:
+          "btn-shine gradient-accent2 text-white shadow-[0_6px_20px_-6px_var(--neon-glow)] hover:shadow-[0_10px_26px_-6px_var(--neon-glow)] hover:-translate-y-0.5 active:translate-y-0",
         ghost: "bg-transparent text-ink-secondary hover:bg-ink-primary/5",
         outline: "border border-border text-ink-primary hover:bg-ink-primary/5 hover:border-series-1/50",
       },

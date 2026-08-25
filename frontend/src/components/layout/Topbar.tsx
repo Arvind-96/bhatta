@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from "react";
-import { Hammer, Menu, Plus, Search } from "lucide-react";
+import { ChevronDown, Hammer, LogOut, Menu, Plus, Search, Settings as SettingsIcon } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboard.store";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/hooks/useTranslation";
+import { avatarToneSolidClass, initialsOf } from "@/lib/avatarTone";
+import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { navItems } from "./Sidebar";
 
@@ -13,6 +15,7 @@ export function Topbar() {
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const kiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const logout = useAuthStore((s) => s.logout);
   const view = useUiStore((s) => s.view);
   const setView = useUiStore((s) => s.setView);
   const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
@@ -21,6 +24,7 @@ export function Topbar() {
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const searchBlurTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const pageTitleKey = navItems.find((n) => n.view === view)?.key ?? "topbar.kilnOverview";
 
@@ -32,7 +36,7 @@ export function Topbar() {
 
   const badge =
     status === "online"
-      ? { variant: "good" as const, label: t("topbar.live"), dot: "bg-status-good" }
+      ? { variant: "live" as const, label: t("topbar.live"), dot: "bg-[var(--neon)]" }
       : status === "connecting"
       ? { variant: "neutral" as const, label: t("topbar.connecting"), dot: "bg-ink-muted" }
       : { variant: "critical" as const, label: t("topbar.offline"), dot: "bg-status-critical" };
@@ -110,10 +114,61 @@ export function Topbar() {
         </button>
 
         <LanguageSwitcher />
-        <Badge variant={badge.variant} className={status === "online" ? "shadow-glow-5" : undefined}>
+        <Badge variant={badge.variant}>
           <span className={`h-1.5 w-1.5 rounded-full ${badge.dot} ${status === "online" ? "animate-pulse-ring" : ""}`} />
           <span className="hidden sm:inline">{badge.label}</span>
         </Badge>
+
+        <div className="relative">
+          <button
+            onClick={() => setProfileOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-xl py-1 pl-1 pr-2 transition-colors hover:bg-ink-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            aria-label={t("nav.settings")}
+          >
+            <span
+              className={cn(
+                "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-[0_0_0_2px_var(--surface),0_0_0_3.5px_var(--neon-glow)]",
+                avatarToneSolidClass(activeKilnId ?? "bhatta")
+              )}
+            >
+              {initialsOf(kiln?.name ?? "Bhatta Cloud")}
+            </span>
+            <ChevronDown className={cn("hidden h-3.5 w-3.5 text-ink-muted transition-transform sm:block", profileOpen && "rotate-180")} />
+          </button>
+
+          {profileOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} aria-hidden />
+              <div className="glass-panel absolute right-0 top-full z-20 mt-1.5 w-56 rounded-xl p-1.5 shadow-glass">
+                <div className="px-2.5 py-2">
+                  <p className="truncate text-sm font-semibold text-ink-primary">{kiln?.name ?? "Bhatta Cloud"}</p>
+                  <p className="truncate text-xs text-ink-muted">{kiln?.role ?? ""}</p>
+                </div>
+                <div className="my-1 h-px bg-border" />
+                <button
+                  onClick={() => {
+                    setView("settings");
+                    setProfileOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-ink-secondary hover:bg-ink-primary/5 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                >
+                  <SettingsIcon className="h-4 w-4 text-series-1" />
+                  {t("nav.settings")}
+                </button>
+                <button
+                  onClick={() => {
+                    setProfileOpen(false);
+                    logout();
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-ink-secondary hover:bg-status-critical/10 hover:text-status-critical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {t("topbar.logout")}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

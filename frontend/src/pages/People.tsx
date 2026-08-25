@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Handshake, MapPinned, Plus, Truck, Users } from "lucide-react";
+import { Handshake, MapPinned, Phone, Plus, Truck, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,25 +39,47 @@ function PersonCard({
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
+  const active = person.status !== "ABSCONDED";
   return (
     <Card>
       <button className="flex w-full items-start gap-3 text-left" onClick={onOpen}>
-        <div
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-            avatarToneClass(person._id)
-          )}
-        >
-          {initialOf(person.name)}
+        <div className="relative shrink-0">
+          <div
+            className={cn(
+              "flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold",
+              avatarToneClass(person._id)
+            )}
+          >
+            {initialOf(person.name)}
+          </div>
+          <span
+            className={cn(
+              "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface",
+              active ? "bg-status-good" : "bg-status-critical"
+            )}
+            aria-hidden
+          />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-ink-primary hover:underline">{person.name}</p>
           <p className="truncate text-sm text-ink-muted">{subtitle}</p>
         </div>
       </button>
-      <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-        <span className="text-sm text-ink-muted">{person.phone ?? "—"}</span>
-        <div className="flex items-center gap-1.5">
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {person.phone ? (
+            <a
+              href={`tel:${person.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border text-ink-secondary transition-colors hover:border-series-1/50 hover:bg-series-1/10 hover:text-series-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              aria-label={person.phone}
+            >
+              <Phone className="h-3.5 w-3.5" />
+            </a>
+          ) : null}
+          <span className="truncate text-sm text-ink-muted">{person.phone ?? "—"}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
           {balanceLabel && <span className="text-xs font-medium text-ink-secondary">{balanceLabel}</span>}
           <Badge variant={person.status === "ABSCONDED" ? "critical" : "good"}>
             {person.status === "ABSCONDED" ? t("people.absconded") : t("common.active")}
