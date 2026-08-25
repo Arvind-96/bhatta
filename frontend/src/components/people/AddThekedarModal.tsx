@@ -98,7 +98,8 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink-primary/50 p-4 backdrop-blur-sm">
+      <div className="flex min-h-full items-center justify-center">
       <Card className="w-full max-w-md hover:translate-y-0">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -210,6 +211,7 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
           )}
         </form>
       </Card>
+      </div>
     </div>
   );
 }

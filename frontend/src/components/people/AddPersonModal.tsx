@@ -168,7 +168,8 @@ export function AddPersonModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
+      <div className="flex min-h-full items-center justify-center">
       <Card className="w-full max-w-sm">
         <div className="-mx-6 -mt-6 mb-4 h-1.5 animate-gradient-flow gradient-brand bg-[length:200%_100%]" />
         <div className="mb-4 flex items-center gap-3">
@@ -462,6 +463,7 @@ export function AddPersonModal({
           )}
         </form>
       </Card>
+      </div>
     </div>
   );
 }

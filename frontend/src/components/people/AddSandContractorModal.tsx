@@ -126,7 +126,8 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
+      <div className="flex min-h-full items-center justify-center">
       <Card className="w-full max-w-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink-primary">{t("people.addSandContractorModalTitle")}</h3>
@@ -263,6 +264,7 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
           )}
         </form>
       </Card>
+      </div>
     </div>
   );
 }
