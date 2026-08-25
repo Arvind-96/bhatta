@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react";
-import { ChevronDown, Hammer, LogOut, Menu, Plus, Search, Settings as SettingsIcon } from "lucide-react";
+import { Bell, Check, ChevronDown, ChevronsUpDown, Hammer, LogOut, Menu, Plus, Search, Settings as SettingsIcon } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboard.store";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useTheme } from "@/hooks/useTheme";
 import { avatarToneSolidClass, initialsOf } from "@/lib/avatarTone";
 import { cn } from "@/lib/utils";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -25,6 +26,9 @@ export function Topbar() {
   const [searchFocused, setSearchFocused] = useState(false);
   const searchBlurTimeout = useRef<ReturnType<typeof setTimeout>>();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const { isDark, toggleTheme } = useTheme();
+  const setActiveKiln = useAuthStore((s) => s.setActiveKiln);
 
   const pageTitleKey = navItems.find((n) => n.view === view)?.key ?? "topbar.kilnOverview";
 
@@ -119,6 +123,42 @@ export function Topbar() {
           <span className="hidden sm:inline">{badge.label}</span>
         </Badge>
 
+        <label className="hidden items-center gap-2 text-xs font-medium text-ink-muted sm:flex">
+          <span>{isDark ? t("topbar.darkMode") : t("topbar.lightMode")}</span>
+          <button
+            role="switch"
+            aria-checked={isDark}
+            aria-label={t("topbar.toggleTheme")}
+            onClick={toggleTheme}
+            className="relative h-[22px] w-[38px] shrink-0 rounded-full bg-ink-primary/15 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 h-[18px] w-[18px] rounded-full bg-gradient-accent2 shadow-sm transition-transform",
+                isDark ? "translate-x-[18px]" : "translate-x-0.5"
+              )}
+            />
+          </button>
+        </label>
+
+        <div className="relative">
+          <button
+            onClick={() => setNotifOpen((o) => !o)}
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-secondary transition-colors hover:bg-ink-primary/5 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            aria-label={t("topbar.notifications")}
+          >
+            <Bell className="h-4 w-4" />
+          </button>
+          {notifOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setNotifOpen(false)} aria-hidden />
+              <div className="glass-panel absolute right-0 top-full z-20 mt-1.5 w-56 rounded-xl p-3 shadow-glass">
+                <p className="text-sm text-ink-muted">{t("topbar.noNotificationsYet")}</p>
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="relative">
           <button
             onClick={() => setProfileOpen((o) => !o)}
@@ -145,6 +185,28 @@ export function Topbar() {
                   <p className="truncate text-xs text-ink-muted">{kiln?.role ?? ""}</p>
                 </div>
                 <div className="my-1 h-px bg-border" />
+                {kilns.length > 1 && (
+                  <>
+                    <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-bold uppercase tracking-wide text-ink-muted">{t("topbar.switchKiln")}</p>
+                    {kilns.map((k) => (
+                      <button
+                        key={k.kilnId}
+                        onClick={() => {
+                          setActiveKiln(k.kilnId);
+                          setProfileOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-ink-secondary hover:bg-ink-primary/5 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-series-1" />
+                          <span className="truncate">{k.name}</span>
+                        </span>
+                        {k.kilnId === activeKilnId && <Check className="h-3.5 w-3.5 shrink-0 text-series-1" />}
+                      </button>
+                    ))}
+                    <div className="my-1 h-px bg-border" />
+                  </>
+                )}
                 <button
                   onClick={() => {
                     setView("settings");

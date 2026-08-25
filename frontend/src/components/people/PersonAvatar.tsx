@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { avatarToneSolidClass } from "@/lib/avatarTone";
 
 interface PersonAvatarProps {
   personId: string;
@@ -37,11 +38,21 @@ export function PersonAvatar({ personId, hasPhoto, name, size = "lg" }: PersonAv
   }, [personId, hasPhoto]);
 
   if (url) {
-    return <img src={url} alt={name} className={`${dimension} shrink-0 rounded-full object-cover shadow-sm`} />;
+    return (
+      <img
+        src={url}
+        alt={name}
+        className={`${dimension} shrink-0 rounded-full object-cover shadow-[0_0_0_2px_var(--surface),0_0_0_3.5px_var(--neon-glow)]`}
+      />
+    );
   }
 
   return (
-    <div className={`${dimension} flex shrink-0 items-center justify-center rounded-full bg-series-1/15 ${textSize} font-bold text-series-1`}>
+    <div
+      className={`${dimension} flex shrink-0 items-center justify-center rounded-full ${textSize} font-bold text-white shadow-[0_0_0_2px_var(--surface),0_0_0_3.5px_var(--neon-glow)] ${avatarToneSolidClass(
+        personId
+      )}`}
+    >
       {name.trim().charAt(0).toUpperCase() || "?"}
     </div>
   );

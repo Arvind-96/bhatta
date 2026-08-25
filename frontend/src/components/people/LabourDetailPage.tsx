@@ -347,22 +347,16 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
           <div className="flex flex-col items-end gap-2">
             <div className="flex gap-2">
               {!isEditing && (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
-                >
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
                   <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                </button>
+                </Button>
               )}
-              <button
-                onClick={toggleAbsconded}
-                className="rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
-              >
+              <Button variant="outline" size="sm" onClick={toggleAbsconded}>
                 {labour.status === "ABSCONDED" ? t("people.markActive") : t("people.markAbsconded")}
-              </button>
+              </Button>
               <button
                 onClick={deleteProfile}
-                className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+                className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical transition-all hover:-translate-y-0.5 hover:bg-status-critical/10 hover:shadow-[0_6px_16px_-6px_rgba(239,74,99,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-critical focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
               >
                 <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
               </button>

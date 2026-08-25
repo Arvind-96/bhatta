@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { QuickLedgerModal, type QuickLedgerCategory } from "./QuickLedgerModal";
+import { Button } from "@/components/ui/button";
 import type { Person } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -27,13 +28,9 @@ export function LedgerQuickActions({ person, onSaved }: LedgerQuickActionsProps)
     <>
       <div className="flex flex-wrap gap-2">
         {ACTIONS.map((a) => (
-          <button
-            key={a.key}
-            onClick={() => setActive(a.key)}
-            className="rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary transition-colors hover:bg-ink-primary/10 hover:text-ink-primary"
-          >
+          <Button key={a.key} variant="outline" size="sm" onClick={() => setActive(a.key)}>
             {t(a.labelKey)}
-          </button>
+          </Button>
         ))}
       </div>
       {active && (
