@@ -108,4 +108,7 @@ export const overviewDict: Record<string, Record<Locale, string>> = {
   "financialOverview.moneyInOutChartSubtitle": { en: "Today, this week, month, and year, side by side", hi: "आज, इस सप्ताह, महीने और वर्ष की तुलना" },
   "financialOverview.paymentMixChart": { en: "How money came in", hi: "आय किस माध्यम से आई" },
   "financialOverview.paymentMixChartSubtitle": { en: "Cash vs. online split for the selected period", hi: "चयनित अवधि के लिए नकद बनाम ऑनलाइन विभाजन" },
+  "overview.heroTagline": { en: "Everything happening at your kiln today, in one place.", hi: "आपके भट्टे पर आज हो रहा हर काम, एक ही जगह।" },
+  "overview.heroLive": { en: "Live", hi: "लाइव" },
+  "overview.heroBricksToday": { en: "{count} bricks logged today", hi: "आज {count} ईंटें दर्ज हुईं" },
 };

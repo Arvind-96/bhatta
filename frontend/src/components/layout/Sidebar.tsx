@@ -66,7 +66,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Flame className="h-4 w-4 text-white" />
         </div>
         <span className="font-display text-base font-semibold text-sidebar-ink">{t("app.name")}</span>
-        <span className="ml-auto animate-gradient-flow gradient-brand rounded bg-[length:200%_200%] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white">
+        <span className="ml-auto animate-gradient-flow gradient-accent2 rounded bg-[length:200%_200%] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white shadow-[0_0_10px_-2px_var(--neon-glow)]">
           Live
         </span>
       </div>

@@ -432,6 +432,78 @@ function SectionHeading({ icon: Icon, title, trailing }: { icon: LucideIcon; tit
   );
 }
 
+// A brand banner at the top of the dashboard — the page used to drop
+// straight into a grid of stat cards with no sense of place. Purely a
+// visual/atmosphere element (the illustration is decorative); the two
+// live numbers it shows (kiln name, today's bricks) are the exact same
+// real values the stat-card grid below also renders, never invented.
+function OverviewHero({ kilnName, dateLabel, todayBricks }: { kilnName: string; dateLabel: string; todayBricks: number }) {
+  const { t } = useTranslation();
+  return (
+    <Card className="overflow-hidden">
+      <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{dateLabel}</p>
+          <h2 className="font-display text-2xl font-bold text-ink-primary sm:text-3xl">{kilnName}</h2>
+          <p className="mt-2 max-w-md text-sm text-ink-secondary">{t("overview.heroTagline")}</p>
+          <div className="mt-4 flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-[var(--neon)] shadow-[0_0_8px_var(--neon-glow)]" style={{ animation: "pulse-neon-soft 1.6s ease-in-out infinite" }} />
+            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--neon)]">{t("overview.heroLive")}</span>
+            <span className="text-xs text-ink-muted">·</span>
+            <span className="text-xs font-medium text-ink-secondary">
+              {t("overview.heroBricksToday", { count: todayBricks.toLocaleString("en-IN") })}
+            </span>
+          </div>
+        </div>
+
+        <div className="relative mx-auto aspect-[16/10] w-full max-w-sm overflow-hidden rounded-2xl">
+          <svg viewBox="0 0 420 280" width="100%" height="100%" preserveAspectRatio="xMidYMax slice" role="img" aria-hidden="true">
+            <defs>
+              <linearGradient id="ovSkyGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="var(--series-1)" stopOpacity=".16" />
+                <stop offset="1" stopColor="var(--series-2)" stopOpacity=".04" />
+              </linearGradient>
+              <linearGradient id="ovGroundGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="var(--series-2)" stopOpacity=".14" />
+                <stop offset="1" stopColor="var(--neon)" stopOpacity=".16" />
+              </linearGradient>
+              <linearGradient id="ovChimneyGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="var(--series-1)" />
+                <stop offset="1" stopColor="#2a4d8f" />
+              </linearGradient>
+            </defs>
+            <rect width="420" height="280" fill="url(#ovSkyGrad)" />
+            <circle className="hero-glow" cx="352" cy="50" r="30" fill="var(--neon)" />
+            <circle cx="352" cy="50" r="15" fill="var(--neon)" opacity=".55" />
+            <path d="M0,196 Q120,168 210,190 T420,182 V280 H0 Z" fill="url(#ovGroundGrad)" />
+            <g className="hero-smoke"><circle cx="118" cy="82" r="8" fill="var(--ink-muted)" opacity=".5" /></g>
+            <g className="hero-smoke"><circle cx="122" cy="76" r="6" fill="var(--ink-muted)" opacity=".5" /></g>
+            <g className="hero-smoke"><circle cx="114" cy="88" r="7" fill="var(--ink-muted)" opacity=".5" /></g>
+            <g className="hero-smoke"><circle cx="120" cy="84" r="5" fill="var(--ink-muted)" opacity=".5" /></g>
+            <rect x="104" y="90" width="28" height="88" rx="3" fill="url(#ovChimneyGrad)" />
+            <rect x="98" y="174" width="40" height="14" rx="2" fill="#213a72" />
+            <g opacity=".92">
+              <rect x="150" y="208" width="34" height="16" rx="2" fill="var(--series-6)" />
+              <rect x="150" y="190" width="34" height="16" rx="2" fill="var(--series-3)" />
+              <rect x="188" y="208" width="34" height="16" rx="2" fill="var(--series-3)" />
+              <rect x="188" y="190" width="34" height="16" rx="2" fill="var(--series-6)" />
+              <rect x="226" y="208" width="34" height="16" rx="2" fill="var(--series-6)" />
+            </g>
+            <g className="hero-truck">
+              <rect x="34" y="186" width="46" height="26" rx="3" fill="var(--series-2)" />
+              <rect x="80" y="196" width="22" height="16" rx="2" fill="var(--neon)" />
+              <rect x="84" y="199" width="14" height="8" rx="1" fill="#eaf9ff" />
+              <circle cx="48" cy="216" r="6" fill="var(--ink-primary)" />
+              <circle cx="90" cy="216" r="6" fill="var(--ink-primary)" />
+            </g>
+            <rect x="0" y="222" width="420" height="3" fill="var(--ink-primary)" opacity=".08" />
+          </svg>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function Overview() {
   const todayBricks = useDashboardStore((s) => s.todayBricks);
   const stock = useDashboardStore((s) => s.stock);
@@ -439,6 +511,8 @@ export function Overview() {
   const { t } = useTranslation();
   const [dispatchTotals, setDispatchTotals] = useState<DispatchTotals | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const kilns = useAuthStore((s) => s.kilns);
+  const kiln = kilns.find((k) => k.kilnId === activeKilnId);
 
   useEffect(() => {
     if (!activeKilnId) return;
@@ -467,6 +541,8 @@ export function Overview() {
 
   return (
     <div className="space-y-7">
+      <OverviewHero kilnName={kiln?.name ?? "Bhatta Cloud"} dateLabel={today} todayBricks={todayBricks} />
+
       <div className="space-y-3">
         <SectionHeading icon={Zap} title={t("overview.sectionTodayProduction")} trailing={today} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
