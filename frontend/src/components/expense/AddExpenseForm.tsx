@@ -6,7 +6,9 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR } from "@/lib/utils";
-import type { Expense, ExpenseType } from "@/types";
+import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
+import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import type { Expense, ExpenseType, LaborPaymentMode } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -35,7 +37,11 @@ export function AddExpenseForm({ expenseTypes, existing, existingTypeName, onSav
   const [amount, setAmount] = useState(existing ? String(existing.amount) : "");
   const [quantity, setQuantity] = useState(existing?.quantity != null ? String(existing.quantity) : "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [paymentMode, setPaymentMode] = useState<LaborPaymentMode | "">(existing?.paymentMode ?? "");
+  const [cashAmount, setCashAmount] = useState(existing?.cashAmount != null ? String(existing.cashAmount) : "");
+  const [onlineAmount, setOnlineAmount] = useState(existing?.onlineAmount != null ? String(existing.onlineAmount) : "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
   const [balance, setBalance] = useState<{ totalPaid: number; totalDue: number } | null>(null);
 
   const isEditing = !!existing;
@@ -72,14 +78,25 @@ export function AddExpenseForm({ expenseTypes, existing, existingTypeName, onSav
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!resolvedTypeName || !amount) return;
+    if (isPaymentSplitMismatched(paymentMode, Number(amount) || 0, cashAmount, onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: (Number(amount) || 0).toLocaleString("en-IN") }));
+      return;
+    }
+    setFormError("");
     setSaving(true);
     try {
+      const paymentInfo = {
+        paymentMode: paymentMode || undefined,
+        cashAmount: paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
+        onlineAmount: paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
+      };
       if (isEditing) {
         await api.expenses.update(existing._id, {
           amount: Number(amount),
           quantity: isGasCylinder && quantity ? Number(quantity) : undefined,
           date: transactionDate || undefined,
           notes: notes || undefined,
+          ...paymentInfo,
         });
       } else {
         await api.expenses.create({
@@ -88,6 +105,7 @@ export function AddExpenseForm({ expenseTypes, existing, existingTypeName, onSav
           quantity: isGasCylinder && quantity ? Number(quantity) : undefined,
           date: transactionDate || undefined,
           notes: notes || undefined,
+          ...paymentInfo,
         });
       }
       onSaved();
@@ -162,6 +180,19 @@ export function AddExpenseForm({ expenseTypes, existing, existingTypeName, onSav
           )}
         </div>
 
+        {Number(amount) > 0 && (
+          <AmountPaymentModeFields
+            amount={Number(amount)}
+            paymentMode={paymentMode}
+            cashAmount={cashAmount}
+            onlineAmount={onlineAmount}
+            onPaymentModeChange={setPaymentMode}
+            onCashAmountChange={setCashAmount}
+            onOnlineAmountChange={setOnlineAmount}
+            inputClassName={inputClass}
+          />
+        )}
+
         {!isEditing && (newTypeName.trim() ? (
           <p className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-center text-xs text-ink-muted">
             {t("expense.newExpenseTypeBalanceHint")}
@@ -186,6 +217,7 @@ export function AddExpenseForm({ expenseTypes, existing, existingTypeName, onSav
           className={`${inputClass} w-full`}
         />
 
+        {formError && <p className="text-sm text-status-critical">{formError}</p>}
         <div className="flex gap-2">
           <Button type="submit" disabled={saving} className="flex-1">
             {t("expense.saveExpense")}

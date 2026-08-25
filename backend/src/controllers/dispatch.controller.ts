@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { createDispatch, deleteDispatch, dispatchTotals, listDispatches, recordDeliveryAdjustment, updateDispatch } from "../services/dispatch.service";
 import { BRICK_GRADES, DISPATCH_PAYMENT_MODES as PAYMENT_MODES } from "../db/schema";
+import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { validateCashOnlineSplit } from "../utils/paymentSplit";
 
 // One row per brick category on this dispatch — see BrickLineItem's doc
@@ -39,12 +40,22 @@ const createSchema = z
     vehicleNumber: z.string().optional(),
     vehicleType: z.string().optional(),
     driverTipAmount: z.number().min(0).optional(),
+    driverTipPaymentMode: z.enum(SIMPLE_PAYMENT_MODES).optional(),
+    driverTipCashAmount: z.number().min(0).optional(),
+    driverTipOnlineAmount: z.number().min(0).optional(),
     discountAmount: z.number().min(0).optional(),
     placeOfSupply: z.string().optional(),
     notes: z.string().optional(),
     dispatchedOn: z.string().min(1, "Transaction date is required"),
     loadingEntryId: z.string().optional(),
   })
+  .superRefine((data, ctx) =>
+    validateCashOnlineSplit(
+      { paymentMode: data.driverTipPaymentMode, cashAmount: data.driverTipCashAmount, onlineAmount: data.driverTipOnlineAmount },
+      data.driverTipAmount ?? 0,
+      ctx
+    )
+  )
   .superRefine((data, ctx) => {
     if (data.loadingEntryId) return;
     if (data.items && data.items.length > 0) return;
@@ -110,6 +121,9 @@ const updateSchema = z
     vehicleNumber: z.string().optional(),
     vehicleType: z.string().optional(),
     driverTipAmount: z.number().min(0).optional(),
+    driverTipPaymentMode: z.enum(SIMPLE_PAYMENT_MODES).optional(),
+    driverTipCashAmount: z.number().min(0).optional(),
+    driverTipOnlineAmount: z.number().min(0).optional(),
     discountAmount: z.number().min(0).optional(),
     placeOfSupply: z.string().optional(),
     notes: z.string().optional(),
@@ -118,6 +132,14 @@ const updateSchema = z
   .superRefine((data, ctx) => {
     if (data.amount === undefined) return;
     validateCashOnlineSplit(data, data.amount - (data.discountAmount ?? 0), ctx);
+  })
+  .superRefine((data, ctx) => {
+    if (data.driverTipAmount === undefined) return;
+    validateCashOnlineSplit(
+      { paymentMode: data.driverTipPaymentMode, cashAmount: data.driverTipCashAmount, onlineAmount: data.driverTipOnlineAmount },
+      data.driverTipAmount,
+      ctx
+    );
   })
   .superRefine((data, ctx) => {
     if (data.amount !== undefined && data.discountAmount != null && data.discountAmount > data.amount) {

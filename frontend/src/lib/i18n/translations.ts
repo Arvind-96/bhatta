@@ -163,6 +163,8 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.driver": { en: "Driver", hi: "ड्राइवर" },
   "common.paymentMode": { en: "Payment mode", hi: "भुगतान का तरीका" },
   "common.paymentModeCashAndOnline": { en: "Cash + Online", hi: "नकद + ऑनलाइन" },
+  "common.paymentOnline": { en: "Online", hi: "ऑनलाइन" },
+  "common.howWasThisPaid": { en: "How was this paid?", hi: "इसका भुगतान कैसे किया गया?" },
   "payment.cashAmount": { en: "Cash amount", hi: "नकद राशि" },
   "payment.onlineAmount": { en: "Online amount", hi: "ऑनलाइन राशि" },
   "payment.splitMismatch": { en: "Cash + Online must add up to ₹{total}", hi: "नकद + ऑनलाइन का योग ₹{total} होना चाहिए" },

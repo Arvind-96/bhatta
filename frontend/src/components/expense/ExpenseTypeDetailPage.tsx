@@ -22,6 +22,18 @@ function monthKey(dateStr: string) {
   return d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 }
 
+// "Cash ₹X + Online ₹Y" for a split payment, a plain "Cash"/"Online" for a
+// single mode, or "—" when no payment mode was recorded at all (true for
+// every expense logged before this feature, and for any manual expense
+// the admin didn't set one on).
+function paymentModeSummary(e: Expense, t: (key: string) => string) {
+  if (!e.paymentMode) return "—";
+  if (e.paymentMode === "CASH_AND_ONLINE") {
+    return `${t("dispatch.paymentCash")} ₹${formatINR(e.cashAmount ?? 0)} + ${t("common.paymentOnline")} ₹${formatINR(e.onlineAmount ?? 0)}`;
+  }
+  return e.paymentMode === "CASH" ? t("dispatch.paymentCash") : t("common.paymentOnline");
+}
+
 // The profile-style page for a single Expense Type — items 3/5 of the
 // request: Total Paid/Total Due at the top (never stored, always
 // recomputed live — see expenseType.service.ts's getExpenseTypeDetail),
@@ -138,6 +150,7 @@ export function ExpenseTypeDetailPage({ expenseTypeId, expenseTypes, onBack }: E
                       <tr className="border-b border-border bg-ink-primary/5 text-left text-sm text-ink-muted">
                         <th className="px-3 py-2 font-medium">{t("expense.transactionDateLabel")}</th>
                         <th className="px-3 py-2 font-medium">{t("common.amount")}</th>
+                        <th className="px-3 py-2 font-medium">{t("common.paymentMode")}</th>
                         <th className="px-3 py-2 font-medium">{t("common.notes")}</th>
                       </tr>
                     </thead>
@@ -150,6 +163,7 @@ export function ExpenseTypeDetailPage({ expenseTypeId, expenseTypes, onBack }: E
                         >
                           <td className="px-3 py-2 text-ink-primary">{new Date(e.date).toLocaleDateString("en-IN")}</td>
                           <td className="px-3 py-2 tabular-nums text-ink-secondary">₹{formatINR(e.amount)}</td>
+                          <td className="px-3 py-2 text-ink-secondary">{paymentModeSummary(e, t)}</td>
                           <td className="px-3 py-2 text-ink-secondary">{e.notes ?? "—"}</td>
                         </tr>
                       ))}

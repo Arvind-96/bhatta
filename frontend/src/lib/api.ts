@@ -5,6 +5,7 @@ import type {
   SalarySlip,
   SalaryStatusEntry,
   SimplePaymentMode,
+  LaborPaymentMode,
   BrickCategory,
   BrickCategoryName,
   BrickGrade,
@@ -229,6 +230,9 @@ export const api = {
       vehicleNumber?: string;
       vehicleType?: string;
       driverTipAmount?: number;
+      driverTipPaymentMode?: LaborPaymentMode;
+      driverTipCashAmount?: number;
+      driverTipOnlineAmount?: number;
       discountAmount?: number;
       placeOfSupply?: string;
       notes?: string;
@@ -264,6 +268,9 @@ export const api = {
         vehicleNumber: string;
         vehicleType: string;
         driverTipAmount: number;
+        driverTipPaymentMode: LaborPaymentMode;
+        driverTipCashAmount: number;
+        driverTipOnlineAmount: number;
         discountAmount: number;
         placeOfSupply: string;
         notes: string;
@@ -827,7 +834,9 @@ export const api = {
       expenseTypeName: string;
       amount: number;
       quantity?: number;
-      paymentMode?: SimplePaymentMode;
+      paymentMode?: LaborPaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
       hours?: number;
       notes?: string;
       soilTripId?: string;
@@ -840,7 +849,9 @@ export const api = {
       input: Partial<{
         amount: number;
         quantity: number;
-        paymentMode: SimplePaymentMode;
+        paymentMode: LaborPaymentMode;
+        cashAmount: number;
+        onlineAmount: number;
         hours: number;
         notes: string;
         date: string;
@@ -992,12 +1003,21 @@ export const api = {
       driverName?: string;
       driverPhone?: string;
       tipAmount?: number;
+      tipPaymentMode?: LaborPaymentMode;
+      tipCashAmount?: number;
+      tipOnlineAmount?: number;
       vehicleType: BrickVehicleType;
       vehicleNumber: string;
       items: LineItemInput[];
       unloadedBricksCount?: number;
       loadingRatePerThousand?: number;
+      loadingPaymentMode?: LaborPaymentMode;
+      loadingCashAmount?: number;
+      loadingOnlineAmount?: number;
       unloadingRatePerThousand?: number;
+      unloadingPaymentMode?: LaborPaymentMode;
+      unloadingCashAmount?: number;
+      unloadingOnlineAmount?: number;
       placeOfSupply?: string;
       date?: string;
       unloadingDate?: string;
@@ -1019,6 +1039,15 @@ export const api = {
         unloadingRatePerThousand: number;
         pricePerBrick: number;
         tipAmount: number;
+        tipPaymentMode: LaborPaymentMode;
+        tipCashAmount: number;
+        tipOnlineAmount: number;
+        loadingPaymentMode: LaborPaymentMode;
+        loadingCashAmount: number;
+        loadingOnlineAmount: number;
+        unloadingPaymentMode: LaborPaymentMode;
+        unloadingCashAmount: number;
+        unloadingOnlineAmount: number;
         placeOfSupply: string;
         date: string;
         unloadingDate: string;

@@ -2,7 +2,10 @@ import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { dispatches, people, brickCategories, brickLoadingEntries, kilns, challans, gatePasses, invoices, expenses, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
-import type { BrickLineItem } from "../db/schema/_helpers";
+import type { BrickLineItem, SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
+import { updateLinkedExpensePaymentInfo } from "./expense.service";
+
+type SimplePaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
@@ -127,6 +130,16 @@ export interface CreateDispatchInput {
   vehicleNumber?: string;
   vehicleType?: string;
   driverTipAmount?: number;
+  // How the Driver Reward above was paid — see SIMPLE_PAYMENT_MODES's own
+  // doc comment. Like driverTipAmount itself, the Log Dispatch form
+  // pre-fills these from the linked trip's own tipPaymentMode/
+  // tipCashAmount/tipOnlineAmount when a trip is selected (client-side,
+  // see Dispatch.tsx's handleTripSelect) but they stay admin-editable from
+  // there — never server-overridden the way bricksCount/categoryId/etc.
+  // are for a trip-linked dispatch.
+  driverTipPaymentMode?: SimplePaymentMode;
+  driverTipCashAmount?: number;
+  driverTipOnlineAmount?: number;
   // When given, `amount` above is treated as the GROSS figure and the
   // stored/billed `amount` becomes `amount - discountAmount` — see
   // brickLoading.service.ts's auto-dispatch flow, the primary caller of
@@ -312,7 +325,12 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
   // loading trip (that trip already logs its own tip separately), but
   // BrickLoadingTripDetailPage's "Add to Dispatch" never sends
   // driverTipAmount, so that path is safe by construction.
-  await autoLogExpense(input.kilnId, "Driver Reward / Inam", dispatch.driverTipAmount, dispatchedOn, `Dispatch ${dispatch.slipNumber}`, { dispatchId: dispatch._id });
+  await autoLogExpense(input.kilnId, "Driver Reward / Inam", dispatch.driverTipAmount, dispatchedOn, `Dispatch ${dispatch.slipNumber}`, {
+    dispatchId: dispatch._id,
+    paymentMode: dispatch.driverTipPaymentMode ?? undefined,
+    cashAmount: dispatch.driverTipCashAmount ?? undefined,
+    onlineAmount: dispatch.driverTipOnlineAmount ?? undefined,
+  });
 
   return dispatch;
 }
@@ -392,6 +410,9 @@ export interface UpdateDispatchInput {
   vehicleNumber?: string;
   vehicleType?: string;
   driverTipAmount?: number;
+  driverTipPaymentMode?: SimplePaymentMode;
+  driverTipCashAmount?: number;
+  driverTipOnlineAmount?: number;
   placeOfSupply?: string;
   notes?: string;
   dispatchedOn?: Date;
@@ -420,7 +441,8 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
     "customerName", "customerAddress", "customerPhone", "grade", "driverId",
     "driverName", "driverPhone", "transportCost", "transportPaidBy",
     "paymentMode", "cashAmount", "onlineAmount", "categoryId", "vehicleNumber",
-    "vehicleType", "driverTipAmount", "placeOfSupply", "notes", "dispatchedOn",
+    "vehicleType", "driverTipAmount", "driverTipPaymentMode", "driverTipCashAmount",
+    "driverTipOnlineAmount", "placeOfSupply", "notes", "dispatchedOn",
   ] as const) {
     if (input[key] !== undefined) patch[key] = input[key];
   }
@@ -562,6 +584,18 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
         }
       }
     }
+  }
+
+  // Carries a Driver Reward payment-mode/split correction through to the
+  // already-created Expense row (see updateBrickLoadingEntry's identical
+  // pattern) — the amount itself was already auto-logged at creation and
+  // is never rewritten here, only how it was paid.
+  if (input.driverTipPaymentMode !== undefined || input.driverTipCashAmount !== undefined || input.driverTipOnlineAmount !== undefined) {
+    await updateLinkedExpensePaymentInfo(kilnId, { dispatchId }, "Driver Reward / Inam", {
+      paymentMode: input.driverTipPaymentMode,
+      cashAmount: input.driverTipCashAmount,
+      onlineAmount: input.driverTipOnlineAmount,
+    });
   }
 
   const finalDispatch = (await db.select().from(dispatches).where(eq(dispatches._id, dispatchId)))[0]!;

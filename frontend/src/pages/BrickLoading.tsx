@@ -8,6 +8,8 @@ import { cn, formatDateTime, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { EditBrickLoadingEntryModal } from "@/components/dispatch/EditBrickLoadingEntryModal";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
+import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
+import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
 import { BrickLoadingTripDetailPage } from "@/components/dispatch/BrickLoadingTripDetailPage";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
@@ -15,7 +17,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, Customer, Person } from "@/types";
+import type { BrickCategory, BrickLoadingDriverSummary, BrickLoadingEntry, Customer, Person, LaborPaymentMode } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -119,9 +121,18 @@ export function BrickLoading() {
     driverName: "",
     driverPhone: "",
     tipAmount: "",
+    tipPaymentMode: "" as LaborPaymentMode | "",
+    tipCashAmount: "",
+    tipOnlineAmount: "",
     date: new Date().toISOString().slice(0, 10),
     loadingRatePerThousand: "",
+    loadingPaymentMode: "" as LaborPaymentMode | "",
+    loadingCashAmount: "",
+    loadingOnlineAmount: "",
     unloadingRatePerThousand: "",
+    unloadingPaymentMode: "" as LaborPaymentMode | "",
+    unloadingCashAmount: "",
+    unloadingOnlineAmount: "",
     items: [emptyLineItemRow()] as LineItemRow[],
     unloadedBricksCount: "",
     vehicleNumber: "",
@@ -130,6 +141,7 @@ export function BrickLoading() {
   };
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
@@ -198,6 +210,19 @@ export function BrickLoading() {
       validItems.length === 0
     )
       return;
+    if (isPaymentSplitMismatched(form.tipPaymentMode, Number(form.tipAmount) || 0, form.tipCashAmount, form.tipOnlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: (Number(form.tipAmount) || 0).toLocaleString("en-IN") }));
+      return;
+    }
+    if (isPaymentSplitMismatched(form.loadingPaymentMode, totalLoadingCharge, form.loadingCashAmount, form.loadingOnlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: totalLoadingCharge.toLocaleString("en-IN") }));
+      return;
+    }
+    if (isPaymentSplitMismatched(form.unloadingPaymentMode, totalUnloadingCharge, form.unloadingCashAmount, form.unloadingOnlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: totalUnloadingCharge.toLocaleString("en-IN") }));
+      return;
+    }
+    setFormError("");
     setLoading(true);
     try {
       await api.brickLoading.create({
@@ -207,6 +232,9 @@ export function BrickLoading() {
         driverName: form.driverName,
         driverPhone: form.driverPhone,
         tipAmount: form.tipAmount ? Number(form.tipAmount) : undefined,
+        tipPaymentMode: form.tipPaymentMode || undefined,
+        tipCashAmount: form.tipPaymentMode === "CASH_AND_ONLINE" ? Number(form.tipCashAmount) : undefined,
+        tipOnlineAmount: form.tipPaymentMode === "CASH_AND_ONLINE" ? Number(form.tipOnlineAmount) : undefined,
         // Vehicle type isn't collected on this form anymore -- TRUCK is a
         // safe default for the still-required DB column.
         vehicleType: "TRUCK",
@@ -218,7 +246,13 @@ export function BrickLoading() {
         })),
         unloadedBricksCount: form.unloadedBricksCount ? Number(form.unloadedBricksCount) : undefined,
         loadingRatePerThousand: form.loadingRatePerThousand ? Number(form.loadingRatePerThousand) : undefined,
+        loadingPaymentMode: form.loadingPaymentMode || undefined,
+        loadingCashAmount: form.loadingPaymentMode === "CASH_AND_ONLINE" ? Number(form.loadingCashAmount) : undefined,
+        loadingOnlineAmount: form.loadingPaymentMode === "CASH_AND_ONLINE" ? Number(form.loadingOnlineAmount) : undefined,
         unloadingRatePerThousand: form.unloadingRatePerThousand ? Number(form.unloadingRatePerThousand) : undefined,
+        unloadingPaymentMode: form.unloadingPaymentMode || undefined,
+        unloadingCashAmount: form.unloadingPaymentMode === "CASH_AND_ONLINE" ? Number(form.unloadingCashAmount) : undefined,
+        unloadingOnlineAmount: form.unloadingPaymentMode === "CASH_AND_ONLINE" ? Number(form.unloadingOnlineAmount) : undefined,
         placeOfSupply: form.placeOfSupply || undefined,
         date: form.date || undefined,
         unloadingDate: form.unloadingDate || undefined,
@@ -381,6 +415,18 @@ export function BrickLoading() {
                   onChange={(e) => setForm((f) => ({ ...f, tipAmount: e.target.value }))}
                   className={inputClass}
                 />
+                {Number(form.tipAmount) > 0 && (
+                  <AmountPaymentModeFields
+                    amount={Number(form.tipAmount)}
+                    paymentMode={form.tipPaymentMode}
+                    cashAmount={form.tipCashAmount}
+                    onlineAmount={form.tipOnlineAmount}
+                    onPaymentModeChange={(mode) => setForm((f) => ({ ...f, tipPaymentMode: mode }))}
+                    onCashAmountChange={(v) => setForm((f) => ({ ...f, tipCashAmount: v }))}
+                    onOnlineAmountChange={(v) => setForm((f) => ({ ...f, tipOnlineAmount: v }))}
+                    inputClassName={inputClass}
+                  />
+                )}
               </div>
             </div>
 
@@ -422,6 +468,18 @@ export function BrickLoading() {
                   <p className="text-xs text-ink-muted">{t("brickLoading.totalLoadingChargeLabel")}</p>
                   <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalLoadingCharge)}</p>
                 </div>
+                {totalLoadingCharge > 0 && (
+                  <AmountPaymentModeFields
+                    amount={totalLoadingCharge}
+                    paymentMode={form.loadingPaymentMode}
+                    cashAmount={form.loadingCashAmount}
+                    onlineAmount={form.loadingOnlineAmount}
+                    onPaymentModeChange={(mode) => setForm((f) => ({ ...f, loadingPaymentMode: mode }))}
+                    onCashAmountChange={(v) => setForm((f) => ({ ...f, loadingCashAmount: v }))}
+                    onOnlineAmountChange={(v) => setForm((f) => ({ ...f, loadingOnlineAmount: v }))}
+                    inputClassName={inputClass}
+                  />
+                )}
               </div>
             </div>
 
@@ -456,8 +514,23 @@ export function BrickLoading() {
                 <p className="text-xs text-ink-muted">{t("brickLoading.totalUnloadingChargeLabel")}</p>
                 <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalUnloadingCharge)}</p>
               </div>
+              {totalUnloadingCharge > 0 && (
+                <div className="mt-2">
+                  <AmountPaymentModeFields
+                    amount={totalUnloadingCharge}
+                    paymentMode={form.unloadingPaymentMode}
+                    cashAmount={form.unloadingCashAmount}
+                    onlineAmount={form.unloadingOnlineAmount}
+                    onPaymentModeChange={(mode) => setForm((f) => ({ ...f, unloadingPaymentMode: mode }))}
+                    onCashAmountChange={(v) => setForm((f) => ({ ...f, unloadingCashAmount: v }))}
+                    onOnlineAmountChange={(v) => setForm((f) => ({ ...f, unloadingOnlineAmount: v }))}
+                    inputClassName={inputClass}
+                  />
+                </div>
+              )}
             </div>
 
+            {formError && <p className="text-sm text-status-critical">{formError}</p>}
             <Button type="submit" disabled={loading}>
               {t("brickLoading.saveEntry")}
             </Button>

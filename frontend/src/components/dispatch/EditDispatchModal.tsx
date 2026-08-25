@@ -7,7 +7,9 @@ import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
-import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, Person } from "@/types";
+import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
+import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, LaborPaymentMode, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -49,6 +51,11 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
   const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ?? "");
   const [vehicleType, setVehicleType] = useState(dispatch.vehicleType ?? "");
   const [driverTipAmount, setDriverTipAmount] = useState(dispatch.driverTipAmount ? String(dispatch.driverTipAmount) : "");
+  const [driverTipPaymentMode, setDriverTipPaymentMode] = useState<LaborPaymentMode | "">(dispatch.driverTipPaymentMode ?? "");
+  const [driverTipCashAmount, setDriverTipCashAmount] = useState(dispatch.driverTipCashAmount != null ? String(dispatch.driverTipCashAmount) : "");
+  const [driverTipOnlineAmount, setDriverTipOnlineAmount] = useState(
+    dispatch.driverTipOnlineAmount != null ? String(dispatch.driverTipOnlineAmount) : ""
+  );
   const [transportCost, setTransportCost] = useState(dispatch.transportCost ? String(dispatch.transportCost) : "");
   const [transportPaidBy, setTransportPaidBy] = useState<"OWNER" | "CUSTOMER">(dispatch.transportPaidBy ?? "OWNER");
   const [placeOfSupply, setPlaceOfSupply] = useState(dispatch.placeOfSupply ?? "");
@@ -83,6 +90,10 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
       setFormError(t("dispatch.discountExceedsAmount"));
       return;
     }
+    if (isPaymentSplitMismatched(driverTipPaymentMode, Number(driverTipAmount) || 0, driverTipCashAmount, driverTipOnlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: (Number(driverTipAmount) || 0).toLocaleString("en-IN") }));
+      return;
+    }
     setFormError("");
     setSaving(true);
     try {
@@ -104,6 +115,9 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
         vehicleNumber: vehicleNumber || undefined,
         vehicleType: vehicleType || undefined,
         driverTipAmount: driverTipAmount ? Number(driverTipAmount) : undefined,
+        driverTipPaymentMode: driverTipPaymentMode || undefined,
+        driverTipCashAmount: driverTipPaymentMode === "CASH_AND_ONLINE" ? Number(driverTipCashAmount) : undefined,
+        driverTipOnlineAmount: driverTipPaymentMode === "CASH_AND_ONLINE" ? Number(driverTipOnlineAmount) : undefined,
         transportCost: transportCost ? Number(transportCost) : undefined,
         transportPaidBy: transportCost ? transportPaidBy : undefined,
         placeOfSupply: placeOfSupply || undefined,
@@ -211,6 +225,18 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
             onChange={(e) => setDriverTipAmount(e.target.value)}
             className={inputClass}
           />
+          {Number(driverTipAmount) > 0 && (
+            <AmountPaymentModeFields
+              amount={Number(driverTipAmount)}
+              paymentMode={driverTipPaymentMode}
+              cashAmount={driverTipCashAmount}
+              onlineAmount={driverTipOnlineAmount}
+              onPaymentModeChange={setDriverTipPaymentMode}
+              onCashAmountChange={setDriverTipCashAmount}
+              onOnlineAmountChange={setDriverTipOnlineAmount}
+              inputClassName={inputClass}
+            />
+          )}
           <input
             placeholder={t("dispatch.vehicleNumberPlaceholder")}
             value={vehicleNumber}

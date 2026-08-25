@@ -7,7 +7,9 @@ import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR } from "@/lib/utils";
 import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
-import type { BrickCategory, BrickLoadingEntry } from "@/types";
+import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
+import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import type { BrickCategory, BrickLoadingEntry, LaborPaymentMode } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -26,7 +28,10 @@ interface EditBrickLoadingEntryModalProps {
 // tipAmount (Driver Reward) never silently rewrites what was already
 // posted to a driver's ledger for legacy entries that still carry a
 // driverId — the backend posts a correction entry for the difference
-// instead.
+// instead. Editing the payment-mode/split fields below also carries
+// through to the already-logged Expense row for that cost (see
+// updateLinkedExpensePaymentInfo) — the amount itself is never rewritten,
+// only how it was paid.
 export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBrickLoadingEntryModalProps) {
   const [customerName, setCustomerName] = useState(entry.customerName ?? "");
   const [customerPhone, setCustomerPhone] = useState(entry.customerPhone ?? "");
@@ -34,29 +39,61 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
   const [driverName, setDriverName] = useState(entry.driverName ?? "");
   const [driverPhone, setDriverPhone] = useState(entry.driverPhone ?? "");
   const [tipAmount, setTipAmount] = useState(String(entry.tipAmount ?? 0));
+  const [tipPaymentMode, setTipPaymentMode] = useState<LaborPaymentMode | "">(entry.tipPaymentMode ?? "");
+  const [tipCashAmount, setTipCashAmount] = useState(entry.tipCashAmount != null ? String(entry.tipCashAmount) : "");
+  const [tipOnlineAmount, setTipOnlineAmount] = useState(entry.tipOnlineAmount != null ? String(entry.tipOnlineAmount) : "");
   const [vehicleNumber, setVehicleNumber] = useState(entry.vehicleNumber);
   const [items, setItems] = useState<LineItemRow[]>(lineItemRowsFrom(entry));
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const [unloadedBricksCount, setUnloadedBricksCount] = useState(entry.unloadedBricksCount ? String(entry.unloadedBricksCount) : "");
   const [loadingRatePerThousand, setLoadingRatePerThousand] = useState(entry.loadingRatePerThousand ? String(entry.loadingRatePerThousand) : "");
+  const [loadingPaymentMode, setLoadingPaymentMode] = useState<LaborPaymentMode | "">(entry.loadingPaymentMode ?? "");
+  const [loadingCashAmount, setLoadingCashAmount] = useState(entry.loadingCashAmount != null ? String(entry.loadingCashAmount) : "");
+  const [loadingOnlineAmount, setLoadingOnlineAmount] = useState(entry.loadingOnlineAmount != null ? String(entry.loadingOnlineAmount) : "");
   const [unloadingRatePerThousand, setUnloadingRatePerThousand] = useState(
     entry.unloadingRatePerThousand ? String(entry.unloadingRatePerThousand) : ""
   );
+  const [unloadingPaymentMode, setUnloadingPaymentMode] = useState<LaborPaymentMode | "">(entry.unloadingPaymentMode ?? "");
+  const [unloadingCashAmount, setUnloadingCashAmount] = useState(entry.unloadingCashAmount != null ? String(entry.unloadingCashAmount) : "");
+  const [unloadingOnlineAmount, setUnloadingOnlineAmount] = useState(entry.unloadingOnlineAmount != null ? String(entry.unloadingOnlineAmount) : "");
   const [date, setDate] = useState(entry.date.slice(0, 10));
   const [unloadingDate, setUnloadingDate] = useState(entry.unloadingDate ? entry.unloadingDate.slice(0, 10) : "");
   const [placeOfSupply, setPlaceOfSupply] = useState(entry.placeOfSupply ?? "");
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
   const { t } = useTranslation();
 
   useEffect(() => {
     api.brickCategories.list().then(setCategories).catch(console.error);
   }, []);
 
+  // Same formulas as BrickLoading.tsx's create form, live against whatever
+  // the admin has currently typed here — so the Cash/Online split below
+  // always validates against the up-to-date charge, not the stale value
+  // this trip was originally saved with.
+  const totalBricksAcrossItems = items.reduce((sum, row) => sum + (Number(row.bricksCount) || 0), 0);
+  const totalLoadingCharge = totalBricksAcrossItems && loadingRatePerThousand ? (totalBricksAcrossItems / 1000) * Number(loadingRatePerThousand) : 0;
+  const totalUnloadingCharge =
+    unloadedBricksCount && unloadingRatePerThousand ? (Number(unloadedBricksCount) / 1000) * Number(unloadingRatePerThousand) : 0;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const validItems = items.filter(isValidLineItemRow);
     if (validItems.length === 0) return;
+    if (isPaymentSplitMismatched(tipPaymentMode, Number(tipAmount) || 0, tipCashAmount, tipOnlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: (Number(tipAmount) || 0).toLocaleString("en-IN") }));
+      return;
+    }
+    if (isPaymentSplitMismatched(loadingPaymentMode, totalLoadingCharge, loadingCashAmount, loadingOnlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: totalLoadingCharge.toLocaleString("en-IN") }));
+      return;
+    }
+    if (isPaymentSplitMismatched(unloadingPaymentMode, totalUnloadingCharge, unloadingCashAmount, unloadingOnlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: totalUnloadingCharge.toLocaleString("en-IN") }));
+      return;
+    }
+    setFormError("");
     setSaving(true);
     try {
       await api.brickLoading.update(entry._id, {
@@ -73,8 +110,17 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
         })),
         unloadedBricksCount: unloadedBricksCount ? Number(unloadedBricksCount) : undefined,
         loadingRatePerThousand: loadingRatePerThousand ? Number(loadingRatePerThousand) : undefined,
+        loadingPaymentMode: loadingPaymentMode || undefined,
+        loadingCashAmount: loadingPaymentMode === "CASH_AND_ONLINE" ? Number(loadingCashAmount) : undefined,
+        loadingOnlineAmount: loadingPaymentMode === "CASH_AND_ONLINE" ? Number(loadingOnlineAmount) : undefined,
         unloadingRatePerThousand: unloadingRatePerThousand ? Number(unloadingRatePerThousand) : undefined,
+        unloadingPaymentMode: unloadingPaymentMode || undefined,
+        unloadingCashAmount: unloadingPaymentMode === "CASH_AND_ONLINE" ? Number(unloadingCashAmount) : undefined,
+        unloadingOnlineAmount: unloadingPaymentMode === "CASH_AND_ONLINE" ? Number(unloadingOnlineAmount) : undefined,
         tipAmount: tipAmount ? Number(tipAmount) : 0,
+        tipPaymentMode: tipPaymentMode || undefined,
+        tipCashAmount: tipPaymentMode === "CASH_AND_ONLINE" ? Number(tipCashAmount) : undefined,
+        tipOnlineAmount: tipPaymentMode === "CASH_AND_ONLINE" ? Number(tipOnlineAmount) : undefined,
         date: date || undefined,
         unloadingDate: unloadingDate || undefined,
         placeOfSupply: placeOfSupply || undefined,
@@ -153,6 +199,18 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 onChange={(e) => setTipAmount(e.target.value)}
                 className={inputClass}
               />
+              {Number(tipAmount) > 0 && (
+                <AmountPaymentModeFields
+                  amount={Number(tipAmount)}
+                  paymentMode={tipPaymentMode}
+                  cashAmount={tipCashAmount}
+                  onlineAmount={tipOnlineAmount}
+                  onPaymentModeChange={setTipPaymentMode}
+                  onCashAmountChange={setTipCashAmount}
+                  onOnlineAmountChange={setTipOnlineAmount}
+                  inputClassName={inputClass}
+                />
+              )}
             </div>
           </div>
 
@@ -184,6 +242,24 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 {t("brickLoading.totalAmountLabel")}: <span className="font-semibold text-ink-primary">₹{formatINR(entry.amount)}</span>
               </p>
             )}
+            {totalLoadingCharge > 0 && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="col-span-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
+                  <p className="text-xs text-ink-muted">{t("brickLoading.totalLoadingChargeLabel")}</p>
+                  <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalLoadingCharge)}</p>
+                </div>
+                <AmountPaymentModeFields
+                  amount={totalLoadingCharge}
+                  paymentMode={loadingPaymentMode}
+                  cashAmount={loadingCashAmount}
+                  onlineAmount={loadingOnlineAmount}
+                  onPaymentModeChange={setLoadingPaymentMode}
+                  onCashAmountChange={setLoadingCashAmount}
+                  onOnlineAmountChange={setLoadingOnlineAmount}
+                  inputClassName={inputClass}
+                />
+              </div>
+            )}
           </div>
 
           <div>
@@ -208,6 +284,24 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 <DateInput value={unloadingDate} onChange={(e) => setUnloadingDate(e.target.value)} className={inputClass} />
               </label>
             </div>
+            {totalUnloadingCharge > 0 && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="col-span-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
+                  <p className="text-xs text-ink-muted">{t("brickLoading.totalUnloadingChargeLabel")}</p>
+                  <p className="text-sm font-semibold tabular-nums text-ink-primary">₹{formatINR(totalUnloadingCharge)}</p>
+                </div>
+                <AmountPaymentModeFields
+                  amount={totalUnloadingCharge}
+                  paymentMode={unloadingPaymentMode}
+                  cashAmount={unloadingCashAmount}
+                  onlineAmount={unloadingOnlineAmount}
+                  onPaymentModeChange={setUnloadingPaymentMode}
+                  onCashAmountChange={setUnloadingCashAmount}
+                  onOnlineAmountChange={setUnloadingOnlineAmount}
+                  inputClassName={inputClass}
+                />
+              </div>
+            )}
           </div>
 
           <input
@@ -217,6 +311,7 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
             className={inputClass}
           />
 
+          {formError && <p className="text-sm text-status-critical">{formError}</p>}
           <Button type="submit" disabled={saving}>
             {t("common.saveChanges")}
           </Button>

@@ -15,7 +15,9 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import { DispatchDetailPage } from "@/components/dispatch/DispatchDetailPage";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
-import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, Person } from "@/types";
+import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
+import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, LaborPaymentMode, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -56,6 +58,9 @@ function emptyForm() {
     driverName: "",
     driverPhone: "",
     driverTipAmount: "",
+    driverTipPaymentMode: "" as LaborPaymentMode | "",
+    driverTipCashAmount: "",
+    driverTipOnlineAmount: "",
     amount: "",
     amountAutoFilled: true,
     discountAmount: "",
@@ -189,6 +194,9 @@ export function Dispatch() {
       driverName: trip.driverName || f.driverName,
       driverPhone: trip.driverPhone || f.driverPhone,
       driverTipAmount: trip.tipAmount != null ? String(trip.tipAmount) : f.driverTipAmount,
+      driverTipPaymentMode: trip.tipPaymentMode ?? f.driverTipPaymentMode,
+      driverTipCashAmount: trip.tipCashAmount != null ? String(trip.tipCashAmount) : f.driverTipCashAmount,
+      driverTipOnlineAmount: trip.tipOnlineAmount != null ? String(trip.tipOnlineAmount) : f.driverTipOnlineAmount,
       placeOfSupply: trip.placeOfSupply || f.placeOfSupply,
       notes: trip.notes || f.notes,
       dispatchedOn: trip.date ? trip.date.slice(0, 10) : f.dispatchedOn,
@@ -201,6 +209,10 @@ export function Dispatch() {
     if (!tripLocked && (totalBricksFromItems === 0 || !form.amount)) return;
     if (!tripLocked && Number(form.discountAmount) > Number(form.amount)) {
       setFormError(t("dispatch.discountExceedsAmount"));
+      return;
+    }
+    if (isPaymentSplitMismatched(form.driverTipPaymentMode, Number(form.driverTipAmount) || 0, form.driverTipCashAmount, form.driverTipOnlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: (Number(form.driverTipAmount) || 0).toLocaleString("en-IN") }));
       return;
     }
     setFormError("");
@@ -228,6 +240,9 @@ export function Dispatch() {
         driverName: form.driverName || undefined,
         driverPhone: form.driverPhone || undefined,
         driverTipAmount: form.driverTipAmount ? Number(form.driverTipAmount) : undefined,
+        driverTipPaymentMode: form.driverTipPaymentMode || undefined,
+        driverTipCashAmount: form.driverTipPaymentMode === "CASH_AND_ONLINE" ? Number(form.driverTipCashAmount) : undefined,
+        driverTipOnlineAmount: form.driverTipPaymentMode === "CASH_AND_ONLINE" ? Number(form.driverTipOnlineAmount) : undefined,
         transportCost: form.transportCost ? Number(form.transportCost) : undefined,
         placeOfSupply: form.placeOfSupply || undefined,
         notes: form.notes || undefined,
@@ -367,6 +382,18 @@ export function Dispatch() {
               onChange={(e) => setForm((f) => ({ ...f, driverTipAmount: e.target.value }))}
               className={inputClass}
             />
+            {Number(form.driverTipAmount) > 0 && (
+              <AmountPaymentModeFields
+                amount={Number(form.driverTipAmount)}
+                paymentMode={form.driverTipPaymentMode}
+                cashAmount={form.driverTipCashAmount}
+                onlineAmount={form.driverTipOnlineAmount}
+                onPaymentModeChange={(mode) => setForm((f) => ({ ...f, driverTipPaymentMode: mode }))}
+                onCashAmountChange={(v) => setForm((f) => ({ ...f, driverTipCashAmount: v }))}
+                onOnlineAmountChange={(v) => setForm((f) => ({ ...f, driverTipOnlineAmount: v }))}
+                inputClassName={inputClass}
+              />
+            )}
 
             <BrickLineItemsEditor items={form.items} onChange={handleItemsChange} categories={categories} readOnly={tripLocked} />
 

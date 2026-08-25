@@ -20,6 +20,11 @@ export interface ProductionSeriesPoint {
 
 export type BrickGrade = "A1" | "JHAMA" | "PELA";
 export type PaymentMode = "CASH" | "BANK" | "UPI" | "GST_INVOICE" | "CASH_AND_ONLINE";
+// The Cash/Online/Cash+Online choice for labor-style costs (Driver Reward,
+// Loading Charge, Unloading Charge) — see AmountPaymentModeFields. Distinct
+// from SimplePaymentMode below (CASH/BANK/UPI, no split support) used by
+// Fuel/Diesel entries.
+export type LaborPaymentMode = "CASH" | "ONLINE" | "CASH_AND_ONLINE";
 
 // One row per brick category on a Brick Loading trip / Dispatch / Challan /
 // Gate Pass / Invoice — a single transaction can cover several categories
@@ -62,6 +67,9 @@ export interface Dispatch {
   vehicleNumber?: string;
   vehicleType?: string;
   driverTipAmount?: number;
+  driverTipPaymentMode?: LaborPaymentMode;
+  driverTipCashAmount?: number;
+  driverTipOnlineAmount?: number;
   discountAmount?: number;
   placeOfSupply?: string;
   notes?: string;
@@ -666,7 +674,9 @@ export interface Expense {
   expenseTypeId?: string;
   amount: number;
   quantity?: number;
-  paymentMode?: SimplePaymentMode;
+  paymentMode?: LaborPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   hours?: number;
   date: string;
   // System Entry Date — the date this record was actually logged into the
@@ -675,6 +685,7 @@ export interface Expense {
   notes?: string;
   soilTripId?: string;
   dispatchId?: string;
+  brickLoadingEntryId?: string;
 }
 
 export interface ExpenseType {
@@ -1047,8 +1058,17 @@ export interface BrickLoadingEntry {
   unloadingLaborerCount?: number;
   unloadingRatePerThousand?: number;
   tipAmount?: number;
+  tipPaymentMode?: LaborPaymentMode;
+  tipCashAmount?: number;
+  tipOnlineAmount?: number;
   loadingCharge?: number;
+  loadingPaymentMode?: LaborPaymentMode;
+  loadingCashAmount?: number;
+  loadingOnlineAmount?: number;
   unloadingCharge?: number;
+  unloadingPaymentMode?: LaborPaymentMode;
+  unloadingCashAmount?: number;
+  unloadingOnlineAmount?: number;
   discountAmount?: number;
   amount?: number;
   categoryId?: { _id: string; category: BrickCategoryName; grade?: string } | string;

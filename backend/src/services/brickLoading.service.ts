@@ -2,7 +2,10 @@ import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, expenses, BRICK_VEHICLE_TYPES } from "../db/schema";
-import type { BrickLineItem } from "../db/schema/_helpers";
+import type { BrickLineItem, SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
+import { updateLinkedExpensePaymentInfo } from "./expense.service";
+
+type SimplePaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 import { addLedgerEntry } from "./ledger.service";
 import { deleteDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
 import { autoLogExpense } from "./expense.service";
@@ -19,6 +22,20 @@ export interface CreateBrickLoadingInput {
   driverName?: string;
   driverPhone?: string;
   tipAmount?: number;
+  // How Driver Reward/Loading Charge/Unloading Charge were each actually
+  // paid — three independent choices (see SIMPLE_PAYMENT_MODES's own doc
+  // comment). The *CashAmount/*OnlineAmount pair only means anything when
+  // its own mode is CASH_AND_ONLINE, and must sum to that cost's own
+  // amount (tipAmount / the computed loadingCharge / unloadingCharge).
+  tipPaymentMode?: SimplePaymentMode;
+  tipCashAmount?: number;
+  tipOnlineAmount?: number;
+  loadingPaymentMode?: SimplePaymentMode;
+  loadingCashAmount?: number;
+  loadingOnlineAmount?: number;
+  unloadingPaymentMode?: SimplePaymentMode;
+  unloadingCashAmount?: number;
+  unloadingOnlineAmount?: number;
   vehicleType: BrickVehicleType;
   vehicleNumber: string;
   // One row per brick category loaded on this trip — quantity + this
@@ -116,14 +133,23 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
         driverName: input.driverName,
         driverPhone: input.driverPhone,
         tipAmount: input.tipAmount,
+        tipPaymentMode: input.tipPaymentMode,
+        tipCashAmount: input.tipCashAmount,
+        tipOnlineAmount: input.tipOnlineAmount,
         vehicleType: input.vehicleType,
         vehicleNumber: input.vehicleNumber,
         bricksCount: totalBricksCount,
         unloadedBricksCount: input.unloadedBricksCount,
         loadingLaborerCount: input.loadingLaborerCount,
         loadingRatePerThousand: input.loadingRatePerThousand,
+        loadingPaymentMode: input.loadingPaymentMode,
+        loadingCashAmount: input.loadingCashAmount,
+        loadingOnlineAmount: input.loadingOnlineAmount,
         unloadingLaborerCount: input.unloadingLaborerCount,
         unloadingRatePerThousand: input.unloadingRatePerThousand,
+        unloadingPaymentMode: input.unloadingPaymentMode,
+        unloadingCashAmount: input.unloadingCashAmount,
+        unloadingOnlineAmount: input.unloadingOnlineAmount,
         categoryId: aggregateCategoryId,
         pricePerBrick: aggregatePricePerBrick,
         items,
@@ -166,9 +192,24 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   // own Expense the moment the trip is created, under a fixed type name so
   // they always land in the same Expense Type bucket (see
   // expense.service.ts's autoLogExpense; no-ops for a zero/unset amount).
-  await autoLogExpense(input.kilnId, "Driver Reward / Inam", entry.tipAmount, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, { brickLoadingEntryId: entry._id });
-  await autoLogExpense(input.kilnId, "Loading Charge", entry.loadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, { brickLoadingEntryId: entry._id });
-  await autoLogExpense(input.kilnId, "Unloading Charge", entry.unloadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, { brickLoadingEntryId: entry._id });
+  await autoLogExpense(input.kilnId, "Driver Reward / Inam", entry.tipAmount, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
+    brickLoadingEntryId: entry._id,
+    paymentMode: entry.tipPaymentMode ?? undefined,
+    cashAmount: entry.tipCashAmount ?? undefined,
+    onlineAmount: entry.tipOnlineAmount ?? undefined,
+  });
+  await autoLogExpense(input.kilnId, "Loading Charge", entry.loadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
+    brickLoadingEntryId: entry._id,
+    paymentMode: entry.loadingPaymentMode ?? undefined,
+    cashAmount: entry.loadingCashAmount ?? undefined,
+    onlineAmount: entry.loadingOnlineAmount ?? undefined,
+  });
+  await autoLogExpense(input.kilnId, "Unloading Charge", entry.unloadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
+    brickLoadingEntryId: entry._id,
+    paymentMode: entry.unloadingPaymentMode ?? undefined,
+    cashAmount: entry.unloadingCashAmount ?? undefined,
+    onlineAmount: entry.unloadingOnlineAmount ?? undefined,
+  });
 
   return entry;
 }
@@ -205,6 +246,15 @@ export interface UpdateBrickLoadingInput {
   // removed from the Log Trip form, i.e. rows that already have a
   // driverId. See the driverId guard below.
   tipAmount?: number;
+  tipPaymentMode?: SimplePaymentMode;
+  tipCashAmount?: number;
+  tipOnlineAmount?: number;
+  loadingPaymentMode?: SimplePaymentMode;
+  loadingCashAmount?: number;
+  loadingOnlineAmount?: number;
+  unloadingPaymentMode?: SimplePaymentMode;
+  unloadingCashAmount?: number;
+  unloadingOnlineAmount?: number;
 }
 
 // Full admin edit — never silently rewrites a tip already posted to the
@@ -304,6 +354,33 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
         category: "TIP",
       });
     }
+  }
+
+  // Carries a payment-mode/split correction through to the already-created
+  // Expense row for that specific cost (see updateLinkedExpensePaymentInfo)
+  // — the amount itself was already auto-logged at creation and is never
+  // rewritten here, only how it was paid. This is what lets Edit Mode fill
+  // in payment details for a trip created before this feature existed.
+  if (input.tipPaymentMode !== undefined || input.tipCashAmount !== undefined || input.tipOnlineAmount !== undefined) {
+    await updateLinkedExpensePaymentInfo(kilnId, { brickLoadingEntryId: entryId }, "Driver Reward / Inam", {
+      paymentMode: input.tipPaymentMode,
+      cashAmount: input.tipCashAmount,
+      onlineAmount: input.tipOnlineAmount,
+    });
+  }
+  if (input.loadingPaymentMode !== undefined || input.loadingCashAmount !== undefined || input.loadingOnlineAmount !== undefined) {
+    await updateLinkedExpensePaymentInfo(kilnId, { brickLoadingEntryId: entryId }, "Loading Charge", {
+      paymentMode: input.loadingPaymentMode,
+      cashAmount: input.loadingCashAmount,
+      onlineAmount: input.loadingOnlineAmount,
+    });
+  }
+  if (input.unloadingPaymentMode !== undefined || input.unloadingCashAmount !== undefined || input.unloadingOnlineAmount !== undefined) {
+    await updateLinkedExpensePaymentInfo(kilnId, { brickLoadingEntryId: entryId }, "Unloading Charge", {
+      paymentMode: input.unloadingPaymentMode,
+      cashAmount: input.unloadingCashAmount,
+      onlineAmount: input.unloadingOnlineAmount,
+    });
   }
 
   emitToKiln(kilnId, "brickLoading:update", updated);

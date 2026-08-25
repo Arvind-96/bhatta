@@ -1,12 +1,13 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "../db/client";
-import { expenses, soilTrips, dispatches, EXPENSE_CATEGORIES, LEDGER_PAYMENT_MODES } from "../db/schema";
+import { expenses, soilTrips, dispatches, EXPENSE_CATEGORIES } from "../db/schema";
+import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { emitToKiln } from "../config/socket";
 import { findOrCreateExpenseType } from "./expenseType.service";
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
-export type ExpensePaymentMode = Exclude<(typeof LEDGER_PAYMENT_MODES)[number], "CASH_AND_ONLINE">;
+export type ExpensePaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 
 export interface CreateExpenseInput {
   kilnId: string;
@@ -15,6 +16,10 @@ export interface CreateExpenseInput {
   amount: number;
   quantity?: number;
   paymentMode?: ExpensePaymentMode;
+  // Only meaningful when paymentMode is CASH_AND_ONLINE — must sum to
+  // `amount`, same convention as dispatches.cashAmount/onlineAmount.
+  cashAmount?: number;
+  onlineAmount?: number;
   hours?: number;
   date?: Date;
   notes?: string;
@@ -53,7 +58,13 @@ export async function autoLogExpense(
   amount: number | null | undefined,
   date: Date | undefined,
   notes: string,
-  links: { dispatchId?: string; brickLoadingEntryId?: string } = {}
+  links: {
+    dispatchId?: string;
+    brickLoadingEntryId?: string;
+    paymentMode?: ExpensePaymentMode;
+    cashAmount?: number;
+    onlineAmount?: number;
+  } = {}
 ) {
   if (!amount || amount <= 0) return;
   const expenseType = await findOrCreateExpenseType(kilnId, typeName);
@@ -64,9 +75,45 @@ export interface UpdateExpenseInput {
   amount?: number;
   quantity?: number;
   paymentMode?: ExpensePaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   hours?: number;
   date?: Date;
   notes?: string;
+}
+
+// Finds the single Expense row auto-logged for a specific cost on a Brick
+// Loading trip (or Dispatch) — by brickLoadingEntryId/dispatchId plus the
+// expense TYPE name, since a trip can have up to three such rows (Driver
+// Reward, Loading Charge, Unloading Charge) and only the one matching this
+// exact type should be touched. Used by updateBrickLoadingEntry/
+// updateDispatch to carry a payment-mode/split edit through to the
+// already-created Expense row, so correcting a historical trip's payment
+// details (see Edit Mode) actually reaches the Expense page too, not just
+// the trip's own record.
+export async function updateLinkedExpensePaymentInfo(
+  kilnId: string,
+  link: { brickLoadingEntryId?: string; dispatchId?: string },
+  typeName: string,
+  info: { paymentMode?: ExpensePaymentMode; cashAmount?: number; onlineAmount?: number }
+) {
+  const expenseType = await findOrCreateExpenseType(kilnId, typeName);
+  const linkCondition = link.brickLoadingEntryId
+    ? eq(expenses.brickLoadingEntryId, link.brickLoadingEntryId)
+    : link.dispatchId
+    ? eq(expenses.dispatchId, link.dispatchId)
+    : undefined;
+  if (!linkCondition) return;
+  const existing = (
+    await db
+      .select()
+      .from(expenses)
+      .where(and(eq(expenses.kilnId, kilnId), linkCondition, eq(expenses.expenseTypeId, expenseType._id)))
+  )[0];
+  if (!existing) return;
+  await db.update(expenses).set(info).where(eq(expenses._id, existing._id));
+  const updated = (await db.select().from(expenses).where(eq(expenses._id, existing._id)))[0]!;
+  emitToKiln(kilnId, "expense:update", updated);
 }
 
 export async function updateExpense(kilnId: string, expenseId: string, input: UpdateExpenseInput) {

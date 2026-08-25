@@ -39,6 +39,15 @@ export function dateColumn(name = "date") {
 // NULL on every row created before this existed — every read path that
 // doesn't know about `items` keeps working off the pre-existing scalar
 // columns, which stay populated as the aggregate (sum) across `items`.
+// The Cash/Online/Cash+Online choice offered on labor-style costs (Driver
+// Reward, Loading Charge, Unloading Charge) — deliberately simpler than
+// DISPATCH_PAYMENT_MODES/LEDGER_PAYMENT_MODES (no BANK/UPI/GST_INVOICE
+// distinction), matching exactly how the admin actually thinks about
+// paying a laborer or driver. Shared across brickLoadingEntries,
+// dispatches (driverTip*), and expenses so the same three values and the
+// same CASH_AND_ONLINE-triggers-a-split convention apply everywhere.
+export const SIMPLE_PAYMENT_MODES = ["CASH", "ONLINE", "CASH_AND_ONLINE"] as const;
+
 export interface BrickLineItem {
   categoryId?: string;
   bricksCount: number;

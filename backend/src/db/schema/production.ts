@@ -1,5 +1,5 @@
 import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex, index, boolean } from "drizzle-orm/mysql-core";
-import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn } from "./_helpers";
+import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn, SIMPLE_PAYMENT_MODES } from "./_helpers";
 import { STACKING_STAGES } from "./people";
 
 export const GHER_STATUSES = ["EMPTY", "STACKING", "FIRING", "READY"] as const;
@@ -197,13 +197,29 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   // correction for legacy rows that still carry a driverId (see the
   // guards in brickLoading.service.ts).
   tipAmount: double("tipAmount").default(0),
+  // How the Driver Reward/Loading/Unloading Charge amounts above were
+  // actually paid — each independent (a trip's driver reward might be
+  // cash while its loading charge is split) since they're three distinct
+  // costs, auto-logged as three separate Expense rows (see
+  // createBrickLoadingEntry). Nullable — the split fields only mean
+  // anything when their own mode is CASH_AND_ONLINE, same convention as
+  // dispatches.cashAmount/onlineAmount.
+  tipPaymentMode: varchar("tipPaymentMode", { length: 20, enum: SIMPLE_PAYMENT_MODES }),
+  tipCashAmount: double("tipCashAmount"),
+  tipOnlineAmount: double("tipOnlineAmount"),
   // Total Loading Charge = (bricksCount/1000) x loadingLaborerCount x
   // loadingRatePerThousand -- computed and stored at create/edit time,
   // same convention as `amount` below.
   loadingCharge: double("loadingCharge"),
+  loadingPaymentMode: varchar("loadingPaymentMode", { length: 20, enum: SIMPLE_PAYMENT_MODES }),
+  loadingCashAmount: double("loadingCashAmount"),
+  loadingOnlineAmount: double("loadingOnlineAmount"),
   // Total Unloading Charge = (unloadedBricksCount/1000) x
   // unloadingLaborerCount x unloadingRatePerThousand.
   unloadingCharge: double("unloadingCharge"),
+  unloadingPaymentMode: varchar("unloadingPaymentMode", { length: 20, enum: SIMPLE_PAYMENT_MODES }),
+  unloadingCashAmount: double("unloadingCashAmount"),
+  unloadingOnlineAmount: double("unloadingOnlineAmount"),
   // Legacy -- no longer collected on the Log Trip form; kept nullable so
   // old rows' stored `amount` (which did net this out) still reads back
   // correctly.

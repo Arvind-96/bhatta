@@ -1,6 +1,5 @@
 import { double, int, json, mysqlTable, varchar, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
-import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn } from "./_helpers";
-import { LEDGER_PAYMENT_MODES } from "./people";
+import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn, SIMPLE_PAYMENT_MODES } from "./_helpers";
 
 export const BRICK_GRADES = ["A1", "JHAMA", "PELA"] as const;
 export const DISPATCH_PAYMENT_MODES = ["CASH", "BANK", "UPI", "GST_INVOICE", "CASH_AND_ONLINE"] as const;
@@ -53,6 +52,15 @@ export const dispatches = mysqlTable("dispatches", {
   vehicleNumber: varchar("vehicleNumber", { length: 255 }),
   vehicleType: varchar("vehicleType", { length: 255 }),
   driverTipAmount: double("driverTipAmount"),
+  // How the Driver Reward above was paid — independent of this dispatch's
+  // own paymentMode/cashAmount/onlineAmount (that set is unused now, see
+  // the comment above; this set is for the tip specifically). Pre-filled
+  // from the originating Brick Loading trip's own tipPaymentMode/
+  // tipCashAmount/tipOnlineAmount when this dispatch is auto-created by
+  // linking a trip (see createDispatch), same as driverTipAmount itself.
+  driverTipPaymentMode: varchar("driverTipPaymentMode", { length: 20, enum: SIMPLE_PAYMENT_MODES }),
+  driverTipCashAmount: double("driverTipCashAmount"),
+  driverTipOnlineAmount: double("driverTipOnlineAmount"),
   // Stored purely for transparent display on the Challan ("gross − discount
   // = net"); `amount` above is already the net, post-discount figure so
   // every downstream revenue total keeps working unchanged.
@@ -342,10 +350,15 @@ export const expenses = mysqlTable("expenses", {
   // Only meaningful for the Gas Cylinder expense type (quantity of
   // cylinders) — left null for every other type.
   quantity: double("quantity"),
-  // A single mode label is enough here (unlike dispatches/ledger entries) —
-  // expenses aren't customer-facing bills that get split payments, this
-  // just powers the Financial Overview's cash/online breakdown.
-  paymentMode: varchar("paymentMode", { length: 50, enum: LEDGER_PAYMENT_MODES }),
+  // CASH_AND_ONLINE here means what it means everywhere else in this app —
+  // split across cashAmount/onlineAmount below, which must sum to `amount`.
+  // The three auto-logged Brick Loading costs (Driver Reward/Loading/
+  // Unloading Charge) carry their own paymentMode/split straight over from
+  // the trip's own tipPaymentMode/loadingPaymentMode/unloadingPaymentMode
+  // (see autoLogExpense); a manually-added expense can set this directly.
+  paymentMode: varchar("paymentMode", { length: 20, enum: SIMPLE_PAYMENT_MODES }),
+  cashAmount: double("cashAmount"),
+  onlineAmount: double("onlineAmount"),
   hours: double("hours"),
   // Transaction Date — the actual date the payment was made (admin-set,
   // editable). System Entry Date (the date logged into the software,
