@@ -185,7 +185,7 @@ export function AddPersonModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <select value={type} onChange={(e) => setType(e.target.value as PersonType)} className={inputClass}>
             {PERSON_TYPES.map((pt) => (
               <option key={pt} value={pt}>

@@ -116,7 +116,7 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <Field label={t("common.name")}>
             <input required placeholder={t("people.thekedarNamePlaceholder")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
           </Field>

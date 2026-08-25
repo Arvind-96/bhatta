@@ -7,11 +7,15 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
 import type { AttendanceStatus, DayAttendance } from "@/types";
 
+// Four genuinely distinct hues — HALF_DAY and LATE used to both land in
+// the yellow/amber family (status-warning vs. amber-400), which read as
+// the same color at a glance. Present/Absent/Half-day/Late now each get
+// their own series tone instead.
 const STATUS_DOT: Record<AttendanceStatus, string> = {
   PRESENT: "bg-status-good/15 text-status-good border-status-good/30",
   ABSENT: "bg-status-critical/15 text-status-critical border-status-critical/30",
-  HALF_DAY: "bg-status-warning/15 text-status-warning border-status-warning/30",
-  LATE: "bg-amber-400/15 text-amber-600 border-amber-400/30",
+  HALF_DAY: "bg-series-3/15 text-series-3 border-series-3/30",
+  LATE: "bg-series-2/15 text-series-2 border-series-2/30",
 };
 
 const MARK_OPTIONS: AttendanceStatus[] = ["ABSENT", "HALF_DAY", "LATE"];
@@ -81,7 +85,7 @@ export function AttendanceCalendar({ personId }: { personId: string }) {
 
       <p className="mb-3 text-sm text-ink-muted">{t("calendar.defaultPresentNote")}</p>
 
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid max-w-sm grid-cols-7 gap-1.5">
         {leadingBlanks.map((_, i) => (
           <div key={`blank-${i}`} />
         ))}

@@ -10,11 +10,14 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
 import type { AttendanceStatus, RosterEntry } from "@/types";
 
+// Kept in sync with AttendanceCalendar.tsx's STATUS_DOT -- same four
+// statuses, same tones, so a status reads the same color whether you're
+// looking at the daily roster here or a person's own monthly calendar.
 const STATUS_BADGE: Record<AttendanceStatus, string> = {
   PRESENT: "bg-status-good/15 text-status-good border-status-good/30",
   ABSENT: "bg-status-critical/15 text-status-critical border-status-critical/30",
-  HALF_DAY: "bg-status-warning/15 text-status-warning border-status-warning/30",
-  LATE: "bg-amber-400/15 text-amber-600 border-amber-400/30",
+  HALF_DAY: "bg-series-3/15 text-series-3 border-series-3/30",
+  LATE: "bg-series-2/15 text-series-2 border-series-2/30",
 };
 
 const MARK_OPTIONS: AttendanceStatus[] = ["ABSENT", "HALF_DAY", "LATE"];
