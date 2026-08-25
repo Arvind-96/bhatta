@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Handshake, MapPinned, Phone, Plus, Truck, Users } from "lucide-react";
+import { ChevronRight, Handshake, MapPinned, Phone, Plus, Truck, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
-import { avatarToneClass, initialOf } from "@/lib/avatarTone";
+import { avatarToneSolidClass, initialOf } from "@/lib/avatarTone";
 import { api } from "@/lib/api";
 import { useWorkTypeLabels } from "@/components/people/personTypes";
 import type { Person, WorkType } from "@/types";
@@ -41,43 +41,48 @@ function PersonCard({
   const { t } = useTranslation();
   const active = person.status !== "ABSCONDED";
   return (
-    <Card>
+    <Card className="group">
       <button className="flex w-full items-start gap-3 text-left" onClick={onOpen}>
         <div className="relative shrink-0">
           <div
             className={cn(
-              "flex h-11 w-11 items-center justify-center rounded-2xl text-sm font-bold",
-              avatarToneClass(person._id)
+              "flex h-[52px] w-[52px] items-center justify-center rounded-2xl text-base font-bold shadow-[0_0_0_3px_var(--surface),0_0_0_4.5px_var(--neon-glow)]",
+              avatarToneSolidClass(person._id)
             )}
           >
             {initialOf(person.name)}
           </div>
           <span
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface",
+              "absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface",
               active ? "bg-status-good" : "bg-status-critical"
             )}
             aria-hidden
           />
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-ink-primary hover:underline">{person.name}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-ink-primary group-hover:underline">{person.name}</p>
           <p className="truncate text-sm text-ink-muted">{subtitle}</p>
         </div>
+        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-ink-muted transition-transform group-hover:translate-x-0.5 group-hover:text-series-1" />
       </button>
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-2">
           {person.phone ? (
-            <a
-              href={`tel:${person.phone}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border text-ink-secondary transition-colors hover:border-series-1/50 hover:bg-series-1/10 hover:text-series-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-              aria-label={person.phone}
-            >
-              <Phone className="h-3.5 w-3.5" />
-            </a>
-          ) : null}
-          <span className="truncate text-sm text-ink-muted">{person.phone ?? "—"}</span>
+            <>
+              <a
+                href={`tel:${person.phone}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-series-1 text-white shadow-glow-1 transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                aria-label={t("people.callPerson", { name: person.name })}
+              >
+                <Phone className="h-3.5 w-3.5" />
+              </a>
+              <span className="truncate text-sm text-ink-muted">{person.phone}</span>
+            </>
+          ) : (
+            <span className="truncate text-sm text-ink-muted">—</span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           {balanceLabel && <span className="text-xs font-medium text-ink-secondary">{balanceLabel}</span>}

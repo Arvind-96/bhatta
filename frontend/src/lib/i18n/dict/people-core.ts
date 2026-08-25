@@ -61,6 +61,7 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
 
   // --- pages/People.tsx ---
   "people.absconded": { en: "Absconded", hi: "फरार" },
+  "people.callPerson": { en: "Call {name}", hi: "{name} को कॉल करें" },
   "people.ratePerThousandBricks": { en: "₹{amount}/1000 bricks", hi: "₹{amount}/1000 ईंट" },
   "people.perThousandBricksShort": { en: "Per 1000 bricks", hi: "प्रति 1000 ईंट" },
   "people.ratePerMonth": { en: "₹{amount}/month", hi: "₹{amount}/माह" },
