@@ -6,3 +6,4 @@ export * from "./soil";
 export * from "./sand";
 export * from "./fleet";
 export * from "./salary";
+export * from "./supplier";

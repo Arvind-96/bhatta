@@ -159,6 +159,22 @@ export interface CustomerVehicle {
   vehicleNumber: string;
 }
 
+export type SupplyUnit = "KG" | "PIECE" | "METER";
+
+export interface SupplyListItem {
+  itemName: string;
+  unit: SupplyUnit;
+}
+
+export interface Supplier {
+  _id: string;
+  name: string;
+  phone?: string;
+  address?: string;
+  suppliesList: SupplyListItem[];
+  createdAt: string;
+}
+
 export interface Customer {
   _id: string;
   name: string;

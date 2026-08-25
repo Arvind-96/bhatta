@@ -33,6 +33,7 @@ import { overviewDict } from "./dict/overview";
 import { salaryDict } from "./dict/salary";
 import { reportsDict } from "./dict/reports";
 import { compareDict } from "./dict/compare";
+import { supplierDict } from "./dict/supplier";
 
 const coreDict: Record<string, Record<Locale, string>> = {
   "app.name": { en: "Bhatta Cloud", hi: "भट्टा क्लाउड" },
@@ -222,6 +223,7 @@ export const translations: Record<string, Record<Locale, string>> = {
   ...salaryDict,
   ...reportsDict,
   ...compareDict,
+  ...supplierDict,
 };
 
 // params supports simple {name}-style interpolation for strings that embed

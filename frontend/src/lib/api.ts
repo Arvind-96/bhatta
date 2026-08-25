@@ -107,7 +107,9 @@ import type {
   StackingVehicleType,
   StockAudit,
   StockLoadingEntry,
+  Supplier,
   SupplierFuelBalance,
+  SupplyListItem,
   TractorFleetEntry,
   StockPoint,
   VehicleDieselEntry,
@@ -439,6 +441,15 @@ export const api = {
       }>
     ) => patch<Customer>(`/customers/${id}`, input, true),
     remove: (id: string) => del<void>(`/customers/${id}`, true),
+  },
+
+  suppliers: {
+    list: () => get<Supplier[]>("/suppliers", true),
+    create: (input: { name: string; phone?: string; address?: string; suppliesList?: SupplyListItem[] }) =>
+      post<Supplier>("/suppliers", input, true),
+    update: (id: string, input: Partial<{ name: string; phone: string; address: string; suppliesList: SupplyListItem[] }>) =>
+      patch<Supplier>(`/suppliers/${id}`, input, true),
+    remove: (id: string) => del<void>(`/suppliers/${id}`, true),
   },
 
   login: (email: string, password: string) => post<AuthResponse>("/auth/login", { email, password }),

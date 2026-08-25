@@ -18,6 +18,7 @@ import { GatePass } from "@/pages/GatePass";
 import { Challan } from "@/pages/Challan";
 import { Invoices } from "@/pages/Invoices";
 import { Customers } from "@/pages/Customers";
+import { Suppliers } from "@/pages/Suppliers";
 import { Expense } from "@/pages/Expense";
 import { Fuel } from "@/pages/Fuel";
 import { Inventory } from "@/pages/Inventory";
@@ -53,6 +54,7 @@ const VIEWS = {
   challan: Challan,
   invoices: Invoices,
   customers: Customers,
+  suppliers: Suppliers,
   expense: Expense,
   fuel: Fuel,
   inventory: Inventory,
