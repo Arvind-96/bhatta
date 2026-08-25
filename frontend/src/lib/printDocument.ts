@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { BrickCategory, BrickLineItem, Challan, Expense, GatePassRecord, Invoice, LedgerEntry, Machine, MachineInstallmentPayment, PaymentReceipt, SandContract, SoilContract, VehicleDieselEntry } from "@/types";
+import type { BrickCategory, BrickLineItem, Challan, Expense, GatePassRecord, Invoice, LedgerEntry, Machine, MachineInstallmentPayment, PaymentReceipt, SandContract, SoilContract, Supplier, SupplierInvoice, VehicleDieselEntry } from "@/types";
 
 // Gate Pass, Challan, Invoice, and Payment Receipt all share one visual
 // language (accent bars, a logo mark, a colored "who this is for" box, a
@@ -220,6 +220,7 @@ const CONTRACT_ACCENT = `:root { --doc-accent: #8a5a2b; --doc-accent-soft: #c08a
 const INVOICE_RECORD_ACCENT = `:root { --doc-accent: #2a4d8f; --doc-accent-soft: #5b7dc0; --doc-accent-tint: #eef3fb; }`;
 const EXPENSE_ACCENT = `:root { --doc-accent: #6b4c9a; --doc-accent-soft: #9a7dc0; --doc-accent-tint: #f4f0fa; }`;
 const DIESEL_ACCENT = `:root { --doc-accent: #b8860b; --doc-accent-soft: #d4a836; --doc-accent-tint: #faf5e6; }`;
+const SUPPLIER_INVOICE_ACCENT = `:root { --doc-accent: #0f766e; --doc-accent-soft: #4fa89f; --doc-accent-tint: #eef8f7; }`;
 
 function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
   const html = `<!doctype html>
@@ -685,6 +686,74 @@ export function printPaymentReceipt(receipt: PaymentReceipt, recipientName: stri
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`Payment Receipt ${receipt.receiptNumber}`, body, RECEIPT_ACCENT);
+}
+
+// The receipt handed to a supplier when goods are received — same shared
+// visual language as the other documents, in its own teal accent. Unlike
+// the customer-facing Invoice, the stamp here reads from the kiln's own
+// payable side: PAID means the kiln has settled this bill in full, DUE
+// means it still owes the supplier for it.
+export function printSupplierInvoiceRecord(invoice: SupplierInvoice, supplier: Supplier, kilnName: string) {
+  const logoLetter = kilnLogoLetter(kilnName);
+  const dueAmount = Math.max(0, invoice.totalBillAmount - invoice.amountPaid);
+  const stamp: PaymentStamp = dueAmount <= 0 ? "PAID" : invoice.amountPaid > 0 ? "PARTIAL" : "DUE";
+  const number = invoice.sequenceNumber ? `SUP-INV-${invoice.sequenceNumber}` : invoice._id.slice(0, 8).toUpperCase();
+
+  const itemRows = invoice.itemsReceived.length
+    ? invoice.itemsReceived
+        .map(
+          (item) =>
+            `<tr><td class="doc-table-label">${escapeHtml(item.itemName)}</td><td class="doc-table-value">${item.quantity} ${escapeHtml(item.unit)}</td></tr>`
+        )
+        .join("")
+    : `<tr><td class="doc-table-label" colspan="2">—</td></tr>`;
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kilnName)}</h1>
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Supplier Invoice</span>
+        <p class="doc-number">${escapeHtml(number)}</p>
+        <p class="doc-date">${invoice.date ? new Date(invoice.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Supplier</p>
+        <p class="doc-box-name">${escapeHtml(supplier.name)}</p>
+        ${supplier.phone ? `<p class="doc-box-detail">${escapeHtml(supplier.phone)}</p>` : ""}
+        ${supplier.address ? `<p class="doc-box-detail">${escapeHtml(supplier.address)}</p>` : ""}
+      </div>
+      <div class="doc-totalbox">
+        ${stampHtml(stamp)}
+        <p class="doc-total-label">Total bill amount</p>
+        <p class="doc-total-amount">₹${formatINR(invoice.totalBillAmount)}</p>
+        <p class="doc-amount-words">${escapeHtml(amountInWords(invoice.totalBillAmount))}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      ${itemRows}
+      <tr><td class="doc-table-label">Amount paid</td><td class="doc-table-value">₹${formatINR(invoice.amountPaid)}</td></tr>
+      ${invoice.paymentMode ? `<tr><td class="doc-table-label">Payment mode</td><td class="doc-table-value">${escapeHtml(paymentModeLabel(invoice))}</td></tr>` : ""}
+      <tr><td class="doc-table-label">Due / Pending amount</td><td class="doc-table-value">₹${formatINR(dueAmount)}</td></tr>
+    </table>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED RECEIPT ~</p>
+    <div class="doc-sign-row">
+      <div class="doc-sign-box">Bhatta owner / Munim<br />(Stamp &amp; Signature)</div>
+      <div class="doc-sign-box">Supplier signature</div>
+    </div>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`Supplier Invoice ${number}`, body, SUPPLIER_INVOICE_ACCENT);
 }
 
 const LEDGER_CATEGORY_LABELS: Record<string, string> = {

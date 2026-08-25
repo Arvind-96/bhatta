@@ -172,7 +172,35 @@ export interface Supplier {
   phone?: string;
   address?: string;
   suppliesList: SupplyListItem[];
+  dateAdded?: string;
   createdAt: string;
+}
+
+export interface SupplierInvoiceItem {
+  itemName: string;
+  unit: SupplyUnit;
+  quantity: number;
+}
+
+export interface SupplierInvoice {
+  _id: string;
+  supplierId: string;
+  sequenceNumber?: number;
+  date?: string;
+  itemsReceived: SupplierInvoiceItem[];
+  totalBillAmount: number;
+  amountPaid: number;
+  paymentMode?: LaborPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
+  createdAt: string;
+}
+
+export interface SupplierDetail {
+  supplier: Supplier;
+  invoices: SupplierInvoice[];
+  totalPaid: number;
+  totalDue: number;
 }
 
 export interface Customer {

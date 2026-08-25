@@ -108,7 +108,10 @@ import type {
   StockAudit,
   StockLoadingEntry,
   Supplier,
+  SupplierDetail,
   SupplierFuelBalance,
+  SupplierInvoice,
+  SupplierInvoiceItem,
   SupplyListItem,
   TractorFleetEntry,
   StockPoint,
@@ -445,11 +448,41 @@ export const api = {
 
   suppliers: {
     list: () => get<Supplier[]>("/suppliers", true),
-    create: (input: { name: string; phone?: string; address?: string; suppliesList?: SupplyListItem[] }) =>
+    detail: (id: string) => get<SupplierDetail>(`/suppliers/${id}`, true),
+    create: (input: { name: string; phone?: string; address?: string; suppliesList?: SupplyListItem[]; dateAdded?: string }) =>
       post<Supplier>("/suppliers", input, true),
-    update: (id: string, input: Partial<{ name: string; phone: string; address: string; suppliesList: SupplyListItem[] }>) =>
-      patch<Supplier>(`/suppliers/${id}`, input, true),
+    update: (
+      id: string,
+      input: Partial<{ name: string; phone: string; address: string; suppliesList: SupplyListItem[]; dateAdded: string }>
+    ) => patch<Supplier>(`/suppliers/${id}`, input, true),
     remove: (id: string) => del<void>(`/suppliers/${id}`, true),
+  },
+
+  supplierInvoices: {
+    create: (input: {
+      supplierId: string;
+      date?: string;
+      itemsReceived?: SupplierInvoiceItem[];
+      totalBillAmount: number;
+      amountPaid?: number;
+      paymentMode?: LaborPaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
+    }) => post<SupplierInvoice>("/supplier-invoices", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        supplierId: string;
+        date: string;
+        itemsReceived: SupplierInvoiceItem[];
+        totalBillAmount: number;
+        amountPaid: number;
+        paymentMode: LaborPaymentMode;
+        cashAmount: number;
+        onlineAmount: number;
+      }>
+    ) => patch<SupplierInvoice>(`/supplier-invoices/${id}`, input, true),
+    remove: (id: string) => del<void>(`/supplier-invoices/${id}`, true),
   },
 
   login: (email: string, password: string) => post<AuthResponse>("/auth/login", { email, password }),

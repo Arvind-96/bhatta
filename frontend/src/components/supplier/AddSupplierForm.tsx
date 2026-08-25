@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { Supplier, SupplyListItem, SupplyUnit } from "@/types";
@@ -28,6 +29,7 @@ export function AddSupplierForm({ existing, onClose, onSaved }: AddSupplierFormP
   const [phone, setPhone] = useState(existing?.phone ?? "");
   const [address, setAddress] = useState(existing?.address ?? "");
   const [suppliesList, setSuppliesList] = useState<SupplyListItem[]>(existing?.suppliesList ?? []);
+  const [dateAdded, setDateAdded] = useState(existing?.dateAdded ? existing.dateAdded.slice(0, 10) : new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
 
   function addItem(itemName: string) {
@@ -48,6 +50,7 @@ export function AddSupplierForm({ existing, onClose, onSaved }: AddSupplierFormP
         phone: phone.trim() || undefined,
         address: address.trim() || undefined,
         suppliesList: suppliesList.filter((i) => i.itemName.trim()),
+        dateAdded: dateAdded || undefined,
       };
       const saved = existing ? await api.suppliers.update(existing._id, payload) : await api.suppliers.create(payload);
       onSaved(saved);
@@ -77,6 +80,10 @@ export function AddSupplierForm({ existing, onClose, onSaved }: AddSupplierFormP
           <input placeholder={t("supplier.phonePlaceholder")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
           <input placeholder={t("supplier.addressPlaceholder")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
         </div>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-ink-muted">{t("supplier.dateAddedLabel")}</span>
+          <DateInput value={dateAdded} onChange={(e) => setDateAdded(e.target.value)} className={inputClass} />
+        </label>
 
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("supplier.suppliesListSection")}</p>

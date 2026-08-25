@@ -9,6 +9,7 @@ export interface SupplierInput {
   phone?: string;
   address?: string;
   suppliesList?: SupplyListItem[];
+  dateAdded?: Date;
 }
 
 export async function createSupplier(kilnId: string, input: SupplierInput) {

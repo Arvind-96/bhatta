@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Container, List, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
+import { Container, FileText, List, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,8 @@ import { Pagination, usePagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { AddSupplierForm } from "@/components/supplier/AddSupplierForm";
+import { AddSupplierInvoiceForm } from "@/components/supplier/AddSupplierInvoiceForm";
+import { SupplierDetailPage } from "@/components/supplier/SupplierDetailPage";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
@@ -43,12 +45,13 @@ function useSupplyItemsCatalog(suppliers: Supplier[]) {
 }
 
 export function Suppliers() {
-  const [mode, setMode] = useState<"list" | "add" | "items">("list");
+  const [mode, setMode] = useState<"list" | "add" | "items" | "invoice">("list");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [openSupplierId, setOpenSupplierId] = useState<string | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
 
@@ -76,6 +79,16 @@ export function Suppliers() {
   const catalog = useSupplyItemsCatalog(suppliers);
   const pendingDeleteSupplier = suppliers.find((s) => s._id === pendingDeleteId) ?? null;
 
+  if (openSupplierId) {
+    return (
+      <SupplierDetailPage
+        supplierId={openSupplierId}
+        onBack={() => setOpenSupplierId(null)}
+        onDeleted={() => setOpenSupplierId(null)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap justify-end gap-2">
@@ -95,9 +108,24 @@ export function Suppliers() {
         <Button size="sm" variant={mode === "items" ? "primary" : "outline"} onClick={() => setMode("items")}>
           <Container className="h-4 w-4" /> {t("supplier.supplyItemsButton")}
         </Button>
+        <Button size="sm" variant={mode === "invoice" ? "primary" : "outline"} onClick={() => setMode("invoice")}>
+          <Plus className="h-4 w-4" /> {t("supplier.recordSuppliesButton")}
+        </Button>
+        <Button size="sm" variant={mode === "invoice" ? "accent" : "outline"} onClick={() => setMode("invoice")}>
+          <FileText className="h-4 w-4" /> {t("supplier.createInvoiceButton")}
+        </Button>
       </div>
 
-      {mode === "add" ? (
+      {mode === "invoice" ? (
+        <AddSupplierInvoiceForm
+          suppliers={suppliers}
+          onClose={() => setMode("list")}
+          onSaved={() => {
+            setMode("list");
+            refresh();
+          }}
+        />
+      ) : mode === "add" ? (
         <AddSupplierForm
           existing={editingSupplier}
           onClose={() => {
@@ -163,11 +191,11 @@ export function Suppliers() {
                 </thead>
                 <tbody>
                   {pagedSuppliers.map((s) => (
-                    <tr key={s._id} className="border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                      <td className="py-3 text-ink-primary">{s.name}</td>
+                    <tr key={s._id} onClick={() => setOpenSupplierId(s._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
+                      <td className="py-3 text-ink-primary hover:underline">{s.name}</td>
                       <td className="py-3 text-ink-secondary">
                         {s.phone ? (
-                          <a href={`tel:${s.phone}`} className="flex items-center gap-1.5 hover:text-series-1">
+                          <a href={`tel:${s.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 hover:text-series-1">
                             <Phone className="h-3.5 w-3.5" /> {s.phone}
                           </a>
                         ) : (
@@ -177,7 +205,7 @@ export function Suppliers() {
                       <td className="py-3 text-ink-secondary">
                         {s.suppliesList.length > 0 ? t("supplier.suppliesCountLabel", { count: s.suppliesList.length }) : "—"}
                       </td>
-                      <td className="py-3">
+                      <td className="py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1.5">
                           <button
                             onClick={() => {

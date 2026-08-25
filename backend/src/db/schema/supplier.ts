@@ -1,5 +1,5 @@
 import { json, mysqlTable, varchar, index } from "drizzle-orm/mysql-core";
-import { idColumn, kilnIdColumn, createdAtColumn } from "./_helpers";
+import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
 
 export const SUPPLY_UNITS = ["KG", "PIECE", "METER"] as const;
 
@@ -21,6 +21,11 @@ export const suppliers = mysqlTable(
     phone: varchar("phone", { length: 32 }),
     address: varchar("address", { length: 500 }),
     suppliesList: json("suppliesList").$type<SupplyListItem[]>().default([]),
+    // The date this supplier relationship actually started, editable by
+    // the admin — distinct from createdAt (when the record was entered
+    // into the software), same convention every transaction-date field
+    // in this app already uses.
+    dateAdded: dateColumn("dateAdded"),
     createdAt: createdAtColumn(),
   },
   (t) => ({

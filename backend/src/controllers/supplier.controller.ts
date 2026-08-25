@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { SUPPLY_UNITS } from "../db/schema";
 import { createSupplier, listSuppliers, updateSupplier, deleteSupplier } from "../services/supplier.service";
+import { getSupplierDetail } from "../services/supplierInvoice.service";
 
 const supplyListItemSchema = z.object({
   itemName: z.string().min(1),
@@ -14,6 +15,7 @@ const createSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   suppliesList: z.array(supplyListItemSchema).optional(),
+  dateAdded: z.coerce.date().optional(),
 });
 const updateSchema = createSchema.partial();
 
@@ -24,6 +26,10 @@ export async function create(req: AuthedRequest, res: Response) {
 
 export async function list(req: AuthedRequest, res: Response) {
   res.json(await listSuppliers(req.kiln!.id));
+}
+
+export async function detail(req: AuthedRequest, res: Response) {
+  res.json(await getSupplierDetail(req.kiln!.id, req.params.id));
 }
 
 export async function update(req: AuthedRequest, res: Response) {

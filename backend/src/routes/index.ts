@@ -51,6 +51,7 @@ import { salaryRouter } from "./salary.routes";
 import { compareRouter } from "./compare.routes";
 import { reportsRouter } from "./reports.routes";
 import { supplierRouter } from "./supplier.routes";
+import { supplierInvoiceRouter } from "./supplierInvoice.routes";
 
 export const apiRouter = Router();
 
@@ -108,3 +109,4 @@ apiRouter.use("/salary", salaryRouter);
 apiRouter.use("/compare", compareRouter);
 apiRouter.use("/reports", reportsRouter);
 apiRouter.use("/suppliers", supplierRouter);
+apiRouter.use("/supplier-invoices", supplierInvoiceRouter);
