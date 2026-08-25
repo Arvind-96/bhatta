@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Plus, Truck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -467,6 +467,12 @@ export function Dispatch() {
           </form>
         </Card>
       )}
+
+      <div className="float-track" aria-hidden>
+        <span className="float-ico">
+          <Truck className="h-[18px] w-[18px]" />
+        </span>
+      </div>
 
       <Card>
         {dispatches.length === 0 ? (

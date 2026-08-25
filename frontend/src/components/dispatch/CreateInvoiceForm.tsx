@@ -398,7 +398,7 @@ export function CreateInvoiceForm({
         />
 
         {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
-        <Button type="submit" disabled={saving} className="col-span-2">
+        <Button type="submit" variant={existing ? "primary" : "accent"} disabled={saving} className="col-span-2">
           {existing ? t("dispatchDocs.saveAndReprintInvoice") : t("dispatchDocs.generateInvoice")}
         </Button>
       </form>

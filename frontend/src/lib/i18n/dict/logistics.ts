@@ -23,6 +23,8 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "brickLoading.logTrip": { en: "Log brick loading trip", hi: "ईंट लदाई ट्रिप दर्ज करें" },
   "brickLoading.truck": { en: "Truck", hi: "ट्रक" },
   "brickLoading.tractor": { en: "Tractor", hi: "ट्रैक्टर" },
+  "brickLoading.vehicleTypeTruckHint": { en: "Larger loads, most common", hi: "बड़ा भार, सबसे आम" },
+  "brickLoading.vehicleTypeTractorHint": { en: "Shorter, in-yard hauls", hi: "छोटी, यार्ड के अंदर ढुलाई" },
   "brickLoading.vehicleNumber": { en: "Vehicle number", hi: "वाहन नंबर" },
   "brickLoading.bricksLoadedPlaceholder": { en: "Loaded brick count", hi: "लदी ईंटों की संख्या" },
   "brickLoading.categoryPlaceholder": { en: "Brick category", hi: "ईंट श्रेणी" },
@@ -58,6 +60,7 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "brickLoading.bricksHeader": { en: "Bricks", hi: "ईंटें" },
   "brickLoading.dispatchHeader": { en: "Dispatch", hi: "डिस्पैच" },
   "brickLoading.editEntryTitle": { en: "Edit brick loading entry", hi: "ईंट लदाई एंट्री संपादित करें" },
+  "brickLoading.confirmDeleteTripTitle": { en: "Delete this loading trip?", hi: "यह लदाई ट्रिप हटाएं?" },
   "brickLoading.confirmDeleteTrip": {
     en: "Delete this loading trip for {vehicleNumber}? Any linked dispatch and stock will be reversed.",
     hi: "{vehicleNumber} के लिए यह लदाई ट्रिप हटाएं? जुड़ा हुआ डिस्पैच और स्टॉक वापस कर दिया जाएगा।",

@@ -181,9 +181,12 @@ export function PhotoCaptureInput({ value, onChange }: PhotoCaptureInputProps) {
     <button
       type="button"
       onClick={() => setStage("choosing")}
-      className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm font-medium text-ink-secondary hover:border-series-1/40 hover:text-series-1"
+      className="flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-4 text-sm font-medium text-ink-secondary transition-colors hover:border-series-1/40 hover:bg-series-1/5 hover:text-series-1"
     >
-      <Upload className="h-4 w-4" /> {t("people.uploadPhotoCta")}
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-series-2/12 text-series-2">
+        <Upload className="h-4 w-4" />
+      </span>
+      {t("people.uploadPhotoCta")}
     </button>
   );
 }

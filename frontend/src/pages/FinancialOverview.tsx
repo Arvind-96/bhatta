@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { PeriodStatCard } from "@/components/dashboard/PeriodStatCard";
 import { MoneyInOutChart } from "@/components/dashboard/MoneyInOutChart";
 import { PaymentMixDonut } from "@/components/dashboard/PaymentMixDonut";
+import { SpendingByCategoryBar } from "@/components/dashboard/SpendingByCategoryBar";
+import { NetMarginGauge } from "@/components/dashboard/NetMarginGauge";
 import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
@@ -159,6 +161,11 @@ export function FinancialOverview() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <MoneyInOutChart overview={overview} />
         <PaymentMixDonut overview={overview} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
+        <SpendingByCategoryBar overview={overview} />
+        <NetMarginGauge overview={overview} />
       </div>
 
       <Card>

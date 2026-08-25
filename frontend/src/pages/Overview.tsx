@@ -19,6 +19,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { PeriodStatCard } from "@/components/dashboard/PeriodStatCard";
 import { ProductionChart } from "@/components/dashboard/ProductionChart";
 import { StockOverview } from "@/components/dashboard/StockOverview";
+import { StockCompositionDonut } from "@/components/dashboard/StockCompositionDonut";
 import { LiveFeed } from "@/components/dashboard/LiveFeed";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -444,7 +445,7 @@ function OverviewHero({ kilnName, dateLabel, todayBricks }: { kilnName: string; 
       <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{dateLabel}</p>
-          <h2 className="font-display text-2xl font-bold text-ink-primary sm:text-3xl">{kilnName}</h2>
+          <h2 className="h-gradient font-display text-2xl font-bold sm:text-3xl">{kilnName}</h2>
           <p className="mt-2 max-w-md text-sm text-ink-secondary">{t("overview.heroTagline")}</p>
           <div className="mt-4 flex items-center gap-2">
             <span className="flex h-2 w-2 rounded-full bg-[var(--neon)] shadow-[0_0_8px_var(--neon-glow)]" style={{ animation: "pulse-neon-soft 1.6s ease-in-out infinite" }} />
@@ -582,8 +583,9 @@ export function Overview() {
 
       <div className="space-y-3">
         <SectionHeading icon={LineChart} title={t("overview.sectionTrends")} />
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ProductionChart />
+          <StockCompositionDonut />
           <StockOverview />
         </div>
       </div>

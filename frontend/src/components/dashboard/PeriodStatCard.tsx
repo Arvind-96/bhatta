@@ -31,10 +31,15 @@ interface PeriodStatCardProps {
 // of six identical black numbers on plain cards.
 export function PeriodStatCard({ label, value, subtitle, icon: Icon, tone = "text-series-1", critical }: PeriodStatCardProps) {
   return (
-    <Card className={cn("animate-rise", critical && "border-status-critical/30")}>
+    <Card className={cn("group animate-rise", critical && "border-status-critical/30")}>
       <CardHeader>
         <CardTitle>{label}</CardTitle>
-        <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl", critical ? "bg-status-critical/10" : TONE_CHIP_BG[tone])}>
+        <div
+          className={cn(
+            "flex h-9 w-9 items-center justify-center rounded-xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110",
+            critical ? "bg-status-critical/10" : TONE_CHIP_BG[tone]
+          )}
+        >
           <Icon className={cn("h-4 w-4", critical ? "text-status-critical" : tone)} />
         </div>
       </CardHeader>

@@ -33,10 +33,15 @@ interface StatCardProps {
 // not just a monochrome icon on an otherwise identical card.
 export function StatCard({ label, value, delta, deltaDirection = "flat", icon: Icon, tone = "text-series-1" }: StatCardProps) {
   return (
-    <Card className="flex animate-rise flex-col gap-3">
+    <Card className="group flex animate-rise flex-col gap-3">
       <div className="flex items-center justify-between">
         <span className="text-sm text-ink-secondary">{label}</span>
-        <div className={cn("flex h-9 w-9 items-center justify-center rounded-xl", TONE_CHIP_BG[tone])}>
+        <div
+          className={cn(
+            "flex h-9 w-9 items-center justify-center rounded-xl transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110",
+            TONE_CHIP_BG[tone]
+          )}
+        >
           <Icon className={cn("h-4 w-4", tone)} />
         </div>
       </div>

@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
-import { formatINR, formatVehicleNumber } from "@/lib/utils";
+import { cn, formatINR, formatVehicleNumber } from "@/lib/utils";
 import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
 import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
 import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
+import { VehicleTypeRadioCards } from "@/components/shared/VehicleTypeRadioCards";
 import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, LaborPaymentMode } from "@/types";
 
 const inputClass =
@@ -225,17 +226,9 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
                 placeholder={t("brickLoading.vehicleNumber")}
                 value={vehicleNumber}
                 onChange={setVehicleNumber}
-                className={inputClass}
+                className={cn(inputClass, "col-span-2")}
               />
-              <select
-                required
-                value={vehicleType}
-                onChange={(e) => setVehicleType(e.target.value as BrickVehicleType)}
-                className={inputClass}
-              >
-                <option value="TRUCK">{t("brickLoading.truck")}</option>
-                <option value="TRACTOR">{t("brickLoading.tractor")}</option>
-              </select>
+              <VehicleTypeRadioCards value={vehicleType} onChange={setVehicleType} className="col-span-2" />
               <input
                 type="number"
                 placeholder={t("brickLoading.loadingRatePlaceholder")}

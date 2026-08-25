@@ -11,6 +11,8 @@ import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, type LineIt
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
 import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
 import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
+import { VehicleTypeRadioCards } from "@/components/shared/VehicleTypeRadioCards";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { BrickLoadingTripDetailPage } from "@/components/dispatch/BrickLoadingTripDetailPage";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
@@ -114,6 +116,8 @@ export function BrickLoading() {
   const [showAddDriver, setShowAddDriver] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BrickLoadingEntry | null>(null);
   const [openTripId, setOpenTripId] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState("");
   const emptyForm = {
     customerName: "",
@@ -266,10 +270,14 @@ export function BrickLoading() {
   }
 
   async function deleteEntry(entry: BrickLoadingEntry) {
-    if (!confirm(t("brickLoading.confirmDeleteTrip", { vehicleNumber: entry.vehicleNumber }))) return false;
-    await api.brickLoading.remove(entry._id);
-    await refresh();
-    return true;
+    setDeleting(true);
+    try {
+      await api.brickLoading.remove(entry._id);
+      await refresh();
+      return true;
+    } finally {
+      setDeleting(false);
+    }
   }
 
   // Filtered as the admin types the Customer/Party Name — picking one
@@ -319,9 +327,7 @@ export function BrickLoading() {
           trip={openTrip}
           onBack={() => setOpenTripId(null)}
           onEdit={() => setEditingEntry(openTrip)}
-          onDelete={async () => {
-            if (await deleteEntry(openTrip)) setOpenTripId(null);
-          }}
+          onDelete={() => setPendingDeleteId(openTrip._id)}
         />
       ) : (
         <>
@@ -438,17 +444,13 @@ export function BrickLoading() {
                   placeholder={t("brickLoading.vehicleNumber")}
                   value={form.vehicleNumber}
                   onChange={(value) => setForm((f) => ({ ...f, vehicleNumber: value }))}
-                  className={inputClass}
+                  className={cn(inputClass, "col-span-2")}
                 />
-                <select
-                  required
+                <VehicleTypeRadioCards
                   value={form.vehicleType}
-                  onChange={(e) => setForm((f) => ({ ...f, vehicleType: e.target.value as BrickVehicleType }))}
-                  className={inputClass}
-                >
-                  <option value="TRUCK">{t("brickLoading.truck")}</option>
-                  <option value="TRACTOR">{t("brickLoading.tractor")}</option>
-                </select>
+                  onChange={(vehicleType) => setForm((f) => ({ ...f, vehicleType }))}
+                  className="col-span-2"
+                />
                 <input
                   type="number"
                   placeholder={t("brickLoading.loadingRatePlaceholder")}
@@ -456,7 +458,7 @@ export function BrickLoading() {
                   onChange={(e) => setForm((f) => ({ ...f, loadingRatePerThousand: e.target.value }))}
                   className={inputClass}
                 />
-                <label className="col-span-2 flex flex-col gap-1">
+                <label className="flex flex-col gap-1">
                   <span className="text-xs text-ink-muted">{t("brickLoading.loadingDateLabel")}</span>
                   <DateInput required value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} className={inputClass} />
                 </label>
@@ -642,6 +644,26 @@ export function BrickLoading() {
       {editingEntry && (
         <EditBrickLoadingEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} onSaved={refresh} />
       )}
+      {pendingDeleteId &&
+        (() => {
+          const target = entries.find((e) => e._id === pendingDeleteId);
+          if (!target) return null;
+          return (
+            <ConfirmDialog
+              title={t("brickLoading.confirmDeleteTripTitle")}
+              detail={t("brickLoading.confirmDeleteTrip", { vehicleNumber: target.vehicleNumber })}
+              confirmLabel={t("common.delete")}
+              loading={deleting}
+              onCancel={() => setPendingDeleteId(null)}
+              onConfirm={async () => {
+                if (await deleteEntry(target)) {
+                  setPendingDeleteId(null);
+                  if (openTripId === target._id) setOpenTripId(null);
+                }
+              }}
+            />
+          );
+        })()}
     </div>
   );
 }

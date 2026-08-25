@@ -225,6 +225,33 @@ body {
   background-image: var(--gradient-brand);
 }
 
+/* Four heading treatments (design-system Foundations section), used for
+   different weights of moment across the app instead of every page
+   heading looking identical: gradient for the top of a whole page,
+   underline for a sub-section inside a page. */
+.h-gradient {
+  background-image: var(--gradient-brand);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.h-underline {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 6px;
+}
+.h-underline::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 40px;
+  border-radius: 3px;
+  background-image: var(--gradient-accent2);
+}
+
 /* Overview page hero illustration (kiln, smoke, delivery truck) — the
    .hero-* classes below are used only by Overview.tsx's hero banner.
    Neutralized automatically by the prefers-reduced-motion block further
@@ -288,6 +315,38 @@ body {
   }
   50% {
     opacity: 0.4;
+  }
+}
+
+/* A small truck that drifts left-to-right above a list page's table,
+   fading in/out at each end — used on Dispatch. Purely decorative;
+   neutralized by the prefers-reduced-motion block below like everything
+   else here. */
+.float-track {
+  position: relative;
+  height: 22px;
+  margin-bottom: 4px;
+}
+.float-ico {
+  position: absolute;
+  top: 0;
+  color: var(--series-1);
+  animation: float-drive 7s linear infinite;
+}
+@keyframes float-drive {
+  0% {
+    left: 0%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 18px);
+    opacity: 0;
   }
 }
 
