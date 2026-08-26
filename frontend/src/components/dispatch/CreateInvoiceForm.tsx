@@ -230,7 +230,7 @@ export function CreateInvoiceForm({
       // so api.customers.detail() already reflects it, giving an accurate
       // print on both a brand-new invoice AND an edit (the old preview only
       // ever covered the "new" case).
-      const [{ stamp, overallDue }, signatureDataUri] = await Promise.all([
+      const [{ stamp }, signatureDataUri] = await Promise.all([
         resolvePaymentInfo({
           customerId: row.customerId || selectedCustomerId || undefined,
           customerName,
@@ -238,7 +238,7 @@ export function CreateInvoiceForm({
         }),
         api.kilns.fetchSignatureDataUri(),
       ]);
-      printInvoiceRecord(row, { ...kilnInfo, signatureDataUri }, categories, overallDue, stamp);
+      printInvoiceRecord(row, { ...kilnInfo, signatureDataUri }, categories, stamp);
       onSaved();
     } finally {
       setSaving(false);

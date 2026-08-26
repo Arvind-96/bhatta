@@ -410,7 +410,7 @@ function invoiceKilnPrefix(kilnName: string) {
 // `paymentStamp` is always shown — if the caller doesn't pass one (no
 // Customer resolvable), it falls back to a status computed purely from
 // this invoice's own paid/remaining amount.
-export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categories: BrickCategory[], customerOverallDue?: number, paymentStamp?: PaymentStamp, fallbackLabel = "—") {
+export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categories: BrickCategory[], paymentStamp?: PaymentStamp, fallbackLabel = "—") {
   const logoLetter = kilnLogoLetter(kiln.name);
   // {kilnPrefix}/{session}/{sessionSerialNumber} (e.g. "JVS/26-27/04") once
   // an invoice has both (every invoice created after this feature shipped)
@@ -533,11 +533,6 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
           ? `<tr><td class="doc-table-label">Remaining on this invoice</td><td class="doc-table-value">₹${formatINR(remainingOnThisInvoice)}</td></tr>`
           : ""
       }
-      ${
-        customerOverallDue != null && customerOverallDue > 0
-          ? `<tr><td class="doc-table-label">Customer's overall remaining due</td><td class="doc-table-value">₹${formatINR(customerOverallDue)}</td></tr>`
-          : ""
-      }
       ${invoice.placeOfSupply ? `<tr><td class="doc-table-label">Place of supply</td><td class="doc-table-value">${escapeHtml(invoice.placeOfSupply)}</td></tr>` : ""}
     </table>
 
@@ -571,7 +566,7 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
     <table class="doc-gst-bottom"><tr>
       <td class="doc-gst-bottom-left">
         <p class="doc-words-label">Amount in Words</p>
-        <p class="doc-words-value">${escapeHtml(amountInWords(invoice.netAmount))}</p>
+        <p class="doc-words-value">${escapeHtml(amountInWords(invoiceTotalRounded))}</p>
         ${
           hasBankDetails
             ? `<div class="doc-bank-details">

@@ -155,11 +155,11 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
   }
   async function printInvoice(i: Invoice) {
     const remainingOnThisDoc = Math.max(0, Math.round((i.netAmount - (i.amountPaidNow ?? i.netAmount)) * 100) / 100);
-    const [{ stamp, overallDue }, signatureDataUri] = await Promise.all([
+    const [{ stamp }, signatureDataUri] = await Promise.all([
       resolvePaymentInfo({ customerId: i.customerId, customerName: i.customerName, remainingOnThisDoc }),
       api.kilns.fetchSignatureDataUri(),
     ]);
-    printInvoiceRecord(i, { ...kilnInfo, signatureDataUri }, categories, overallDue, stamp);
+    printInvoiceRecord(i, { ...kilnInfo, signatureDataUri }, categories, stamp);
   }
 
   const driver = dispatch.driverName || (typeof dispatch.driverId === "object" ? dispatch.driverId?.name : undefined);

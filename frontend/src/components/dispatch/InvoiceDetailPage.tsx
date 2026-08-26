@@ -58,11 +58,11 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
 
   async function handlePrint() {
     const remainingOnThisDoc = Math.max(0, Math.round((invoice.netAmount - (invoice.amountPaidNow ?? invoice.netAmount)) * 100) / 100);
-    const [{ stamp, overallDue }, signatureDataUri] = await Promise.all([
+    const [{ stamp }, signatureDataUri] = await Promise.all([
       resolvePaymentInfo({ customerId: invoice.customerId, customerName: invoice.customerName, remainingOnThisDoc }),
       api.kilns.fetchSignatureDataUri(),
     ]);
-    printInvoiceRecord(invoice, { ...kilnInfo, signatureDataUri }, categories, overallDue, stamp);
+    printInvoiceRecord(invoice, { ...kilnInfo, signatureDataUri }, categories, stamp);
   }
 
   const invoiceGross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);

@@ -568,7 +568,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                       <td className="py-3 text-ink-secondary">{new Date(p.date).toLocaleDateString("en-IN")}</td>
                       <td className="py-3 text-ink-primary">{p.fuelType}</td>
                       <td className="py-3 text-ink-secondary">
-                        {typeof p.supplierId === "object" ? p.supplierId.name : "—"}
+                        {p.supplierId && typeof p.supplierId === "object" ? p.supplierId.name : "—"}
                       </td>
                       <td className="py-3 text-ink-secondary">{p.vehicleNumber ?? "—"}</td>
                       <td className="py-3 tabular-nums text-ink-secondary">{p.actualWeightKg.toLocaleString("en-IN")} kg</td>
@@ -621,7 +621,7 @@ function EditFuelLogModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const [gherId, setGherId] = useState(typeof log.gherId === "object" ? log.gherId._id : log.gherId);
+  const [gherId, setGherId] = useState(log.gherId && typeof log.gherId === "object" ? log.gherId._id : log.gherId);
   const [fuelType, setFuelType] = useState(log.fuelType);
   const [quantityKg, setQuantityKg] = useState(String(log.quantityKg));
   const [notes, setNotes] = useState(log.notes ?? "");
@@ -846,7 +846,7 @@ function ConsumptionTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
               <div key={l._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                 <div>
                   <p className="text-ink-primary">
-                    {t("fuel.gherNumber", { number: typeof l.gherId === "object" ? l.gherId.number : "—" })} · {l.fuelType}
+                    {t("fuel.gherNumber", { number: l.gherId && typeof l.gherId === "object" ? l.gherId.number : "—" })} · {l.fuelType}
                   </p>
                   <p className="text-sm text-ink-muted">{new Date(l.date).toLocaleDateString("en-IN")}</p>
                 </div>
