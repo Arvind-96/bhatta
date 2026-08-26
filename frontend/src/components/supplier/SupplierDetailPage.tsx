@@ -62,6 +62,24 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
     onDeleted();
   }
 
+  // Total received per suppliesList item, summed from this supplier's own
+  // invoices only (unlike the kiln-wide Supply Items catalog on the main
+  // Suppliers page) — matched by itemName+unit the same way. Computed
+  // above the `!detail` early return so this hook always runs on every
+  // render, even the first (loading) one — a hook after a conditional
+  // return breaks React's rules and crashes on the render where `detail`
+  // finishes loading.
+  const receivedByItemKey = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const inv of detail?.invoices ?? []) {
+      for (const item of inv.itemsReceived ?? []) {
+        const key = `${item.itemName.trim().toLowerCase()}__${item.unit}`;
+        totals.set(key, (totals.get(key) ?? 0) + item.quantity);
+      }
+    }
+    return totals;
+  }, [detail]);
+
   if (!detail) {
     return (
       <div>
@@ -77,20 +95,6 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
 
   const { supplier, invoices, totalPaid, totalDue } = detail;
   const pendingDeleteInvoice = invoices.find((i) => i._id === pendingDeleteInvoiceId) ?? null;
-
-  // Total received per suppliesList item, summed from this supplier's own
-  // invoices only (unlike the kiln-wide Supply Items catalog on the main
-  // Suppliers page) — matched by itemName+unit the same way.
-  const receivedByItemKey = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const inv of invoices) {
-      for (const item of inv.itemsReceived ?? []) {
-        const key = `${item.itemName.trim().toLowerCase()}__${item.unit}`;
-        totals.set(key, (totals.get(key) ?? 0) + item.quantity);
-      }
-    }
-    return totals;
-  }, [invoices]);
 
   return (
     <div>
