@@ -694,12 +694,14 @@ export function printSupplierInvoiceRecord(invoice: SupplierInvoice, supplier: S
   const stamp: PaymentStamp = dueAmount <= 0 ? "PAID" : invoice.amountPaid > 0 ? "PARTIAL" : "DUE";
   const number = invoice.sequenceNumber ? `SUP-INV-${invoice.sequenceNumber}` : invoice._id.slice(0, 8).toUpperCase();
 
+  const rateByKey = new Map(supplier.suppliesList.map((i) => [`${i.itemName.trim().toLowerCase()}__${i.unit}`, i.rate]));
   const itemRows = invoice.itemsReceived.length
     ? invoice.itemsReceived
-        .map(
-          (item) =>
-            `<tr><td class="doc-table-label">${escapeHtml(item.itemName)}</td><td class="doc-table-value">${item.quantity} ${escapeHtml(item.unit)}</td></tr>`
-        )
+        .map((item) => {
+          const rate = rateByKey.get(`${item.itemName.trim().toLowerCase()}__${item.unit}`);
+          const rateText = rate != null ? ` @ ₹${rate}/${item.unit}` : "";
+          return `<tr><td class="doc-table-label">${escapeHtml(item.itemName)}</td><td class="doc-table-value">${item.quantity} ${escapeHtml(item.unit)}${escapeHtml(rateText)}</td></tr>`;
+        })
         .join("")
     : `<tr><td class="doc-table-label" colspan="2">—</td></tr>`;
 
