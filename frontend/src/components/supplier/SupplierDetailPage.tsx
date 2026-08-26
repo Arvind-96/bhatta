@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, Pencil, Phone, Plus, Printer, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, History, Pencil, Phone, Plus, Printer, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -12,6 +12,11 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR } from "@/lib/utils";
 import { printSupplierInvoiceRecord } from "@/lib/printDocument";
 import type { Supplier, SupplierDetail, SupplierInvoice } from "@/types";
+
+function formatItemsReceived(invoice: SupplierInvoice): string {
+  if (!invoice.itemsReceived || invoice.itemsReceived.length === 0) return "—";
+  return invoice.itemsReceived.map((i) => `${i.quantity.toLocaleString("en-IN")} ${i.unit} ${i.itemName}`).join(", ");
+}
 
 interface SupplierDetailPageProps {
   supplierId: string;
@@ -73,6 +78,20 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
   const { supplier, invoices, totalPaid, totalDue } = detail;
   const pendingDeleteInvoice = invoices.find((i) => i._id === pendingDeleteInvoiceId) ?? null;
 
+  // Total received per suppliesList item, summed from this supplier's own
+  // invoices only (unlike the kiln-wide Supply Items catalog on the main
+  // Suppliers page) — matched by itemName+unit the same way.
+  const receivedByItemKey = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const inv of invoices) {
+      for (const item of inv.itemsReceived ?? []) {
+        const key = `${item.itemName.trim().toLowerCase()}__${item.unit}`;
+        totals.set(key, (totals.get(key) ?? 0) + item.quantity);
+      }
+    }
+    return totals;
+  }, [invoices]);
+
   return (
     <div>
       <button onClick={onBack} className="mb-3 flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink-primary">
@@ -133,12 +152,16 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
                 <p className="text-sm text-ink-muted">—</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
-                  {supplier.suppliesList.map((item, i) => (
-                    <span key={i} className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary">
-                      {item.itemName} · {item.unit}
-                      {item.rate != null ? ` · ₹${item.rate}` : ""}
-                    </span>
-                  ))}
+                  {supplier.suppliesList.map((item, i) => {
+                    const received = receivedByItemKey.get(`${item.itemName.trim().toLowerCase()}__${item.unit}`) ?? 0;
+                    return (
+                      <span key={i} className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary">
+                        {item.itemName} · {item.unit}
+                        {item.rate != null ? ` · ₹${item.rate}` : ""}
+                        {received > 0 ? ` · ${received.toLocaleString("en-IN")} ${item.unit} ${t("supplier.receivedSuffix")}` : ""}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </Card>
@@ -162,17 +185,50 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
               </div>
             </Card>
 
+            {supplier.rateHistory.length > 0 && (
+              <Card className="lg:col-span-2">
+                <h4 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  <History className="h-3.5 w-3.5" /> {t("supplier.rateHistorySection")}
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px] text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left text-sm text-ink-muted">
+                        <th className="pb-2 font-medium">{t("supplier.itemNamePlaceholder")}</th>
+                        <th className="pb-2 font-medium text-right">{t("supplier.previousRateLabel")}</th>
+                        <th className="pb-2 font-medium text-right">{t("supplier.newRateLabel")}</th>
+                        <th className="pb-2 font-medium text-right">{t("supplier.effectiveDateLabel")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...supplier.rateHistory]
+                        .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())
+                        .map((entry, i) => (
+                          <tr key={i} className="border-b border-border/60 last:border-0">
+                            <td className="py-3 text-ink-primary">{entry.itemName} · {entry.unit}</td>
+                            <td className="py-3 text-right tabular-nums text-ink-muted line-through">₹{entry.previousRate}</td>
+                            <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{entry.newRate}</td>
+                            <td className="py-3 text-right text-ink-secondary">{new Date(entry.effectiveDate).toLocaleDateString("en-IN")}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
             <Card className="lg:col-span-2">
               <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("supplier.invoiceListSection")}</h4>
               {invoices.length === 0 ? (
                 <p className="py-6 text-center text-sm text-ink-muted">{t("supplier.noInvoicesYet")}</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[560px] text-sm">
+                  <table className="w-full min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-sm text-ink-muted">
                         <th className="pb-2 font-medium">{t("dispatchDocs.numberHeader")}</th>
                         <th className="pb-2 font-medium">{t("common.date")}</th>
+                        <th className="pb-2 font-medium">{t("supplier.receivedQuantityHeader")}</th>
                         <th className="pb-2 font-medium text-right">{t("supplier.totalBillAmountLabel")}</th>
                         <th className="pb-2 font-medium text-right">{t("supplier.amountPaidLabel")}</th>
                         <th className="pb-2 font-medium text-right">{t("supplier.dueAmountLabel")}</th>
@@ -188,6 +244,7 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
                               {inv.sequenceNumber ? `SUP-INV-${inv.sequenceNumber}` : "—"}
                             </td>
                             <td className="py-3 text-ink-secondary">{inv.date ? new Date(inv.date).toLocaleDateString("en-IN") : "—"}</td>
+                            <td className="py-3 max-w-[220px] truncate text-ink-secondary" title={formatItemsReceived(inv)}>{formatItemsReceived(inv)}</td>
                             <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(inv.totalBillAmount)}</td>
                             <td className="py-3 text-right tabular-nums text-status-good">₹{formatINR(inv.amountPaid)}</td>
                             <td className="py-3 text-right tabular-nums text-status-critical">₹{formatINR(due)}</td>

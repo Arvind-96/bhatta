@@ -9,6 +9,17 @@ export interface SupplyListItem {
   rate?: number;
 }
 
+// One entry per rate change on an item already in suppliesList — recorded
+// automatically by updateSupplier when it sees an item's rate actually
+// change (not on first-time set, since there's no "previous" rate yet).
+export interface RateHistoryEntry {
+  itemName: string;
+  unit: (typeof SUPPLY_UNITS)[number];
+  previousRate: number;
+  newRate: number;
+  effectiveDate: string;
+}
+
 // External vendors the kiln buys raw materials from (coal, gas, wood,
 // salt, ...) — distinct from suppliedItems (kiln → labourer, tools/
 // materials handed out from Inventory) and from Person (kiln staff/
@@ -22,6 +33,7 @@ export const suppliers = mysqlTable(
     phone: varchar("phone", { length: 32 }),
     address: varchar("address", { length: 500 }),
     suppliesList: json("suppliesList").$type<SupplyListItem[]>().default([]),
+    rateHistory: json("rateHistory").$type<RateHistoryEntry[]>().default([]),
     // The date this supplier relationship actually started, editable by
     // the admin — distinct from createdAt (when the record was entered
     // into the software), same convention every transaction-date field

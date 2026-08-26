@@ -1,8 +1,29 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { suppliers, type SupplyListItem } from "../db/schema";
+import { suppliers, type RateHistoryEntry, type SupplyListItem } from "../db/schema";
 import { emitToKiln } from "../config/socket";
+
+function itemKey(itemName: string, unit: string) {
+  return `${itemName.trim().toLowerCase()}__${unit}`;
+}
+
+// Compares the incoming suppliesList against what's currently on file and
+// returns one history entry per item whose rate actually changed value —
+// not for a brand-new item or a rate being set for the first time, since
+// there's no "previous" rate to show then.
+function diffRates(existingList: SupplyListItem[], nextList: SupplyListItem[]): RateHistoryEntry[] {
+  const existingByKey = new Map(existingList.map((i) => [itemKey(i.itemName, i.unit), i]));
+  const entries: RateHistoryEntry[] = [];
+  const effectiveDate = new Date().toISOString().slice(0, 10);
+  for (const next of nextList) {
+    const prev = existingByKey.get(itemKey(next.itemName, next.unit));
+    if (prev?.rate != null && next.rate != null && prev.rate !== next.rate) {
+      entries.push({ itemName: next.itemName, unit: next.unit, previousRate: prev.rate, newRate: next.rate, effectiveDate });
+    }
+  }
+  return entries;
+}
 
 export interface SupplierInput {
   name: string;
@@ -27,7 +48,16 @@ export async function listSuppliers(kilnId: string) {
 export async function updateSupplier(kilnId: string, supplierId: string, input: Partial<SupplierInput>) {
   const existing = (await db.select().from(suppliers).where(and(eq(suppliers._id, supplierId), eq(suppliers.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Supplier not found in this kiln");
-  await db.update(suppliers).set(input).where(eq(suppliers._id, supplierId));
+
+  const patch: Partial<typeof suppliers.$inferInsert> = { ...input };
+  if (input.suppliesList) {
+    const newEntries = diffRates(existing.suppliesList ?? [], input.suppliesList);
+    if (newEntries.length > 0) {
+      patch.rateHistory = [...(existing.rateHistory ?? []), ...newEntries];
+    }
+  }
+
+  await db.update(suppliers).set(patch).where(eq(suppliers._id, supplierId));
   const updated = (await db.select().from(suppliers).where(eq(suppliers._id, supplierId)))[0]!;
   emitToKiln(kilnId, "supplier:update", updated);
   return updated;

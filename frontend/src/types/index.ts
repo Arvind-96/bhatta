@@ -167,12 +167,21 @@ export interface SupplyListItem {
   rate?: number;
 }
 
+export interface RateHistoryEntry {
+  itemName: string;
+  unit: SupplyUnit;
+  previousRate: number;
+  newRate: number;
+  effectiveDate: string;
+}
+
 export interface Supplier {
   _id: string;
   name: string;
   phone?: string;
   address?: string;
   suppliesList: SupplyListItem[];
+  rateHistory: RateHistoryEntry[];
   dateAdded?: string;
   createdAt: string;
 }

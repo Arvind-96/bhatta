@@ -8,6 +8,7 @@ import { getSupplierDetail } from "../services/supplierInvoice.service";
 const supplyListItemSchema = z.object({
   itemName: z.string().min(1),
   unit: z.enum(SUPPLY_UNITS),
+  rate: z.number().min(0).optional(),
 });
 
 const createSchema = z.object({

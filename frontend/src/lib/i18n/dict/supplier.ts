@@ -49,4 +49,10 @@ export const supplierDict: Record<string, Record<Locale, string>> = {
   "supplier.ratePlaceholder": { en: "Rate (₹/unit)", hi: "दर (₹/यूनिट)" },
   "supplier.rateLabel": { en: "Rate", hi: "दर" },
   "supplier.totalQuantityLabel": { en: "Total received", hi: "कुल प्राप्त" },
+  "supplier.receivedSuffix": { en: "received", hi: "प्राप्त" },
+  "supplier.receivedQuantityHeader": { en: "Received quantity", hi: "प्राप्त मात्रा" },
+  "supplier.rateHistorySection": { en: "Rate History", hi: "दर इतिहास" },
+  "supplier.previousRateLabel": { en: "Previous rate", hi: "पिछली दर" },
+  "supplier.newRateLabel": { en: "New rate", hi: "नई दर" },
+  "supplier.effectiveDateLabel": { en: "Effective date", hi: "प्रभावी तारीख" },
 };
