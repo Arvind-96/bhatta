@@ -136,6 +136,7 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
                   {supplier.suppliesList.map((item, i) => (
                     <span key={i} className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary">
                       {item.itemName} · {item.unit}
+                      {item.rate != null ? ` · ₹${item.rate}` : ""}
                     </span>
                   ))}
                 </div>

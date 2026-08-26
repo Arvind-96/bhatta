@@ -46,6 +46,13 @@ export async function listSupplierInvoices(kilnId: string, supplierId: string) {
     .orderBy(desc(supplierInvoices.date), desc(supplierInvoices.createdAt));
 }
 
+// Kiln-wide, every supplier — feeds the Supply Items catalog's "total
+// received" figure, which sums itemsReceived across every supplier's
+// invoices rather than just one.
+export async function listAllSupplierInvoices(kilnId: string) {
+  return db.select().from(supplierInvoices).where(eq(supplierInvoices.kilnId, kilnId)).orderBy(desc(supplierInvoices.date));
+}
+
 // Total paid/pending across every invoice for this supplier — never
 // stored, always recomputed from amountPaid/totalBillAmount so an edit
 // to either can never leave a stale balance behind (same convention as

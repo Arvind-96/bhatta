@@ -14,7 +14,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
-import type { Supplier, SupplyUnit } from "@/types";
+import type { Supplier, SupplierInvoice, SupplyUnit } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -29,24 +29,35 @@ function unitLabelFor(t: (key: string) => string, unit: SupplyUnit) {
 // records actually say. Grouped by item name + unit (the same item at two
 // different units — rare, but real — gets two rows) with every supplier
 // offering it attached.
-function useSupplyItemsCatalog(suppliers: Supplier[]) {
+function useSupplyItemsCatalog(suppliers: Supplier[], invoices: SupplierInvoice[]) {
   return useMemo(() => {
-    const byKey = new Map<string, { itemName: string; unit: SupplyUnit; supplierNames: string[] }>();
+    const byKey = new Map<string, { itemName: string; unit: SupplyUnit; supplierNames: string[]; totalQuantity: number }>();
     for (const supplier of suppliers) {
       for (const item of supplier.suppliesList) {
         const key = `${item.itemName.trim().toLowerCase()}__${item.unit}`;
-        const entry = byKey.get(key) ?? { itemName: item.itemName, unit: item.unit, supplierNames: [] };
+        const entry = byKey.get(key) ?? { itemName: item.itemName, unit: item.unit, supplierNames: [], totalQuantity: 0 };
         if (!entry.supplierNames.includes(supplier.name)) entry.supplierNames.push(supplier.name);
         byKey.set(key, entry);
       }
     }
+    // Total received sums itemsReceived across every invoice — matched by
+    // the same itemName+unit key as the catalog, not tied to any one
+    // supplier, so it reflects everything ever received kiln-wide.
+    for (const invoice of invoices) {
+      for (const item of invoice.itemsReceived ?? []) {
+        const key = `${item.itemName.trim().toLowerCase()}__${item.unit}`;
+        const entry = byKey.get(key);
+        if (entry) entry.totalQuantity += item.quantity;
+      }
+    }
     return Array.from(byKey.values()).sort((a, b) => a.itemName.localeCompare(b.itemName));
-  }, [suppliers]);
+  }, [suppliers, invoices]);
 }
 
 export function Suppliers() {
   const [mode, setMode] = useState<"list" | "add" | "items" | "invoice">("list");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [invoices, setInvoices] = useState<SupplierInvoice[]>([]);
   const [search, setSearch] = useState("");
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -59,12 +70,18 @@ export function Suppliers() {
     setSuppliers(await api.suppliers.list());
   }
 
+  async function refreshInvoices() {
+    setInvoices(await api.supplierInvoices.list());
+  }
+
   useEffect(() => {
     if (!activeKilnId) return;
     refresh().catch(console.error);
+    refreshInvoices().catch(console.error);
   }, [activeKilnId]);
 
   useKilnEvent("supplier:update", () => refresh());
+  useKilnEvent("supplierInvoice:update", () => refreshInvoices());
 
   const filtered = suppliers.filter((s) => {
     if (!search.trim()) return true;
@@ -76,7 +93,7 @@ export function Suppliers() {
     );
   });
   const { page, setPage, pageCount, pageItems: pagedSuppliers, total } = usePagination(filtered, 10);
-  const catalog = useSupplyItemsCatalog(suppliers);
+  const catalog = useSupplyItemsCatalog(suppliers, invoices);
   const pendingDeleteSupplier = suppliers.find((s) => s._id === pendingDeleteId) ?? null;
 
   if (openSupplierId) {
@@ -153,6 +170,10 @@ export function Suppliers() {
                     <p className="truncate text-sm font-semibold text-ink-primary">{entry.itemName}</p>
                     <Badge variant="neutral">{unitLabelFor(t, entry.unit)}</Badge>
                   </div>
+                  <p className="mt-2 text-sm font-semibold tabular-nums text-ink-primary">
+                    {entry.totalQuantity.toLocaleString("en-IN")} {unitLabelFor(t, entry.unit)}
+                  </p>
+                  <p className="text-xs text-ink-muted">{t("supplier.totalQuantityLabel")}</p>
                   <p className="mt-1.5 text-xs text-ink-muted">{t("supplier.suppliedByLabel")}</p>
                   <p className="truncate text-xs text-ink-secondary">{entry.supplierNames.join(", ")}</p>
                 </div>

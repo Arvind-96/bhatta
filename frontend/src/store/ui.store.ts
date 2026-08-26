@@ -17,7 +17,6 @@ export type AppView =
   | "invoices"
   | "customers"
   | "expense"
-  | "fuel"
   | "inventory"
   | "stock"
   | "fleet"

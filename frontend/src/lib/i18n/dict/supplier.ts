@@ -46,4 +46,7 @@ export const supplierDict: Record<string, Record<Locale, string>> = {
   "supplier.confirmDeleteInvoice": { en: "Delete this invoice? This cannot be undone.", hi: "यह इनवॉइस हटाएं? इसे वापस नहीं लाया जा सकता।" },
   "supplier.invoiceDetailTitle": { en: "Supplier invoice", hi: "आपूर्तिकर्ता इनवॉइस" },
   "supplier.printReceipt": { en: "Print receipt", hi: "रसीद प्रिंट करें" },
+  "supplier.ratePlaceholder": { en: "Rate (₹/unit)", hi: "दर (₹/यूनिट)" },
+  "supplier.rateLabel": { en: "Rate", hi: "दर" },
+  "supplier.totalQuantityLabel": { en: "Total received", hi: "कुल प्राप्त" },
 };

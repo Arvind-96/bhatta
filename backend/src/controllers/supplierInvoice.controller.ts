@@ -5,6 +5,7 @@ import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import {
   createSupplierInvoice,
   getSupplierDetail,
+  listAllSupplierInvoices,
   updateSupplierInvoice,
   deleteSupplierInvoice,
 } from "../services/supplierInvoice.service";
@@ -34,6 +35,10 @@ export async function create(req: AuthedRequest, res: Response) {
 
 export async function detailForSupplier(req: AuthedRequest, res: Response) {
   res.json(await getSupplierDetail(req.kiln!.id, req.params.supplierId));
+}
+
+export async function listAll(req: AuthedRequest, res: Response) {
+  res.json(await listAllSupplierInvoices(req.kiln!.id));
 }
 
 export async function update(req: AuthedRequest, res: Response) {

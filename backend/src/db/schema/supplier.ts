@@ -6,6 +6,7 @@ export const SUPPLY_UNITS = ["KG", "PIECE", "METER"] as const;
 export interface SupplyListItem {
   itemName: string;
   unit: (typeof SUPPLY_UNITS)[number];
+  rate?: number;
 }
 
 // External vendors the kiln buys raw materials from (coal, gas, wood,

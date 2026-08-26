@@ -164,6 +164,7 @@ export type SupplyUnit = "KG" | "PIECE" | "METER";
 export interface SupplyListItem {
   itemName: string;
   unit: SupplyUnit;
+  rate?: number;
 }
 
 export interface Supplier {

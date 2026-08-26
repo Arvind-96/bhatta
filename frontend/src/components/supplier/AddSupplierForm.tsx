@@ -37,6 +37,11 @@ export function AddSupplierForm({ existing, onClose, onSaved }: AddSupplierFormP
     setSuppliesList((list) => [...list, { itemName, unit: "KG" }]);
   }
 
+  function updateItemRate(index: number, value: string) {
+    const rate = value === "" ? undefined : Number(value);
+    setSuppliesList((list) => list.map((v, j) => (j === index ? { ...v, rate } : v)));
+  }
+
   function unitLabel(unit: SupplyUnit) {
     return unit === "KG" ? t("supplier.unitKg") : unit === "PIECE" ? t("supplier.unitPiece") : t("supplier.unitMeter");
   }
@@ -112,31 +117,40 @@ export function AddSupplierForm({ existing, onClose, onSaved }: AddSupplierFormP
           ) : (
             <div className="flex flex-col gap-2">
               {suppliesList.map((item, i) => (
-                <div key={i} className="flex gap-2">
+                <div key={i} className="flex flex-col gap-1.5 rounded-xl border border-border p-2 sm:flex-row sm:items-center sm:rounded-none sm:border-0 sm:p-0">
                   <input
                     placeholder={t("supplier.itemNamePlaceholder")}
                     value={item.itemName}
                     onChange={(e) => setSuppliesList((list) => list.map((v, j) => (j === i ? { ...v, itemName: e.target.value } : v)))}
                     className={inputClass + " flex-1"}
                   />
-                  <select
-                    value={item.unit}
-                    onChange={(e) => setSuppliesList((list) => list.map((v, j) => (j === i ? { ...v, unit: e.target.value as SupplyUnit } : v)))}
-                    className={inputClass}
-                  >
-                    {UNITS.map((u) => (
-                      <option key={u} value={u}>
-                        {unitLabel(u)}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setSuppliesList((list) => list.filter((_, j) => j !== i))}
-                    className="text-ink-muted hover:text-status-critical"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  <div className="flex gap-2">
+                    <select
+                      value={item.unit}
+                      onChange={(e) => setSuppliesList((list) => list.map((v, j) => (j === i ? { ...v, unit: e.target.value as SupplyUnit } : v)))}
+                      className={inputClass + " flex-1 sm:flex-none"}
+                    >
+                      {UNITS.map((u) => (
+                        <option key={u} value={u}>
+                          {unitLabel(u)}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      placeholder={t("supplier.ratePlaceholder")}
+                      value={item.rate ?? ""}
+                      onChange={(e) => updateItemRate(i, e.target.value)}
+                      className={inputClass + " w-28"}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSuppliesList((list) => list.filter((_, j) => j !== i))}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-muted hover:text-status-critical"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

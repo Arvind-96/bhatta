@@ -459,6 +459,7 @@ export const api = {
   },
 
   supplierInvoices: {
+    list: () => get<SupplierInvoice[]>("/supplier-invoices", true),
     create: (input: {
       supplierId: string;
       date?: string;
