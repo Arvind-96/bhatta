@@ -217,7 +217,7 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex max-h-[80vh] flex-col gap-5 overflow-y-auto pr-1">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Basic details */}
           <div className="flex flex-col gap-2">
             <div className="grid grid-cols-2 gap-2">

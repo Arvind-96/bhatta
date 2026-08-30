@@ -485,6 +485,11 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
   const igstAmount = Math.round((invoice.netAmount * igstRate) / 100 * 100) / 100;
   const totalAfterTax = Math.round((invoice.netAmount + cgstAmount + sgstAmount + igstAmount) * 100) / 100;
   const invoiceTotalRounded = Math.round(totalAfterTax);
+  // The top Bill/Ship To box's headline figure: once GST is on the
+  // invoice, this should read the same post-tax rounded total as the
+  // "Invoice Total (Round off)" row below rather than the pre-tax
+  // netAmount, so the two don't disagree at a glance.
+  const headerTotal = hasGst ? invoiceTotalRounded : invoice.netAmount;
   const hasBankDetails = !!(kiln.bankAccountNumber || kiln.bankName || kiln.bankIfscCode);
 
   const body = `
@@ -501,7 +506,7 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
         </div>
       </div>
       <div class="doc-meta">
-        <span class="doc-badge">${kiln.gstNumber ? "GST Invoice" : "Invoice"}</span>
+        <span class="doc-badge">${hasGst ? "GST Invoice" : "Invoice"}</span>
         <p class="doc-number">${escapeHtml(number)}</p>
         <p class="doc-date">Invoice Date: ${new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
       </div>
@@ -519,8 +524,8 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
       <div class="doc-totalbox">
         ${stampHtml(resolvedStamp)}
         <p class="doc-total-label">Total amount</p>
-        <p class="doc-total-amount">₹${formatINR(invoice.netAmount)}</p>
-        <p class="doc-amount-words">${escapeHtml(amountInWords(invoice.netAmount))}</p>
+        <p class="doc-total-amount">₹${formatINR(headerTotal)}</p>
+        <p class="doc-amount-words">${escapeHtml(amountInWords(headerTotal))}</p>
       </div>
     </div>
 

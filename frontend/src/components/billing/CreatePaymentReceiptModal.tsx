@@ -144,7 +144,9 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
     try {
       if (selectedCustomer) {
         const paidAmount = Number(amountPaid);
+        const { nextSequenceNumber } = await api.invoices.nextSequenceNumber();
         const row = await api.invoices.create({
+          sequenceNumber: nextSequenceNumber,
           customerId: selectedCustomer._id,
           customerName: selectedCustomer.name,
           customerPhone: selectedCustomer.phones[0],

@@ -47,7 +47,9 @@ export function AddCustomerPaymentModal({ customer, currentDue, onClose, onSaved
     setSaving(true);
     try {
       const paidAmount = Number(amount);
+      const { nextSequenceNumber } = await api.invoices.nextSequenceNumber();
       const row = await api.invoices.create({
+        sequenceNumber: nextSequenceNumber,
         customerId: customer._id,
         customerName: customer.name,
         customerPhone: customer.phones[0],
