@@ -1,6 +1,8 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { invoices, expenses, ledgerEntries, people, ghers, fuelLogs, stackingEntries, fuelPurchases } from "../db/schema";
+import { invoices, expenses, ledgerEntries, people, ghers, fuelLogs, stackingEntries, fuelPurchases, chamberGradings } from "../db/schema";
+import type { BrickLineItem } from "../db/schema/_helpers";
+import { totalGradedOutput } from "./chamberGrading.service";
 
 // A simplified revenue-vs-cost snapshot, not a full accounting P&L
 // (no depreciation, no partner-wise split, no accrual/cash distinction
@@ -22,7 +24,7 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
   // silently disagree with Financial Overview for the same period. Using
   // the same source here keeps every "revenue"/"money received" figure in
   // the app in agreement.
-  const [invoiceRows, expenseRows, dueEntries, customers] = await Promise.all([
+  const [invoiceRows, expenseRows, dueEntries, customers, totalBricksProduced] = await Promise.all([
     db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.seasonId, seasonId), sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`)),
     db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.seasonId, seasonId), gte(expenses.date, since))),
     // ledgerEntries.seasonId is optional (not reliably populated — see
@@ -30,6 +32,7 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
     // here for that reason; the date-range bound already scopes this.
     db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), gte(ledgerEntries.date, since), eq(ledgerEntries.direction, "DUE"))),
     db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))),
+    totalGradedOutput(kilnId, seasonId, since),
   ]);
 
   const customerIds = new Set(customers.map((c) => c._id));
@@ -47,6 +50,12 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
     laborCosts,
     totalCosts,
     netProfit: revenue - totalCosts,
+    // Every expense/labor cost for the period, spread across every brick
+    // graded out of a chamber in that same window — a kiln-wide average,
+    // not attributable to any one batch (see chamberCostReport for the
+    // directly-attributable, one-chamber version of this same idea).
+    totalBricksProduced,
+    costPerBrick: totalBricksProduced > 0 ? Math.round((totalCosts / totalBricksProduced) * 100) / 100 : null,
   };
 }
 
@@ -56,20 +65,24 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
 // paid for that chamber. Deliberately doesn't try to allocate a share of
 // molding/soil cost across chambers — that attribution gets arbitrary fast
 // without a much bigger cost-accounting model, so it's left out rather
-// than guessed at.
+// than guessed at. Divided by that same cycle's own graded output (once
+// graded) for a real, directly-attributable ₹/brick figure — null while
+// the chamber hasn't been graded yet this cycle, rather than guessed at
+// from bricks merely loaded (which haven't survived firing yet).
 export async function chamberCostReport(kilnId: string, seasonId: string, gherId: string) {
   const gher = (await db.select().from(ghers).where(and(eq(ghers._id, gherId), eq(ghers.kilnId, kilnId))))[0];
   if (!gher) throw new Error("Referenced chamber not found in this kiln");
 
   const since = gher.cycleStartedAt ?? new Date(0);
 
-  const [fuelLogRows, stackingEntryRows, fuelPurchaseRows] = await Promise.all([
+  const [fuelLogRows, stackingEntryRows, fuelPurchaseRows, gradingRows] = await Promise.all([
     db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), eq(fuelLogs.gherId, gherId), gte(fuelLogs.date, since))),
     db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId), eq(stackingEntries.gherId, gherId), gte(stackingEntries.date, since))),
     // fuelPurchases stays kiln-wide/unfiltered — this is only used to
     // derive an average ₹/kg per fuel type (fuelStockBalance's own
     // cumulative treatment), not this chamber's own activity.
     db.select().from(fuelPurchases).where(eq(fuelPurchases.kilnId, kilnId)),
+    db.select().from(chamberGradings).where(and(eq(chamberGradings.kilnId, kilnId), eq(chamberGradings.seasonId, seasonId), eq(chamberGradings.gherId, gherId), gte(chamberGradings.date, since))),
   ]);
 
   const fuelTotals = new Map<string, { amount: number; weight: number }>();
@@ -95,10 +108,18 @@ export async function chamberCostReport(kilnId: string, seasonId: string, gherId
     0
   );
 
+  const totalCost = fuelCost + stackingCost;
+  const bricksProduced = gradingRows.reduce((sum, g) => {
+    const items = (g.items as BrickLineItem[] | null) ?? [];
+    return sum + (items.length > 0 ? items.reduce((s, i) => s + i.bricksCount, 0) : g.a1Count + g.jhamaCount + g.pelaCount + g.rodaCount);
+  }, 0);
+
   return {
     gherNumber: gher.number,
     fuelCost: Math.round(fuelCost),
     stackingCost: Math.round(stackingCost),
-    totalCost: Math.round(fuelCost + stackingCost),
+    totalCost: Math.round(totalCost),
+    bricksProduced,
+    costPerBrick: bricksProduced > 0 ? Math.round((totalCost / bricksProduced) * 100) / 100 : null,
   };
 }

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
 import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
-import { GherMap } from "@/components/stacking/GherMap";
 import { EditStackingEntryModal } from "@/components/stacking/EditStackingEntryModal";
 import { OperatorDetailPage } from "@/components/stacking/OperatorDetailPage";
 import { StackingContractorDetailPage } from "@/components/stacking/StackingContractorDetailPage";
@@ -16,7 +15,6 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import type {
   Gher,
-  GherStatus,
   Person,
   StackingContractorSummary,
   StackingEntry,
@@ -28,23 +26,6 @@ import type {
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
-
-function useStatusLegend(): { status: GherStatus; label: string }[] {
-  const { t } = useTranslation();
-  return [
-    { status: "EMPTY", label: t("stacking.statusEmpty") },
-    { status: "STACKING", label: t("stacking.statusBharaiInProgress") },
-    { status: "FIRING", label: t("stacking.statusFiring") },
-    { status: "READY", label: t("stacking.statusReadyUnloading") },
-  ];
-}
-
-const NEXT_STATUS: Record<GherStatus, GherStatus> = {
-  EMPTY: "STACKING",
-  STACKING: "FIRING",
-  FIRING: "READY",
-  READY: "EMPTY",
-};
 
 function useStageMeta(): Record<StackingStage, { label: string; sublabel: string }> {
   const { t } = useTranslation();
@@ -373,7 +354,6 @@ function TractorFleetSection({ fleet }: { fleet: TractorFleetEntry[] }) {
 
 export function Stacking() {
   const { t } = useTranslation();
-  const statusLegend = useStatusLegend();
   const stageMeta = useStageMeta();
   const [ghers, setGhers] = useState<Gher[]>([]);
   const [entries, setEntries] = useState<StackingEntry[]>([]);
@@ -430,11 +410,6 @@ export function Stacking() {
   useKilnEvent("stackingVehicle:update", () => refresh());
   useKilnEvent("ledger:update", () => refresh());
   useKilnEvent("person:update", () => refresh());
-
-  async function handleAdvance(gher: Gher) {
-    await api.ghers.updateStatus(gher._id, NEXT_STATUS[gher.status]);
-    refresh();
-  }
 
   function openLedgerFor(personId: string) {
     const person = gangs.find((p) => p._id === personId);
@@ -510,36 +485,6 @@ export function Stacking() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("stacking.kilnChambersGher")}</CardTitle>
-          <span className="text-sm text-ink-muted">{t("stacking.clickChamberToAdvance")}</span>
-        </CardHeader>
-        <div className="flex flex-col items-center gap-4">
-          <GherMap ghers={ghers} onAdvance={handleAdvance} />
-          <div className="flex flex-wrap justify-center gap-4">
-            {statusLegend.map(({ status, label }) => (
-              <div key={status} className="flex items-center gap-1.5 text-xs text-ink-secondary">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{
-                    background:
-                      status === "EMPTY"
-                        ? "var(--ink-muted)"
-                        : status === "STACKING"
-                        ? "var(--status-warning)"
-                        : status === "FIRING"
-                        ? "var(--status-serious)"
-                        : "var(--status-good)",
-                  }}
-                />
-                {label}
-              </div>
-            ))}
-          </div>
-        </div>
-      </Card>
-
       <StageSection
         stage="TRANSPORT"
         contractorSummary={contractorSummary}

@@ -3,12 +3,14 @@ import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { createChamberGrading, listGradings } from "../services/chamberGrading.service";
 
+const itemSchema = z.object({
+  categoryId: z.string(),
+  bricksCount: z.number().int().positive(),
+});
+
 const createSchema = z.object({
   gherId: z.string(),
-  a1Count: z.number().int().min(0),
-  jhamaCount: z.number().int().min(0).optional(),
-  pelaCount: z.number().int().min(0).optional(),
-  rodaCount: z.number().int().min(0).optional(),
+  items: z.array(itemSchema).min(1, "At least one brick category is required"),
   date: z.string().optional(),
   notes: z.string().optional(),
 });

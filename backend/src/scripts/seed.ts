@@ -12,6 +12,7 @@ import { createMoldingEntry } from "../services/molding.service";
 import { logWastage } from "../services/wastage.service";
 import { createStackingEntry } from "../services/stacking.service";
 import { createChamberGrading } from "../services/chamberGrading.service";
+import { createBrickCategory } from "../services/brickCategory.service";
 import { createFiringShift } from "../services/firingShift.service";
 import { createFuelPurchase } from "../services/fuelPurchase.service";
 import { createFuelLog } from "../services/fuelLog.service";
@@ -231,6 +232,20 @@ async function main() {
   console.log("Setting up chambers...");
   await ensureGherCount(kilnId, 20);
   const ghers = await listGhers(kilnId);
+
+  // ---------------- Brick categories ----------------
+  console.log("Setting up brick categories...");
+  const brickCategoryDefs = [
+    { category: "A-1 Grade", grade: "A1", pricePerBrick: 7.5 },
+    { category: "Jhama", grade: "Jhama", pricePerBrick: 5 },
+    { category: "Pela/Seem", grade: "Pela", pricePerBrick: 4 },
+    { category: "Roda", grade: "Roda", pricePerBrick: 2.5 },
+  ];
+  const brickCategories: Record<string, string> = {};
+  for (const def of brickCategoryDefs) {
+    const created = await createBrickCategory(kilnId, def.category, def.pricePerBrick, def.grade);
+    brickCategories[def.grade] = created._id;
+  }
 
   // ---------------- Machines ----------------
   console.log("Creating machines...");
@@ -456,12 +471,14 @@ async function main() {
         const roda = Math.round(stackedApprox * randFloat(0.01, 0.03));
         await createChamberGrading({
           kilnId,
-    seasonId,
+          seasonId,
           gherId: ghers[c.gherIdx]._id,
-          a1Count: a1,
-          jhamaCount: jhama,
-          pelaCount: pela,
-          rodaCount: roda,
+          items: [
+            { categoryId: brickCategories.A1, bricksCount: a1 },
+            { categoryId: brickCategories.Jhama, bricksCount: jhama },
+            { categoryId: brickCategories.Pela, bricksCount: pela },
+            { categoryId: brickCategories.Roda, bricksCount: roda },
+          ],
           date: dateAtOffset(dayOffset),
           notes: "Chamber opened, quality graded and moved to godown",
         });

@@ -16,6 +16,7 @@ import type {
   Challan,
   ChamberCostReport,
   ChamberGrading,
+  ChamberOverviewEntry,
   ComplianceDocument,
   ComplianceDocumentType,
   ContractorNetBalance,
@@ -1010,6 +1011,7 @@ export const api = {
     list: () => get<Gher[]>("/ghers", true),
     setup: (count: number) => post<Gher[]>("/ghers/setup", { count }, true),
     updateStatus: (id: string, status: GherStatus) => patch<Gher>(`/ghers/${id}/status`, { status }, true),
+    overview: () => get<ChamberOverviewEntry[]>("/ghers/overview", true),
   },
 
   stacking: {
@@ -1362,12 +1364,10 @@ export const api = {
     list: (days = 60) => get<ChamberGrading[]>(`/chamber-gradings?days=${days}`, true),
     create: (input: {
       gherId: string;
-      a1Count: number;
-      jhamaCount?: number;
-      pelaCount?: number;
-      rodaCount?: number;
+      items: { categoryId: string; bricksCount: number }[];
+      date?: string;
       notes?: string;
-    }) => post<{ grading: ChamberGrading; recoveryPercent: number | null }>("/chamber-gradings", input, true),
+    }) => post<{ grading: ChamberGrading; totalOutput: number; recoveryPercent: number | null }>("/chamber-gradings", input, true),
   },
 
   firingShifts: {

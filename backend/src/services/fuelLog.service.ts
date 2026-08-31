@@ -64,6 +64,21 @@ export async function listFuelLogs(kilnId: string, seasonId: string, days = 14) 
   return rows.map((r) => ({ ...r, gherId: gherById.get(r.gherId) ?? r.gherId }));
 }
 
+// One chamber's own fuel feed, broken down by type — the Firing chamber
+// board's "how much fuel is going into this chamber" figure, scoped the
+// same way stackedSinceForGher scopes bricks (since = the chamber's own
+// cycleStartedAt, or omitted for all-time).
+export async function fuelConsumedForGher(kilnId: string, seasonId: string, gherId: string, since?: Date) {
+  const conditions = [eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), eq(fuelLogs.gherId, gherId)];
+  if (since) conditions.push(gte(fuelLogs.date, since));
+  const logs = await db.select().from(fuelLogs).where(and(...conditions));
+
+  const byFuelType = new Map<string, number>();
+  for (const l of logs) byFuelType.set(l.fuelType, (byFuelType.get(l.fuelType) ?? 0) + l.quantityKg);
+
+  return { totalKg: logs.reduce((sum, l) => sum + l.quantityKg, 0), byFuelType: Object.fromEntries(byFuelType) };
+}
+
 // seasonIds, not a single seasonId — see dispatch.service.ts's
 // totalDispatchedSince for the convention.
 export async function totalFuelConsumed(kilnId: string, seasonIds: string[], since: Date) {

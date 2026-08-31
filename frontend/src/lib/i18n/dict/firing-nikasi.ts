@@ -76,6 +76,25 @@ export const firingNikasiDict: Record<string, Record<Locale, string>> = {
   "firing.pelaHeader": { en: "Pela", hi: "पेला" },
   "firing.rodaHeader": { en: "Roda", hi: "रोड़ा" },
   "firing.recoveryHeader": { en: "Recovery", hi: "रिकवरी" },
+  "firing.totalOutputHeader": { en: "Total output", hi: "कुल उत्पादन" },
+  "firing.legacyGradingLabel": { en: "Logged before category-wise grading", hi: "श्रेणी-वार ग्रेडिंग से पहले दर्ज" },
+  "firing.chamberUnloadingPlaceholder": { en: "Chamber (should be UNLOADING)…", hi: "घेर (अनलोडिंग होना चाहिए)…" },
+
+  // ---- Firing.tsx: Kiln Chambers board ----
+  "firing.statusReadyToUnload": { en: "Ready to unload", hi: "उतारने के लिए तैयार" },
+  "firing.statusUnloading": { en: "Unloading (Nikasi)", hi: "उतराई (निकासी)" },
+  "firing.chamberNumberLabel": { en: "Chamber #{number}", hi: "घेर #{number}" },
+  "firing.bricksLoadedThisCycleLabel": { en: "Bricks loaded this cycle", hi: "इस चक्र में लोड की गई ईंटें" },
+  "firing.fuelThisCycleLabel": { en: "Fuel this cycle", hi: "इस चक्र में ईंधन" },
+  "firing.bricksUnloadedThisCycleLabel": { en: "Bricks unloaded this cycle", hi: "इस चक्र में उतारी गई ईंटें" },
+  "firing.costPerBrickLabel": { en: "Cost / brick", hi: "लागत / ईंट" },
+  "firing.chamberCostBreakdown": {
+    en: "Fuel ₹{fuel} + Stacking ₹{stacking} = ₹{total} total this cycle",
+    hi: "ईंधन ₹{fuel} + स्टैकिंग ₹{stacking} = इस चक्र में कुल ₹{total}",
+  },
+  "firing.rawBricksInChambersLabel": { en: "Raw bricks currently in chambers", hi: "चैंबर में मौजूद कच्ची ईंटें" },
+  "firing.totalFinishedStockLabel": { en: "Total finished stock (all categories)", hi: "कुल तैयार स्टॉक (सभी श्रेणियाँ)" },
+  "firing.selectChamberForDetailPlaceholder": { en: "Select a chamber for details…", hi: "विवरण के लिए एक घेर चुनें…" },
 
   // ---- Firing.tsx: incidents tab ----
   "firing.logIncidentEmergency": { en: "Log incident / emergency", hi: "घटना / आपातकाल दर्ज करें" },

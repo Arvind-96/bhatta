@@ -183,7 +183,7 @@ function ChamberSettings() {
         <input
           type="number"
           min={1}
-          max={60}
+          max={200}
           placeholder={t("settings.numberOfChambers")}
           value={count}
           onChange={(e) => setCount(e.target.value)}

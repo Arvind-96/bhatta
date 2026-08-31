@@ -24,6 +24,7 @@ export const overviewDict: Record<string, Record<Locale, string>> = {
   "overview.expenses": { en: "Expenses", hi: "खर्च" },
   "overview.labor": { en: "Labor", hi: "मज़दूरी" },
   "overview.netProfit": { en: "Net profit", hi: "शुद्ध लाभ" },
+  "overview.costPerBrick": { en: "Cost / brick", hi: "लागत / ईंट" },
   "overview.financialSummaryDisclaimer": {
     en: "Simplified view — revenue from dispatches, costs from logged expenses + labor ledger entries. Does not yet allocate soil/molding cost per batch or include depreciation.",
     hi: "सरल दृश्य — आमदनी डिस्पैच से, लागत दर्ज खर्चों + मज़दूरी खाता-बही प्रविष्टियों से। इसमें अभी प्रति बैच मिट्टी/पथाई लागत या मूल्यह्रास शामिल नहीं है।",

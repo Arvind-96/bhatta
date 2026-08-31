@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Flame, Plus } from "lucide-react";
+import { Flame, Layers, Plus, Warehouse } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,8 +15,13 @@ import { LedgerModal } from "@/components/people/LedgerModal";
 import { FitterDetailPage } from "@/components/firing/FitterDetailPage";
 import { PakayiContractorDetailPage } from "@/components/firing/PakayiContractorDetailPage";
 import { PakayiOperatorDetailPage } from "@/components/firing/PakayiOperatorDetailPage";
+import { GherMap } from "@/components/firing/GherMap";
+import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import type {
+  BrickCategory,
+  ChamberCostReport,
   ChamberGrading,
+  ChamberOverviewEntry,
   FireRoundSpeed,
   FiringShift,
   FitterRosterSummary,
@@ -24,6 +29,7 @@ import type {
   FuelLogPeriodTotals,
   FuelType,
   Gher,
+  GherStatus,
   IncidentType,
   KilnIncident,
   PakayiContractorSummary,
@@ -60,6 +66,239 @@ function useGhers() {
   });
 
   return ghers;
+}
+
+// Per-chamber current-cycle progress (bricks loaded, fuel fed, bricks
+// unloaded) — the live data behind the chamber board below. Refetched on
+// every event that could change any of those three figures for any
+// chamber, not just gher:update itself.
+function useChamberOverview() {
+  const [overview, setOverview] = useState<ChamberOverviewEntry[]>([]);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+
+  async function refresh() {
+    setOverview(await api.ghers.overview());
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    refresh().catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKilnId]);
+
+  useKilnEvent("gher:update", () => refresh());
+  useKilnEvent("stacking:update", () => refresh());
+  useKilnEvent("fuelLog:update", () => refresh());
+  useKilnEvent("nikasi:update", () => refresh());
+  useKilnEvent("grading:update", () => refresh());
+
+  return overview;
+}
+
+// The kiln's own Brick Categories, live — same list Stock.tsx manages,
+// shown here too (not just usable in the Grading form's picker) so the
+// admin can see current stock without leaving the Firing page, and any
+// category added later shows up here automatically.
+function useBrickCategories() {
+  const [categories, setCategories] = useState<BrickCategory[]>([]);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+
+  async function refresh() {
+    setCategories(await api.brickCategories.list());
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    refresh().catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKilnId]);
+
+  useKilnEvent("brickCategory:update", () => refresh());
+
+  return categories;
+}
+
+const NEXT_STATUS: Record<GherStatus, GherStatus> = {
+  EMPTY: "STACKING",
+  STACKING: "FIRING",
+  FIRING: "READY",
+  READY: "UNLOADING",
+  UNLOADING: "EMPTY",
+};
+
+function useChamberStatusLegend(): { status: GherStatus; label: string }[] {
+  const { t } = useTranslation();
+  return [
+    { status: "EMPTY", label: t("stacking.statusEmpty") },
+    { status: "STACKING", label: t("stacking.statusBharaiInProgress") },
+    { status: "FIRING", label: t("stacking.statusFiring") },
+    { status: "READY", label: t("firing.statusReadyToUnload") },
+    { status: "UNLOADING", label: t("firing.statusUnloading") },
+  ];
+}
+
+const STATUS_LEGEND_COLOR: Record<GherStatus, string> = {
+  EMPTY: "var(--ink-muted)",
+  STACKING: "var(--status-warning)",
+  FIRING: "var(--status-serious)",
+  READY: "var(--status-good)",
+  UNLOADING: "var(--series-3)",
+};
+
+// One chamber's own detail — loading/firing/unloading progress this cycle,
+// plus its directly-attributable cost report (fuel + stacking wages ÷ its
+// own graded output, once graded). Selected via a plain dropdown rather
+// than rendering this for every chamber at once, so the panel stays usable
+// whether the kiln has 20 chambers or 200.
+function ChamberDetailPanel({ entry }: { entry: ChamberOverviewEntry }) {
+  const { t } = useTranslation();
+  const [cost, setCost] = useState<ChamberCostReport | null>(null);
+  const { gher, bricksLoadedThisCycle, fuelThisCycle, bricksUnloadedThisCycle } = entry;
+
+  useEffect(() => {
+    api.financialReports.chamberCost(gher._id).then(setCost).catch(console.error);
+  }, [gher._id]);
+
+  return (
+    <Card>
+      <div className="mb-3 flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-ink-primary">{t("firing.chamberNumberLabel", { number: gher.number })}</h4>
+        <Badge variant={gher.status === "FIRING" ? "critical" : gher.status === "READY" ? "good" : gher.status === "EMPTY" ? "neutral" : "warning"}>
+          {gher.status}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded-xl border border-border bg-ink-primary/[0.03] p-3 text-center">
+          <p className="text-lg font-semibold tabular-nums text-ink-primary">{bricksLoadedThisCycle.toLocaleString("en-IN")}</p>
+          <p className="text-sm text-ink-muted">{t("firing.bricksLoadedThisCycleLabel")}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-ink-primary/[0.03] p-3 text-center">
+          <p className="text-lg font-semibold tabular-nums text-ink-primary">{fuelThisCycle.totalKg.toLocaleString("en-IN")} kg</p>
+          <p className="text-sm text-ink-muted">{t("firing.fuelThisCycleLabel")}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-ink-primary/[0.03] p-3 text-center">
+          <p className="text-lg font-semibold tabular-nums text-ink-primary">{bricksUnloadedThisCycle.toLocaleString("en-IN")}</p>
+          <p className="text-sm text-ink-muted">{t("firing.bricksUnloadedThisCycleLabel")}</p>
+        </div>
+        <div className="rounded-xl border border-series-1/30 bg-series-1/5 p-3 text-center">
+          <p className="text-lg font-semibold tabular-nums text-series-1">{cost?.costPerBrick != null ? `₹${cost.costPerBrick}` : "—"}</p>
+          <p className="text-sm text-ink-muted">{t("firing.costPerBrickLabel")}</p>
+        </div>
+      </div>
+      {Object.keys(fuelThisCycle.byFuelType).length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {Object.entries(fuelThisCycle.byFuelType).map(([type, kg]) => (
+            <span key={type} className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary">
+              {type}: {kg.toLocaleString("en-IN")} kg
+            </span>
+          ))}
+        </div>
+      )}
+      {cost && (
+        <p className="mt-3 text-sm text-ink-muted">
+          {t("firing.chamberCostBreakdown", { fuel: formatINR(cost.fuelCost), stacking: formatINR(cost.stackingCost), total: formatINR(cost.totalCost) })}
+        </p>
+      )}
+    </Card>
+  );
+}
+
+// The "Kiln Chambers (Gher)" board — moved here from Stacking.tsx (Firing
+// is where loading/firing/unloading actually converge for a chamber, not
+// just the stacking stage), plus the per-chamber live figures Stacking's
+// version never showed: bricks loaded, fuel consumed, bricks unloaded this
+// cycle, and — via the picker below the map — a full cost breakdown down
+// to ₹/brick for whichever chamber the admin selects.
+function ChamberBoard() {
+  const { t } = useTranslation();
+  const overview = useChamberOverview();
+  const categories = useBrickCategories();
+  const statusLegend = useChamberStatusLegend();
+  const [selectedGherId, setSelectedGherId] = useState("");
+
+  async function handleAdvance(gher: Gher) {
+    await api.ghers.updateStatus(gher._id, NEXT_STATUS[gher.status]);
+  }
+
+  const ghers = overview.map((o) => o.gher);
+  const inProgressBricks = overview.filter((o) => o.gher.status !== "EMPTY").reduce((sum, o) => sum + o.bricksLoadedThisCycle, 0);
+  const totalFinishedStock = categories.reduce((sum, c) => sum + c.quantity, 0);
+  const selected = overview.find((o) => o.gher._id === selectedGherId) ?? null;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("stacking.kilnChambersGher")}</CardTitle>
+          <span className="text-sm text-ink-muted">{t("stacking.clickChamberToAdvance")}</span>
+        </CardHeader>
+        <div className="flex flex-col items-center gap-4">
+          <GherMap ghers={ghers} onAdvance={handleAdvance} />
+          <div className="flex flex-wrap justify-center gap-4">
+            {statusLegend.map(({ status, label }) => (
+              <div key={status} className="flex items-center gap-1.5 text-xs text-ink-secondary">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: STATUS_LEGEND_COLOR[status] }} />
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card>
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-series-4/15 text-series-4">
+              <Layers className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">{inProgressBricks.toLocaleString("en-IN")}</p>
+              <p className="text-sm text-ink-muted">{t("firing.rawBricksInChambersLabel")}</p>
+            </div>
+          </div>
+        </Card>
+        <Card>
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-series-1/15 text-series-1">
+              <Warehouse className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-lg font-semibold tabular-nums text-ink-primary">{totalFinishedStock.toLocaleString("en-IN")}</p>
+              <p className="text-sm text-ink-muted">{t("firing.totalFinishedStockLabel")}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("stock.brickCategoriesHeading")}</h4>
+        {categories.length === 0 ? (
+          <p className="py-4 text-center text-sm text-ink-muted">{t("stock.noCategoriesYet")}</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {categories.map((c) => (
+              <span key={c._id} className="rounded-full border border-border bg-ink-primary/5 px-2.5 py-1 text-xs text-ink-secondary">
+                {c.grade ? `${c.category} (${c.grade})` : c.category}: <span className="font-medium text-ink-primary">{c.quantity.toLocaleString("en-IN")}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <select value={selectedGherId} onChange={(e) => setSelectedGherId(e.target.value)} className={cn(inputClass, "w-full sm:max-w-xs")}>
+          <option value="">{t("firing.selectChamberForDetailPlaceholder")}</option>
+          {ghers.map((g) => (
+            <option key={g._id} value={g._id}>
+              {t("firing.gherNumberStatus", { number: g.number, status: g.status })}
+            </option>
+          ))}
+        </select>
+      </Card>
+
+      {selected && <ChamberDetailPanel entry={selected} />}
+    </div>
+  );
 }
 
 function useFuelTypes() {
@@ -565,13 +804,18 @@ function GradingTab() {
   const [gradings, setGradings] = useState<ChamberGrading[]>([]);
   const [roundSpeed, setRoundSpeed] = useState<FireRoundSpeed | null>(null);
   const ghers = useGhers();
+  const categories = useBrickCategories();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ gherId: "", a1Count: "", jhamaCount: "", pelaCount: "", rodaCount: "" });
+  const [gherId, setGherId] = useState("");
+  const [items, setItems] = useState<LineItemRow[]>([emptyLineItemRow()]);
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { page, setPage, pageCount, pageItems: pagedGradings, total } = usePagination(gradings, 10);
 
-  const readyGhers = ghers.filter((g) => g.status === "READY");
+  // Grading is the finalize-after-unloading step now — the chamber picker
+  // suggests UNLOADING chambers first (falling back to every chamber if
+  // none are mid-unload, e.g. grading something logged a little late).
+  const unloadingGhers = ghers.filter((g) => g.status === "UNLOADING");
 
   async function refresh() {
     const [gradingData, speedData] = await Promise.all([api.chamberGradings.list(), api.gherRoundSpeed()]);
@@ -587,19 +831,19 @@ function GradingTab() {
   useKilnEvent("grading:update", () => refresh());
   useKilnEvent("gher:update", () => refresh());
 
+  const validItems = items.filter(isValidLineItemRow);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.gherId || !form.a1Count) return;
+    if (!gherId || validItems.length === 0) return;
     setLoading(true);
     try {
       await api.chamberGradings.create({
-        gherId: form.gherId,
-        a1Count: Number(form.a1Count),
-        jhamaCount: form.jhamaCount ? Number(form.jhamaCount) : undefined,
-        pelaCount: form.pelaCount ? Number(form.pelaCount) : undefined,
-        rodaCount: form.rodaCount ? Number(form.rodaCount) : undefined,
+        gherId,
+        items: validItems.map((row) => ({ categoryId: row.categoryId, bricksCount: Number(row.bricksCount) })),
       });
-      setForm({ gherId: "", a1Count: "", jhamaCount: "", pelaCount: "", rodaCount: "" });
+      setGherId("");
+      setItems([emptyLineItemRow()]);
       setShowForm(false);
       await refresh();
     } finally {
@@ -634,50 +878,17 @@ function GradingTab() {
 
       {showForm && (
         <Card>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-            <select
-              required
-              value={form.gherId}
-              onChange={(e) => setForm((f) => ({ ...f, gherId: e.target.value }))}
-              className={cn(inputClass, "col-span-2")}
-            >
-              <option value="">{t("firing.chamberReadyPlaceholder")}</option>
-              {(readyGhers.length > 0 ? readyGhers : ghers).map((g) => (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+            <select required value={gherId} onChange={(e) => setGherId(e.target.value)} className={inputClass}>
+              <option value="">{t("firing.chamberUnloadingPlaceholder")}</option>
+              {(unloadingGhers.length > 0 ? unloadingGhers : ghers).map((g) => (
                 <option key={g._id} value={g._id}>
                   {t("firing.gherNumberStatus", { number: g.number, status: g.status })}
                 </option>
               ))}
             </select>
-            <input
-              required
-              type="number"
-              placeholder={t("firing.a1GradeCountPlaceholder")}
-              value={form.a1Count}
-              onChange={(e) => setForm((f) => ({ ...f, a1Count: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              placeholder={t("firing.jhamaPlaceholder")}
-              value={form.jhamaCount}
-              onChange={(e) => setForm((f) => ({ ...f, jhamaCount: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              placeholder={t("firing.pelaPlaceholder")}
-              value={form.pelaCount}
-              onChange={(e) => setForm((f) => ({ ...f, pelaCount: e.target.value }))}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              placeholder={t("firing.rodaPlaceholder")}
-              value={form.rodaCount}
-              onChange={(e) => setForm((f) => ({ ...f, rodaCount: e.target.value }))}
-              className={inputClass}
-            />
-            <Button type="submit" disabled={loading} className="col-span-2">
+            <BrickLineItemsEditor items={items} onChange={setItems} categories={categories} pricingEnabled={false} />
+            <Button type="submit" disabled={loading || !gherId || validItems.length === 0}>
               {t("firing.saveGrading")}
             </Button>
           </form>
@@ -694,33 +905,44 @@ function GradingTab() {
                 <tr className="border-b border-border text-left text-sm text-ink-muted">
                   <th className="pb-2 font-medium">{t("common.date")}</th>
                   <th className="pb-2 font-medium">{t("firing.chamberHeader")}</th>
-                  <th className="pb-2 font-medium">{t("firing.a1Header")}</th>
-                  <th className="pb-2 font-medium">{t("firing.jhamaHeader")}</th>
-                  <th className="pb-2 font-medium">{t("firing.pelaHeader")}</th>
-                  <th className="pb-2 font-medium">{t("firing.rodaHeader")}</th>
+                  <th className="pb-2 font-medium">{t("stock.brickCategoriesHeading")}</th>
+                  <th className="pb-2 font-medium text-right">{t("firing.totalOutputHeader")}</th>
                   <th className="pb-2 font-medium text-right">{t("firing.recoveryHeader")}</th>
                 </tr>
               </thead>
               <tbody>
-                {pagedGradings.map((g) => (
-                  <tr key={g._id} className="border-b border-border/60 last:border-0">
-                    <td className="py-3 text-ink-secondary">{new Date(g.date).toLocaleDateString("en-IN")}</td>
-                    <td className="py-3 text-ink-primary">#{typeof g.gherId === "object" ? g.gherId.number : "—"}</td>
-                    <td className="py-3 tabular-nums text-status-good">{g.a1Count.toLocaleString("en-IN")}</td>
-                    <td className="py-3 tabular-nums text-ink-secondary">{g.jhamaCount.toLocaleString("en-IN")}</td>
-                    <td className="py-3 tabular-nums text-ink-secondary">{g.pelaCount.toLocaleString("en-IN")}</td>
-                    <td className="py-3 tabular-nums text-status-critical">{g.rodaCount.toLocaleString("en-IN")}</td>
-                    <td className="py-3 text-right">
-                      {g.recoveryPercent != null ? (
-                        <Badge variant={g.recoveryPercent >= 85 ? "good" : g.recoveryPercent >= 70 ? "warning" : "critical"}>
-                          {g.recoveryPercent}%
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {pagedGradings.map((g) => {
+                  const hasItems = g.items && g.items.length > 0;
+                  return (
+                    <tr key={g._id} className="border-b border-border/60 last:border-0">
+                      <td className="py-3 text-ink-secondary">{new Date(g.date).toLocaleDateString("en-IN")}</td>
+                      <td className="py-3 text-ink-primary">#{typeof g.gherId === "object" ? g.gherId.number : "—"}</td>
+                      <td className="py-3 max-w-[280px]">
+                        {hasItems ? (
+                          <div className="flex flex-wrap gap-1">
+                            {g.items.map((item, i) => (
+                              <span key={i} className="rounded-full border border-border bg-ink-primary/5 px-2 py-0.5 text-xs text-ink-secondary">
+                                {typeof item.categoryId === "object" ? item.categoryId.category : "—"}: {item.bricksCount.toLocaleString("en-IN")}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink-muted">{t("firing.legacyGradingLabel")}</span>
+                        )}
+                      </td>
+                      <td className="py-3 text-right tabular-nums font-medium text-ink-primary">{g.totalOutput.toLocaleString("en-IN")}</td>
+                      <td className="py-3 text-right">
+                        {g.recoveryPercent != null ? (
+                          <Badge variant={g.recoveryPercent >= 85 ? "good" : g.recoveryPercent >= 70 ? "warning" : "critical"}>
+                            {g.recoveryPercent}%
+                          </Badge>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
@@ -1125,6 +1347,8 @@ export function Firing() {
 
   return (
     <div className="space-y-4">
+      <ChamberBoard />
+
       <FuelUsageSummary fuelTypes={fuelTypes} />
 
       <SegmentedTabs

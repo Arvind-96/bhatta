@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { list, roundSpeed, setup, updateStatus } from "../controllers/gher.controller";
+import { list, overview, roundSpeed, setup, updateStatus } from "../controllers/gher.controller";
 import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
@@ -9,4 +9,5 @@ gherRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSea
 gherRouter.post("/setup", asyncHandler(setup));
 gherRouter.get("/", asyncHandler(list));
 gherRouter.get("/round-speed", asyncHandler(roundSpeed));
+gherRouter.get("/overview", asyncHandler(overview));
 gherRouter.patch("/:id/status", asyncHandler(updateStatus));

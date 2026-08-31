@@ -919,13 +919,26 @@ export interface WastageLog {
   notes?: string;
 }
 
-export type GherStatus = "EMPTY" | "STACKING" | "FIRING" | "READY";
+export type GherStatus = "EMPTY" | "STACKING" | "FIRING" | "READY" | "UNLOADING";
 
 export interface Gher {
   _id: string;
   number: number;
   status: GherStatus;
+  cycleStartedAt?: string;
   updatedAt: string;
+}
+
+export interface ChamberFuelBreakdown {
+  totalKg: number;
+  byFuelType: Record<string, number>;
+}
+
+export interface ChamberOverviewEntry {
+  gher: Gher;
+  bricksLoadedThisCycle: number;
+  fuelThisCycle: ChamberFuelBreakdown;
+  bricksUnloadedThisCycle: number;
 }
 
 export type StackingQuality = "GOOD" | "AVERAGE" | "POOR";
@@ -1376,13 +1389,23 @@ export interface FireRoundSpeed {
   recentMovements: { gherNumber: number; startedAt: string }[];
 }
 
+export interface ChamberGradingItem {
+  categoryId: { _id: string; category: BrickCategoryName; grade?: string } | string;
+  bricksCount: number;
+}
+
 export interface ChamberGrading {
   _id: string;
   gherId: { _id: string; number: number } | string;
+  // Legacy fixed 4-way split — populated on rows graded before the switch
+  // to Brick Categories, always 0 on rows graded since.
   a1Count: number;
   jhamaCount: number;
   pelaCount: number;
   rodaCount: number;
+  // What a chamber is actually graded into now — see items above.
+  items: ChamberGradingItem[];
+  totalOutput: number;
   stackedCount?: number;
   recoveryPercent: number | null;
   date: string;
@@ -1545,6 +1568,8 @@ export interface SeasonFinancialSummary {
   laborCosts: number;
   totalCosts: number;
   netProfit: number;
+  totalBricksProduced: number;
+  costPerBrick: number | null;
 }
 
 export interface PaymentMethodSplit {
@@ -1588,6 +1613,8 @@ export interface ChamberCostReport {
   fuelCost: number;
   stackingCost: number;
   totalCost: number;
+  bricksProduced: number;
+  costPerBrick: number | null;
 }
 
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "LATE";

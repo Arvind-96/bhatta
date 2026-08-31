@@ -1,0 +1,1 @@
+ALTER TABLE `chamber_gradings` ADD `items` json;

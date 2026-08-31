@@ -2,7 +2,13 @@ import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex, index, b
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn, SIMPLE_PAYMENT_MODES } from "./_helpers";
 import { STACKING_STAGES } from "./people";
 
-export const GHER_STATUSES = ["EMPTY", "STACKING", "FIRING", "READY"] as const;
+// UNLOADING sits between READY (fired, waiting to be opened) and EMPTY
+// (finalized) — the admin advances a chamber into it once nikasi/unloading
+// labor starts, and it's chamber grading's own createChamberGrading that
+// takes it the rest of the way to EMPTY (finalizing the categorized output
+// into real brick-category stock), same as READY→EMPTY used to happen
+// automatically before this status existed.
+export const GHER_STATUSES = ["EMPTY", "STACKING", "FIRING", "READY", "UNLOADING"] as const;
 
 // Who's responsible for a damage count logged on a Molding/Stacking/Nikasi
 // entry — admin-set, optional (most entries have no damage at all). Kept as
@@ -80,10 +86,22 @@ export const chamberGradings = mysqlTable("chamber_gradings", {
   kilnId: kilnIdColumn(),
   seasonId: varchar("seasonId", { length: 64 }),
   gherId: varchar("gherId", { length: 64 }).notNull(),
+  // Legacy fixed 4-way split — stays populated (and displayed) on every row
+  // created before the switch to admin-defined Brick Categories below;
+  // simply left at their 0 default on every row created after. Never
+  // written to going forward — see `items`.
   a1Count: int("a1Count").notNull().default(0),
   jhamaCount: int("jhamaCount").notNull().default(0),
   pelaCount: int("pelaCount").notNull().default(0),
   rodaCount: int("rodaCount").notNull().default(0),
+  // The kiln's own Brick Categories (categoryId + bricksCount per line,
+  // pricePerBrick/amount unused — same BrickLineItem shape Dispatch/Invoice
+  // use, no pricing concept here) — what a chamber's baked output is
+  // actually graded into now. Each line credits real, dispatchable stock
+  // via brickCategory.service.ts's createBrickProductionEntry, unlike the
+  // legacy columns above which only ever fed a disconnected dashboard
+  // ledger. NULL on every row created before this existed.
+  items: itemsColumn(),
   stackedCount: int("stackedCount"),
   date: dateColumn(),
   notes: text("notes"),

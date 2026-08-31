@@ -369,7 +369,7 @@ export function Nikasi() {
               className={inputClass}
             >
               <option value="">{t("nikasi.chamberPlaceholder")}</option>
-              {ghers.map((g) => (
+              {(ghers.some((g) => g.status === "UNLOADING") ? ghers.filter((g) => g.status === "UNLOADING") : ghers).map((g) => (
                 <option key={g._id} value={g._id}>
                   {t("nikasi.gherNumberStatus", { number: g.number, status: g.status })}
                 </option>

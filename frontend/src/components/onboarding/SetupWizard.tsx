@@ -174,7 +174,7 @@ export function SetupWizard() {
             <input
               type="number"
               min={1}
-              max={60}
+              max={200}
               placeholder={t("settings.numberOfChambers")}
               value={chambers}
               onChange={(e) => setChambers(e.target.value)}

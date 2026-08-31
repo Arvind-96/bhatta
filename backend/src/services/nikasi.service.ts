@@ -99,6 +99,19 @@ export async function listNikasiEntries(kilnId: string, seasonId: string | null,
     .map((r) => ({ ...r, gangId: gangById.get(r.gangId) ?? r.gangId, gherId: gherById.get(r.gherId) ?? r.gherId }));
 }
 
+// One chamber's own unloading progress this cycle — the Firing chamber
+// board's "how much has been unloaded from this chamber so far" figure,
+// scoped the same way stackedSinceForGher scopes bricks (since = the
+// chamber's own cycleStartedAt, or omitted for all-time). Labor tracking
+// only, same caveat as createNikasiEntry's own doc comment — the
+// authoritative graded/stocked count still comes from chamber grading.
+export async function unloadedSinceForGher(kilnId: string, seasonId: string, gherId: string, since?: Date) {
+  const conditions = [eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId), eq(nikasiEntries.gherId, gherId)];
+  if (since) conditions.push(gte(nikasiEntries.date, since));
+  const entries = await db.select().from(nikasiEntries).where(and(...conditions));
+  return entries.reduce((sum, e) => sum + e.bricksCount, 0);
+}
+
 // All-time damage total for a given window — used by the dashboard's
 // combined "raw + bharai + nikasi damage" figure alongside
 // molding.service.ts's damagedMoldedSince and stacking.service.ts's

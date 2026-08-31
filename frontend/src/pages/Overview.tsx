@@ -206,7 +206,7 @@ function SeasonSummaryCard() {
         <IndianRupee className="h-4 w-4 text-series-1" />
         <p className="text-sm font-medium text-ink-primary">{t("overview.financialSummary", { days: summary.days })}</p>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <div>
           <p className="text-sm text-ink-muted">{t("overview.revenue")}</p>
           <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(summary.revenue)}</p>
@@ -224,6 +224,10 @@ function SeasonSummaryCard() {
           <p className={cn("text-lg font-semibold tabular-nums", summary.netProfit >= 0 ? "text-status-good" : "text-status-critical")}>
             ₹{formatINR(summary.netProfit)}
           </p>
+        </div>
+        <div>
+          <p className="text-sm text-ink-muted">{t("overview.costPerBrick")}</p>
+          <p className="text-lg font-semibold tabular-nums text-ink-primary">{summary.costPerBrick != null ? `₹${summary.costPerBrick}` : "—"}</p>
         </div>
       </div>
       <p className="mt-3 text-[11px] text-ink-muted">{t("overview.financialSummaryDisclaimer")}</p>

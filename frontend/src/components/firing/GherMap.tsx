@@ -7,13 +7,7 @@ const STATUS_COLOR: Record<GherStatus, string> = {
   STACKING: "var(--status-warning)",
   FIRING: "var(--status-serious)",
   READY: "var(--status-good)",
-};
-
-const NEXT_STATUS: Record<GherStatus, GherStatus> = {
-  EMPTY: "STACKING",
-  STACKING: "FIRING",
-  FIRING: "READY",
-  READY: "EMPTY",
+  UNLOADING: "var(--series-3)",
 };
 
 interface GherMapProps {
