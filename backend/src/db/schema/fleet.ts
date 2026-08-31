@@ -41,6 +41,7 @@ export const machines = mysqlTable("machines", {
 export const machineInstallmentPayments = mysqlTable("machine_installment_payments", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   machineId: varchar("machineId", { length: 64 }).notNull(),
   amount: double("amount").notNull(),
   date: dateColumn(),
@@ -53,6 +54,7 @@ export const MACHINE_FUEL_TYPES = ["DIESEL", "PETROL", "ELECTRICITY"] as const;
 export const machineFuelLogs = mysqlTable("machine_fuel_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   machineId: varchar("machineId", { length: 64 }).notNull(),
   fuelType: varchar("fuelType", { length: 50, enum: MACHINE_FUEL_TYPES }).notNull(),
   quantity: double("quantity").notNull(),
@@ -65,6 +67,7 @@ export const machineFuelLogs = mysqlTable("machine_fuel_logs", {
 export const machineMaintenanceLogs = mysqlTable("machine_maintenance_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   machineId: varchar("machineId", { length: 64 }).notNull(),
   description: text("description").notNull(),
   cost: double("cost").default(0),
@@ -87,6 +90,7 @@ export const inventoryItems = mysqlTable("inventory_items", {
 export const suppliedItems = mysqlTable("supplied_items", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   personId: varchar("personId", { length: 64 }).notNull(),
   itemId: varchar("itemId", { length: 64 }).notNull(),
   quantity: double("quantity").notNull(),
@@ -105,6 +109,7 @@ export const fuelTypes = mysqlTable("fuel_types", {
 export const fuelPurchases = mysqlTable("fuel_purchases", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   fuelType: varchar("fuelType", { length: 255 }).notNull(),
   supplierId: varchar("supplierId", { length: 64 }),
   vehicleNumber: varchar("vehicleNumber", { length: 255 }),
@@ -121,6 +126,7 @@ export const fuelPurchases = mysqlTable("fuel_purchases", {
 export const fuelLogs = mysqlTable("fuel_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   gherId: varchar("gherId", { length: 64 }).notNull(),
   fuelType: varchar("fuelType", { length: 255 }).notNull(),
   quantityKg: double("quantityKg").notNull(),
@@ -147,6 +153,7 @@ export const kilnVehicles = mysqlTable("kiln_vehicles", {
 export const vehicleDieselEntries = mysqlTable("vehicle_diesel_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   vehicleId: varchar("vehicleId", { length: 64 }).notNull(),
   // Snapshot of the vehicle's own `type` at fill-up time — printed/shown on
   // this entry even if the vehicle's type is edited later, same convention

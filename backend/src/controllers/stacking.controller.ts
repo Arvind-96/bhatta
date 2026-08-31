@@ -32,13 +32,14 @@ export async function create(req: AuthedRequest, res: Response) {
   const entry = await createStackingEntry({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(entry);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const entries = await listStackingEntries(req.kiln!.id, {
+  const entries = await listStackingEntries(req.kiln!.id, req.season!.id, {
     gherId: req.query.gherId as string | undefined,
     gangId: req.query.gangId as string | undefined,
     from: req.query.from ? new Date(String(req.query.from)) : undefined,
@@ -71,16 +72,16 @@ export async function remove(req: AuthedRequest, res: Response) {
 }
 
 export async function operatorSummary(req: AuthedRequest, res: Response) {
-  const result = await stackingOperatorSummary(req.kiln!.id);
+  const result = await stackingOperatorSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }
 
 export async function tractorFleet(req: AuthedRequest, res: Response) {
-  const result = await tractorFleetSummary(req.kiln!.id);
+  const result = await tractorFleetSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }
 
 export async function contractorSummary(req: AuthedRequest, res: Response) {
-  const result = await stackingContractorSummary(req.kiln!.id);
+  const result = await stackingContractorSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }

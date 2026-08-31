@@ -64,7 +64,7 @@ export function kilnPrefix(kilnName: string) {
 // better-sqlite3 driver) — createDispatch below closes that gap with a
 // retry loop against the (kilnId, slipNumber) unique constraint, not by
 // trying to make this function itself atomic.
-async function generateSlipNumber(kilnId: string, dispatchedOn: Date) {
+async function generateSlipNumber(kilnId: string, seasonId: string, dispatchedOn: Date) {
   const kiln = (await db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)))[0];
   const prefix = kilnPrefix(kiln?.name ?? "KILN");
   const dayStart = startOfDay(dispatchedOn);
@@ -72,7 +72,7 @@ async function generateSlipNumber(kilnId: string, dispatchedOn: Date) {
   const countRow = (await db
     .select({ count: sql<number>`count(*)` })
     .from(dispatches)
-    .where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, dayStart), lte(dispatches.dispatchedOn, dayEnd))))[0];
+    .where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), gte(dispatches.dispatchedOn, dayStart), lte(dispatches.dispatchedOn, dayEnd))))[0];
   const seq = (countRow?.count ?? 0) + 1;
   return `${prefix}-${formatDDMMYYYY(dayStart)}-${String(seq).padStart(2, "0")}`;
 }
@@ -83,8 +83,8 @@ async function generateSlipNumber(kilnId: string, dispatchedOn: Date) {
 // invoice book's numbering runs continuously. Same race caveat as
 // generateSlipNumber above — closed by createDispatch's retry loop, not
 // here.
-async function generateInvoiceNumber(kilnId: string) {
-  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(dispatches).where(eq(dispatches.kilnId, kilnId)))[0];
+async function generateInvoiceNumber(kilnId: string, seasonId: string) {
+  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId))))[0];
   return String((countRow?.count ?? 0) + 1);
 }
 
@@ -105,6 +105,7 @@ export function isDuplicateEntryError(err: unknown): boolean {
 
 export interface CreateDispatchInput {
   kilnId: string;
+  seasonId: string;
   customerName: string;
   customerId?: string;
   customerAddress?: string;
@@ -207,6 +208,11 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
       // pattern brickLoading.service.ts's own auto-dispatch call uses.
       amount: (loadingEntry.amount ?? 0) + (loadingEntry.discountAmount ?? 0),
     };
+    // Inherits the trip's own seasonId rather than the request's current
+    // one — a dispatch created from a trip logged in an earlier season
+    // stays filed under that same season, keeping the trip→dispatch chain
+    // internally consistent even if a season switch happened in between.
+    input.seasonId = loadingEntry.seasonId ?? rawInput.seasonId;
   } else if (rawInput.items && rawInput.items.length > 0) {
     // A manually-created multi-category dispatch — normalize `items` and
     // let its own aggregate bricksCount/categoryId feed the rest of this
@@ -253,8 +259,8 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
   let dispatch: typeof dispatches.$inferSelect | undefined;
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_NUMBER_GENERATION_ATTEMPTS; attempt++) {
-    const slipNumber = await generateSlipNumber(input.kilnId, dispatchedOn);
-    const invoiceNumber = await generateInvoiceNumber(input.kilnId);
+    const slipNumber = await generateSlipNumber(input.kilnId, input.seasonId, dispatchedOn);
+    const invoiceNumber = await generateInvoiceNumber(input.kilnId, input.seasonId);
     const _id = randomUUID();
     const { loadingEntryId: _loadingEntryId, ...insertableInput } = input;
     try {
@@ -312,6 +318,7 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
   // the kind of gap reconcileFinishedGoods exists to catch.
   await recordStockEntry({
     kilnId: input.kilnId,
+    seasonId: dispatch.seasonId!,
     type: "FINISHED_GOODS",
     itemName: GRADE_STOCK_ITEM[(grade ?? "A1") as BrickGrade],
     quantity: -input.bricksCount,
@@ -325,7 +332,7 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
   // loading trip (that trip already logs its own tip separately), but
   // BrickLoadingTripDetailPage's "Add to Dispatch" never sends
   // driverTipAmount, so that path is safe by construction.
-  await autoLogExpense(input.kilnId, "Driver Reward / Inam", dispatch.driverTipAmount, dispatchedOn, `Dispatch ${dispatch.slipNumber}`, {
+  await autoLogExpense(input.kilnId, dispatch.seasonId!, "Driver Reward / Inam", dispatch.driverTipAmount, dispatchedOn, `Dispatch ${dispatch.slipNumber}`, {
     dispatchId: dispatch._id,
     paymentMode: dispatch.driverTipPaymentMode ?? undefined,
     cashAmount: dispatch.driverTipCashAmount ?? undefined,
@@ -375,6 +382,7 @@ export async function recordDeliveryAdjustment(kilnId: string, dispatchId: strin
 
     await recordStockEntry({
       kilnId,
+      seasonId: dispatch.seasonId!,
       type: "FINISHED_GOODS",
       itemName: GRADE_STOCK_ITEM[dispatch.grade as BrickGrade] ?? GRADE_STOCK_ITEM.A1,
       quantity: input.returnedCount,
@@ -549,11 +557,11 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
     if (oldGrade === newGrade) {
       const delta = newBricksCount - existing.bricksCount;
       if (delta !== 0) {
-        await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[oldGrade], quantity: -delta });
+        await recordStockEntry({ kilnId, seasonId: existing.seasonId!, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[oldGrade], quantity: -delta });
       }
     } else {
-      await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[oldGrade], quantity: existing.bricksCount });
-      await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[newGrade], quantity: -newBricksCount });
+      await recordStockEntry({ kilnId, seasonId: existing.seasonId!, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[oldGrade], quantity: existing.bricksCount });
+      await recordStockEntry({ kilnId, seasonId: existing.seasonId!, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[newGrade], quantity: -newBricksCount });
     }
   }
 
@@ -638,7 +646,7 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
 
   if (remainingBricksOut !== 0) {
     const grade = (existing.grade ?? "A1") as BrickGrade;
-    await recordStockEntry({ kilnId, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[grade], quantity: remainingBricksOut });
+    await recordStockEntry({ kilnId, seasonId: existing.seasonId!, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[grade], quantity: remainingBricksOut });
   }
 
   const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
@@ -704,8 +712,8 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
 // dispatch (including a Brick-Loading-linked one) older than a month from
 // the Dispatch/Billing/Gate-Pass pages, even though it was fully visible
 // and correctly linked on the Brick Loading page the whole time.
-export async function listDispatches(kilnId: string, days?: number) {
-  const conditions = [eq(dispatches.kilnId, kilnId)];
+export async function listDispatches(kilnId: string, seasonId: string, days?: number) {
+  const conditions = [eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId)];
   if (days) {
     const since = new Date();
     since.setDate(since.getDate() - days);
@@ -766,15 +774,20 @@ export async function listDispatchesForCustomer(kilnId: string, customerId: stri
   }));
 }
 
-export async function totalDispatchedSince(kilnId: string, since: Date) {
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since)));
+// seasonIds, not a single seasonId — callers doing a "state of the world
+// right now" reconciliation check (see reconciliation.service.ts) pass
+// every season up to and including the current one (seasonIdsThrough), so
+// this sums across the whole cumulative history rather than one season's
+// slice, matching brickCategories.quantity's own always-cumulative meaning.
+export async function totalDispatchedSince(kilnId: string, seasonIds: string[], since: Date) {
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), inArray(dispatches.seasonId, seasonIds), gte(dispatches.dispatchedOn, since)));
   return rows.reduce((sum, d) => sum + d.bricksCount, 0);
 }
 
-export async function dispatchTotals(kilnId: string, days = 7) {
+export async function dispatchTotals(kilnId: string, seasonId: string, days = 7) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, since)));
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), gte(dispatches.dispatchedOn, since)));
 
   return {
     days,

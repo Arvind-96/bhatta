@@ -1,11 +1,12 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import { wastageLogs } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
 export interface CreateWastageInput {
   kilnId: string;
+  seasonId: string;
   type: "SOIL" | "KACCHI_BRICK";
   cause: "RAIN" | "TRANSPORT" | "OTHER";
   quantity: number;
@@ -22,13 +23,15 @@ export async function logWastage(input: CreateWastageInput) {
   return entry;
 }
 
-export async function listWastage(kilnId: string, days = 30) {
+export async function listWastage(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  return await db.select().from(wastageLogs).where(and(eq(wastageLogs.kilnId, kilnId), gte(wastageLogs.date, since))).orderBy(desc(wastageLogs.date));
+  return await db.select().from(wastageLogs).where(and(eq(wastageLogs.kilnId, kilnId), eq(wastageLogs.seasonId, seasonId), gte(wastageLogs.date, since))).orderBy(desc(wastageLogs.date));
 }
 
-export async function totalWastage(kilnId: string, since: Date, type: "SOIL" | "KACCHI_BRICK") {
-  const entries = await db.select().from(wastageLogs).where(and(eq(wastageLogs.kilnId, kilnId), eq(wastageLogs.type, type), gte(wastageLogs.date, since)));
+// seasonIds, not a single seasonId — see dispatch.service.ts's
+// totalDispatchedSince for the convention.
+export async function totalWastage(kilnId: string, seasonIds: string[], since: Date, type: "SOIL" | "KACCHI_BRICK") {
+  const entries = await db.select().from(wastageLogs).where(and(eq(wastageLogs.kilnId, kilnId), inArray(wastageLogs.seasonId, seasonIds), eq(wastageLogs.type, type), gte(wastageLogs.date, since)));
   return entries.reduce((sum: number, e: typeof wastageLogs.$inferSelect) => sum + e.quantity, 0);
 }

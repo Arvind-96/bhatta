@@ -23,7 +23,7 @@ export interface DashboardSummary {
 // pages (Overview's outstanding-advances list, the Salary page's status
 // grid, Customer balances) so nothing here can drift from what those pages
 // show; this just pulls them all onto one screen.
-export async function dashboardSummary(kilnId: string): Promise<DashboardSummary> {
+export async function dashboardSummary(kilnId: string, seasonId: string): Promise<DashboardSummary> {
   const now = new Date();
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const weekAgo = new Date();
@@ -35,9 +35,9 @@ export async function dashboardSummary(kilnId: string): Promise<DashboardSummary
     listLedgerForKiln(kilnId, { from: firstOfMonth, to: now }),
     listCustomers(kilnId),
     listSalaryStatus(kilnId, currentMonthString()),
-    db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, weekAgo))),
-    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), gte(stackingEntries.date, weekAgo))),
-    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, weekAgo))),
+    db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), eq(moldingEntries.seasonId, seasonId), gte(moldingEntries.date, weekAgo))),
+    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId), gte(stackingEntries.date, weekAgo))),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId), gte(nikasiEntries.date, weekAgo))),
   ]);
 
   const categoryTotals = new Map<string, { paid: number; due: number }>();
@@ -52,7 +52,7 @@ export async function dashboardSummary(kilnId: string): Promise<DashboardSummary
     .filter(([cat]) => ["ADVANCE", "KHARCHI", "MEDICAL", "FESTIVAL", "FARE"].includes(cat))
     .map(([category, { paid, due }]) => ({ category, paid: round2(paid), due: round2(due) }));
 
-  const customerDetails = await Promise.all(customers.map((c) => getCustomerDetail(kilnId, c._id)));
+  const customerDetails = await Promise.all(customers.map((c) => getCustomerDetail(kilnId, c._id, seasonId)));
   const totalCustomerDue = round2(customerDetails.reduce((s, d) => s + Math.max(0, d.totalDue), 0));
 
   const bricksDamagedThisWeek =

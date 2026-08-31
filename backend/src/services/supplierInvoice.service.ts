@@ -9,6 +9,7 @@ type PaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 
 export interface SupplierInvoiceInput {
   supplierId: string;
+  seasonId: string;
   date?: Date;
   itemsReceived?: SupplierInvoiceItem[];
   totalBillAmount: number;
@@ -20,9 +21,10 @@ export interface SupplierInvoiceInput {
 
 // MAX-based (not COUNT-based) so a deleted invoice's number is never
 // reissued to a different real transaction — same reasoning as the
-// existing Challan/Gate Pass/Invoice generateSequenceNumber.
-async function nextSequenceNumber(kilnId: string) {
-  const maxRow = (await db.select({ max: sql<number | null>`max(${supplierInvoices.sequenceNumber})` }).from(supplierInvoices).where(eq(supplierInvoices.kilnId, kilnId)))[0];
+// existing Challan/Gate Pass/Invoice generateSequenceNumber. Scoped to the
+// season so numbering resets to 1 each new Bhatta Season.
+async function nextSequenceNumber(kilnId: string, seasonId: string) {
+  const maxRow = (await db.select({ max: sql<number | null>`max(${supplierInvoices.sequenceNumber})` }).from(supplierInvoices).where(and(eq(supplierInvoices.kilnId, kilnId), eq(supplierInvoices.seasonId, seasonId))))[0];
   return (maxRow?.max ?? 0) + 1;
 }
 
@@ -31,7 +33,7 @@ export async function createSupplierInvoice(kilnId: string, input: SupplierInvoi
   if (!supplier) throw new Error("Supplier not found in this kiln");
 
   const _id = randomUUID();
-  const sequenceNumber = await nextSequenceNumber(kilnId);
+  const sequenceNumber = await nextSequenceNumber(kilnId, input.seasonId);
   await db.insert(supplierInvoices).values({ ...input, _id, kilnId, sequenceNumber });
   const row = (await db.select().from(supplierInvoices).where(eq(supplierInvoices._id, _id)))[0]!;
   emitToKiln(kilnId, "supplierInvoice:update", row);

@@ -16,6 +16,7 @@ export async function create(req: AuthedRequest, res: Response) {
   const supplied = await createSuppliedItem({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(supplied);
@@ -24,7 +25,7 @@ export async function create(req: AuthedRequest, res: Response) {
 export async function list(req: AuthedRequest, res: Response) {
   const personId = req.query.personId as string | undefined;
   if (!personId) return res.json([]);
-  const items = await listSuppliedItems(req.kiln!.id, personId);
+  const items = await listSuppliedItems(req.kiln!.id, req.season!.id, personId);
   res.json(items);
 }
 

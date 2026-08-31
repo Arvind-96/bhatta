@@ -1,11 +1,13 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { stockEntries } from "../db/schema";
+import { seasonIdsThrough } from "./season.util";
 import { emitToKiln } from "../config/socket";
 
 export interface CreateStockInput {
   kilnId: string;
+  seasonId: string;
   type: "RAW_MATERIAL" | "FINISHED_GOODS";
   itemName: string;
   quantity: number;
@@ -28,6 +30,7 @@ export async function recordStockEntry(input: CreateStockInput) {
     await db.insert(stockEntries).values({
       _id,
       kilnId: input.kilnId,
+      seasonId: input.seasonId,
       type: input.type,
       itemName: input.itemName,
       quantity: input.quantity,
@@ -48,21 +51,25 @@ export interface ListStockEntriesFilter {
 }
 
 // The Stock report's movement log — contrast with getStockSnapshot below,
-// which is the unbounded all-time running total, not date-scoped.
-export async function listStockEntries(kilnId: string, filter: ListStockEntriesFilter = {}) {
+// which is the running total through a season, not date-scoped. seasonId is
+// nullable — pass null for an all-time, every-season view (Reports).
+export async function listStockEntries(kilnId: string, seasonId: string | null, filter: ListStockEntriesFilter = {}) {
   const conditions = [eq(stockEntries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(stockEntries.seasonId, seasonId));
   if (filter.itemName) conditions.push(eq(stockEntries.itemName, filter.itemName));
   if (filter.from) conditions.push(gte(stockEntries.recordedOn, filter.from));
   if (filter.to) conditions.push(lte(stockEntries.recordedOn, filter.to));
   return db.select().from(stockEntries).where(and(...conditions)).orderBy(desc(stockEntries.recordedOn));
 }
 
-export async function getStockSnapshot(kilnId: string) {
-  // Each StockEntry is a delta (grading adds, dispatch/consumption
-  // subtracts) that this sums into a running total per item — this has to
-  // stay unbounded (no LIMIT) to stay correct; see the QA-pass note this
-  // fix came from.
-  const entries = await db.select().from(stockEntries).where(eq(stockEntries.kilnId, kilnId)).orderBy(desc(stockEntries.recordedOn));
+// Cumulative through the selected season (like fuelStockBalance) — each
+// StockEntry is a delta (grading adds, dispatch/consumption subtracts) that
+// this sums into a running total per item; has to stay unbounded (no LIMIT)
+// within that season range to stay correct; see the QA-pass note this fix
+// came from.
+export async function getStockSnapshot(kilnId: string, seasonId: string) {
+  const seasonIds = await seasonIdsThrough(kilnId, seasonId);
+  const entries = await db.select().from(stockEntries).where(and(eq(stockEntries.kilnId, kilnId), inArray(stockEntries.seasonId, seasonIds))).orderBy(desc(stockEntries.recordedOn));
 
   const totals = new Map<string, number>();
   for (const entry of entries) {

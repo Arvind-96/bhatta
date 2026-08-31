@@ -24,6 +24,7 @@ export const ghers = mysqlTable("ghers", {
 export const moldingEntries = mysqlTable("molding_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   workerId: varchar("workerId", { length: 64 }).notNull(),
   bricksCount: int("bricksCount").notNull(),
   ratePerThousand: double("ratePerThousand").notNull(),
@@ -41,6 +42,7 @@ export const STACKING_QUALITY = ["GOOD", "AVERAGE", "POOR"] as const;
 export const stackingEntries = mysqlTable("stacking_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   gherId: varchar("gherId", { length: 64 }).notNull(),
   gangId: varchar("gangId", { length: 64 }).notNull(),
   stage: varchar("stage", { length: 50, enum: STACKING_STAGES }),
@@ -76,6 +78,7 @@ export const stackingVehicles = mysqlTable("stacking_vehicles", {
 export const chamberGradings = mysqlTable("chamber_gradings", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   gherId: varchar("gherId", { length: 64 }).notNull(),
   a1Count: int("a1Count").notNull().default(0),
   jhamaCount: int("jhamaCount").notNull().default(0),
@@ -92,6 +95,7 @@ export const SHIFT_TYPES = ["DAY", "NIGHT"] as const;
 export const firingShifts = mysqlTable("firing_shifts", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   fitterId: varchar("fitterId", { length: 64 }).notNull(),
   gherId: varchar("gherId", { length: 64 }),
   shiftType: varchar("shiftType", { length: 50, enum: SHIFT_TYPES }).notNull(),
@@ -106,6 +110,7 @@ export const firingShifts = mysqlTable("firing_shifts", {
 export const fireMovementLogs = mysqlTable("fire_movement_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   gherId: varchar("gherId", { length: 64 }).notNull(),
   gherNumber: int("gherNumber").notNull(),
   startedAt: datetime("startedAt", { mode: "date" }).$defaultFn(() => new Date()),
@@ -116,6 +121,7 @@ export const INCIDENT_TYPES = ["CRACK_LEAKAGE", "WEATHER_FLOODING", "ELECTRICAL_
 export const kilnIncidents = mysqlTable("kiln_incidents", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   gherId: varchar("gherId", { length: 64 }),
   type: varchar("type", { length: 50, enum: INCIDENT_TYPES }).notNull(),
   description: text("description").notNull(),
@@ -129,6 +135,7 @@ export const kilnIncidents = mysqlTable("kiln_incidents", {
 export const nikasiEntries = mysqlTable("nikasi_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   gherId: varchar("gherId", { length: 64 }).notNull(),
   gangId: varchar("gangId", { length: 64 }).notNull(),
   bricksCount: int("bricksCount").notNull(),
@@ -142,6 +149,7 @@ export const nikasiEntries = mysqlTable("nikasi_entries", {
 export const loadingEntries = mysqlTable("loading_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   dispatchId: varchar("dispatchId", { length: 64 }),
   palledarId: varchar("palledarId", { length: 64 }).notNull(),
   bricksCount: int("bricksCount").notNull(),
@@ -156,6 +164,7 @@ export const BRICK_VEHICLE_TYPES = ["TRUCK", "TRACTOR"] as const;
 export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   // Plain, sequential per-kiln trip counter ("1", "2", ...) — same
   // never-resets convention as dispatches.invoiceNumber. Nullable at the DB
   // level only because rows created before this field existed have none;
@@ -262,8 +271,9 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   kilnDateIdx: index("brickloading_kiln_date_idx").on(t.kilnId, t.date),
   // Not violated by historical NULL tripNumbers — MySQL unique indexes
   // allow multiple NULLs — only real, generated numbers are ever checked
-  // against each other.
-  kilnTripNumberUnique: uniqueIndex("brickloading_kiln_tripnumber_unique").on(t.kilnId, t.tripNumber),
+  // against each other. Scoped to (kilnId, seasonId, tripNumber), not just
+  // (kilnId, tripNumber), so trip numbering restarts at 1 each new season.
+  kilnTripNumberUnique: uniqueIndex("brickloading_kiln_tripnumber_unique").on(t.kilnId, t.seasonId, t.tripNumber),
 }));
 
 // Free-form, admin-defined — not a fixed vocabulary. The kiln can name
@@ -286,6 +296,7 @@ export const brickCategories = mysqlTable("brick_categories", {
 export const brickProductionEntries = mysqlTable("brick_production_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   categoryId: varchar("categoryId", { length: 64 }).notNull(),
   bricksCount: int("bricksCount").notNull(),
   date: dateColumn(),
@@ -296,6 +307,7 @@ export const brickProductionEntries = mysqlTable("brick_production_entries", {
 export const productionLogs = mysqlTable("production_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   batchNumber: varchar("batchNumber", { length: 255 }).notNull(),
   bricksCount: int("bricksCount").notNull(),
   qualityGrade: varchar("qualityGrade", { length: 50 }).default("A"),
@@ -315,6 +327,7 @@ export const WASTAGE_CAUSES = ["RAIN", "TRANSPORT", "OTHER"] as const;
 export const wastageLogs = mysqlTable("wastage_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   type: varchar("type", { length: 50, enum: WASTAGE_TYPES }).notNull(),
   cause: varchar("cause", { length: 50, enum: WASTAGE_CAUSES }).notNull(),
   quantity: double("quantity").notNull(),

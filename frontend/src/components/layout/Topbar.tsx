@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Bell, Check, ChevronDown, ChevronsUpDown, Hammer, LogOut, Menu, Plus, Search, Settings as SettingsIcon } from "lucide-react";
+import { Bell, Check, ChevronDown, ChevronsUpDown, Hammer, History, LogOut, Menu, Plus, Search, Settings as SettingsIcon } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboard.store";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
@@ -17,6 +17,12 @@ export function Topbar() {
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const kiln = kilns.find((k) => k.kilnId === activeKilnId);
   const logout = useAuthStore((s) => s.logout);
+  const seasons = useAuthStore((s) => s.seasons);
+  const activeSeasonId = useAuthStore((s) => s.activeSeasonId);
+  const setActiveSeason = useAuthStore((s) => s.setActiveSeason);
+  const activeSeason = seasons.find((s) => s._id === activeSeasonId);
+  const currentSeason = seasons.find((s) => s.isCurrent);
+  const viewingArchivedSeason = !!activeSeason && !activeSeason.isCurrent;
   const view = useUiStore((s) => s.view);
   const setView = useUiStore((s) => s.setView);
   const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen);
@@ -52,7 +58,23 @@ export function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-4 sm:px-6">
+    <>
+      {viewingArchivedSeason && (
+        <div className="sticky top-0 z-50 flex flex-wrap items-center justify-center gap-2 bg-status-warning/15 px-4 py-2 text-sm text-status-warning">
+          <History className="h-4 w-4 shrink-0" />
+          <span>{t("topbar.viewingArchivedSeason", { season: activeSeason?.label ?? "" })}</span>
+          {currentSeason && (
+            <button
+              type="button"
+              onClick={() => setActiveSeason(currentSeason._id)}
+              className="font-semibold underline underline-offset-2 hover:no-underline focus-visible:outline-none"
+            >
+              {t("topbar.switchToCurrentSeason")}
+            </button>
+          )}
+        </div>
+      )}
+      <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-4 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <button
           onClick={() => setMobileNavOpen(true)}
@@ -232,6 +254,7 @@ export function Topbar() {
           )}
         </div>
       </div>
-    </header>
+      </header>
+    </>
   );
 }

@@ -13,11 +13,11 @@ const createSchema = z.object({
 
 export async function createStockEntry(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);
-  const entry = await recordStockEntry({ ...input, kilnId: req.kiln!.id });
+  const entry = await recordStockEntry({ ...input, kilnId: req.kiln!.id, seasonId: req.season!.id });
   res.status(201).json(entry);
 }
 
 export async function listStockSnapshot(req: AuthedRequest, res: Response) {
-  const snapshot = await getStockSnapshot(req.kiln!.id);
+  const snapshot = await getStockSnapshot(req.kiln!.id, req.season!.id);
   res.json(snapshot);
 }

@@ -10,7 +10,10 @@ import { round2, ProductionSummary } from "./types";
 // driverId) rather than the older generic work_entries table, since those
 // dedicated tables are what the live Molding/Stacking/Nikasi/Brick Loading
 // pages actually write to and display today.
-export async function personProductionTotals(kilnId: string, personIds: string[], from?: Date, to?: Date): Promise<ProductionSummary> {
+// seasonId is nullable — pass null for an all-time, every-season view; the
+// only current callers (people.reports.ts) are admin-picked date-range
+// reports, which always pass null.
+export async function personProductionTotals(kilnId: string, seasonId: string | null, personIds: string[], from?: Date, to?: Date): Promise<ProductionSummary> {
   if (personIds.length === 0) return { bricksCount: 0, damagedCount: 0, byModule: [] };
 
   const dateConditions = (col: AnyMySqlColumn): SQL[] => {
@@ -21,10 +24,10 @@ export async function personProductionTotals(kilnId: string, personIds: string[]
   };
 
   const [molding, stacking, nikasi, brickLoading] = await Promise.all([
-    db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.workerId, personIds), ...dateConditions(moldingEntries.date))),
-    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), inArray(stackingEntries.gangId, personIds), ...dateConditions(stackingEntries.date))),
-    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), inArray(nikasiEntries.gangId, personIds), ...dateConditions(nikasiEntries.date))),
-    db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), inArray(brickLoadingEntries.driverId, personIds), ...dateConditions(brickLoadingEntries.date))),
+    db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), seasonId ? eq(moldingEntries.seasonId, seasonId) : undefined, inArray(moldingEntries.workerId, personIds), ...dateConditions(moldingEntries.date))),
+    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), seasonId ? eq(stackingEntries.seasonId, seasonId) : undefined, inArray(stackingEntries.gangId, personIds), ...dateConditions(stackingEntries.date))),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), seasonId ? eq(nikasiEntries.seasonId, seasonId) : undefined, inArray(nikasiEntries.gangId, personIds), ...dateConditions(nikasiEntries.date))),
+    db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), seasonId ? eq(brickLoadingEntries.seasonId, seasonId) : undefined, inArray(brickLoadingEntries.driverId, personIds), ...dateConditions(brickLoadingEntries.date))),
   ]);
 
   const byModule = [

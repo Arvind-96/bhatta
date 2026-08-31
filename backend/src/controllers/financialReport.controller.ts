@@ -4,11 +4,11 @@ import { chamberCostReport, seasonFinancialSummary } from "../services/financial
 
 export async function summary(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 30;
-  const result = await seasonFinancialSummary(req.kiln!.id, days);
+  const result = await seasonFinancialSummary(req.kiln!.id, req.season!.id, days);
   res.json(result);
 }
 
 export async function chamberCost(req: AuthedRequest, res: Response) {
-  const result = await chamberCostReport(req.kiln!.id, req.params.gherId);
+  const result = await chamberCostReport(req.kiln!.id, req.season!.id, req.params.gherId);
   res.json(result);
 }

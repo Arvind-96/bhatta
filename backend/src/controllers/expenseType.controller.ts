@@ -20,7 +20,7 @@ export async function list(req: AuthedRequest, res: Response) {
 }
 
 export async function detail(req: AuthedRequest, res: Response) {
-  res.json(await getExpenseTypeDetail(req.kiln!.id, req.params.id));
+  res.json(await getExpenseTypeDetail(req.kiln!.id, req.params.id, req.season!.id));
 }
 
 export async function update(req: AuthedRequest, res: Response) {

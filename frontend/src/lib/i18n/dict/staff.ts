@@ -84,10 +84,19 @@ export const staffDict: Record<string, Record<Locale, string>> = {
   "settings.saveCapacity": { en: "Save capacity", hi: "क्षमता सहेजें" },
   "settings.bhattaSeason": { en: "Bhatta Season", hi: "भट्टा सीज़न" },
   "settings.bhattaSeasonDescription": {
-    en: "The bhatta season generally runs Aug 1 – Jul 31. Change this if this kiln's season starts differently.",
-    hi: "भट्टा सीज़न आमतौर पर 1 अगस्त से 31 जुलाई तक चलता है। अगर इस भट्टे का सीज़न अलग से शुरू होता है तो यहाँ बदलें।",
+    en: "Switch which season's data the whole app shows, or start a new one when this season ends. Starting a new season archives the current one (read-only) and resets dispatch/challan/gate pass/trip numbering to 1 — nothing is ever deleted.",
+    hi: "पूरे ऐप में किस सीज़न का डेटा दिखे यह बदलें, या इस सीज़न के खत्म होने पर नया सीज़न शुरू करें। नया सीज़न शुरू करने से मौजूदा सीज़न संग्रहीत (केवल पढ़ने योग्य) हो जाता है और डिस्पैच/चालान/गेट पास/ट्रिप नंबरिंग 1 से फिर शुरू होती है — कुछ भी हटाया नहीं जाता।",
   },
-  "settings.saveSeason": { en: "Save season", hi: "सीज़न सहेजें" },
+  "settings.currentSeason": { en: "Current", hi: "मौजूदा" },
+  "settings.archivedSeason": { en: "Archived", hi: "संग्रहीत" },
+  "settings.startNewSeason": { en: "Start new Bhatta Season", hi: "नया भट्टा सीज़न शुरू करें" },
+  "settings.newSeasonLabelPlaceholder": { en: "Season name (e.g. 2026-27)", hi: "सीज़न का नाम (जैसे 2026-27)" },
+  "settings.startSeasonButton": { en: "Start season", hi: "सीज़न शुरू करें" },
+  "settings.startSeasonConfirmTitle": { en: "Start this new season?", hi: "क्या यह नया सीज़न शुरू करें?" },
+  "settings.startSeasonConfirmDetail": {
+    en: "The current season will be archived (read-only, still visible in Settings) and every counter — dispatch slips, challans, gate passes, invoices, brick loading trips — restarts at 1. This can't be undone.",
+    hi: "मौजूदा सीज़न संग्रहीत हो जाएगा (केवल पढ़ने योग्य, फिर भी Settings में दिखेगा) और हर काउंटर — डिस्पैच स्लिप, चालान, गेट पास, इनवॉइस, ईंट लोडिंग ट्रिप — 1 से फिर शुरू होगा। इसे वापस नहीं किया जा सकता।",
+  },
   "settings.shiftTimings": { en: "Shift Timings", hi: "शिफ़्ट का समय" },
   "settings.shiftTimingsDescription": {
     en: "The default shift window shown on the Attendance page as a reference for what counts as Late — marking still happens by hand.",

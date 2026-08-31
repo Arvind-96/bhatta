@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateSoilArrivalInput {
   kilnId: string;
+  seasonId: string;
   landownerId: string;
   contractId?: string;
   jcbUsed?: boolean;
@@ -230,8 +231,11 @@ export interface ListSoilArrivalFilter {
   contractId?: string;
 }
 
-export async function listSoilArrivals(kilnId: string, filter: ListSoilArrivalFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report).
+export async function listSoilArrivals(kilnId: string, seasonId: string | null, filter: ListSoilArrivalFilter = {}) {
   const conditions = [eq(soilArrivals.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(soilArrivals.seasonId, seasonId));
   if (filter.landownerId) conditions.push(eq(soilArrivals.landownerId, filter.landownerId));
   if (filter.contractId) conditions.push(eq(soilArrivals.contractId, filter.contractId));
   const rows = await db.select().from(soilArrivals).where(and(...conditions)).orderBy(desc(soilArrivals.date));

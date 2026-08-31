@@ -11,10 +11,6 @@ export const kilns = mysqlTable("kilns", {
   longitude: double("longitude"),
   radiusMeters: int("radiusMeters").default(200),
   yardCapacityBricks: int("yardCapacityBricks"),
-  // The bhatta season, e.g. Aug 1 – Jul 31 by default — used for
-  // season-scoped reporting. Month is 1-12, day is 1-31.
-  seasonStartMonth: int("seasonStartMonth").default(8),
-  seasonStartDay: int("seasonStartDay").default(1),
   // Reference info for the Attendance roster page — not an auto clock-in
   // (there's no check-in device), just the shift window shown to the admin
   // so "Late" has a concrete meaning when marking someone manually.

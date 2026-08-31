@@ -9,6 +9,8 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { cn } from "@/lib/utils";
 import type { ComplianceDocument, ComplianceDocumentType, StockAudit } from "@/types";
 
 const inputClass =
@@ -239,50 +241,37 @@ function YardCapacitySettings() {
   );
 }
 
-const MONTH_OPTIONS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-// A fixed non-leap reference year (2023) — this is a recurring annual
-// anchor day, not tied to any specific year, so Feb is always capped at
-// 28 rather than sometimes allowing a Feb 29 that won't exist most years.
-function daysInMonth(month: number) {
-  return new Date(2023, month, 0).getDate();
+// "YYYY-MM-DD" in LOCAL time — what <input type="date"> expects/emits, same
+// helper Compare.tsx uses for its own date pickers.
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+function toDateInputValue(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-function SeasonSettings() {
+function BhattaSeasonSettings() {
   const { t } = useTranslation();
-  const kilns = useAuthStore((s) => s.kilns);
-  const activeKilnId = useAuthStore((s) => s.activeKilnId);
-  const setKilns = useAuthStore((s) => s.setKilns);
-  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+  const seasons = useAuthStore((s) => s.seasons);
+  const activeSeasonId = useAuthStore((s) => s.activeSeasonId);
+  const setSeasons = useAuthStore((s) => s.setSeasons);
+  const setActiveSeason = useAuthStore((s) => s.setActiveSeason);
 
-  const [startMonth, setStartMonth] = useState(activeKiln?.seasonStartMonth ?? 8);
-  const [startDay, setStartDay] = useState(activeKiln?.seasonStartDay ?? 1);
+  const [label, setLabel] = useState("");
+  const [startDate, setStartDate] = useState(() => toDateInputValue(new Date()));
+  const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    setStartMonth(activeKiln?.seasonStartMonth ?? 8);
-    setStartDay(activeKiln?.seasonStartDay ?? 1);
-  }, [activeKilnId]);
-
-  // Clamp the day whenever the month changes so e.g. picking February never
-  // leaves a previously-selected "31" sitting there as an invalid value.
-  function changeMonth(month: number) {
-    setStartMonth(month);
-    setStartDay((day) => Math.min(day, daysInMonth(month)));
-  }
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function handleStart() {
     setSaving(true);
     try {
-      await api.kilns.updateSeason(startMonth, startDay);
-      setKilns(kilns.map((k) => (k.kilnId === activeKilnId ? { ...k, seasonStartMonth: startMonth, seasonStartDay: startDay } : k)));
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      const created = await api.seasons.create({ label: label.trim(), startDate });
+      const refreshed = await api.seasons.list();
+      setSeasons(refreshed);
+      setActiveSeason(created._id);
+      setLabel("");
+      setStartDate(toDateInputValue(new Date()));
+      setConfirming(false);
     } finally {
       setSaving(false);
     }
@@ -295,28 +284,59 @@ function SeasonSettings() {
       </CardHeader>
       <p className="mb-4 text-sm text-ink-muted">{t("settings.bhattaSeasonDescription")}</p>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <div className="flex gap-2">
-          <select value={startMonth} onChange={(e) => changeMonth(Number(e.target.value))} className={inputClass + " flex-1"}>
-            {MONTH_OPTIONS.map((name, i) => (
-              <option key={name} value={i + 1}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            min={1}
-            max={daysInMonth(startMonth)}
-            value={startDay}
-            onChange={(e) => setStartDay(Math.max(1, Math.min(Number(e.target.value), daysInMonth(startMonth))))}
-            className={inputClass + " w-20"}
-          />
-        </div>
-        <Button type="submit" disabled={saving}>
-          {saved ? t("settings.saved") : saving ? t("settings.savingEllipsis") : t("settings.saveSeason")}
+      <div className="flex flex-col gap-2">
+        {seasons.map((s) => {
+          const active = s._id === activeSeasonId;
+          return (
+            <button
+              key={s._id}
+              type="button"
+              onClick={() => setActiveSeason(s._id)}
+              className={cn(
+                "flex items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                active ? "border-series-1 bg-series-1/10" : "border-border hover:border-ink-primary/15"
+              )}
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium text-ink-primary">{s.label}</p>
+                <p className="truncate text-sm text-ink-muted">
+                  {new Date(s.startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                </p>
+              </div>
+              <Badge variant={s.isCurrent ? "good" : "neutral"}>
+                {s.isCurrent ? t("settings.currentSeason") : t("settings.archivedSeason")}
+              </Badge>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="my-4 h-px bg-border" />
+
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("settings.startNewSeason")}</p>
+      <div className="flex flex-col gap-3">
+        <input
+          placeholder={t("settings.newSeasonLabelPlaceholder")}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          className={inputClass}
+        />
+        <DateInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
+        <Button type="button" variant="outline" disabled={!label.trim() || !startDate} onClick={() => setConfirming(true)}>
+          {t("settings.startSeasonButton")}
         </Button>
-      </form>
+      </div>
+
+      {confirming && (
+        <ConfirmDialog
+          title={t("settings.startSeasonConfirmTitle")}
+          detail={t("settings.startSeasonConfirmDetail")}
+          confirmLabel={saving ? t("settings.savingEllipsis") : t("settings.startSeasonButton")}
+          onConfirm={handleStart}
+          onCancel={() => setConfirming(false)}
+          loading={saving}
+        />
+      )}
     </Card>
   );
 }
@@ -786,7 +806,7 @@ export function Settings() {
       <GeofenceSettings />
       <ChamberSettings />
       <YardCapacitySettings />
-      <SeasonSettings />
+      <BhattaSeasonSettings />
       <ShiftSettings />
       <GstSettings />
       <BillingDetailsSettings />

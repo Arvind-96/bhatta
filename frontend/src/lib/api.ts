@@ -127,7 +127,7 @@ import type {
   SandDeliveryTractorEntry,
 } from "@/types";
 import type { ReportResult, ReportRunParams, DashboardSummary } from "@/types/reports";
-import { useAuthStore, type AuthUser, type UserKiln } from "@/store/auth.store";
+import { useAuthStore, type AuthUser, type UserKiln, type UserSeason } from "@/store/auth.store";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
@@ -142,13 +142,14 @@ export interface LineItemInput {
 }
 
 async function request<T>(path: string, options: RequestInit = {}, scoped = false): Promise<T> {
-  const { token, activeKilnId } = useAuthStore.getState();
+  const { token, activeKilnId, activeSeasonId } = useAuthStore.getState();
   const res = await fetch(`${API_URL}/api${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(scoped && activeKilnId ? { "X-Kiln-Id": activeKilnId } : {}),
+      ...(scoped && activeSeasonId ? { "X-Season-Id": activeSeasonId } : {}),
       ...options.headers,
     },
   });
@@ -175,7 +176,7 @@ const patch = <T>(path: string, body: unknown, scoped = false) =>
 // header (the browser sets its own multipart boundary header when given a
 // FormData body directly), otherwise identical auth/kiln-scoping behavior.
 async function postFile<T>(path: string, fieldName: string, file: File | Blob, scoped = true): Promise<T> {
-  const { token, activeKilnId } = useAuthStore.getState();
+  const { token, activeKilnId, activeSeasonId } = useAuthStore.getState();
   const formData = new FormData();
   formData.append(fieldName, file, file instanceof File ? file.name : "capture.jpg");
   const res = await fetch(`${API_URL}/api${path}`, {
@@ -183,6 +184,7 @@ async function postFile<T>(path: string, fieldName: string, file: File | Blob, s
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(scoped && activeKilnId ? { "X-Kiln-Id": activeKilnId } : {}),
+      ...(scoped && activeSeasonId ? { "X-Season-Id": activeSeasonId } : {}),
     },
     body: formData,
   });
@@ -508,8 +510,6 @@ export const api = {
       patch("/kilns/geofence", { latitude, longitude, radiusMeters }, true),
     updateYardCapacity: (yardCapacityBricks: number) =>
       patch("/kilns/yard-capacity", { yardCapacityBricks }, true),
-    updateSeason: (seasonStartMonth: number, seasonStartDay: number) =>
-      patch("/kilns/season", { seasonStartMonth, seasonStartDay }, true),
     updateShiftTimes: (dayShiftStart: string, dayShiftEnd: string) =>
       patch("/kilns/shift-times", { dayShiftStart, dayShiftEnd }, true),
     updateProfile: (input: { name?: string; location?: string; phone?: string }) =>
@@ -555,6 +555,11 @@ export const api = {
       });
     },
     completeOnboarding: () => post("/kilns/onboarding/complete", {}, true),
+  },
+
+  seasons: {
+    list: () => get<UserSeason[]>("/seasons", true),
+    create: (input: { label: string; startDate: string }) => post<UserSeason>("/seasons", input, true),
   },
 
   people: {

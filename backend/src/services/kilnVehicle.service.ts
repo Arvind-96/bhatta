@@ -60,6 +60,7 @@ async function lastKnownMeterReading(kilnId: string, vehicleId: string, excludeE
 
 export interface CreateDieselEntryInput {
   kilnId: string;
+  seasonId: string;
   vehicleId: string;
   quantityLiters: number;
   initialMeterReading?: number;
@@ -123,8 +124,11 @@ export interface ListDieselEntriesFilter {
   to?: Date;
 }
 
-export async function listDieselEntries(kilnId: string, filter: ListDieselEntriesFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view
+// (Reports' date-range queries).
+export async function listDieselEntries(kilnId: string, seasonId: string | null, filter: ListDieselEntriesFilter = {}) {
   const conditions = [eq(vehicleDieselEntries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(vehicleDieselEntries.seasonId, seasonId));
   if (filter.days) {
     const since = new Date();
     since.setDate(since.getDate() - filter.days);
@@ -162,8 +166,9 @@ export async function deleteDieselEntry(kilnId: string, entryId: string) {
 // Per-vehicle rollup for a date range — the Vehicles report's data source
 // (contrast with listDieselEntries above, which is the Diesel report's raw
 // detail log over the same underlying table).
-export async function vehicleDieselSummary(kilnId: string, filter: { from?: Date; to?: Date } = {}) {
+export async function vehicleDieselSummary(kilnId: string, seasonId: string | null, filter: { from?: Date; to?: Date } = {}) {
   const conditions = [eq(vehicleDieselEntries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(vehicleDieselEntries.seasonId, seasonId));
   if (filter.from) conditions.push(gte(vehicleDieselEntries.date, filter.from));
   if (filter.to) conditions.push(lte(vehicleDieselEntries.date, filter.to));
 
@@ -196,7 +201,7 @@ export async function vehicleDieselSummary(kilnId: string, filter: { from?: Date
 
 // The Stock page's diesel-usage-at-a-glance — how much diesel went into
 // each vehicle today / this week / this month / this year.
-export async function dieselPeriodTotals(kilnId: string) {
+export async function dieselPeriodTotals(kilnId: string, seasonId: string) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const weekAgo = new Date();
@@ -208,10 +213,10 @@ export async function dieselPeriodTotals(kilnId: string) {
 
   const [vehicles, today, week, month, year] = await Promise.all([
     db.select().from(kilnVehicles).where(eq(kilnVehicles.kilnId, kilnId)),
-    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), gte(vehicleDieselEntries.date, startOfDay))),
-    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), gte(vehicleDieselEntries.date, weekAgo))),
-    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), gte(vehicleDieselEntries.date, monthAgo))),
-    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), gte(vehicleDieselEntries.date, yearAgo))),
+    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.seasonId, seasonId), gte(vehicleDieselEntries.date, startOfDay))),
+    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.seasonId, seasonId), gte(vehicleDieselEntries.date, weekAgo))),
+    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.seasonId, seasonId), gte(vehicleDieselEntries.date, monthAgo))),
+    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.seasonId, seasonId), gte(vehicleDieselEntries.date, yearAgo))),
   ]);
 
   const vehicleNameById = new Map(vehicles.map((v) => [v._id, v.name]));

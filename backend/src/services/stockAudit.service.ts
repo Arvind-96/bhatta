@@ -7,6 +7,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateStockAuditInput {
   kilnId: string;
+  seasonId: string;
   itemName: string;
   physicalCount: number;
   date?: Date;
@@ -18,7 +19,7 @@ export interface CreateStockAuditInput {
 // of the comparison is guaranteed to be what the software actually
 // believes, not what the munim remembers it being.
 export async function createStockAudit(input: CreateStockAuditInput) {
-  const snapshot = await getStockSnapshot(input.kilnId);
+  const snapshot = await getStockSnapshot(input.kilnId, input.seasonId);
   const registerCount = snapshot.find((s) => s.itemName === input.itemName)?.quantity ?? 0;
   const variance = input.physicalCount - registerCount;
 
@@ -29,8 +30,8 @@ export async function createStockAudit(input: CreateStockAuditInput) {
   return audit;
 }
 
-export async function listStockAudits(kilnId: string, days = 365) {
+export async function listStockAudits(kilnId: string, seasonId: string, days = 365) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  return await db.select().from(stockAudits).where(and(eq(stockAudits.kilnId, kilnId), gte(stockAudits.date, since))).orderBy(desc(stockAudits.date));
+  return await db.select().from(stockAudits).where(and(eq(stockAudits.kilnId, kilnId), eq(stockAudits.seasonId, seasonId), gte(stockAudits.date, since))).orderBy(desc(stockAudits.date));
 }

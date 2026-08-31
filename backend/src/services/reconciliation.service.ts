@@ -8,6 +8,7 @@ import { totalA1Output } from "./chamberGrading.service";
 import { totalDispatchedSince } from "./dispatch.service";
 import { getStockSnapshot } from "./stock.service";
 import { totalNikasiDamage } from "./nikasi.service";
+import { seasonIdsThrough } from "./season.util";
 
 const MISMATCH_ALERT_THRESHOLD = 0.05; // 5%
 const YARD_WARNING_THRESHOLD = 0.85; // 85% full
@@ -23,14 +24,15 @@ const EPOCH = new Date(0);
 // The same fieldStock figure doubles as the drying-yard occupancy check:
 // once it nears the yard's brick capacity, there's nowhere to put freshly
 // molded bricks until stacking catches up.
-export async function reconcileSoilToKiln(kilnId: string, days = 30) {
+export async function reconcileSoilToKiln(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
+  const seasonIds = await seasonIdsThrough(kilnId, seasonId);
 
   const [molded, stacked, wastage, kiln] = await Promise.all([
-    totalMolded(kilnId, since),
-    totalStacked(kilnId, since),
-    totalWastage(kilnId, since, "KACCHI_BRICK"),
+    totalMolded(kilnId, seasonIds, since),
+    totalStacked(kilnId, seasonIds, since),
+    totalWastage(kilnId, seasonIds, since, "KACCHI_BRICK"),
     db.select().from(kilns).where(eq(kilns._id, kilnId)).then((rows) => rows[0]),
   ]);
 
@@ -63,14 +65,15 @@ export async function reconcileSoilToKiln(kilnId: string, days = 30) {
 // to move stock out without ever logging a Dispatch, this is where it
 // shows up — production and warehouse counts stop adding up to what was
 // actually made, even though no single record looks wrong on its own.
-export async function reconcileFinishedGoods(kilnId: string, days = 30) {
+export async function reconcileFinishedGoods(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
+  const seasonIds = await seasonIdsThrough(kilnId, seasonId);
 
   const [produced, dispatched, snapshot] = await Promise.all([
-    totalA1Output(kilnId, since),
-    totalDispatchedSince(kilnId, since),
-    getStockSnapshot(kilnId),
+    totalA1Output(kilnId, seasonIds, since),
+    totalDispatchedSince(kilnId, seasonIds, since),
+    getStockSnapshot(kilnId, seasonId),
   ]);
 
   const currentStock = snapshot.find((s) => s.itemName === "Bricks (A-1 Grade)")?.quantity ?? 0;
@@ -97,13 +100,14 @@ export async function reconcileFinishedGoods(kilnId: string, days = 30) {
 // molded but not yet loaded into a chamber. Not clamped at zero: a
 // negative figure is itself a data-integrity signal worth seeing, same as
 // reconcileSoilToKiln's own alert.
-export async function dashboardStockSummary(kilnId: string) {
+export async function dashboardStockSummary(kilnId: string, seasonId: string) {
+  const seasonIds = await seasonIdsThrough(kilnId, seasonId);
   const [molded, stacked, wastage, moldingDamage, nikasiDamage] = await Promise.all([
-    totalMolded(kilnId, EPOCH),
-    totalStacked(kilnId, EPOCH),
-    totalWastage(kilnId, EPOCH, "KACCHI_BRICK"),
-    damagedMoldedSince(kilnId, EPOCH),
-    totalNikasiDamage(kilnId, EPOCH),
+    totalMolded(kilnId, seasonIds, EPOCH),
+    totalStacked(kilnId, seasonIds, EPOCH),
+    totalWastage(kilnId, seasonIds, EPOCH, "KACCHI_BRICK"),
+    damagedMoldedSince(kilnId, seasonIds, EPOCH),
+    totalNikasiDamage(kilnId, seasonIds, EPOCH),
   ]);
 
   const rawBrickStock = molded - (stacked.bricksCount + stacked.damageCount + wastage);

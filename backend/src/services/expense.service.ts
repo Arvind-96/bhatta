@@ -11,6 +11,7 @@ export type ExpensePaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 
 export interface CreateExpenseInput {
   kilnId: string;
+  seasonId: string;
   expenseTypeId?: string;
   category?: ExpenseCategory;
   amount: number;
@@ -54,6 +55,7 @@ export async function createExpense(input: CreateExpenseInput) {
 // don't need their own guard.
 export async function autoLogExpense(
   kilnId: string,
+  seasonId: string,
   typeName: string,
   amount: number | null | undefined,
   date: Date | undefined,
@@ -68,7 +70,7 @@ export async function autoLogExpense(
 ) {
   if (!amount || amount <= 0) return;
   const expenseType = await findOrCreateExpenseType(kilnId, typeName);
-  await createExpense({ kilnId, expenseTypeId: expenseType._id, amount, date, notes, ...links });
+  await createExpense({ kilnId, seasonId, expenseTypeId: expenseType._id, amount, date, notes, ...links });
 }
 
 export interface UpdateExpenseInput {
@@ -140,18 +142,21 @@ export interface ListExpensesFilter {
   to?: Date;
 }
 
-export async function listExpenses(kilnId: string, filter: ListExpensesFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// the Reports page's own admin-picked date-range reports).
+export async function listExpenses(kilnId: string, seasonId: string | null, filter: ListExpensesFilter = {}) {
   const conditions = [eq(expenses.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(expenses.seasonId, seasonId));
   if (filter.category) conditions.push(eq(expenses.category, filter.category));
   if (filter.from) conditions.push(gte(expenses.date, filter.from));
   if (filter.to) conditions.push(lte(expenses.date, filter.to));
   return await db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.date));
 }
 
-export async function expenseTotalsByCategory(kilnId: string, days = 30) {
+export async function expenseTotalsByCategory(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since)));
+  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.seasonId, seasonId), gte(expenses.date, since)));
 
   const totals = new Map<ExpenseCategory, number>();
   for (const e of rows) {
@@ -161,7 +166,7 @@ export async function expenseTotalsByCategory(kilnId: string, days = 30) {
   return Array.from(totals.entries()).map(([category, amount]) => ({ category, amount }));
 }
 
-export async function totalExpensesSince(kilnId: string, since: Date) {
-  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since)));
+export async function totalExpensesSince(kilnId: string, seasonId: string, since: Date) {
+  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.seasonId, seasonId), gte(expenses.date, since)));
   return rows.reduce((sum, e) => sum + e.amount, 0);
 }

@@ -10,6 +10,7 @@ export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
 
 export interface CreateMoldingInput {
   kilnId: string;
+  seasonId: string;
   workerId: string;
   bricksCount: number;
   ratePerThousand: number;
@@ -205,8 +206,12 @@ export interface ListMoldingFilter {
   to?: Date;
 }
 
-export async function listMoldingEntries(kilnId: string, filter: ListMoldingFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report and the Reports page's own
+// admin-picked date-range reports, both deliberately season-agnostic).
+export async function listMoldingEntries(kilnId: string, seasonId: string | null, filter: ListMoldingFilter = {}) {
   const conditions = [eq(moldingEntries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(moldingEntries.seasonId, seasonId));
   if (filter.workerId) conditions.push(eq(moldingEntries.workerId, filter.workerId));
   if (filter.from) conditions.push(gte(moldingEntries.date, filter.from));
   if (filter.to) conditions.push(lte(moldingEntries.date, filter.to));
@@ -219,18 +224,23 @@ export async function listMoldingEntries(kilnId: string, filter: ListMoldingFilt
   return rows.map((r) => ({ ...r, workerId: workerById.get(r.workerId) ?? r.workerId }));
 }
 
-export async function todayMoldingTotal(kilnId: string) {
+export async function todayMoldingTotal(kilnId: string, seasonId: string) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const entries = await db
     .select()
     .from(moldingEntries)
-    .where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, startOfDay), eq(moldingEntries.washedOut, false)));
+    .where(and(eq(moldingEntries.kilnId, kilnId), eq(moldingEntries.seasonId, seasonId), gte(moldingEntries.date, startOfDay), eq(moldingEntries.washedOut, false)));
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
 }
 
-export async function totalMolded(kilnId: string, since: Date, until?: Date) {
-  const conditions = [eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, since), eq(moldingEntries.washedOut, false)];
+// seasonIds, not a single seasonId — a reconciliation-style caller passes
+// every season through the current one (seasonIdsThrough) for a
+// cumulative "state of the world" figure; a page-level widget passes just
+// [seasonId] for a single season's own total. See dispatch.service.ts's
+// totalDispatchedSince for the same convention.
+export async function totalMolded(kilnId: string, seasonIds: string[], since: Date, until?: Date) {
+  const conditions = [eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.seasonId, seasonIds), gte(moldingEntries.date, since), eq(moldingEntries.washedOut, false)];
   if (until) conditions.push(lte(moldingEntries.date, until));
   const entries = await db.select().from(moldingEntries).where(and(...conditions));
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
@@ -239,15 +249,15 @@ export async function totalMolded(kilnId: string, since: Date, until?: Date) {
 // Damage is tracked independently of washedOut — a batch that wasn't
 // rained out can still have some bricks crack/break in handling, so this
 // deliberately doesn't filter washedOut the way totalMolded does.
-export async function damagedMoldedSince(kilnId: string, since: Date) {
-  const entries = await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), gte(moldingEntries.date, since)));
+export async function damagedMoldedSince(kilnId: string, seasonIds: string[], since: Date) {
+  const entries = await db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), inArray(moldingEntries.seasonId, seasonIds), gte(moldingEntries.date, since)));
   return entries.reduce((sum, e) => sum + (e.damagedCount ?? 0), 0);
 }
 
 // Whole-kiln totals, unfiltered by work type — the "at a glance" numbers
 // at the top of the Molding page, distinct from the Pathai-scoped
 // contractor breakdown below.
-export async function moldingPeriodTotals(kilnId: string) {
+export async function moldingPeriodTotals(kilnId: string, seasonId: string) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const weekAgo = new Date();
@@ -256,12 +266,12 @@ export async function moldingPeriodTotals(kilnId: string) {
   monthAgo.setDate(monthAgo.getDate() - 30);
 
   const [today, week, month, todayDamaged, weekDamaged, monthDamaged] = await Promise.all([
-    todayMoldingTotal(kilnId),
-    totalMolded(kilnId, weekAgo),
-    totalMolded(kilnId, monthAgo),
-    damagedMoldedSince(kilnId, startOfDay),
-    damagedMoldedSince(kilnId, weekAgo),
-    damagedMoldedSince(kilnId, monthAgo),
+    todayMoldingTotal(kilnId, seasonId),
+    totalMolded(kilnId, [seasonId], weekAgo),
+    totalMolded(kilnId, [seasonId], monthAgo),
+    damagedMoldedSince(kilnId, [seasonId], startOfDay),
+    damagedMoldedSince(kilnId, [seasonId], weekAgo),
+    damagedMoldedSince(kilnId, [seasonId], monthAgo),
   ]);
 
   return { today, week, month, todayDamaged, weekDamaged, monthDamaged };
@@ -290,11 +300,13 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // they're tagged "PATHAI" themselves, or have at least one Pathai-relevant
 // worker by that same rule. Doesn't affect the whole-kiln totals above
 // (moldingPeriodTotals), which stay unfiltered.
-export async function moldingContractorSummary(kilnId: string) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report).
+export async function moldingContractorSummary(kilnId: string, seasonId: string | null) {
   const [allContractors, workers, allEntries] = await Promise.all([
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"), eq(people.active, true))),
-    db.select().from(moldingEntries).where(eq(moldingEntries.kilnId, kilnId)),
+    db.select().from(moldingEntries).where(seasonId ? and(eq(moldingEntries.kilnId, kilnId), eq(moldingEntries.seasonId, seasonId)) : eq(moldingEntries.kilnId, kilnId)),
   ]);
 
   const workerIdsWithEntries = new Set(allEntries.map((e) => e.workerId));
@@ -315,9 +327,10 @@ export async function moldingContractorSummary(kilnId: string) {
       // same filter.
       const workerIdSet = new Set(workerIds);
       const gangEntries = allEntries.filter((e) => workerIdSet.has(e.workerId));
+      const seasonCond = seasonId ? [eq(ledgerEntries.seasonId, seasonId)] : [];
       const gangLedgerEntries = workerIds.length
-        ? await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, [contractor._id, ...workerIds])))
-        : await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, contractor._id)));
+        ? await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), ...seasonCond, inArray(ledgerEntries.personId, [contractor._id, ...workerIds])))
+        : await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), ...seasonCond, eq(ledgerEntries.personId, contractor._id)));
 
       const bricksByWorker = new Map<string, number>();
       const damagedByWorker = new Map<string, number>();

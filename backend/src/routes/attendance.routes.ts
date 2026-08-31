@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { forPerson, listForDay, mark, roster } from "../controllers/attendance.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const attendanceRouter = Router();
 
-attendanceRouter.use(requireAuth, resolveKiln);
+attendanceRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 attendanceRouter.post("/", asyncHandler(mark));
 attendanceRouter.get("/", asyncHandler(listForDay));
 attendanceRouter.get("/for-person/:personId", asyncHandler(forPerson));

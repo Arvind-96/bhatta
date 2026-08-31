@@ -1,4 +1,5 @@
 export * from "./auth";
+export * from "./season";
 export * from "./people";
 export * from "./production";
 export * from "./dispatch";

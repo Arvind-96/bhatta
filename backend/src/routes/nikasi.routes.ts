@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { contractorSummary, create, list, operatorSummary, periodTotals, remove, update } from "../controllers/nikasi.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const nikasiRouter = Router();
 
-nikasiRouter.use(requireAuth, resolveKiln);
+nikasiRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 nikasiRouter.post("/", asyncHandler(create));
 nikasiRouter.get("/", asyncHandler(list));
 nikasiRouter.get("/operator-summary", asyncHandler(operatorSummary));

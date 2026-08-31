@@ -9,7 +9,7 @@ import { invoices, expenses, ledgerEntries, people, ghers, fuelLogs, stackingEnt
 // asked. Labor/service costs come from every non-customer ledger DUE entry
 // (wages/payments owed, accrual-style — matches when the cost was
 // incurred, not necessarily when it was paid out).
-export async function seasonFinancialSummary(kilnId: string, days = 30) {
+export async function seasonFinancialSummary(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
@@ -23,8 +23,11 @@ export async function seasonFinancialSummary(kilnId: string, days = 30) {
   // the same source here keeps every "revenue"/"money received" figure in
   // the app in agreement.
   const [invoiceRows, expenseRows, dueEntries, customers] = await Promise.all([
-    db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`)),
-    db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), gte(expenses.date, since))),
+    db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.seasonId, seasonId), sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`)),
+    db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.seasonId, seasonId), gte(expenses.date, since))),
+    // ledgerEntries.seasonId is optional (not reliably populated — see
+    // ledger.service.ts's AddLedgerEntryInput comment) and left unfiltered
+    // here for that reason; the date-range bound already scopes this.
     db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), gte(ledgerEntries.date, since), eq(ledgerEntries.direction, "DUE"))),
     db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))),
   ]);
@@ -54,15 +57,18 @@ export async function seasonFinancialSummary(kilnId: string, days = 30) {
 // molding/soil cost across chambers — that attribution gets arbitrary fast
 // without a much bigger cost-accounting model, so it's left out rather
 // than guessed at.
-export async function chamberCostReport(kilnId: string, gherId: string) {
+export async function chamberCostReport(kilnId: string, seasonId: string, gherId: string) {
   const gher = (await db.select().from(ghers).where(and(eq(ghers._id, gherId), eq(ghers.kilnId, kilnId))))[0];
   if (!gher) throw new Error("Referenced chamber not found in this kiln");
 
   const since = gher.cycleStartedAt ?? new Date(0);
 
   const [fuelLogRows, stackingEntryRows, fuelPurchaseRows] = await Promise.all([
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.gherId, gherId), gte(fuelLogs.date, since))),
-    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.gherId, gherId), gte(stackingEntries.date, since))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), eq(fuelLogs.gherId, gherId), gte(fuelLogs.date, since))),
+    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId), eq(stackingEntries.gherId, gherId), gte(stackingEntries.date, since))),
+    // fuelPurchases stays kiln-wide/unfiltered — this is only used to
+    // derive an average ₹/kg per fuel type (fuelStockBalance's own
+    // cumulative treatment), not this chamber's own activity.
     db.select().from(fuelPurchases).where(eq(fuelPurchases.kilnId, kilnId)),
   ]);
 

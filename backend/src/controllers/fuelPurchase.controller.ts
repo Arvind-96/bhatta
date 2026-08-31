@@ -29,6 +29,7 @@ export async function create(req: AuthedRequest, res: Response) {
   const purchase = await createFuelPurchase({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(purchase);
@@ -36,17 +37,17 @@ export async function create(req: AuthedRequest, res: Response) {
 
 export async function list(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 30;
-  const purchases = await listFuelPurchases(req.kiln!.id, days);
+  const purchases = await listFuelPurchases(req.kiln!.id, req.season!.id, days);
   res.json(purchases);
 }
 
 export async function stockBalance(req: AuthedRequest, res: Response) {
-  const balance = await fuelStockBalance(req.kiln!.id);
+  const balance = await fuelStockBalance(req.kiln!.id, req.season!.id);
   res.json(Object.fromEntries(balance));
 }
 
 export async function supplierBalances(req: AuthedRequest, res: Response) {
-  const balances = await supplierFuelBalances(req.kiln!.id);
+  const balances = await supplierFuelBalances(req.kiln!.id, req.season!.id);
   res.json(balances);
 }
 

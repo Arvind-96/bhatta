@@ -26,6 +26,7 @@ function wageFor(quantity: number, ratePerThousand: number) {
 
 export interface CreateWorkEntryInput {
   kilnId: string;
+  seasonId: string;
   personId: string;
   workType: WorkType;
   quantity: number;
@@ -140,8 +141,11 @@ export interface ListWorkEntryFilter {
   to?: Date;
 }
 
-export async function listWorkEntries(kilnId: string, filter: ListWorkEntryFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report).
+export async function listWorkEntries(kilnId: string, seasonId: string | null, filter: ListWorkEntryFilter = {}) {
   const conditions = [eq(workEntries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(workEntries.seasonId, seasonId));
   if (filter.personId) conditions.push(eq(workEntries.personId, filter.personId));
   if (filter.workType) conditions.push(eq(workEntries.workType, filter.workType));
   if (filter.from) conditions.push(gte(workEntries.date, filter.from));
@@ -169,14 +173,14 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // persons are always covered by pakayiContractorSummary instead, and
 // anyone mapped under a Pakayi contractor is folded into that contractor's
 // card rather than listed separately here.
-export async function pakayiOperatorSummary(kilnId: string) {
+export async function pakayiOperatorSummary(kilnId: string, seasonId: string) {
   const operators = await db
     .select()
     .from(people)
     .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.pakayiContractorId), eq(people.active, true)))
     .orderBy(asc(people.name));
 
-  const allEntries = await db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.workType, "PAKAYI")));
+  const allEntries = await db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.seasonId, seasonId), eq(workEntries.workType, "PAKAYI")));
   const entriesByPerson = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
     if (!entriesByPerson.has(e.personId)) entriesByPerson.set(e.personId, []);
@@ -188,7 +192,7 @@ export async function pakayiOperatorSummary(kilnId: string) {
     const opEntries = entriesByPerson.get(operator._id) ?? [];
     if (opEntries.length === 0) continue;
 
-    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id)));
+    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), eq(ledgerEntries.personId, operator._id)));
     const { due, paid, balance } = sumByDirection(opLedgerEntries);
 
     results.push({
@@ -220,11 +224,11 @@ export async function pakayiOperatorSummary(kilnId: string) {
 // nikasi.service.ts's nikasiContractorSummary, built on the shared
 // work_entries table (filtered to workType PAKAYI) instead of a dedicated
 // entries table, since Pakayi never got one of its own.
-export async function pakayiContractorSummary(kilnId: string) {
+export async function pakayiContractorSummary(kilnId: string, seasonId: string) {
   const [allContractors, workers, allEntries] = await Promise.all([
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
     db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
-    db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.workType, "PAKAYI"))),
+    db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.seasonId, seasonId), eq(workEntries.workType, "PAKAYI"))),
   ]);
 
   const workerIdsWithEntries = new Set(allEntries.map((e) => e.personId));
@@ -240,8 +244,8 @@ export async function pakayiContractorSummary(kilnId: string) {
       const personIds = [contractor._id, ...workerIds];
 
       const [gangEntries, gangLedgerEntries] = await Promise.all([
-        db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.workType, "PAKAYI"), inArray(workEntries.personId, personIds))),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))),
+        db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.seasonId, seasonId), eq(workEntries.workType, "PAKAYI"), inArray(workEntries.personId, personIds))),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), inArray(ledgerEntries.personId, personIds))),
       ]);
 
       const quantityByWorker = new Map<string, number>();

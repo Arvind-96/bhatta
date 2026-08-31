@@ -43,13 +43,14 @@ export async function create(req: AuthedRequest, res: Response) {
   const receipt = await createPaymentReceipt({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(receipt);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const result = await listPaymentReceipts(req.kiln!.id, req.query.personId as string | undefined);
+  const result = await listPaymentReceipts(req.kiln!.id, req.season!.id, req.query.personId as string | undefined);
   res.json(result);
 }
 

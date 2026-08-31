@@ -15,6 +15,6 @@ const pushSchema = z.object({
 
 export async function pushSync(req: AuthedRequest, res: Response) {
   const input = pushSchema.parse(req.body);
-  const results = await applySyncPush({ kilnId: req.kiln!.id, changes: input.changes });
+  const results = await applySyncPush({ kilnId: req.kiln!.id, seasonId: req.season!.id, changes: input.changes });
   res.json({ applied: results.length, results });
 }

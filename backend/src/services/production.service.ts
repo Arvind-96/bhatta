@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateProductionInput {
   kilnId: string;
+  seasonId: string;
   batchNumber: string;
   bricksCount: number;
   qualityGrade?: string;
@@ -42,6 +43,7 @@ export async function createProductionLog(input: CreateProductionInput) {
     await db.insert(productionLogs).values({
       _id,
       kilnId: input.kilnId,
+      seasonId: input.seasonId,
       batchNumber: input.batchNumber,
       bricksCount: input.bricksCount,
       qualityGrade: input.qualityGrade ?? "A",
@@ -74,18 +76,18 @@ export async function createProductionLog(input: CreateProductionInput) {
   return log;
 }
 
-export async function getTodayProduction(kilnId: string) {
+export async function getTodayProduction(kilnId: string, seasonId: string) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  return await db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), gte(productionLogs.producedOn, startOfDay))).orderBy(desc(productionLogs.producedOn));
+  return await db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), eq(productionLogs.seasonId, seasonId), gte(productionLogs.producedOn, startOfDay))).orderBy(desc(productionLogs.producedOn));
 }
 
-export async function getProductionSeries(kilnId: string, days = 14) {
+export async function getProductionSeries(kilnId: string, seasonId: string, days = 14) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const logs = await db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), gte(productionLogs.producedOn, since))).orderBy(asc(productionLogs.producedOn));
+  const logs = await db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), eq(productionLogs.seasonId, seasonId), gte(productionLogs.producedOn, since))).orderBy(asc(productionLogs.producedOn));
 
   const byDay = new Map<string, number>();
   for (const log of logs) {

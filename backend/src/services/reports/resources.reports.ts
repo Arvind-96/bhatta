@@ -10,7 +10,7 @@ const vehicles: ReportDefinition = {
   key: "vehicles",
   titleKey: "reports.title.vehicles",
   async run(kilnId, filters) {
-    const rows = await vehicleDieselSummary(kilnId, { from: filters.from, to: filters.to });
+    const rows = await vehicleDieselSummary(kilnId, null, { from: filters.from, to: filters.to });
     const scoped = filters.vehicleId ? rows.filter((r) => r.vehicleId === filters.vehicleId) : rows;
     const detail = scoped.map((r) => ({
       vehicle: r.vehicleName,
@@ -39,7 +39,7 @@ const diesel: ReportDefinition = {
   key: "diesel",
   titleKey: "reports.title.diesel",
   async run(kilnId, filters) {
-    const rows = await listDieselEntries(kilnId, { from: filters.from, to: filters.to, vehicleId: filters.vehicleId, driverId: filters.driverId });
+    const rows = await listDieselEntries(kilnId, null, { from: filters.from, to: filters.to, vehicleId: filters.vehicleId, driverId: filters.driverId });
     const detail = rows.map((r) => ({
       date: r.date ? r.date.toISOString() : null,
       vehicle: refName(r.vehicleId),
@@ -83,7 +83,7 @@ const stock: ReportDefinition = {
   key: "stock",
   titleKey: "reports.title.stock",
   async run(kilnId, filters) {
-    const rows = await listStockEntries(kilnId, { from: filters.from, to: filters.to });
+    const rows = await listStockEntries(kilnId, null, { from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.recordedOn ? r.recordedOn.toISOString() : null,
       type: r.type,
@@ -127,7 +127,7 @@ const inventory: ReportDefinition = {
   key: "inventory",
   titleKey: "reports.title.inventory",
   async run(kilnId, filters) {
-    const rows = await listInventoryItemsForPeriod(kilnId, { from: filters.from, to: filters.to });
+    const rows = await listInventoryItemsForPeriod(kilnId, null, { from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       name: r.name,
       remaining: r.quantity,

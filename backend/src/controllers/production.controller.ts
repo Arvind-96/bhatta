@@ -13,17 +13,17 @@ const createSchema = z.object({
 
 export async function createProduction(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);
-  const log = await createProductionLog({ ...input, kilnId: req.kiln!.id });
+  const log = await createProductionLog({ ...input, kilnId: req.kiln!.id, seasonId: req.season!.id });
   res.status(201).json(log);
 }
 
 export async function listTodayProduction(req: AuthedRequest, res: Response) {
-  const logs = await getTodayProduction(req.kiln!.id);
+  const logs = await getTodayProduction(req.kiln!.id, req.season!.id);
   res.json(logs);
 }
 
 export async function listProductionSeries(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 14;
-  const series = await getProductionSeries(req.kiln!.id, days);
+  const series = await getProductionSeries(req.kiln!.id, req.season!.id, days);
   res.json(series);
 }

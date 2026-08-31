@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateSuppliedItemInput {
   kilnId: string;
+  seasonId: string;
   personId: string;
   itemId: string;
   quantity: number;
@@ -32,8 +33,12 @@ export async function createSuppliedItem(input: CreateSuppliedItemInput) {
   return supplied;
 }
 
-export async function listSuppliedItems(kilnId: string, personId: string) {
-  const rows = await db.select().from(suppliedItems).where(and(eq(suppliedItems.kilnId, kilnId), eq(suppliedItems.personId, personId))).orderBy(desc(suppliedItems.date));
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report).
+export async function listSuppliedItems(kilnId: string, seasonId: string | null, personId: string) {
+  const conditions = [eq(suppliedItems.kilnId, kilnId), eq(suppliedItems.personId, personId)];
+  if (seasonId) conditions.push(eq(suppliedItems.seasonId, seasonId));
+  const rows = await db.select().from(suppliedItems).where(and(...conditions)).orderBy(desc(suppliedItems.date));
   const itemIds = [...new Set(rows.map((r) => r.itemId))];
   const itemRows = itemIds.length ? await db.select({ _id: inventoryItems._id, name: inventoryItems.name, unit: inventoryItems.unit }).from(inventoryItems).where(eq(inventoryItems.kilnId, kilnId)) : [];
   const itemById = new Map(itemRows.filter((i) => itemIds.includes(i._id)).map((i) => [i._id, i]));

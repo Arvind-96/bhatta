@@ -18,6 +18,7 @@ export const supplierInvoices = mysqlTable(
   {
     _id: idColumn(),
     kilnId: kilnIdColumn(),
+    seasonId: varchar("seasonId", { length: 64 }),
     supplierId: varchar("supplierId", { length: 64 }).notNull(),
     sequenceNumber: int("sequenceNumber"),
     date: dateColumn(),

@@ -37,13 +37,14 @@ export async function create(req: AuthedRequest, res: Response) {
     ...rest,
     expenseTypeId: expenseType._id,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(expense);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const expenses = await listExpenses(req.kiln!.id, {
+  const expenses = await listExpenses(req.kiln!.id, req.season!.id, {
     category: req.query.category ? categorySchema.parse(req.query.category) : undefined,
     from: req.query.from ? new Date(String(req.query.from)) : undefined,
     to: req.query.to ? new Date(String(req.query.to)) : undefined,
@@ -53,7 +54,7 @@ export async function list(req: AuthedRequest, res: Response) {
 
 export async function totals(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 30;
-  const result = await expenseTotalsByCategory(req.kiln!.id, days);
+  const result = await expenseTotalsByCategory(req.kiln!.id, req.season!.id, days);
   res.json(result);
 }
 

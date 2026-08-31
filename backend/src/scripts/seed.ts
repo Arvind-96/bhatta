@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { asc, count, eq } from "drizzle-orm";
 import { db, runMigrations } from "../db/client";
-import { kilns, people, ledgerEntries } from "../db/schema";
+import { kilns, people, ledgerEntries, seasons } from "../db/schema";
+import { randomUUID } from "crypto";
 
 import { createPerson } from "../services/person.service";
 import { ensureGherCount, listGhers, updateGherStatus } from "../services/gher.service";
@@ -57,6 +58,14 @@ async function main() {
   }
   const kilnId = kiln._id as string;
   console.log(`Seeding test data into kiln "${kiln.name}" (${kilnId})`);
+
+  let season = (await db.select().from(seasons).where(eq(seasons.kilnId, kilnId)))[0];
+  if (!season) {
+    const _id = randomUUID();
+    await db.insert(seasons).values({ _id, kilnId, label: "Seed season", startDate: new Date(), isCurrent: true });
+    season = (await db.select().from(seasons).where(eq(seasons._id, _id)))[0]!;
+  }
+  const seasonId = season._id;
 
   const existingPeople = (await db.select({ c: count() }).from(people).where(eq(people.kilnId, kilnId)))[0]!.c;
   if (existingPeople > 0) {
@@ -236,7 +245,7 @@ async function main() {
     { name: "Generator Set (62.5 KVA)", type: "GENERATOR" },
     { name: "Submersible Pump", type: "PUMP" },
   ];
-  const machines = await Promise.all(machineDefs.map((m) => createMachine({ kilnId, ...m })));
+  const machines = await Promise.all(machineDefs.map((m) => createMachine({ kilnId, seasonId, ...m })));
 
   // ---------------- Compliance documents ----------------
   console.log("Creating compliance documents...");
@@ -290,13 +299,13 @@ async function main() {
   }
 
   // gher #6 (index 6) parked at READY, waiting to be opened — demo variety
-  await updateGherStatus(kilnId, ghers[6]._id, "STACKING");
-  await updateGherStatus(kilnId, ghers[6]._id, "READY");
+  await updateGherStatus(kilnId, seasonId, ghers[6]._id, "STACKING");
+  await updateGherStatus(kilnId, seasonId, ghers[6]._id, "READY");
 
   // ---------------- Raw material stock baseline ----------------
-  await recordStockEntry({ kilnId, type: "RAW_MATERIAL", itemName: "Soil (Weathering Yard)", quantity: randInt(80, 150), unit: "trolleys" });
-  await recordStockEntry({ kilnId, type: "RAW_MATERIAL", itemName: "Sand", quantity: randInt(20, 60), unit: "trolleys" });
-  await recordStockEntry({ kilnId, type: "RAW_MATERIAL", itemName: "Diesel (HSD)", quantity: randInt(200, 600), unit: "litres" });
+  await recordStockEntry({ kilnId, seasonId, type: "RAW_MATERIAL", itemName: "Soil (Weathering Yard)", quantity: randInt(80, 150), unit: "trolleys" });
+  await recordStockEntry({ kilnId, seasonId, type: "RAW_MATERIAL", itemName: "Sand", quantity: randInt(20, 60), unit: "trolleys" });
+  await recordStockEntry({ kilnId, seasonId, type: "RAW_MATERIAL", itemName: "Diesel (HSD)", quantity: randInt(200, 600), unit: "litres" });
 
   // ---------------- Day-by-day operational history ----------------
   console.log(`Generating ${TOTAL_DAYS} days of operational history (soil, molding, stacking, firing, attendance, dispatch, expenses)...`);
@@ -314,6 +323,7 @@ async function main() {
         const driver = randChoice(drivers);
         await createSoilTrip({
           kilnId,
+          seasonId,
           landownerId: landowner._id,
           driverId: driver._id,
           tractorNumber: `HR-46-${randChoice(["A", "B"])}-${randInt(1000, 9999)}`,
@@ -332,6 +342,7 @@ async function main() {
       for (const worker of activeWorkers) {
         await createMoldingEntry({
           kilnId,
+    seasonId,
           workerId: worker._id,
           bricksCount: randInt(2500, 6000),
           ratePerThousand: (worker as any).ratePerThousand ?? 400,
@@ -342,6 +353,7 @@ async function main() {
       if (isRainDay) {
         await logWastage({
           kilnId,
+    seasonId,
           type: "KACCHI_BRICK",
           cause: "RAIN",
           quantity: randInt(500, 2000),
@@ -351,6 +363,7 @@ async function main() {
         });
         await logWastage({
           kilnId,
+    seasonId,
           type: "SOIL",
           cause: "RAIN",
           quantity: randInt(1, 4),
@@ -366,6 +379,7 @@ async function main() {
         const gang = randChoice(contractors);
         await createStackingEntry({
           kilnId,
+    seasonId,
           gherId: ghers[c.gherIdx]._id,
           gangId: gang._id,
           stage: randChoice(["TRANSPORT", "CHAMBER_STACKING"] as const),
@@ -380,7 +394,7 @@ async function main() {
     // --- Chamber transitions to FIRING on the day its cycle starts firing ---
     for (const c of cycles) {
       if (dayOffset === c.fireFrom) {
-        await updateGherStatus(kilnId, ghers[c.gherIdx]._id, "FIRING");
+        await updateGherStatus(kilnId, seasonId, ghers[c.gherIdx]._id, "FIRING");
       }
     }
 
@@ -391,6 +405,7 @@ async function main() {
         const fitter = randChoice(fitters);
         await createFiringShift({
           kilnId,
+    seasonId,
           fitterId: fitter._id,
           gherId: ghers[firingToday[0]]._id,
           shiftType,
@@ -404,6 +419,7 @@ async function main() {
       for (const gherIdx of firingToday) {
         await createFuelLog({
           kilnId,
+    seasonId,
           gherId: ghers[gherIdx]._id,
           fuelType: randChoice(["COAL", "COAL", "TUDI", "LAKDI"] as const),
           quantityKg: randInt(700, 1400),
@@ -419,6 +435,7 @@ async function main() {
       const shortfall = Math.random() < 0.3 ? randInt(50, 400) : randInt(0, 50);
       await createFuelPurchase({
         kilnId,
+        seasonId,
         fuelType: randChoice(["COAL", "COAL", "TUDI"] as const),
         supplierId: supplier._id,
         invoicedWeightKg: invoiced,
@@ -439,6 +456,7 @@ async function main() {
         const roda = Math.round(stackedApprox * randFloat(0.01, 0.03));
         await createChamberGrading({
           kilnId,
+    seasonId,
           gherId: ghers[c.gherIdx]._id,
           a1Count: a1,
           jhamaCount: jhama,
@@ -449,6 +467,7 @@ async function main() {
         });
         await createProductionLog({
           kilnId,
+          seasonId,
           batchNumber: `B-${dateAtOffset(dayOffset).getFullYear()}-${String(ghers[c.gherIdx].number).padStart(2, "0")}-${dayOffset}`,
           bricksCount: a1 + jhama + pela + roda,
           qualityGrade: "A",
@@ -483,6 +502,7 @@ async function main() {
       const amount = Math.round((bricksCount / 1000) * pricePerThousand);
       const dispatch = await createDispatch({
         kilnId,
+    seasonId,
         customerName: customer.name,
         customerId: customer._id,
         grade,
@@ -499,6 +519,7 @@ async function main() {
       const palledar = randChoice(palledars);
       await createLoadingEntry({
         kilnId,
+    seasonId,
         dispatchId: dispatch._id,
         palledarId: palledar._id,
         bricksCount,
@@ -540,6 +561,7 @@ async function main() {
       const [lo, hi] = amountRanges[category];
       await createExpense({
         kilnId,
+    seasonId,
         category,
         amount: randInt(lo, hi),
         date: dateAtOffset(dayOffset),
@@ -548,6 +570,7 @@ async function main() {
     if (dayOffset % 6 === 0) {
       await createExpense({
         kilnId,
+    seasonId,
         category: "JCB_RENTAL",
         amount: randInt(3000, 6000),
         hours: randInt(4, 8),
@@ -558,6 +581,7 @@ async function main() {
     if (dayOffset % 5 === 0) {
       await createExpense({
         kilnId,
+    seasonId,
         category: "MOLD_SAND",
         amount: randInt(2000, 5000),
         date: dateAtOffset(dayOffset),
@@ -566,6 +590,7 @@ async function main() {
     if (dayOffset % 9 === 0) {
       await createExpense({
         kilnId,
+    seasonId,
         category: "ROYALTY_CHALLAN",
         amount: randInt(1500, 4000),
         date: dateAtOffset(dayOffset),
@@ -579,6 +604,7 @@ async function main() {
   console.log("Creating kiln incidents...");
   await createKilnIncident({
     kilnId,
+    seasonId,
     gherId: ghers[2]._id,
     type: "CRACK_LEAKAGE",
     description: "Crack developed in chamber wall during firing, emergency patchwork done",
@@ -588,6 +614,7 @@ async function main() {
   });
   await createKilnIncident({
     kilnId,
+    seasonId,
     type: "WEATHER_FLOODING",
     description: "Sudden rain flooded the drying yard overnight",
     repairCost: 0,
@@ -596,6 +623,7 @@ async function main() {
   });
   await createKilnIncident({
     kilnId,
+    seasonId,
     type: "ELECTRICAL_FAILURE",
     description: "Blower motor burnout, replaced same day",
     repairCost: randInt(4000, 9000),
@@ -611,6 +639,7 @@ async function main() {
         const dayOffset = randInt(0, TOTAL_DAYS - 1);
         await createMachineFuelLog({
           kilnId,
+    seasonId,
           machineId: machine._id,
           fuelType: "DIESEL",
           quantity: randInt(15, 45),
@@ -624,6 +653,7 @@ async function main() {
         const dayOffset = randInt(0, TOTAL_DAYS - 1);
         await createMachineFuelLog({
           kilnId,
+    seasonId,
           machineId: machine._id,
           fuelType: randChoice(["DIESEL", "ELECTRICITY"] as const),
           quantity: randInt(10, 60),
@@ -635,6 +665,7 @@ async function main() {
   }
   await createMaintenanceLog({
     kilnId,
+    seasonId,
     machineId: machines[3]._id, // JCB
     description: "Hydraulic hose replaced",
     cost: randInt(2000, 6000),
@@ -643,6 +674,7 @@ async function main() {
   });
   await createMaintenanceLog({
     kilnId,
+    seasonId,
     machineId: machines[4]._id, // Pug mill
     description: "Blade sharpening and belt replacement",
     cost: randInt(1500, 4000),
@@ -654,6 +686,7 @@ async function main() {
   console.log("Creating stock audits...");
   await createStockAudit({
     kilnId,
+    seasonId,
     itemName: "Bricks (A-1 Grade)",
     physicalCount: randInt(15000, 40000),
     date: dateAtOffset(2),
@@ -661,6 +694,7 @@ async function main() {
   });
   await createStockAudit({
     kilnId,
+    seasonId,
     itemName: "Diesel (HSD)",
     physicalCount: randInt(150, 500),
     date: dateAtOffset(1),

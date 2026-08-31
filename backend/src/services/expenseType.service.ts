@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { expenseTypes, expenses } from "../db/schema";
+import { seasonIdsThrough } from "./season.util";
 import { emitToKiln } from "../config/socket";
 
 export interface ExpenseTypeInput {
@@ -50,14 +51,15 @@ export async function findOrCreateExpenseType(kilnId: string, name: string) {
 // expense is a pure payment, so it always adds to paid and subtracts from
 // due. openingPaid/openingDue are the type's starting balances, added on
 // top of every expense's own amount.
-export async function getExpenseTypeDetail(kilnId: string, expenseTypeId: string) {
+export async function getExpenseTypeDetail(kilnId: string, expenseTypeId: string, seasonId: string) {
   const expenseType = (await db.select().from(expenseTypes).where(and(eq(expenseTypes._id, expenseTypeId), eq(expenseTypes.kilnId, kilnId))))[0];
   if (!expenseType) throw new Error("Expense type not found in this kiln");
 
+  const seasonIds = await seasonIdsThrough(kilnId, seasonId);
   const rows = await db
     .select()
     .from(expenses)
-    .where(and(eq(expenses.kilnId, kilnId), eq(expenses.expenseTypeId, expenseTypeId)))
+    .where(and(eq(expenses.kilnId, kilnId), inArray(expenses.seasonId, seasonIds), eq(expenses.expenseTypeId, expenseTypeId)))
     .orderBy(desc(expenses.date));
 
   let totalPaid = expenseType.openingPaid;

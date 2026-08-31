@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateSoilTripInput {
   kilnId: string;
+  seasonId: string;
   landownerId: string;
   driverId?: string;
   contractId?: string;
@@ -90,8 +91,12 @@ export interface ListSoilTripsFilter {
   to?: Date;
 }
 
-export async function listSoilTrips(kilnId: string, filter: ListSoilTripsFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report and the Reports page's own
+// admin-picked date-range reports).
+export async function listSoilTrips(kilnId: string, seasonId: string | null, filter: ListSoilTripsFilter = {}) {
   const conditions = [eq(soilTrips.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(soilTrips.seasonId, seasonId));
   if (filter.landownerId) conditions.push(eq(soilTrips.landownerId, filter.landownerId));
   if (filter.contractId) conditions.push(eq(soilTrips.contractId, filter.contractId));
   if (filter.landId) conditions.push(eq(soilTrips.landId, filter.landId));
@@ -120,11 +125,11 @@ export async function updateSoilTripStatus(kilnId: string, tripId: string, statu
   return trip;
 }
 
-export async function soilInwardTotals(kilnId: string, days = 30) {
+export async function soilInwardTotals(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const trips = await db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), gte(soilTrips.date, since)));
+  const trips = await db.select().from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.seasonId, seasonId), gte(soilTrips.date, since)));
   const totalTrolleys = trips.reduce((sum, t) => sum + (t.trolleyCount ?? 0), 0);
   const readyTrolleys = trips.filter((t) => t.status === "READY").reduce((sum, t) => sum + (t.trolleyCount ?? 0), 0);
 

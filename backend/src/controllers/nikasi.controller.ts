@@ -28,13 +28,14 @@ export async function create(req: AuthedRequest, res: Response) {
   const entry = await createNikasiEntry({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(entry);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const entries = await listNikasiEntries(req.kiln!.id, {
+  const entries = await listNikasiEntries(req.kiln!.id, req.season!.id, {
     gherId: req.query.gherId as string | undefined,
     gangId: req.query.gangId as string | undefined,
   });
@@ -60,16 +61,16 @@ export async function remove(req: AuthedRequest, res: Response) {
 }
 
 export async function operatorSummary(req: AuthedRequest, res: Response) {
-  const result = await nikasiOperatorSummary(req.kiln!.id);
+  const result = await nikasiOperatorSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }
 
 export async function contractorSummary(req: AuthedRequest, res: Response) {
-  const result = await nikasiContractorSummary(req.kiln!.id);
+  const result = await nikasiContractorSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }
 
 export async function periodTotals(req: AuthedRequest, res: Response) {
-  const result = await nikasiPeriodTotals(req.kiln!.id);
+  const result = await nikasiPeriodTotals(req.kiln!.id, req.season!.id);
   res.json(result);
 }

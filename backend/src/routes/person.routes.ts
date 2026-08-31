@@ -15,13 +15,13 @@ import {
   uploadIdentityProof as uploadIdentityProofHandler,
   uploadPhoto as uploadPhotoHandler,
 } from "../controllers/person.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 import { uploadPhoto, uploadIdentityProof } from "../middleware/upload.middleware";
 
 export const personRouter = Router();
 
-personRouter.use(requireAuth, resolveKiln);
+personRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 personRouter.post("/", asyncHandler(create));
 personRouter.get("/", asyncHandler(list));
 personRouter.get("/advances", asyncHandler(advances));

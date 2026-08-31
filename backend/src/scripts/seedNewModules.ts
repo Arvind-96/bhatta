@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { and, asc, count, desc, eq, isNotNull } from "drizzle-orm";
 import { db, runMigrations } from "../db/client";
-import { kilns, people, dispatches, nikasiEntries, brickLoadingEntries, brickCategories } from "../db/schema";
+import { kilns, people, dispatches, nikasiEntries, brickLoadingEntries, brickCategories, seasons } from "../db/schema";
+import { randomUUID } from "crypto";
 
 import { createPerson } from "../services/person.service";
 import { listGhers } from "../services/gher.service";
@@ -68,6 +69,14 @@ async function main() {
   }
   const kilnId = kiln._id as string;
   console.log(`Seeding new-module test data into kiln "${kiln.name}" (${kilnId})`);
+
+  let season = (await db.select().from(seasons).where(eq(seasons.kilnId, kilnId)))[0];
+  if (!season) {
+    const _id = randomUUID();
+    await db.insert(seasons).values({ _id, kilnId, label: "Seed season", startDate: new Date(), isCurrent: true });
+    season = (await db.select().from(seasons).where(eq(seasons._id, _id)))[0]!;
+  }
+  const seasonId = season._id;
 
   const ghers = await listGhers(kilnId);
   if (ghers.length === 0) {
@@ -163,6 +172,7 @@ async function main() {
       const gher = randChoice(ghers);
       await createStackingEntry({
         kilnId,
+        seasonId,
         gherId: gher._id,
         gangId: randChoice([...transportLaborers, transportContractor])._id,
         stage: "TRANSPORT",
@@ -173,6 +183,7 @@ async function main() {
       });
       await createStackingEntry({
         kilnId,
+        seasonId,
         gherId: gher._id,
         gangId: randChoice(chamberLaborers)._id,
         stage: "CHAMBER_STACKING",
@@ -182,6 +193,7 @@ async function main() {
       if (d % 3 === 0) {
         await createStackingEntry({
           kilnId,
+        seasonId,
           gherId: randChoice(ghers)._id,
           gangId: independentTransport._id,
           stage: "TRANSPORT",
@@ -192,6 +204,7 @@ async function main() {
         });
         await createStackingEntry({
           kilnId,
+        seasonId,
           gherId: randChoice(ghers)._id,
           gangId: independentChamber._id,
           stage: "CHAMBER_STACKING",
@@ -243,6 +256,7 @@ async function main() {
     for (let d = 10; d >= 0; d--) {
       await createNikasiEntry({
         kilnId,
+        seasonId,
         gherId: randChoice(ghers)._id,
         gangId: randChoice(nikasiLaborers)._id,
         bricksCount: randInt(3000, 7000),
@@ -251,6 +265,7 @@ async function main() {
       if (d % 2 === 0) {
         await createNikasiEntry({
           kilnId,
+        seasonId,
           gherId: randChoice(ghers)._id,
           gangId: independentNikasi._id,
           bricksCount: randInt(2000, 5000),
@@ -331,6 +346,7 @@ async function main() {
       const seedCategory = randChoice(seedCategories);
       await createBrickLoadingEntry({
         kilnId,
+        seasonId,
         vehicleType: randChoice(["TRUCK", "TRACTOR"] as const),
         vehicleNumber: driver.vehicleNumber || `HR-46-B-${randInt(1000, 9999)}`,
         items: [{ categoryId: seedCategory._id, pricePerBrick: seedCategory.pricePerBrick ?? 7, bricksCount: randInt(3000, 9000) }],

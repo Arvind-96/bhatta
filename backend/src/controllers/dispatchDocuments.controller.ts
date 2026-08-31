@@ -53,14 +53,14 @@ const challanUpdateSchema = challanSchema.omit({ dispatchId: true }).partial();
 
 export async function createChallanHandler(req: AuthedRequest, res: Response) {
   const input = challanSchema.parse(req.body);
-  const row = await createChallan(req.kiln!.id, { ...input, challanDate: input.challanDate ? new Date(input.challanDate) : undefined });
+  const row = await createChallan(req.kiln!.id, req.season!.id, { ...input, challanDate: input.challanDate ? new Date(input.challanDate) : undefined });
   res.status(201).json(row);
 }
 export async function listChallansHandler(req: AuthedRequest, res: Response) {
-  res.json(await listChallans(req.kiln!.id, req.query.dispatchId as string | undefined));
+  res.json(await listChallans(req.kiln!.id, req.season!.id, req.query.dispatchId as string | undefined));
 }
 export async function nextChallanSequenceNumberHandler(req: AuthedRequest, res: Response) {
-  res.json({ nextSequenceNumber: await nextChallanSequenceNumber(req.kiln!.id) });
+  res.json({ nextSequenceNumber: await nextChallanSequenceNumber(req.kiln!.id, req.season!.id) });
 }
 export async function updateChallanHandler(req: AuthedRequest, res: Response) {
   const input = challanUpdateSchema.parse(req.body);
@@ -91,14 +91,14 @@ const gatePassUpdateSchema = gatePassSchema.omit({ dispatchId: true }).partial()
 
 export async function createGatePassHandler(req: AuthedRequest, res: Response) {
   const input = gatePassSchema.parse(req.body);
-  const row = await createGatePass(req.kiln!.id, { ...input, gatePassDate: input.gatePassDate ? new Date(input.gatePassDate) : undefined });
+  const row = await createGatePass(req.kiln!.id, req.season!.id, { ...input, gatePassDate: input.gatePassDate ? new Date(input.gatePassDate) : undefined });
   res.status(201).json(row);
 }
 export async function listGatePassesHandler(req: AuthedRequest, res: Response) {
-  res.json(await listGatePasses(req.kiln!.id, req.query.dispatchId as string | undefined));
+  res.json(await listGatePasses(req.kiln!.id, req.season!.id, req.query.dispatchId as string | undefined));
 }
 export async function nextGatePassSequenceNumberHandler(req: AuthedRequest, res: Response) {
-  res.json({ nextSequenceNumber: await nextGatePassSequenceNumber(req.kiln!.id) });
+  res.json({ nextSequenceNumber: await nextGatePassSequenceNumber(req.kiln!.id, req.season!.id) });
 }
 export async function updateGatePassHandler(req: AuthedRequest, res: Response) {
   const input = gatePassUpdateSchema.parse(req.body);
@@ -145,14 +145,14 @@ const invoiceUpdateSchema = invoiceSchema.omit({ dispatchId: true }).partial();
 
 export async function createInvoiceHandler(req: AuthedRequest, res: Response) {
   const input = invoiceSchema.parse(req.body);
-  const row = await createInvoice(req.kiln!.id, { ...input, invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : undefined });
+  const row = await createInvoice(req.kiln!.id, req.season!.id, { ...input, invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : undefined });
   res.status(201).json(row);
 }
 export async function listInvoicesHandler(req: AuthedRequest, res: Response) {
-  res.json(await listInvoices(req.kiln!.id, req.query.dispatchId as string | undefined));
+  res.json(await listInvoices(req.kiln!.id, req.season!.id, req.query.dispatchId as string | undefined));
 }
 export async function nextInvoiceSequenceNumberHandler(req: AuthedRequest, res: Response) {
-  res.json({ nextSequenceNumber: await nextInvoiceSequenceNumber(req.kiln!.id) });
+  res.json({ nextSequenceNumber: await nextInvoiceSequenceNumber(req.kiln!.id, req.season!.id) });
 }
 export async function updateInvoiceHandler(req: AuthedRequest, res: Response) {
   const input = invoiceUpdateSchema.parse(req.body);

@@ -9,6 +9,7 @@ export type IncidentType = (typeof INCIDENT_TYPES)[number];
 
 export interface CreateIncidentInput {
   kilnId: string;
+  seasonId: string;
   gherId?: string;
   type: IncidentType;
   description: string;
@@ -31,6 +32,7 @@ export async function createKilnIncident(input: CreateIncidentInput) {
   if (input.repairCost && input.repairCost > 0) {
     await createExpense({
       kilnId: input.kilnId,
+      seasonId: input.seasonId,
       category: "MACHINERY_REPAIR",
       amount: input.repairCost,
       notes: `${input.type}: ${input.description}`,
@@ -43,10 +45,10 @@ export async function createKilnIncident(input: CreateIncidentInput) {
   return incident;
 }
 
-export async function listKilnIncidents(kilnId: string, days = 90) {
+export async function listKilnIncidents(kilnId: string, seasonId: string, days = 90) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(kilnIncidents).where(and(eq(kilnIncidents.kilnId, kilnId), gte(kilnIncidents.date, since))).orderBy(desc(kilnIncidents.date));
+  const rows = await db.select().from(kilnIncidents).where(and(eq(kilnIncidents.kilnId, kilnId), eq(kilnIncidents.seasonId, seasonId), gte(kilnIncidents.date, since))).orderBy(desc(kilnIncidents.date));
 
   const gherIds = [...new Set(rows.map((r) => r.gherId).filter((v): v is string => !!v))];
   const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)) : [];

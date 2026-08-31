@@ -17,6 +17,7 @@ export async function create(req: AuthedRequest, res: Response) {
   const log = await createFuelLog({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(log);
@@ -24,19 +25,19 @@ export async function create(req: AuthedRequest, res: Response) {
 
 export async function list(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 14;
-  const logs = await listFuelLogs(req.kiln!.id, days);
+  const logs = await listFuelLogs(req.kiln!.id, req.season!.id, days);
   res.json(logs);
 }
 
 export async function efficiency(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 7;
   const baselineDays = req.query.baselineDays ? Number(req.query.baselineDays) : 30;
-  const result = await fuelEfficiency(req.kiln!.id, days, baselineDays);
+  const result = await fuelEfficiency(req.kiln!.id, req.season!.id, days, baselineDays);
   res.json(result);
 }
 
 export async function periodTotals(req: AuthedRequest, res: Response) {
-  const result = await fuelLogPeriodTotals(req.kiln!.id);
+  const result = await fuelLogPeriodTotals(req.kiln!.id, req.season!.id);
   res.json(result);
 }
 

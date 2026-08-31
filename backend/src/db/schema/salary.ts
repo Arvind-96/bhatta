@@ -8,6 +8,7 @@ import { idColumn, kilnIdColumn, createdAtColumn } from "./_helpers";
 export const salarySlips = mysqlTable("salary_slips", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   personId: varchar("personId", { length: 64 }).notNull(),
   month: varchar("month", { length: 20 }).notNull(), // "YYYY-MM"
   daysPresent: double("daysPresent").notNull(),

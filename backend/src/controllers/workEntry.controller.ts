@@ -25,13 +25,14 @@ export async function create(req: AuthedRequest, res: Response) {
   const entry = await createWorkEntry({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(entry);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const entries = await listWorkEntries(req.kiln!.id, {
+  const entries = await listWorkEntries(req.kiln!.id, req.season!.id, {
     personId: req.query.personId as string | undefined,
     workType: req.query.workType as (typeof WORK_TYPES)[number] | undefined,
   });
@@ -57,11 +58,11 @@ export async function remove(req: AuthedRequest, res: Response) {
 }
 
 export async function operatorSummary(req: AuthedRequest, res: Response) {
-  const result = await pakayiOperatorSummary(req.kiln!.id);
+  const result = await pakayiOperatorSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }
 
 export async function contractorSummary(req: AuthedRequest, res: Response) {
-  const result = await pakayiContractorSummary(req.kiln!.id);
+  const result = await pakayiContractorSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }

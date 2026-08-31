@@ -9,6 +9,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateGradingInput {
   kilnId: string;
+  seasonId: string;
   gherId: string;
   a1Count: number;
   jhamaCount?: number;
@@ -32,7 +33,7 @@ const GRADE_ITEM_NAMES = {
 export async function createChamberGrading(input: CreateGradingInput) {
   const gher = await assertGherInKiln(input.kilnId, input.gherId);
 
-  const stackedCount = await stackedSinceForGher(input.kilnId, input.gherId, gher.cycleStartedAt ?? undefined);
+  const stackedCount = await stackedSinceForGher(input.kilnId, input.seasonId, input.gherId, gher.cycleStartedAt ?? undefined);
 
   const _id = randomUUID();
   await db.insert(chamberGradings).values({ ...input, _id, stackedCount });
@@ -50,6 +51,7 @@ export async function createChamberGrading(input: CreateGradingInput) {
     if (quantity > 0) {
       await recordStockEntry({
         kilnId: input.kilnId,
+        seasonId: input.seasonId,
         type: "FINISHED_GOODS",
         itemName,
         quantity,
@@ -67,10 +69,10 @@ export async function createChamberGrading(input: CreateGradingInput) {
   return { grading, recoveryPercent };
 }
 
-export async function listGradings(kilnId: string, days = 60) {
+export async function listGradings(kilnId: string, seasonId: string, days = 60) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(chamberGradings).where(and(eq(chamberGradings.kilnId, kilnId), gte(chamberGradings.date, since))).orderBy(desc(chamberGradings.date));
+  const rows = await db.select().from(chamberGradings).where(and(eq(chamberGradings.kilnId, kilnId), eq(chamberGradings.seasonId, seasonId), gte(chamberGradings.date, since))).orderBy(desc(chamberGradings.date));
 
   const gherIds = [...new Set(rows.map((r) => r.gherId))];
   const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)) : [];
@@ -83,8 +85,10 @@ export async function listGradings(kilnId: string, days = 60) {
   }));
 }
 
-export async function totalA1Output(kilnId: string, since: Date, until?: Date) {
-  const conditions = [eq(chamberGradings.kilnId, kilnId), gte(chamberGradings.date, since)];
+// seasonIds, not a single seasonId — see dispatch.service.ts's
+// totalDispatchedSince for the convention.
+export async function totalA1Output(kilnId: string, seasonIds: string[], since: Date, until?: Date) {
+  const conditions = [eq(chamberGradings.kilnId, kilnId), inArray(chamberGradings.seasonId, seasonIds), gte(chamberGradings.date, since)];
   if (until) conditions.push(lte(chamberGradings.date, until));
   const gradings = await db.select().from(chamberGradings).where(and(...conditions));
   return gradings.reduce((sum, g) => sum + g.a1Count, 0);

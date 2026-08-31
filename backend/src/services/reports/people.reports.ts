@@ -66,7 +66,7 @@ const labourLedger: ReportDefinition = {
     let productionSummary;
     const scopedPersonIds = personIds ?? (filters.personId ? [filters.personId] : undefined);
     if (scopedPersonIds) {
-      productionSummary = await personProductionTotals(kilnId, scopedPersonIds, filters.from, filters.to);
+      productionSummary = await personProductionTotals(kilnId, null, scopedPersonIds, filters.from, filters.to);
     }
 
     if (filters.groupBy && filters.groupBy !== "none") {
@@ -147,8 +147,8 @@ const labourByContractor: ReportDefinition = {
         const [contractorLedger, laborerLedgers, contractorProd, laborerProds] = await Promise.all([
           listLedgerForKiln(kilnId, { personId: contractor._id, from: filters.from, to: filters.to }),
           Promise.all(laborers.map((l) => listLedgerForKiln(kilnId, { personId: l._id, from: filters.from, to: filters.to }))),
-          personProductionTotals(kilnId, [contractor._id], filters.from, filters.to),
-          Promise.all(laborers.map((l) => personProductionTotals(kilnId, [l._id], filters.from, filters.to))),
+          personProductionTotals(kilnId, null, [contractor._id], filters.from, filters.to),
+          Promise.all(laborers.map((l) => personProductionTotals(kilnId, null, [l._id], filters.from, filters.to))),
         ]);
 
         const sumLedger = (entries: typeof contractorLedger) => {

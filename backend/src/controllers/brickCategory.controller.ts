@@ -64,6 +64,7 @@ export async function createProduction(req: AuthedRequest, res: Response) {
   const entry = await createBrickProductionEntry({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(entry);
@@ -71,7 +72,7 @@ export async function createProduction(req: AuthedRequest, res: Response) {
 
 export async function listProduction(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : undefined;
-  const entries = await listBrickProductionEntries(req.kiln!.id, days);
+  const entries = await listBrickProductionEntries(req.kiln!.id, req.season!.id, days);
   res.json(entries);
 }
 
@@ -85,6 +86,7 @@ export async function createLoading(req: AuthedRequest, res: Response) {
   const entry = await createStockLoadingEntry({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(entry);
@@ -92,7 +94,7 @@ export async function createLoading(req: AuthedRequest, res: Response) {
 
 export async function listLoading(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : undefined;
-  const entries = await listStockLoadingEntries(req.kiln!.id, days);
+  const entries = await listStockLoadingEntries(req.kiln!.id, req.season!.id, days);
   res.json(entries);
 }
 

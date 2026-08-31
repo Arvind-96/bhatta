@@ -7,6 +7,7 @@ export const DISPATCH_PAYMENT_MODES = ["CASH", "BANK", "UPI", "GST_INVOICE", "CA
 export const dispatches = mysqlTable("dispatches", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerId: varchar("customerId", { length: 64 }),
   // Snapshot of the client's address/phone at sale time — printed on the
@@ -75,17 +76,18 @@ export const dispatches = mysqlTable("dispatches", {
   localId: varchar("localId", { length: 64 }),
   createdAt: createdAtColumn(),
 }, (t) => ({
-  // Scoped to (kilnId, slipNumber), not slipNumber alone — the slip number
-  // is now a human-readable per-kiln document number ("JVS-16-08-2026-01"),
-  // deterministic from the kiln's name/date/daily-sequence, so two
-  // different kilns (e.g. two same-named ones under one account) can
-  // legitimately land on the identical-looking text without colliding.
-  slipNumberUnique: uniqueIndex("dispatch_slip_unique").on(t.kilnId, t.slipNumber),
-  // Scoped to (kilnId, invoiceNumber), not invoiceNumber alone — becoming a
-  // plain per-kiln sequential counter ("61") means two different kilns'
-  // Nth invoice would otherwise collide under a global constraint, the
-  // same class of bug already fixed for slipNumber above.
-  invoiceNumberUnique: uniqueIndex("dispatch_invoice_unique").on(t.kilnId, t.invoiceNumber),
+  // Scoped to (kilnId, seasonId, slipNumber), not slipNumber alone — the
+  // slip number is now a human-readable per-kiln document number
+  // ("JVS-16-08-2026-01"), deterministic from the kiln's name/date/daily-
+  // sequence, so two different kilns (e.g. two same-named ones under one
+  // account) can legitimately land on the identical-looking text without
+  // colliding — and seasonId means slip numbering restarts each season.
+  slipNumberUnique: uniqueIndex("dispatch_slip_unique").on(t.kilnId, t.seasonId, t.slipNumber),
+  // Scoped to (kilnId, seasonId, invoiceNumber), not invoiceNumber alone —
+  // becoming a plain per-kiln sequential counter ("61") means two different
+  // kilns' Nth invoice would otherwise collide under a global constraint,
+  // the same class of bug already fixed for slipNumber above.
+  invoiceNumberUnique: uniqueIndex("dispatch_invoice_unique").on(t.kilnId, t.seasonId, t.invoiceNumber),
   localIdUnique: uniqueIndex("dispatch_localid_unique").on(t.localId),
   kilnDispatchedIdx: index("dispatch_kiln_dispatched_idx").on(t.kilnId, t.dispatchedOn),
 }));
@@ -111,6 +113,7 @@ export const dispatches = mysqlTable("dispatches", {
 export const challans = mysqlTable("challans", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   dispatchId: varchar("dispatchId", { length: 64 }).notNull(),
   sequenceNumber: int("sequenceNumber"),
   vehicleNumber: varchar("vehicleNumber", { length: 255 }),
@@ -131,12 +134,13 @@ export const challans = mysqlTable("challans", {
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDispatchIdx: index("challan_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
-  sequenceUnique: uniqueIndex("challan_kiln_sequence_unique").on(t.kilnId, t.sequenceNumber),
+  sequenceUnique: uniqueIndex("challan_kiln_sequence_unique").on(t.kilnId, t.seasonId, t.sequenceNumber),
 }));
 
 export const gatePasses = mysqlTable("gate_passes", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   dispatchId: varchar("dispatchId", { length: 64 }).notNull(),
   sequenceNumber: int("sequenceNumber"),
   vehicleNumber: varchar("vehicleNumber", { length: 255 }),
@@ -155,12 +159,13 @@ export const gatePasses = mysqlTable("gate_passes", {
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDispatchIdx: index("gatepass_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
-  sequenceUnique: uniqueIndex("gatepass_kiln_sequence_unique").on(t.kilnId, t.sequenceNumber),
+  sequenceUnique: uniqueIndex("gatepass_kiln_sequence_unique").on(t.kilnId, t.seasonId, t.sequenceNumber),
 }));
 
 export const invoices = mysqlTable("invoices", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   // Nullable — an invoice generated from a customer's own profile page
   // (a general/advance payment via "Add Amount", or a sale logged
   // directly against a Customer record) has no originating Dispatch.
@@ -231,7 +236,7 @@ export const invoices = mysqlTable("invoices", {
 }, (t) => ({
   kilnDispatchIdx: index("invoice_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
   kilnCustomerIdx: index("invoice_kiln_customer_idx").on(t.kilnId, t.customerId),
-  sequenceUnique: uniqueIndex("invoice_kiln_sequence_unique").on(t.kilnId, t.sequenceNumber),
+  sequenceUnique: uniqueIndex("invoice_kiln_sequence_unique").on(t.kilnId, t.seasonId, t.sequenceNumber),
 }));
 
 // Every phone/address/driver/vehicle a customer might have — plain JSON
@@ -268,6 +273,7 @@ export const customers = mysqlTable("customers", {
 export const stockEntries = mysqlTable("stock_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   type: varchar("type", { length: 50, enum: ["RAW_MATERIAL", "FINISHED_GOODS"] }).notNull(),
   itemName: varchar("itemName", { length: 255 }).notNull(),
   quantity: double("quantity").notNull(),
@@ -284,6 +290,7 @@ export const stockEntries = mysqlTable("stock_entries", {
 export const stockAudits = mysqlTable("stock_audits", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   itemName: varchar("itemName", { length: 255 }).notNull(),
   registerCount: double("registerCount").notNull(),
   physicalCount: double("physicalCount").notNull(),
@@ -296,6 +303,7 @@ export const stockAudits = mysqlTable("stock_audits", {
 export const stockLoadingEntries = mysqlTable("stock_loading_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   categoryId: varchar("categoryId", { length: 64 }).notNull(),
   bricksCount: int("bricksCount").notNull(),
   date: dateColumn(),
@@ -342,6 +350,7 @@ export const expenseTypes = mysqlTable("expense_types", {
 export const expenses = mysqlTable("expenses", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   // Nullable now — see the EXPENSE_CATEGORIES comment above; new rows use
   // expenseTypeId instead.
   category: varchar("category", { length: 50, enum: EXPENSE_CATEGORIES }),

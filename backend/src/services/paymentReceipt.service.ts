@@ -24,6 +24,7 @@ async function withPerson(receipt: typeof paymentReceipts.$inferSelect) {
 
 export interface CreatePaymentReceiptInput {
   kilnId: string;
+  seasonId: string;
   personId: string;
   amountPaid: number;
   totalAgreedAmount?: number;
@@ -84,8 +85,11 @@ export async function createPaymentReceipt(input: CreatePaymentReceiptInput) {
   return receipt;
 }
 
-export async function listPaymentReceipts(kilnId: string, personId?: string) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report).
+export async function listPaymentReceipts(kilnId: string, seasonId: string | null, personId?: string) {
   const conditions = [eq(paymentReceipts.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(paymentReceipts.seasonId, seasonId));
   if (personId) conditions.push(eq(paymentReceipts.personId, personId));
   const rows = await db.select().from(paymentReceipts).where(and(...conditions)).orderBy(desc(paymentReceipts.date));
   return Promise.all(rows.map(withPerson));

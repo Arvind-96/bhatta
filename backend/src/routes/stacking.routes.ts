@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { contractorSummary, create, list, operatorSummary, remove, tractorFleet, update } from "../controllers/stacking.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const stackingRouter = Router();
 
-stackingRouter.use(requireAuth, resolveKiln);
+stackingRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 stackingRouter.post("/", asyncHandler(create));
 stackingRouter.get("/", asyncHandler(list));
 stackingRouter.get("/operator-summary", asyncHandler(operatorSummary));

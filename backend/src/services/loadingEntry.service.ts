@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateLoadingInput {
   kilnId: string;
+  seasonId: string;
   dispatchId?: string;
   palledarId: string;
   bricksCount: number;
@@ -56,10 +57,10 @@ export async function createLoadingEntry(input: CreateLoadingInput) {
   return { entry, countMismatch, dispatchBricksCount };
 }
 
-export async function listLoadingEntries(kilnId: string, days = 30) {
+export async function listLoadingEntries(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(loadingEntries).where(and(eq(loadingEntries.kilnId, kilnId), gte(loadingEntries.date, since))).orderBy(desc(loadingEntries.date));
+  const rows = await db.select().from(loadingEntries).where(and(eq(loadingEntries.kilnId, kilnId), eq(loadingEntries.seasonId, seasonId), gte(loadingEntries.date, since))).orderBy(desc(loadingEntries.date));
 
   const palledarIds = [...new Set(rows.map((r) => r.palledarId))];
   const dispatchIds = [...new Set(rows.map((r) => r.dispatchId).filter((v): v is string => !!v))];

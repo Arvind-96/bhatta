@@ -29,13 +29,14 @@ export async function create(req: AuthedRequest, res: Response) {
   const entry = await createMoldingEntry({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(entry);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const entries = await listMoldingEntries(req.kiln!.id, {
+  const entries = await listMoldingEntries(req.kiln!.id, req.season!.id, {
     workerId: req.query.workerId as string | undefined,
     from: req.query.from ? new Date(String(req.query.from)) : undefined,
     to: req.query.to ? new Date(String(req.query.to)) : undefined,
@@ -44,17 +45,17 @@ export async function list(req: AuthedRequest, res: Response) {
 }
 
 export async function today(req: AuthedRequest, res: Response) {
-  const total = await todayMoldingTotal(req.kiln!.id);
+  const total = await todayMoldingTotal(req.kiln!.id, req.season!.id);
   res.json({ total });
 }
 
 export async function periodTotals(req: AuthedRequest, res: Response) {
-  const result = await moldingPeriodTotals(req.kiln!.id);
+  const result = await moldingPeriodTotals(req.kiln!.id, req.season!.id);
   res.json(result);
 }
 
 export async function contractorSummary(req: AuthedRequest, res: Response) {
-  const result = await moldingContractorSummary(req.kiln!.id);
+  const result = await moldingContractorSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }
 

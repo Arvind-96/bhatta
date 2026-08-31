@@ -15,6 +15,7 @@ export async function create(req: AuthedRequest, res: Response) {
   const audit = await createStockAudit({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(audit);
@@ -22,6 +23,6 @@ export async function create(req: AuthedRequest, res: Response) {
 
 export async function list(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 365;
-  const audits = await listStockAudits(req.kiln!.id, days);
+  const audits = await listStockAudits(req.kiln!.id, req.season!.id, days);
   res.json(audits);
 }

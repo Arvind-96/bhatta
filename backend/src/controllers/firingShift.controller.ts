@@ -20,13 +20,14 @@ export async function create(req: AuthedRequest, res: Response) {
   const shift = await createFiringShift({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(shift);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const shifts = await listFiringShifts(req.kiln!.id, {
+  const shifts = await listFiringShifts(req.kiln!.id, req.season!.id, {
     days: req.query.days ? Number(req.query.days) : undefined,
     fitterId: req.query.fitterId as string | undefined,
   });
@@ -35,6 +36,6 @@ export async function list(req: AuthedRequest, res: Response) {
 
 export async function roster(req: AuthedRequest, res: Response) {
   const date = req.query.date ? new Date(String(req.query.date)) : undefined;
-  const result = await fitterRosterSummary(req.kiln!.id, date);
+  const result = await fitterRosterSummary(req.kiln!.id, req.season!.id, date);
   res.json(result);
 }

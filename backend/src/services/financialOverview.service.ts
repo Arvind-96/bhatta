@@ -74,7 +74,10 @@ function splitByPaymentMode<T extends { paymentMode?: string | null; cashAmount?
 //     double-count the same rupees. Real customer payments never post to
 //     ledgerEntries at all (see above), so no customer-exclusion filter is
 //     needed here any more either.
-async function flowForRange(kilnId: string, since: Date, until?: Date) {
+// seasonId is nullable — pass null for an all-time, every-season view
+// (Compare needs to see across a season boundary to compare two
+// admin-picked date ranges at all, so it never passes a single season).
+async function flowForRange(kilnId: string, seasonId: string | null, since: Date, until?: Date) {
   const dateRange = (col: any) => (until ? and(gte(col, since), lte(col, until)) : gte(col, since));
   // invoiceDate is nullable on older rows — fall back to createdAt so a
   // legacy invoice with no explicit date still lands in the right period
@@ -87,12 +90,16 @@ async function flowForRange(kilnId: string, since: Date, until?: Date) {
     : sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`;
 
   const [dispatchRows, expenseRows, fuelPurchaseRows, dieselRows, paidEntries, invoiceRows] = await Promise.all([
-    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), dateRange(dispatches.dispatchedOn))),
-    db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), dateRange(expenses.date))),
-    db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), dateRange(fuelPurchases.date))),
-    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), dateRange(vehicleDieselEntries.date))),
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), seasonId ? eq(dispatches.seasonId, seasonId) : undefined, dateRange(dispatches.dispatchedOn))),
+    db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), seasonId ? eq(expenses.seasonId, seasonId) : undefined, dateRange(expenses.date))),
+    db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), seasonId ? eq(fuelPurchases.seasonId, seasonId) : undefined, dateRange(fuelPurchases.date))),
+    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), seasonId ? eq(vehicleDieselEntries.seasonId, seasonId) : undefined, dateRange(vehicleDieselEntries.date))),
+    // ledgerEntries.seasonId is optional (not reliably populated — see
+    // ledger.service.ts's AddLedgerEntryInput comment) and left unfiltered
+    // here regardless of seasonId; the date-range bound already scopes this
+    // to the requested window.
     db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), dateRange(ledgerEntries.date), eq(ledgerEntries.direction, "PAID"))),
-    db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), invoiceDateRange)),
+    db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), seasonId ? eq(invoices.seasonId, seasonId) : undefined, invoiceDateRange)),
   ]);
 
   const moneyReceived = invoiceRows.reduce((sum, inv) => sum + (inv.amountPaidNow ?? inv.netAmount), 0);
@@ -164,7 +171,7 @@ function istStartOfDay(date: Date): Date {
   return new Date(istNow.getTime() - IST_OFFSET_MS);
 }
 
-export async function financialOverview(kilnId: string) {
+export async function financialOverview(kilnId: string, seasonId: string) {
   const now = new Date();
   const oneYearAgo = new Date(now);
   oneYearAgo.setFullYear(now.getFullYear() - 1);
@@ -175,16 +182,16 @@ export async function financialOverview(kilnId: string) {
   const yearAgo = istStartOfDay(oneYearAgo);
 
   const [today, week, month, year, position] = await Promise.all([
-    flowForRange(kilnId, startOfDay),
-    flowForRange(kilnId, weekAgo),
-    flowForRange(kilnId, monthAgo),
-    flowForRange(kilnId, yearAgo),
+    flowForRange(kilnId, seasonId, startOfDay),
+    flowForRange(kilnId, seasonId, weekAgo),
+    flowForRange(kilnId, seasonId, monthAgo),
+    flowForRange(kilnId, seasonId, yearAgo),
     currentPosition(kilnId),
   ]);
 
   return { today, week, month, year, ...position };
 }
 
-export async function financialOverviewCustomRange(kilnId: string, from: Date, to: Date) {
-  return flowForRange(kilnId, from, to);
+export async function financialOverviewCustomRange(kilnId: string, seasonId: string | null, from: Date, to: Date) {
+  return flowForRange(kilnId, seasonId, from, to);
 }

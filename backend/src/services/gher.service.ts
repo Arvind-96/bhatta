@@ -26,7 +26,7 @@ export async function listGhers(kilnId: string) {
   return db.select().from(ghers).where(eq(ghers.kilnId, kilnId)).orderBy(asc(ghers.number));
 }
 
-export async function updateGherStatus(kilnId: string, gherId: string, status: GherStatus) {
+export async function updateGherStatus(kilnId: string, seasonId: string, gherId: string, status: GherStatus) {
   const update: Record<string, unknown> = { status, updatedAt: new Date() };
   // A fresh STACKING stage marks the start of a new firing cycle — this is
   // the boundary chamberGrading.service.ts uses to scope "bricks stacked
@@ -40,7 +40,7 @@ export async function updateGherStatus(kilnId: string, gherId: string, status: G
   const gher = (await db.select().from(ghers).where(eq(ghers._id, gherId)))[0]!;
 
   if (status === "FIRING") {
-    await db.insert(fireMovementLogs).values({ _id: randomUUID(), kilnId, gherId: gher._id, gherNumber: gher.number });
+    await db.insert(fireMovementLogs).values({ _id: randomUUID(), kilnId, seasonId, gherId: gher._id, gherNumber: gher.number });
   }
 
   emitToKiln(kilnId, "gher:update", gher);
@@ -56,12 +56,12 @@ export async function assertGherInKiln(kilnId: string, gherId: string) {
 // "1 to 1.5 chambers/day" is the healthy range quoted on-site — this just
 // counts how many FIRING transitions happened in the window and divides by
 // days, which is the practical measure of round speed.
-export async function fireRoundSpeed(kilnId: string, days = 14) {
+export async function fireRoundSpeed(kilnId: string, seasonId: string, days = 14) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
   const [movements, currentRows] = await Promise.all([
-    db.select().from(fireMovementLogs).where(and(eq(fireMovementLogs.kilnId, kilnId), gte(fireMovementLogs.startedAt, since))).orderBy(desc(fireMovementLogs.startedAt)),
+    db.select().from(fireMovementLogs).where(and(eq(fireMovementLogs.kilnId, kilnId), eq(fireMovementLogs.seasonId, seasonId), gte(fireMovementLogs.startedAt, since))).orderBy(desc(fireMovementLogs.startedAt)),
     db.select().from(ghers).where(and(eq(ghers.kilnId, kilnId), eq(ghers.status, "FIRING"))).orderBy(desc(ghers.updatedAt)),
   ]);
   const current = currentRows[0];

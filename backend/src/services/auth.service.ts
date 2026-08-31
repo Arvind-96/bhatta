@@ -7,6 +7,7 @@ import { asc, eq, inArray, count } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
 import { kilns, users, kilnMemberships, people, ghers } from "../db/schema";
 import { env } from "../config/env";
+import { createInitialSeason } from "./season.service";
 
 export interface RegisterInput {
   name: string;
@@ -62,8 +63,6 @@ async function listMemberships(userId: string) {
         name: kiln?.name ?? "Unknown",
         location: kiln?.location,
         phone: kiln?.phone,
-        seasonStartMonth: kiln?.seasonStartMonth ?? 8,
-        seasonStartDay: kiln?.seasonStartDay ?? 1,
         dayShiftStart: kiln?.dayShiftStart ?? "08:00",
         dayShiftEnd: kiln?.dayShiftEnd ?? "18:00",
         gstNumber: kiln?.gstNumber ?? undefined,
@@ -99,6 +98,7 @@ export async function registerUser(input: RegisterInput) {
     if (!input.kilnName) throw new Error("kilnName is required to create a new kiln");
     kilnId = randomUUID();
     await db.insert(kilns).values({ _id: kilnId, name: input.kilnName, location: input.kilnLocation });
+    await createInitialSeason(kilnId, new Date());
     role = "OWNER";
   }
 
@@ -130,6 +130,7 @@ export async function getCurrentUser(userId: string) {
 export async function createAdditionalKiln(userId: string, name: string, location?: string) {
   const kilnId = randomUUID();
   await db.insert(kilns).values({ _id: kilnId, name, location });
+  await createInitialSeason(kilnId, new Date());
   await db.insert(kilnMemberships).values({ _id: randomUUID(), userId, kilnId, role: "OWNER" });
   return { kilnId, role: "OWNER" as const, name, location };
 }
@@ -152,8 +153,6 @@ export async function defaultKilnPublicInfo() {
     name: kiln.name,
     location: kiln.location ?? undefined,
     phone: kiln.phone ?? undefined,
-    seasonStartMonth: kiln.seasonStartMonth ?? 8,
-    seasonStartDay: kiln.seasonStartDay ?? 1,
     dayShiftStart: kiln.dayShiftStart ?? "08:00",
     dayShiftEnd: kiln.dayShiftEnd ?? "18:00",
     gstNumber: kiln.gstNumber ?? undefined,
@@ -186,12 +185,6 @@ export async function setYardCapacity(kilnId: string, yardCapacityBricks: number
   return kiln;
 }
 
-export async function setSeason(kilnId: string, seasonStartMonth: number, seasonStartDay: number) {
-  await db.update(kilns).set({ seasonStartMonth, seasonStartDay }).where(eq(kilns._id, kilnId));
-  const kiln = (await db.select().from(kilns).where(eq(kilns._id, kilnId)))[0];
-  if (!kiln) throw new Error("Kiln not found");
-  return kiln;
-}
 
 export async function setShiftTimes(kilnId: string, dayShiftStart: string, dayShiftEnd: string) {
   await db.update(kilns).set({ dayShiftStart, dayShiftEnd }).where(eq(kilns._id, kilnId));

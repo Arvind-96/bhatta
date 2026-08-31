@@ -69,6 +69,7 @@ async function assertCategoryInKiln(kilnId: string, categoryId: string) {
 
 export interface CreateBrickProductionInput {
   kilnId: string;
+  seasonId: string;
   categoryId: string;
   bricksCount: number;
   date?: Date;
@@ -93,10 +94,10 @@ export async function createBrickProductionEntry(input: CreateBrickProductionInp
   return entry;
 }
 
-export async function listBrickProductionEntries(kilnId: string, days = 60) {
+export async function listBrickProductionEntries(kilnId: string, seasonId: string, days = 60) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(brickProductionEntries).where(and(eq(brickProductionEntries.kilnId, kilnId), gte(brickProductionEntries.date, since))).orderBy(desc(brickProductionEntries.date));
+  const rows = await db.select().from(brickProductionEntries).where(and(eq(brickProductionEntries.kilnId, kilnId), eq(brickProductionEntries.seasonId, seasonId), gte(brickProductionEntries.date, since))).orderBy(desc(brickProductionEntries.date));
   return withCategory(kilnId, rows);
 }
 
@@ -119,6 +120,7 @@ export async function deleteBrickProductionEntry(kilnId: string, entryId: string
 
 export interface CreateStockLoadingInput {
   kilnId: string;
+  seasonId: string;
   categoryId: string;
   bricksCount: number;
   date?: Date;
@@ -145,10 +147,10 @@ export async function createStockLoadingEntry(input: CreateStockLoadingInput) {
   return entry;
 }
 
-export async function listStockLoadingEntries(kilnId: string, days = 60) {
+export async function listStockLoadingEntries(kilnId: string, seasonId: string, days = 60) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(stockLoadingEntries).where(and(eq(stockLoadingEntries.kilnId, kilnId), gte(stockLoadingEntries.date, since))).orderBy(desc(stockLoadingEntries.date));
+  const rows = await db.select().from(stockLoadingEntries).where(and(eq(stockLoadingEntries.kilnId, kilnId), eq(stockLoadingEntries.seasonId, seasonId), gte(stockLoadingEntries.date, since))).orderBy(desc(stockLoadingEntries.date));
   return withCategory(kilnId, rows);
 }
 

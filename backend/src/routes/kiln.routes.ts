@@ -9,7 +9,6 @@ import {
   updateGeofence,
   updateGst,
   updateProfile,
-  updateSeason,
   updateShiftTimes,
   updateYardCapacity,
   uploadSignatureHandler,
@@ -27,7 +26,6 @@ kilnRouter.get("/", asyncHandler(listKilns));
 kilnRouter.post("/", asyncHandler(createKiln));
 kilnRouter.patch("/geofence", resolveKiln, asyncHandler(updateGeofence));
 kilnRouter.patch("/yard-capacity", resolveKiln, asyncHandler(updateYardCapacity));
-kilnRouter.patch("/season", resolveKiln, asyncHandler(updateSeason));
 kilnRouter.patch("/shift-times", resolveKiln, asyncHandler(updateShiftTimes));
 kilnRouter.patch("/gst", resolveKiln, asyncHandler(updateGst));
 kilnRouter.patch("/profile", resolveKiln, asyncHandler(updateProfile));

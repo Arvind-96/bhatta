@@ -12,18 +12,20 @@ export interface SyncChange {
 
 export interface SyncPushInput {
   kilnId: string;
+  seasonId: string;
   changes: SyncChange[];
 }
 
 // Applies a batch of offline changes pushed by the on-site sync engine.
 // Uses localId as the idempotency key so retried pushes never double-apply.
-export async function applySyncPush({ kilnId, changes }: SyncPushInput) {
+export async function applySyncPush({ kilnId, seasonId, changes }: SyncPushInput) {
   const results = [];
 
   for (const change of changes) {
     if (change.entityType === "production") {
       const log = await createProductionLog({
         kilnId,
+        seasonId,
         batchNumber: String(change.payload.batchNumber),
         bricksCount: Number(change.payload.bricksCount),
         qualityGrade: change.payload.qualityGrade as string | undefined,
@@ -33,6 +35,7 @@ export async function applySyncPush({ kilnId, changes }: SyncPushInput) {
     } else if (change.entityType === "stock") {
       const entry = await recordStockEntry({
         kilnId,
+        seasonId,
         type: change.payload.type as "RAW_MATERIAL" | "FINISHED_GOODS",
         itemName: String(change.payload.itemName),
         quantity: Number(change.payload.quantity),

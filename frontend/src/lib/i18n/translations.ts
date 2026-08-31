@@ -82,6 +82,11 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "topbar.logProduction": { en: "Log production", hi: "उत्पादन दर्ज करें" },
   "topbar.newReceipt": { en: "New payment receipt", hi: "नई भुगतान रसीद" },
   "topbar.newSoilTrip": { en: "Log soil trip", hi: "मिट्टी की ट्रिप दर्ज करें" },
+  "topbar.viewingArchivedSeason": {
+    en: "Viewing archived season \"{season}\" — read-only",
+    hi: "संग्रहीत सीज़न \"{season}\" देख रहे हैं — केवल पढ़ने योग्य",
+  },
+  "topbar.switchToCurrentSeason": { en: "Switch to current season", hi: "मौजूदा सीज़न पर जाएं" },
 
   "nav.group.dashboard": { en: "Dashboard", hi: "डैशबोर्ड" },
   "nav.group.production": { en: "Production", hi: "उत्पादन" },

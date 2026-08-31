@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { downloadPdf, forPerson, generate, generateForPerson, removeSlip, status, updateSlip } from "../controllers/salary.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const salaryRouter = Router();
 
-salaryRouter.use(requireAuth, resolveKiln);
+salaryRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 salaryRouter.get("/", asyncHandler(status));
 salaryRouter.post("/generate", asyncHandler(generate));
 salaryRouter.post("/generate/:personId", asyncHandler(generateForPerson));

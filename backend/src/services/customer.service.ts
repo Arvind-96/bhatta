@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { customers } from "../db/schema";
 import { listInvoicesForCustomer } from "./dispatchDocuments.service";
+import { seasonIdsThrough } from "./season.util";
 import { emitToKiln } from "../config/socket";
 
 export interface CustomerDriverInput {
@@ -73,11 +74,12 @@ export async function findCustomerByName(kilnId: string, name: string) {
 // general-payment flow) charges nothing — it's a pure payment, so it
 // only ever reduces due. openingPaid/openingDue are the customer's
 // starting balances, added on top of every invoice's contribution.
-export async function getCustomerDetail(kilnId: string, customerId: string) {
+export async function getCustomerDetail(kilnId: string, customerId: string, seasonId: string) {
   const customer = (await db.select().from(customers).where(and(eq(customers._id, customerId), eq(customers.kilnId, kilnId))))[0];
   if (!customer) throw new Error("Customer not found in this kiln");
 
-  const invoiceRows = await listInvoicesForCustomer(kilnId, customerId, customer.name);
+  const seasonIds = await seasonIdsThrough(kilnId, seasonId);
+  const invoiceRows = await listInvoicesForCustomer(kilnId, customerId, customer.name, seasonIds);
 
   let totalPaid = customer.openingPaid;
   let totalDue = customer.openingDue;

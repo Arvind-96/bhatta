@@ -31,6 +31,7 @@ export const lands = mysqlTable("lands", {
 export const soilTrips = mysqlTable("soil_trips", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   landownerId: varchar("landownerId", { length: 64 }).notNull(),
   driverId: varchar("driverId", { length: 64 }),
   contractId: varchar("contractId", { length: 64 }),
@@ -90,6 +91,7 @@ export interface SoilArrivalTractorEntry {
 export const soilArrivals = mysqlTable("soil_arrivals", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   landownerId: varchar("landownerId", { length: 64 }).notNull(),
   contractId: varchar("contractId", { length: 64 }),
   jcbUsed: boolean("jcbUsed").default(false),
@@ -114,6 +116,7 @@ export const soilArrivals = mysqlTable("soil_arrivals", {
 export const jcbWorkLogs = mysqlTable("jcb_work_logs", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   landId: varchar("landId", { length: 64 }).notNull(),
   landownerId: varchar("landownerId", { length: 64 }).notNull(),
   machineId: varchar("machineId", { length: 64 }),

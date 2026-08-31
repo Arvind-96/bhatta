@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateShiftInput {
   kilnId: string;
+  seasonId: string;
   fitterId: string;
   gherId?: string;
   shiftType: "DAY" | "NIGHT";
@@ -54,8 +55,11 @@ export interface ListFiringShiftFilter {
   to?: Date;
 }
 
-export async function listFiringShifts(kilnId: string, filter: ListFiringShiftFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report).
+export async function listFiringShifts(kilnId: string, seasonId: string | null, filter: ListFiringShiftFilter = {}) {
   const conditions = [eq(firingShifts.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(firingShifts.seasonId, seasonId));
   if (filter.from || filter.to) {
     if (filter.from) conditions.push(gte(firingShifts.date, filter.from));
     if (filter.to) conditions.push(lte(firingShifts.date, filter.to));
@@ -129,15 +133,15 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // 6-person team size this kiln is meant to run (flagged, not blocked, if
 // the actual count drifts — same soft-warning convention as everywhere
 // else in this app).
-export async function fitterRosterSummary(kilnId: string, forDate?: Date) {
+export async function fitterRosterSummary(kilnId: string, seasonId: string, forDate?: Date) {
   const date = forDate ?? new Date();
   const fitters = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "FITTER"), eq(people.active, true))).orderBy(asc(people.name));
 
   const results = await Promise.all(
     fitters.map(async (fitter) => {
       const [shifts, fitterLedgerEntries] = await Promise.all([
-        db.select().from(firingShifts).where(and(eq(firingShifts.kilnId, kilnId), eq(firingShifts.fitterId, fitter._id))).orderBy(desc(firingShifts.date)),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, fitter._id))),
+        db.select().from(firingShifts).where(and(eq(firingShifts.kilnId, kilnId), eq(firingShifts.seasonId, seasonId), eq(firingShifts.fitterId, fitter._id))).orderBy(desc(firingShifts.date)),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), eq(ledgerEntries.personId, fitter._id))),
       ]);
       const { due, paid, balance } = sumByDirection(fitterLedgerEntries);
 

@@ -10,6 +10,7 @@ export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
 
 export interface CreateNikasiInput {
   kilnId: string;
+  seasonId: string;
   gherId: string;
   gangId: string;
   bricksCount: number;
@@ -74,8 +75,11 @@ export interface ListNikasiFilter {
   to?: Date;
 }
 
-export async function listNikasiEntries(kilnId: string, filter: ListNikasiFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report).
+export async function listNikasiEntries(kilnId: string, seasonId: string | null, filter: ListNikasiFilter = {}) {
   const conditions = [eq(nikasiEntries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(nikasiEntries.seasonId, seasonId));
   if (filter.gherId) conditions.push(eq(nikasiEntries.gherId, filter.gherId));
   if (filter.gangId) conditions.push(eq(nikasiEntries.gangId, filter.gangId));
   if (filter.from) conditions.push(gte(nikasiEntries.date, filter.from));
@@ -99,15 +103,15 @@ export async function listNikasiEntries(kilnId: string, filter: ListNikasiFilter
 // combined "raw + bharai + nikasi damage" figure alongside
 // molding.service.ts's damagedMoldedSince and stacking.service.ts's
 // totalStacked().damageCount.
-export async function totalNikasiDamage(kilnId: string, since: Date) {
-  const entries = await db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, since)));
+export async function totalNikasiDamage(kilnId: string, seasonIds: string[], since: Date) {
+  const entries = await db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), inArray(nikasiEntries.seasonId, seasonIds), gte(nikasiEntries.date, since)));
   return entries.reduce((sum, e) => sum + (e.damagedCount ?? 0), 0);
 }
 
 // Whole-kiln totals — every NikasiEntry already means "nikasi work" (no
 // other module writes this collection), so unlike the Pathai-tagged
 // contractor breakdown below, there's no ambiguity to filter out here.
-export async function nikasiPeriodTotals(kilnId: string) {
+export async function nikasiPeriodTotals(kilnId: string, seasonId: string) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const weekAgo = new Date();
@@ -116,9 +120,9 @@ export async function nikasiPeriodTotals(kilnId: string) {
   monthAgo.setDate(monthAgo.getDate() - 30);
 
   const [todayEntries, weekEntries, monthEntries] = await Promise.all([
-    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, startOfDay))),
-    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, weekAgo))),
-    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), gte(nikasiEntries.date, monthAgo))),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId), gte(nikasiEntries.date, startOfDay))),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId), gte(nikasiEntries.date, weekAgo))),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId), gte(nikasiEntries.date, monthAgo))),
   ]);
 
   const sum = (entries: typeof todayEntries, field: "bricksCount" | "damagedCount") =>
@@ -154,14 +158,14 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // bug fixed in molding.service.ts's moldingContractorSummary). The
 // `continue` below already excludes anyone with zero entries, so nothing
 // irrelevant leaks in from removing the workType filter.
-export async function nikasiOperatorSummary(kilnId: string) {
+export async function nikasiOperatorSummary(kilnId: string, seasonId: string) {
   const operators = await db
     .select()
     .from(people)
     .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.nikasiContractorId), eq(people.active, true)))
     .orderBy(asc(people.name));
 
-  const allEntries = await db.select().from(nikasiEntries).where(eq(nikasiEntries.kilnId, kilnId));
+  const allEntries = await db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId)));
   const entriesByGang = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
     const id = e.gangId;
@@ -174,7 +178,7 @@ export async function nikasiOperatorSummary(kilnId: string) {
     const opEntries = entriesByGang.get(operator._id) ?? [];
     if (opEntries.length === 0) continue;
 
-    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id)));
+    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), eq(ledgerEntries.personId, operator._id)));
     const { due, paid, balance } = sumByDirection(opLedgerEntries);
 
     results.push({
@@ -217,11 +221,11 @@ export async function nikasiOperatorSummary(kilnId: string) {
 // is tighter than just "assigned via nikasiContractorId"). A contractor is
 // included if they're tagged "NIKASI" themselves, or have at least one
 // Nikasi-relevant laborer by that same rule.
-export async function nikasiContractorSummary(kilnId: string) {
+export async function nikasiContractorSummary(kilnId: string, seasonId: string) {
   const [allContractors, laborers, allEntries] = await Promise.all([
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
     db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
-    db.select().from(nikasiEntries).where(eq(nikasiEntries.kilnId, kilnId)),
+    db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId))),
   ]);
 
   const gangIdsWithEntries = new Set(allEntries.map((e) => e.gangId));
@@ -237,8 +241,8 @@ export async function nikasiContractorSummary(kilnId: string) {
       const personIds = [contractor._id, ...laborerIds];
 
       const [gangEntries, gangLedgerEntries] = await Promise.all([
-        db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), inArray(nikasiEntries.gangId, personIds))),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))),
+        db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId), inArray(nikasiEntries.gangId, personIds))),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), inArray(ledgerEntries.personId, personIds))),
       ]);
 
       const bricksByLaborer = new Map<string, number>();

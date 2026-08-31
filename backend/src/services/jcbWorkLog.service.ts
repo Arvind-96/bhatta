@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateJcbWorkLogInput {
   kilnId: string;
+  seasonId: string;
   landId: string;
   landownerId: string;
   driverId: string;
@@ -54,8 +55,8 @@ export interface ListJcbWorkLogsFilter {
   to?: Date;
 }
 
-export async function listJcbWorkLogs(kilnId: string, filter: ListJcbWorkLogsFilter = {}) {
-  const conditions = [eq(jcbWorkLogs.kilnId, kilnId)];
+export async function listJcbWorkLogs(kilnId: string, seasonId: string, filter: ListJcbWorkLogsFilter = {}) {
+  const conditions = [eq(jcbWorkLogs.kilnId, kilnId), eq(jcbWorkLogs.seasonId, seasonId)];
   if (filter.landId) conditions.push(eq(jcbWorkLogs.landId, filter.landId));
   if (filter.driverId) conditions.push(eq(jcbWorkLogs.driverId, filter.driverId));
   if (filter.contractId) conditions.push(eq(jcbWorkLogs.contractId, filter.contractId));
@@ -89,5 +90,7 @@ export async function listJcbWorkLogs(kilnId: string, filter: ListJcbWorkLogsFil
 // digging at this khet" figure surfaced on the contract/land detail view.
 export async function totalJcbHoursForLand(kilnId: string, landId: string) {
   const logs = await db.select().from(jcbWorkLogs).where(and(eq(jcbWorkLogs.kilnId, kilnId), eq(jcbWorkLogs.landId, landId)));
+  // Deliberately season-agnostic (no seasonId filter) — an all-time "how
+  // long has the JCB worked this khet" total.
   return logs.reduce((sum, l) => sum + l.hoursWorked, 0);
 }

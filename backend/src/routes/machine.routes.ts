@@ -12,12 +12,12 @@ import {
   remove,
   update,
 } from "../controllers/machine.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const machineRouter = Router();
 
-machineRouter.use(requireAuth, resolveKiln);
+machineRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 machineRouter.post("/", asyncHandler(create));
 machineRouter.get("/", asyncHandler(list));
 machineRouter.post("/fuel-logs", asyncHandler(createFuelLog));

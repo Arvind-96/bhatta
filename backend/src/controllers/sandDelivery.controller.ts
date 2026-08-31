@@ -26,13 +26,14 @@ export async function create(req: AuthedRequest, res: Response) {
   const entry = await createSandDelivery({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(entry);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const entries = await listSandDeliveries(req.kiln!.id, {
+  const entries = await listSandDeliveries(req.kiln!.id, req.season!.id, {
     sandContractorId: req.query.sandContractorId as string | undefined,
     contractId: req.query.contractId as string | undefined,
   });

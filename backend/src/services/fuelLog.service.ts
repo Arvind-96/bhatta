@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateFuelLogInput {
   kilnId: string;
+  seasonId: string;
   gherId: string;
   fuelType: string;
   quantityKg: number;
@@ -52,10 +53,10 @@ export async function deleteFuelLog(kilnId: string, logId: string) {
   emitToKiln(kilnId, "fuelLog:update", { _id: logId, deleted: true });
 }
 
-export async function listFuelLogs(kilnId: string, days = 14) {
+export async function listFuelLogs(kilnId: string, seasonId: string, days = 14) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, since))).orderBy(desc(fuelLogs.date));
+  const rows = await db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), gte(fuelLogs.date, since))).orderBy(desc(fuelLogs.date));
 
   const gherIds = [...new Set(rows.map((r) => r.gherId))];
   const gherRows = gherIds.length ? await db.select({ _id: ghers._id, number: ghers.number }).from(ghers).where(inArray(ghers._id, gherIds)) : [];
@@ -63,15 +64,17 @@ export async function listFuelLogs(kilnId: string, days = 14) {
   return rows.map((r) => ({ ...r, gherId: gherById.get(r.gherId) ?? r.gherId }));
 }
 
-export async function totalFuelConsumed(kilnId: string, since: Date) {
-  const logs = await db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, since)));
+// seasonIds, not a single seasonId — see dispatch.service.ts's
+// totalDispatchedSince for the convention.
+export async function totalFuelConsumed(kilnId: string, seasonIds: string[], since: Date) {
+  const logs = await db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), inArray(fuelLogs.seasonId, seasonIds), gte(fuelLogs.date, since)));
   return logs.reduce((sum, l) => sum + l.quantityKg, 0);
 }
 
 // The Firing (Pakayi) page's top-of-page summary — how much of each fuel
 // was fed into chambers today / this week / this month / this year, so the
 // admin doesn't have to page through the raw log to see the picture.
-export async function fuelLogPeriodTotals(kilnId: string) {
+export async function fuelLogPeriodTotals(kilnId: string, seasonId: string) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
   const weekAgo = new Date();
@@ -82,10 +85,10 @@ export async function fuelLogPeriodTotals(kilnId: string) {
   yearAgo.setFullYear(yearAgo.getFullYear() - 1);
 
   const [today, week, month, year] = await Promise.all([
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, startOfDay))),
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, weekAgo))),
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, monthAgo))),
-    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), gte(fuelLogs.date, yearAgo))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), gte(fuelLogs.date, startOfDay))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), gte(fuelLogs.date, weekAgo))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), gte(fuelLogs.date, monthAgo))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), gte(fuelLogs.date, yearAgo))),
   ]);
 
   function byFuelType(logs: typeof today) {

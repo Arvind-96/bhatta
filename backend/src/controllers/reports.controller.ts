@@ -56,6 +56,6 @@ export async function listReportKeys(_req: AuthedRequest, res: Response) {
 }
 
 export async function dashboardSummaryHandler(req: AuthedRequest, res: Response) {
-  const result = await dashboardSummary(req.kiln!.id);
+  const result = await dashboardSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }

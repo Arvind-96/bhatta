@@ -34,6 +34,7 @@ export async function create(req: AuthedRequest, res: Response) {
   const machine = await createMachine({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : undefined,
   });
   res.status(201).json(machine);
@@ -90,6 +91,7 @@ export async function createInstallment(req: AuthedRequest, res: Response) {
   const input = installmentSchema.parse(req.body);
   const result = await createInstallmentPayment({
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     machineId: req.params.id,
     amount: input.amount,
     date: input.date ? new Date(input.date) : undefined,
@@ -99,7 +101,7 @@ export async function createInstallment(req: AuthedRequest, res: Response) {
 }
 
 export async function listInstallments(req: AuthedRequest, res: Response) {
-  const payments = await listInstallmentPayments(req.kiln!.id, req.params.id);
+  const payments = await listInstallmentPayments(req.kiln!.id, req.season!.id, req.params.id);
   res.json(payments);
 }
 
@@ -117,6 +119,7 @@ export async function createFuelLog(req: AuthedRequest, res: Response) {
   const result = await createMachineFuelLog({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(result);
@@ -124,7 +127,7 @@ export async function createFuelLog(req: AuthedRequest, res: Response) {
 
 export async function listFuelLogs(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 30;
-  const logs = await listMachineFuelLogs(req.kiln!.id, days);
+  const logs = await listMachineFuelLogs(req.kiln!.id, req.season!.id, days);
   res.json(logs);
 }
 
@@ -142,6 +145,7 @@ export async function createMaintenance(req: AuthedRequest, res: Response) {
   const log = await createMaintenanceLog({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(log);
@@ -149,6 +153,6 @@ export async function createMaintenance(req: AuthedRequest, res: Response) {
 
 export async function listMaintenance(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 90;
-  const logs = await listMaintenanceLogs(req.kiln!.id, days);
+  const logs = await listMaintenanceLogs(req.kiln!.id, req.season!.id, days);
   res.json(logs);
 }

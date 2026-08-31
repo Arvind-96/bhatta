@@ -39,9 +39,12 @@ export async function listInventoryItems(kilnId: string) {
 // Same shape as listInventoryItems' all-time usedQuantity, but scoped to a
 // date range — the Inventory report's "used this period" column, alongside
 // the item's live (all-time) remaining quantity.
-export async function listInventoryItemsForPeriod(kilnId: string, filter: { from?: Date; to?: Date } = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view
+// (the only current caller, the Inventory report, always does).
+export async function listInventoryItemsForPeriod(kilnId: string, seasonId: string | null, filter: { from?: Date; to?: Date } = {}) {
   const items = await db.select().from(inventoryItems).where(eq(inventoryItems.kilnId, kilnId)).orderBy(asc(inventoryItems.name));
   const conditions = [eq(suppliedItems.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(suppliedItems.seasonId, seasonId));
   if (filter.from) conditions.push(gte(suppliedItems.date, filter.from));
   if (filter.to) conditions.push(lte(suppliedItems.date, filter.to));
   const usedRows = await db

@@ -29,7 +29,7 @@ const soil: ReportDefinition = {
   key: "soil",
   titleKey: "reports.title.soil",
   async run(kilnId, filters) {
-    const rows = await listSoilTrips(kilnId, { landownerId: filters.personId, from: filters.from, to: filters.to });
+    const rows = await listSoilTrips(kilnId, null, { landownerId: filters.personId, from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.date ? r.date.toISOString() : null,
       landowner: refName(r.landownerId),
@@ -69,7 +69,7 @@ const sand: ReportDefinition = {
   key: "sand",
   titleKey: "reports.title.sand",
   async run(kilnId, filters) {
-    const rows = await listSandDeliveries(kilnId, { sandContractorId: filters.personId, from: filters.from, to: filters.to });
+    const rows = await listSandDeliveries(kilnId, null, { sandContractorId: filters.personId, from: filters.from, to: filters.to });
     const contractorIds = [...new Set(rows.map((r) => r.sandContractorId))];
     const contractorRows = contractorIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, contractorIds)) : [];
     const nameById = new Map(contractorRows.map((c) => [c._id, c.name]));
@@ -117,7 +117,7 @@ const molding: ReportDefinition = {
   key: "molding",
   titleKey: "reports.title.molding",
   async run(kilnId, filters) {
-    const rows = await listMoldingEntries(kilnId, { workerId: filters.personId, from: filters.from, to: filters.to });
+    const rows = await listMoldingEntries(kilnId, null, { workerId: filters.personId, from: filters.from, to: filters.to });
     const detail = rows
       .filter((r) => !filters.damageFault || r.damageFault === filters.damageFault)
       .map((r) => ({
@@ -162,7 +162,7 @@ const stacking: ReportDefinition = {
   key: "stacking",
   titleKey: "reports.title.stacking",
   async run(kilnId, filters) {
-    const rows = await listStackingEntries(kilnId, { gangId: filters.personId, from: filters.from, to: filters.to });
+    const rows = await listStackingEntries(kilnId, null, { gangId: filters.personId, from: filters.from, to: filters.to });
     const detail = rows
       .filter((r) => !filters.damageFault || r.damageFault === filters.damageFault)
       .map((r) => ({
@@ -207,7 +207,7 @@ const firing: ReportDefinition = {
   key: "firing",
   titleKey: "reports.title.firing",
   async run(kilnId, filters) {
-    const rows = await listFiringShifts(kilnId, { fitterId: filters.personId, from: filters.from, to: filters.to });
+    const rows = await listFiringShifts(kilnId, null, { fitterId: filters.personId, from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.date ? r.date.toISOString() : null,
       fitter: refName(r.fitterId),
@@ -249,7 +249,7 @@ const nikasi: ReportDefinition = {
   key: "nikasi",
   titleKey: "reports.title.nikasi",
   async run(kilnId, filters) {
-    const rows = await listNikasiEntries(kilnId, { gangId: filters.personId, from: filters.from, to: filters.to });
+    const rows = await listNikasiEntries(kilnId, null, { gangId: filters.personId, from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.date ? r.date.toISOString() : null,
       gang: refName(r.gangId),
@@ -289,7 +289,7 @@ const brickLoading: ReportDefinition = {
   key: "brickLoading",
   titleKey: "reports.title.brickLoading",
   async run(kilnId, filters) {
-    const rows = await listBrickLoadingEntries(kilnId, { driverId: filters.driverId, from: filters.from, to: filters.to });
+    const rows = await listBrickLoadingEntries(kilnId, null, { driverId: filters.driverId, from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.date ? r.date.toISOString() : null,
       tripNumber: r.tripNumber ?? "",

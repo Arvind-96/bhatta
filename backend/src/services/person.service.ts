@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
 import { people, ledgerEntries, customers, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
 import { getCustomerDetail } from "./customer.service";
+import { getCurrentSeasonId } from "./season.util";
 import { emitToKiln } from "../config/socket";
 
 export type PersonType = (typeof PERSON_TYPES)[number];
@@ -366,10 +367,11 @@ export async function listPaymentsDue(kilnId: string) {
 // oldest invoice that still isn't fully paid.
 export async function customerCreditAging(kilnId: string) {
   const customerRows = await db.select().from(customers).where(eq(customers.kilnId, kilnId));
+  const currentSeasonId = await getCurrentSeasonId(kilnId);
 
   const results = [];
   for (const customer of customerRows) {
-    const detail = await getCustomerDetail(kilnId, customer._id);
+    const detail = await getCustomerDetail(kilnId, customer._id, currentSeasonId);
     if (detail.totalDue <= 0) continue;
 
     // invoices come back newest-first (see listInvoicesForCustomer) — the

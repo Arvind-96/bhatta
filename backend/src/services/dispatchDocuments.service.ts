@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { challans, gatePasses, invoices, dispatches, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem } from "../db/schema/_helpers";
@@ -13,23 +13,24 @@ type PaymentMode = (typeof DISPATCH_PAYMENT_MODES)[number];
 // generateTripNumber for the exact collision-after-delete bug this avoids.
 // MAX() ignores NULL rows, so a challan/gate pass/invoice saved with its
 // serial number left blank never advances this — the same suggested number
-// comes back next time, exactly as requested.
-async function generateSequenceNumber(table: typeof challans | typeof gatePasses | typeof invoices, kilnId: string) {
-  const maxRow = (await db.select({ max: sql<number | null>`max(${table.sequenceNumber})` }).from(table).where(eq(table.kilnId, kilnId)))[0];
+// comes back next time, exactly as requested. Scoped to the season so
+// numbering resets to 1 each new Bhatta Season.
+async function generateSequenceNumber(table: typeof challans | typeof gatePasses | typeof invoices, kilnId: string, seasonId: string) {
+  const maxRow = (await db.select({ max: sql<number | null>`max(${table.sequenceNumber})` }).from(table).where(and(eq(table.kilnId, kilnId), eq(table.seasonId, seasonId))))[0];
   return (maxRow?.max ?? 0) + 1;
 }
 
 // "Peek" the next available number without consuming it — used by the
 // Create form to pre-fill the Serial Number field before the admin has
 // saved anything.
-export async function nextChallanSequenceNumber(kilnId: string) {
-  return generateSequenceNumber(challans, kilnId);
+export async function nextChallanSequenceNumber(kilnId: string, seasonId: string) {
+  return generateSequenceNumber(challans, kilnId, seasonId);
 }
-export async function nextGatePassSequenceNumber(kilnId: string) {
-  return generateSequenceNumber(gatePasses, kilnId);
+export async function nextGatePassSequenceNumber(kilnId: string, seasonId: string) {
+  return generateSequenceNumber(gatePasses, kilnId, seasonId);
 }
-export async function nextInvoiceSequenceNumber(kilnId: string) {
-  return generateSequenceNumber(invoices, kilnId);
+export async function nextInvoiceSequenceNumber(kilnId: string, seasonId: string) {
+  return generateSequenceNumber(invoices, kilnId, seasonId);
 }
 
 async function assertDispatch(kilnId: string, dispatchId: string) {
@@ -70,12 +71,12 @@ function applyItemsAggregate<T extends { items?: BrickLineItem[]; categoryId?: s
   return { ...input, items: summary.items, categoryId: summary.categoryId, bricksCount: summary.bricksCount };
 }
 
-export async function createChallan(kilnId: string, rawInput: ChallanInput) {
+export async function createChallan(kilnId: string, seasonId: string, rawInput: ChallanInput) {
   await assertDispatch(kilnId, rawInput.dispatchId);
   const input = applyItemsAggregate(rawInput);
   const _id = randomUUID();
   try {
-    await db.insert(challans).values({ ...input, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId });
+    await db.insert(challans).values({ ...input, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId, seasonId });
   } catch (err) {
     if (isDuplicateEntryError(err)) throw new Error(`Serial number ${input.sequenceNumber} is already in use in this kiln — refresh and try again.`);
     throw err;
@@ -91,9 +92,12 @@ export interface ListChallansFilter {
   to?: Date;
 }
 
-export async function listChallans(kilnId: string, filter: string | ListChallansFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view
+// (Reports' date-range queries).
+export async function listChallans(kilnId: string, seasonId: string | null, filter: string | ListChallansFilter = {}) {
   const f: ListChallansFilter = typeof filter === "string" ? { dispatchId: filter } : filter;
   const conditions = [eq(challans.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(challans.seasonId, seasonId));
   if (f.dispatchId) conditions.push(eq(challans.dispatchId, f.dispatchId));
   if (f.from) conditions.push(gte(challans.challanDate, f.from));
   if (f.to) conditions.push(lte(challans.challanDate, f.to));
@@ -143,12 +147,12 @@ export interface GatePassInput {
   notes?: string;
 }
 
-export async function createGatePass(kilnId: string, rawInput: GatePassInput) {
+export async function createGatePass(kilnId: string, seasonId: string, rawInput: GatePassInput) {
   await assertDispatch(kilnId, rawInput.dispatchId);
   const input = applyItemsAggregate(rawInput);
   const _id = randomUUID();
   try {
-    await db.insert(gatePasses).values({ ...input, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId });
+    await db.insert(gatePasses).values({ ...input, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId, seasonId });
   } catch (err) {
     if (isDuplicateEntryError(err)) throw new Error(`Serial number ${input.sequenceNumber} is already in use in this kiln — refresh and try again.`);
     throw err;
@@ -164,9 +168,12 @@ export interface ListGatePassesFilter {
   to?: Date;
 }
 
-export async function listGatePasses(kilnId: string, filter: string | ListGatePassesFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view
+// (Reports' date-range queries).
+export async function listGatePasses(kilnId: string, seasonId: string | null, filter: string | ListGatePassesFilter = {}) {
   const f: ListGatePassesFilter = typeof filter === "string" ? { dispatchId: filter } : filter;
   const conditions = [eq(gatePasses.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(gatePasses.seasonId, seasonId));
   if (f.dispatchId) conditions.push(eq(gatePasses.dispatchId, f.dispatchId));
   if (f.from) conditions.push(gte(gatePasses.gatePassDate, f.from));
   if (f.to) conditions.push(lte(gatePasses.gatePassDate, f.to));
@@ -243,10 +250,10 @@ export interface InvoiceInput {
 // Indian financial year, Apr 1 – Mar 31, e.g. Aug 2026 or Jan 2027 both
 // give "26-27" — the {session} segment of the GST invoice number format
 // ({kilnPrefix}/{session}/{sessionSerialNumber}, see createInvoice below).
-// Deliberately independent of the kiln's own configurable bhatta season
-// (kilns.seasonStartMonth/Day, e.g. Aug 1 by default) — that's a
-// brick-production-cycle concept used for season-scoped reporting, not
-// the fixed calendar GST/accounting year.
+// Deliberately independent of the admin-configured Bhatta Season (see
+// db/schema/season.ts) — that's a brick-production-cycle concept the
+// admin starts/ends on their own schedule, not the fixed calendar
+// GST/accounting year.
 function financialYearSession(date: Date): string {
   const year = date.getFullYear();
   const startYear = date.getMonth() >= 3 ? year : year - 1; // getMonth() is 0-based; 3 = April
@@ -255,7 +262,7 @@ function financialYearSession(date: Date): string {
   return `${shortStart}-${shortEnd}`;
 }
 
-export async function createInvoice(kilnId: string, rawInput: InvoiceInput) {
+export async function createInvoice(kilnId: string, seasonId: string, rawInput: InvoiceInput) {
   if (rawInput.dispatchId) await assertDispatch(kilnId, rawInput.dispatchId);
   const input = applyItemsAggregate(rawInput);
   const invoiceDate = input.invoiceDate ?? new Date();
@@ -267,7 +274,7 @@ export async function createInvoice(kilnId: string, rawInput: InvoiceInput) {
 
   const _id = randomUUID();
   try {
-    await db.insert(invoices).values({ ...input, invoiceDate, session, sessionSerialNumber, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId });
+    await db.insert(invoices).values({ ...input, invoiceDate, session, sessionSerialNumber, sequenceNumber: input.sequenceNumber ?? null, _id, kilnId, seasonId });
   } catch (err) {
     if (isDuplicateEntryError(err)) throw new Error(`Serial number ${input.sequenceNumber} is already in use in this kiln — refresh and try again.`);
     throw err;
@@ -284,9 +291,12 @@ export interface ListInvoicesFilter {
   to?: Date;
 }
 
-export async function listInvoices(kilnId: string, filter: string | ListInvoicesFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view
+// (Reports' date-range queries).
+export async function listInvoices(kilnId: string, seasonId: string | null, filter: string | ListInvoicesFilter = {}) {
   const f: ListInvoicesFilter = typeof filter === "string" ? { dispatchId: filter } : filter;
   const conditions = [eq(invoices.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(invoices.seasonId, seasonId));
   if (f.dispatchId) conditions.push(eq(invoices.dispatchId, f.dispatchId));
   if (f.customerId) conditions.push(eq(invoices.customerId, f.customerId));
   if (f.from) conditions.push(gte(invoices.invoiceDate, f.from));
@@ -300,11 +310,15 @@ export async function listInvoices(kilnId: string, filter: string | ListInvoices
 // older/Dispatch-created invoices that never had a customerId to begin
 // with. See the schema comment on invoices.customerId for why both are
 // checked instead of just one.
-export async function listInvoicesForCustomer(kilnId: string, customerId: string, customerName: string) {
+// seasonIds is the cumulative-through-season set (see season.util.ts's
+// seasonIdsThrough) — a customer's balance always includes every season up
+// to and including the one being viewed, never just one season in
+// isolation (same "carries forward" principle as openingPaid/openingDue).
+export async function listInvoicesForCustomer(kilnId: string, customerId: string, customerName: string, seasonIds: string[]) {
   const rows = await db
     .select()
     .from(invoices)
-    .where(and(eq(invoices.kilnId, kilnId), or(eq(invoices.customerId, customerId), and(isNull(invoices.customerId), eq(sql`lower(${invoices.customerName})`, customerName.toLowerCase())))))
+    .where(and(eq(invoices.kilnId, kilnId), inArray(invoices.seasonId, seasonIds), or(eq(invoices.customerId, customerId), and(isNull(invoices.customerId), eq(sql`lower(${invoices.customerName})`, customerName.toLowerCase())))))
     .orderBy(desc(invoices.createdAt));
   return rows;
 }

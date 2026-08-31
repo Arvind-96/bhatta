@@ -140,6 +140,7 @@ export const LEDGER_PAYMENT_MODES = ["CASH", "BANK", "UPI", "CASH_AND_ONLINE"] a
 export const ledgerEntries = mysqlTable("ledger_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   personId: varchar("personId", { length: 64 }).notNull(),
   direction: varchar("direction", { length: 50, enum: ["DUE", "PAID"] }).notNull(),
   amount: double("amount").notNull(),
@@ -162,6 +163,7 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
 export const paymentReceipts = mysqlTable("payment_receipts", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   personId: varchar("personId", { length: 64 }).notNull(),
   receiptNumber: varchar("receiptNumber", { length: 255 }).notNull(),
   amountPaid: double("amountPaid").notNull(),
@@ -182,6 +184,7 @@ export const paymentReceipts = mysqlTable("payment_receipts", {
 export const workEntries = mysqlTable("work_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   personId: varchar("personId", { length: 64 }).notNull(),
   workType: varchar("workType", { length: 50, enum: WORK_TYPES }).notNull(),
   quantity: double("quantity").notNull(),
@@ -199,6 +202,7 @@ export const workEntries = mysqlTable("work_entries", {
 export const attendances = mysqlTable("attendances", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   personId: varchar("personId", { length: 64 }).notNull(),
   date: dateColumn().notNull(),
   status: varchar("status", { length: 50, enum: ["PRESENT", "ABSENT", "HALF_DAY", "LATE"] }).notNull(),

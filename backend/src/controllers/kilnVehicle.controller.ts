@@ -55,6 +55,7 @@ export async function createDieselHandler(req: AuthedRequest, res: Response) {
   const entry = await createDieselEntry({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(entry);
@@ -63,7 +64,7 @@ export async function createDieselHandler(req: AuthedRequest, res: Response) {
 export async function listDieselHandler(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : undefined;
   const driverId = req.query.driverId ? String(req.query.driverId) : undefined;
-  const entries = await listDieselEntries(req.kiln!.id, { days, driverId });
+  const entries = await listDieselEntries(req.kiln!.id, req.season!.id, { days, driverId });
   res.json(entries);
 }
 
@@ -91,6 +92,6 @@ export async function removeDieselHandler(req: AuthedRequest, res: Response) {
 }
 
 export async function dieselPeriodTotalsHandler(req: AuthedRequest, res: Response) {
-  const result = await dieselPeriodTotals(req.kiln!.id);
+  const result = await dieselPeriodTotals(req.kiln!.id, req.season!.id);
   res.json(result);
 }

@@ -22,6 +22,7 @@ import { totalA1Output } from "./chamberGrading.service";
 import { dispatchTotalsForRange } from "./dispatch.service";
 import { financialOverviewCustomRange } from "./financialOverview.service";
 import { monthStringsInRange } from "../utils/season";
+import { allSeasonIds } from "./season.util";
 
 export const COMPARE_MODULES = [
   "financial", "bricks", "molding", "stacking", "nikasi", "firing", "brickLoading",
@@ -30,10 +31,11 @@ export const COMPARE_MODULES = [
 export type CompareModule = (typeof COMPARE_MODULES)[number];
 
 async function compareBricks(kilnId: string, from: Date, to: Date) {
+  const seasonIds = await allSeasonIds(kilnId);
   const [molded, stacked, a1Output, dispatched] = await Promise.all([
-    totalMolded(kilnId, from, to),
-    totalStacked(kilnId, from, to),
-    totalA1Output(kilnId, from, to),
+    totalMolded(kilnId, seasonIds, from, to),
+    totalStacked(kilnId, seasonIds, from, to),
+    totalA1Output(kilnId, seasonIds, from, to),
     dispatchTotalsForRange(kilnId, from, to),
   ]);
   return {
@@ -58,7 +60,8 @@ async function compareMolding(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareStacking(kilnId: string, from: Date, to: Date) {
-  const result = await totalStacked(kilnId, from, to);
+  const seasonIds = await allSeasonIds(kilnId);
+  const result = await totalStacked(kilnId, seasonIds, from, to);
   return { bricksStacked: result.bricksCount, damageCount: result.damageCount };
 }
 
@@ -220,7 +223,7 @@ export async function compareModule(kilnId: string, module: CompareModule, range
     let metrics: Record<string, number | Record<string, number>>;
     switch (module) {
       case "financial": {
-        const flow = await financialOverviewCustomRange(kilnId, from, effectiveTo);
+        const flow = await financialOverviewCustomRange(kilnId, null, from, effectiveTo);
         metrics = {
           moneyReceived: flow.moneyReceived,
           moneySpent: flow.moneySpent,

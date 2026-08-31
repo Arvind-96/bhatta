@@ -11,12 +11,12 @@ import {
   removeProduction,
   updateCategoryQuantity,
 } from "../controllers/brickCategory.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const brickCategoryRouter = Router();
 
-brickCategoryRouter.use(requireAuth, resolveKiln);
+brickCategoryRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 
 brickCategoryRouter.post("/", asyncHandler(createCategory));
 brickCategoryRouter.get("/", asyncHandler(listCategories));

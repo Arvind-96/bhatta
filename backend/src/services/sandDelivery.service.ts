@@ -8,6 +8,7 @@ import { emitToKiln } from "../config/socket";
 
 export interface CreateSandDeliveryInput {
   kilnId: string;
+  seasonId: string;
   sandContractorId: string;
   contractId?: string;
   tractorUsed?: boolean;
@@ -197,8 +198,11 @@ export interface ListSandDeliveryFilter {
   to?: Date;
 }
 
-export async function listSandDeliveries(kilnId: string, filter: ListSandDeliveryFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// the Reports page's own admin-picked date-range reports).
+export async function listSandDeliveries(kilnId: string, seasonId: string | null, filter: ListSandDeliveryFilter = {}) {
   const conditions = [eq(sandDeliveries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(sandDeliveries.seasonId, seasonId));
   if (filter.sandContractorId) conditions.push(eq(sandDeliveries.sandContractorId, filter.sandContractorId));
   if (filter.contractId) conditions.push(eq(sandDeliveries.contractId, filter.contractId));
   if (filter.from) conditions.push(gte(sandDeliveries.date, filter.from));

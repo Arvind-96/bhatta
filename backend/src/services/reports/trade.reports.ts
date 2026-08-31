@@ -25,7 +25,7 @@ const customers: ReportDefinition = {
         // paidThisPeriod counted them, so an advance payment made
         // dueThisPeriod go negative for that customer even though nothing
         // was actually overpaid.
-        const invoices = await listInvoices(kilnId, { customerId: c._id, from: filters.from, to: filters.to });
+        const invoices = await listInvoices(kilnId, null, { customerId: c._id, from: filters.from, to: filters.to });
         const invoicedThisPeriod = round2(invoices.reduce((s, i) => s + i.netAmount, 0));
         const paidThisPeriod = round2(invoices.reduce((s, i) => s + (i.amountPaidNow ?? i.netAmount), 0));
         return {
@@ -65,7 +65,7 @@ const invoices: ReportDefinition = {
   key: "invoices",
   titleKey: "reports.title.invoices",
   async run(kilnId, filters) {
-    const rows = await listInvoices(kilnId, { customerId: filters.customerId, from: filters.from, to: filters.to });
+    const rows = await listInvoices(kilnId, null, { customerId: filters.customerId, from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
       serial: r.sequenceNumber != null ? `INV-${r.sequenceNumber}` : "",
@@ -123,7 +123,7 @@ const gatePasses: ReportDefinition = {
   key: "gatePasses",
   titleKey: "reports.title.gatePasses",
   async run(kilnId, filters) {
-    const rows = await listGatePasses(kilnId, { from: filters.from, to: filters.to });
+    const rows = await listGatePasses(kilnId, null, { from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.gatePassDate ? r.gatePassDate.toISOString() : null,
       serial: r.sequenceNumber != null ? `GP-${r.sequenceNumber}` : "",
@@ -162,7 +162,7 @@ const challans: ReportDefinition = {
   key: "challans",
   titleKey: "reports.title.challans",
   async run(kilnId, filters) {
-    const rows = await listChallans(kilnId, { from: filters.from, to: filters.to });
+    const rows = await listChallans(kilnId, null, { from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.challanDate ? r.challanDate.toISOString() : null,
       serial: r.sequenceNumber != null ? `CH-${r.sequenceNumber}` : "",
@@ -202,7 +202,7 @@ const expenses: ReportDefinition = {
   titleKey: "reports.title.expenses",
   async run(kilnId, filters) {
     const [allRows, types] = await Promise.all([
-      listExpenses(kilnId, { from: filters.from, to: filters.to }),
+      listExpenses(kilnId, null, { from: filters.from, to: filters.to }),
       listExpenseTypes(kilnId),
     ]);
     // filters.category is matched against BOTH the modern admin-extensible

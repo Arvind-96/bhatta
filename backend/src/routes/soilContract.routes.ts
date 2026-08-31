@@ -11,12 +11,12 @@ import {
   update,
   updateStatus,
 } from "../controllers/soilContract.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const soilContractRouter = Router();
 
-soilContractRouter.use(requireAuth, resolveKiln);
+soilContractRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 soilContractRouter.post("/", asyncHandler(create));
 soilContractRouter.get("/", asyncHandler(list));
 soilContractRouter.get("/dashboard", asyncHandler(dashboard));

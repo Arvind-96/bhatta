@@ -32,6 +32,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { useLiveProduction } from "@/hooks/useLiveProduction";
 import { useUiStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
+import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
 import { SetupWizard } from "@/components/onboarding/SetupWizard";
@@ -128,11 +129,21 @@ export function Dashboard() {
   const ActiveView = VIEWS[view];
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const setSeasons = useAuthStore((s) => s.setSeasons);
   const needsSetup = kilns.find((k) => k.kilnId === activeKilnId)?.needsSetup ?? false;
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [view]);
+
+  // Seasons are per-kiln (setActiveKiln/setKilns already clear the prior
+  // kiln's list to avoid a stale X-Season-Id) — re-fetched every time the
+  // active kiln changes, including the very first mount right after
+  // App.tsx's bootstrapPublicKiln sets it.
+  useEffect(() => {
+    if (!activeKilnId) return;
+    api.seasons.list().then(setSeasons).catch(console.error);
+  }, [activeKilnId, setSeasons]);
 
   if (needsSetup) {
     return <SetupWizard />;

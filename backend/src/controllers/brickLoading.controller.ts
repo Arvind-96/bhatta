@@ -69,6 +69,7 @@ export async function create(req: AuthedRequest, res: Response) {
   const entry = await createBrickLoadingEntry({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
     unloadingDate: input.unloadingDate ? new Date(input.unloadingDate) : undefined,
   });
@@ -76,7 +77,7 @@ export async function create(req: AuthedRequest, res: Response) {
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const entries = await listBrickLoadingEntries(req.kiln!.id, {
+  const entries = await listBrickLoadingEntries(req.kiln!.id, req.season!.id, {
     driverId: req.query.driverId as string | undefined,
     days: req.query.days ? Number(req.query.days) : undefined,
   });
@@ -131,6 +132,6 @@ export async function remove(req: AuthedRequest, res: Response) {
 }
 
 export async function driverSummary(req: AuthedRequest, res: Response) {
-  const result = await brickLoadingDriverSummary(req.kiln!.id);
+  const result = await brickLoadingDriverSummary(req.kiln!.id, req.season!.id);
   res.json(result);
 }

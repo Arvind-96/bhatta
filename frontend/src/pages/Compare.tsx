@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PieChart, Boxes, Hammer, Layers, ArrowDownToLine, Thermometer, PackagePlus, PackageCheck,
   Truck, Car, Fuel, Wallet, Warehouse, CalendarCheck, Banknote, Users, ArrowLeftRight, CalendarRange,
@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
-import { useAuthStore } from "@/store/auth.store";
+import { useAuthStore, type UserSeason } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn, formatINR } from "@/lib/utils";
 import type { CompareModule, SeasonYearResult } from "@/types";
@@ -72,19 +72,43 @@ interface DateRangeValue {
   to: string; // YYYY-MM-DD
 }
 
-// The kiln's business season runs Aug 1 (by default, configurable in
-// Settings) – Jul 31 the next year — used only to default the two range
-// pickers below to "this season vs last season"; the admin can then pick
-// any other pair of dates freely.
-function currentSeasonYear(seasonStartMonth: number, seasonStartDay: number, reference = new Date()) {
-  const thisYearStart = new Date(reference.getFullYear(), seasonStartMonth - 1, seasonStartDay);
-  return reference >= thisYearStart ? reference.getFullYear() : reference.getFullYear() - 1;
+// Default the two range pickers to "this Bhatta Season vs the one before
+// it" — real admin-set season boundaries (Settings' season switcher), not
+// a fixed Aug1-Jul31 calendar anchor. The admin can still pick any other
+// pair of dates freely afterward.
+function seasonDateRange(seasons: UserSeason[], season: UserSeason): DateRangeValue {
+  // The end of a season is the day before whichever later season (by
+  // startDate) began — or today, if nothing started after it yet (it's
+  // still the open, current one).
+  const later = seasons
+    .filter((s) => new Date(s.startDate).getTime() > new Date(season.startDate).getTime())
+    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0];
+  const to = later ? new Date(new Date(later.startDate).getTime() - 24 * 60 * 60 * 1000) : new Date();
+  return { from: toDateInputValue(new Date(season.startDate)), to: toDateInputValue(to) };
 }
 
-function seasonRange(seasonStartMonth: number, seasonStartDay: number, seasonYear: number): DateRangeValue {
-  const from = new Date(seasonYear, seasonStartMonth - 1, seasonStartDay);
-  const to = new Date(seasonYear + 1, seasonStartMonth - 1, seasonStartDay - 1);
-  return { from: toDateInputValue(from), to: toDateInputValue(to) };
+// Fewer than 2 real seasons exist yet (a brand new kiln, still on "Season
+// 1") — fall back to two trailing 365-day windows back to back so the two
+// pickers still default to something comparable instead of one empty range.
+function trailingYearRanges(reference = new Date()): [DateRangeValue, DateRangeValue] {
+  const oneYearAgo = new Date(reference);
+  oneYearAgo.setDate(oneYearAgo.getDate() - 365);
+  const twoYearsAgo = new Date(reference);
+  twoYearsAgo.setDate(twoYearsAgo.getDate() - 730);
+  const dayBeforeOneYearAgo = new Date(oneYearAgo);
+  dayBeforeOneYearAgo.setDate(dayBeforeOneYearAgo.getDate() - 1);
+  return [
+    { from: toDateInputValue(twoYearsAgo), to: toDateInputValue(dayBeforeOneYearAgo) },
+    { from: toDateInputValue(oneYearAgo), to: toDateInputValue(reference) },
+  ];
+}
+
+function defaultRanges(seasons: UserSeason[]): [DateRangeValue, DateRangeValue] {
+  const sorted = [...seasons].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  const current = sorted.find((s) => s.isCurrent) ?? sorted[0];
+  const previous = sorted.find((s) => s._id !== current?._id);
+  if (!current || !previous) return trailingYearRanges();
+  return [seasonDateRange(seasons, previous), seasonDateRange(seasons, current)];
 }
 
 function formatRangeLabel(fromIso: string, toIso: string) {
@@ -127,21 +151,31 @@ function RangePicker({ label, value, onChange }: { label: string; value: DateRan
 // time — every module the app tracks, per the client's explicit ask, not
 // a curated subset. Each module's headline metrics come from
 // backend/src/services/compare.service.ts. The two range pickers default
-// to "this season vs last season" (Aug1-Jul31) but accept any dates.
+// to "this Bhatta Season vs the one before it" but accept any dates.
 export function Compare() {
   const { t } = useTranslation();
-  const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
-  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
-  const seasonStartMonth = activeKiln?.seasonStartMonth ?? 8;
-  const seasonStartDay = activeKiln?.seasonStartDay ?? 1;
-  const thisSeasonYear = currentSeasonYear(seasonStartMonth, seasonStartDay);
+  const seasons = useAuthStore((s) => s.seasons);
 
   const [module, setModule] = useState<CompareModule>("financial");
-  const [rangeA, setRangeA] = useState<DateRangeValue>(() => seasonRange(seasonStartMonth, seasonStartDay, thisSeasonYear - 1));
-  const [rangeB, setRangeB] = useState<DateRangeValue>(() => seasonRange(seasonStartMonth, seasonStartDay, thisSeasonYear));
+  const [rangeA, setRangeA] = useState<DateRangeValue>(() => trailingYearRanges()[0]);
+  const [rangeB, setRangeB] = useState<DateRangeValue>(() => trailingYearRanges()[1]);
   const [results, setResults] = useState<SeasonYearResult[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const defaulted = useRef(false);
+
+  // Seasons load asynchronously (Dashboard's own effect) after this page
+  // has already mounted with the trailing-365-days fallback above — once
+  // real season data actually arrives, re-seed the two pickers from it,
+  // but only the very first time so a later re-render never clobbers
+  // whatever ranges the admin has since picked themselves.
+  useEffect(() => {
+    if (defaulted.current || seasons.length === 0) return;
+    defaulted.current = true;
+    const [a, b] = defaultRanges(seasons);
+    setRangeA(a);
+    setRangeB(b);
+  }, [seasons]);
 
   const validRange = !!rangeA.from && !!rangeA.to && !!rangeB.from && !!rangeB.to && rangeA.from <= rangeA.to && rangeB.from <= rangeB.to;
 

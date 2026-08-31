@@ -166,6 +166,7 @@ export async function create(req: AuthedRequest, res: Response) {
     bricksCount: input.bricksCount ?? 0,
     amount: input.amount ?? 0,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     dispatchedOn: input.dispatchedOn ? new Date(input.dispatchedOn) : undefined,
   });
   res.status(201).json(dispatch);
@@ -173,13 +174,13 @@ export async function create(req: AuthedRequest, res: Response) {
 
 export async function list(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : undefined;
-  const dispatches = await listDispatches(req.kiln!.id, days);
+  const dispatches = await listDispatches(req.kiln!.id, req.season!.id, days);
   res.json(dispatches);
 }
 
 export async function totals(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 7;
-  const result = await dispatchTotals(req.kiln!.id, days);
+  const result = await dispatchTotals(req.kiln!.id, req.season!.id, days);
   res.json(result);
 }
 

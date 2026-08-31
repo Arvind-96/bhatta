@@ -11,7 +11,6 @@ import {
   setGstNumber,
   setKilnBillingDetails,
   setKilnGeofence,
-  setSeason,
   setShiftTimes,
   setYardCapacity,
   updateKilnProfile,
@@ -32,22 +31,6 @@ const geofenceSchema = z.object({
 const yardCapacitySchema = z.object({
   yardCapacityBricks: z.number().positive(),
 });
-
-// A fixed non-leap reference year — this is a recurring annual anchor day,
-// not a specific calendar date, so Feb always caps at 28.
-function daysInMonth(month: number) {
-  return new Date(2023, month, 0).getDate();
-}
-
-const seasonSchema = z
-  .object({
-    seasonStartMonth: z.number().int().min(1).max(12),
-    seasonStartDay: z.number().int().min(1).max(31),
-  })
-  .refine((data) => data.seasonStartDay <= daysInMonth(data.seasonStartMonth), {
-    message: "seasonStartDay is not valid for the selected seasonStartMonth",
-    path: ["seasonStartDay"],
-  });
 
 const TIME_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const shiftTimesSchema = z.object({
@@ -95,12 +78,6 @@ export async function updateGeofence(req: AuthedRequest, res: Response) {
 export async function updateYardCapacity(req: AuthedRequest, res: Response) {
   const input = yardCapacitySchema.parse(req.body);
   const kiln = await setYardCapacity(req.kiln!.id, input.yardCapacityBricks);
-  res.json(kiln);
-}
-
-export async function updateSeason(req: AuthedRequest, res: Response) {
-  const input = seasonSchema.parse(req.body);
-  const kiln = await setSeason(req.kiln!.id, input.seasonStartMonth, input.seasonStartDay);
   res.json(kiln);
 }
 

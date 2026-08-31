@@ -16,6 +16,7 @@ export type BrickVehicleType = (typeof BRICK_VEHICLE_TYPES)[number];
 
 export interface CreateBrickLoadingInput {
   kilnId: string;
+  seasonId: string;
   customerName?: string;
   customerPhone?: string;
   customerAddress?: string;
@@ -76,12 +77,12 @@ function computeLaborCharge(bricks: number | undefined, ratePerThousand: number 
 // still race between two concurrent creates for the same kiln — closed by
 // the retry loop in createBrickLoadingEntry below, not by trying to make
 // this atomic.
-async function generateTripNumber(kilnId: string) {
+async function generateTripNumber(kilnId: string, seasonId: string) {
   const maxRow = (
     await db
       .select({ max: sql<number | null>`max(cast(${brickLoadingEntries.tripNumber} as unsigned))` })
       .from(brickLoadingEntries)
-      .where(eq(brickLoadingEntries.kilnId, kilnId))
+      .where(and(eq(brickLoadingEntries.kilnId, kilnId), eq(brickLoadingEntries.seasonId, seasonId)))
   )[0];
   return String((maxRow?.max ?? 0) + 1);
 }
@@ -120,12 +121,13 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   let entry: typeof brickLoadingEntries.$inferSelect | undefined;
   let lastError: unknown;
   for (let attempt = 0; attempt < MAX_NUMBER_GENERATION_ATTEMPTS; attempt++) {
-    const tripNumber = await generateTripNumber(input.kilnId);
+    const tripNumber = await generateTripNumber(input.kilnId, input.seasonId);
     const _id = randomUUID();
     try {
       await db.insert(brickLoadingEntries).values({
         _id,
         kilnId: input.kilnId,
+        seasonId: input.seasonId,
         tripNumber,
         customerName: input.customerName,
         customerPhone: input.customerPhone,
@@ -192,19 +194,19 @@ export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   // own Expense the moment the trip is created, under a fixed type name so
   // they always land in the same Expense Type bucket (see
   // expense.service.ts's autoLogExpense; no-ops for a zero/unset amount).
-  await autoLogExpense(input.kilnId, "Driver Reward / Inam", entry.tipAmount, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
+  await autoLogExpense(input.kilnId, entry.seasonId!, "Driver Reward / Inam", entry.tipAmount, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
     brickLoadingEntryId: entry._id,
     paymentMode: entry.tipPaymentMode ?? undefined,
     cashAmount: entry.tipCashAmount ?? undefined,
     onlineAmount: entry.tipOnlineAmount ?? undefined,
   });
-  await autoLogExpense(input.kilnId, "Loading Charge", entry.loadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
+  await autoLogExpense(input.kilnId, entry.seasonId!, "Loading Charge", entry.loadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
     brickLoadingEntryId: entry._id,
     paymentMode: entry.loadingPaymentMode ?? undefined,
     cashAmount: entry.loadingCashAmount ?? undefined,
     onlineAmount: entry.loadingOnlineAmount ?? undefined,
   });
-  await autoLogExpense(input.kilnId, "Unloading Charge", entry.unloadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
+  await autoLogExpense(input.kilnId, entry.seasonId!, "Unloading Charge", entry.unloadingCharge, entry.date ?? undefined, `Trip #${entry.tripNumber ?? entry._id}`, {
     brickLoadingEntryId: entry._id,
     paymentMode: entry.unloadingPaymentMode ?? undefined,
     cashAmount: entry.unloadingCashAmount ?? undefined,
@@ -453,8 +455,11 @@ export interface ListBrickLoadingFilter {
   to?: Date;
 }
 
-export async function listBrickLoadingEntries(kilnId: string, filter: ListBrickLoadingFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report).
+export async function listBrickLoadingEntries(kilnId: string, seasonId: string | null, filter: ListBrickLoadingFilter = {}) {
   const conditions = [eq(brickLoadingEntries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(brickLoadingEntries.seasonId, seasonId));
   if (filter.driverId) conditions.push(eq(brickLoadingEntries.driverId, filter.driverId));
   if (filter.days) {
     const since = new Date();
@@ -508,10 +513,10 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // total bricks moved, total tips earned, trip count, and ledger balance —
 // so an owner can see "who's driving the most, and what have I tipped them"
 // at a glance.
-export async function brickLoadingDriverSummary(kilnId: string) {
+export async function brickLoadingDriverSummary(kilnId: string, seasonId: string) {
   const drivers = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "DRIVER"), eq(people.active, true))).orderBy(asc(people.name));
 
-  const allEntries = await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId));
+  const allEntries = await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), eq(brickLoadingEntries.seasonId, seasonId)));
   const entriesByDriver = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
     if (!e.driverId) continue;
@@ -525,7 +530,7 @@ export async function brickLoadingDriverSummary(kilnId: string) {
     const driverEntries = entriesByDriver.get(driver._id) ?? [];
     if (driverEntries.length === 0) continue;
 
-    const driverLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, driver._id)));
+    const driverLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), eq(ledgerEntries.personId, driver._id)));
     const { due, paid, balance } = sumByDirection(driverLedgerEntries);
 
     results.push({

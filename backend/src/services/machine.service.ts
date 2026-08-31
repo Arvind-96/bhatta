@@ -19,6 +19,7 @@ const INSTALLMENT_EXPENSE_TYPE_NAME = "Installment";
 
 export interface CreateMachineInput {
   kilnId: string;
+  seasonId: string;
   name: string;
   type: MachineType;
   identifier?: string;
@@ -36,15 +37,17 @@ export interface CreateMachineInput {
 }
 
 export async function createMachine(input: CreateMachineInput) {
+  const { seasonId, ...machineInput } = input;
   const _id = randomUUID();
   const totalPaid = input.totalPaid ?? 0;
   const remainingDue = Math.max(0, (input.price ?? 0) - totalPaid);
-  await db.insert(machines).values({ ...input, _id, totalPaid, remainingDue });
+  await db.insert(machines).values({ ...machineInput, _id, totalPaid, remainingDue });
 
   if (totalPaid > 0) {
     const expenseType = await findOrCreateExpenseType(input.kilnId, INSTALLMENT_EXPENSE_TYPE_NAME);
     await createExpense({
       kilnId: input.kilnId,
+      seasonId,
       expenseTypeId: expenseType._id,
       amount: totalPaid,
       notes: `Purchase: ${input.name}`,
@@ -108,6 +111,7 @@ export async function updateMachine(kilnId: string, machineId: string, input: Up
 
 export interface CreateInstallmentPaymentInput {
   kilnId: string;
+  seasonId: string;
   machineId: string;
   amount: number;
   date?: Date;
@@ -124,6 +128,7 @@ export async function createInstallmentPayment(input: CreateInstallmentPaymentIn
   await db.insert(machineInstallmentPayments).values({
     _id,
     kilnId: input.kilnId,
+    seasonId: input.seasonId,
     machineId: input.machineId,
     amount: input.amount,
     date: input.date,
@@ -137,6 +142,7 @@ export async function createInstallmentPayment(input: CreateInstallmentPaymentIn
   const expenseType = await findOrCreateExpenseType(input.kilnId, INSTALLMENT_EXPENSE_TYPE_NAME);
   await createExpense({
     kilnId: input.kilnId,
+    seasonId: input.seasonId,
     expenseTypeId: expenseType._id,
     amount: input.amount,
     notes: `Installment: ${machine.name}`,
@@ -150,16 +156,17 @@ export async function createInstallmentPayment(input: CreateInstallmentPaymentIn
   return { payment, machine: updatedMachine };
 }
 
-export async function listInstallmentPayments(kilnId: string, machineId: string) {
+export async function listInstallmentPayments(kilnId: string, seasonId: string, machineId: string) {
   return await db
     .select()
     .from(machineInstallmentPayments)
-    .where(and(eq(machineInstallmentPayments.kilnId, kilnId), eq(machineInstallmentPayments.machineId, machineId)))
+    .where(and(eq(machineInstallmentPayments.kilnId, kilnId), eq(machineInstallmentPayments.seasonId, seasonId), eq(machineInstallmentPayments.machineId, machineId)))
     .orderBy(desc(machineInstallmentPayments.date));
 }
 
 export interface CreateFuelLogInput {
   kilnId: string;
+  seasonId: string;
   machineId: string;
   fuelType: "DIESEL" | "PETROL" | "ELECTRICITY";
   quantity: number;
@@ -189,7 +196,7 @@ export async function createMachineFuelLog(input: CreateFuelLogInput) {
     const history = await db
       .select()
       .from(machineFuelLogs)
-      .where(and(eq(machineFuelLogs.kilnId, input.kilnId), eq(machineFuelLogs.machineId, input.machineId), gte(machineFuelLogs.date, since), gt(machineFuelLogs.hoursRun, 0)));
+      .where(and(eq(machineFuelLogs.kilnId, input.kilnId), eq(machineFuelLogs.seasonId, input.seasonId), eq(machineFuelLogs.machineId, input.machineId), gte(machineFuelLogs.date, since), gt(machineFuelLogs.hoursRun, 0)));
 
     if (history.length >= 3) {
       const totalQty = history.reduce((sum, h) => sum + h.quantity, 0);
@@ -211,10 +218,10 @@ export async function createMachineFuelLog(input: CreateFuelLogInput) {
   return { log, ratePerHour, baselineRatePerHour, consumptionAlert };
 }
 
-export async function listMachineFuelLogs(kilnId: string, days = 30) {
+export async function listMachineFuelLogs(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(machineFuelLogs).where(and(eq(machineFuelLogs.kilnId, kilnId), gte(machineFuelLogs.date, since))).orderBy(desc(machineFuelLogs.date));
+  const rows = await db.select().from(machineFuelLogs).where(and(eq(machineFuelLogs.kilnId, kilnId), eq(machineFuelLogs.seasonId, seasonId), gte(machineFuelLogs.date, since))).orderBy(desc(machineFuelLogs.date));
   return withMachine(rows);
 }
 
@@ -227,6 +234,7 @@ async function withMachine<T extends { machineId: string }>(rows: T[]) {
 
 export interface CreateMaintenanceInput {
   kilnId: string;
+  seasonId: string;
   machineId: string;
   description: string;
   cost?: number;
@@ -244,6 +252,7 @@ export async function createMaintenanceLog(input: CreateMaintenanceInput) {
   if (input.cost && input.cost > 0) {
     await createExpense({
       kilnId: input.kilnId,
+      seasonId: input.seasonId,
       category: "MACHINERY_REPAIR",
       amount: input.cost,
       notes: input.description,
@@ -255,9 +264,9 @@ export async function createMaintenanceLog(input: CreateMaintenanceInput) {
   return log;
 }
 
-export async function listMaintenanceLogs(kilnId: string, days = 90) {
+export async function listMaintenanceLogs(kilnId: string, seasonId: string, days = 90) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(machineMaintenanceLogs).where(and(eq(machineMaintenanceLogs.kilnId, kilnId), gte(machineMaintenanceLogs.date, since))).orderBy(desc(machineMaintenanceLogs.date));
+  const rows = await db.select().from(machineMaintenanceLogs).where(and(eq(machineMaintenanceLogs.kilnId, kilnId), eq(machineMaintenanceLogs.seasonId, seasonId), gte(machineMaintenanceLogs.date, since))).orderBy(desc(machineMaintenanceLogs.date));
   return withMachine(rows);
 }

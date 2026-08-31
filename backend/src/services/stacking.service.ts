@@ -13,6 +13,7 @@ export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
 
 export interface CreateStackingInput {
   kilnId: string;
+  seasonId: string;
   gherId: string;
   gangId: string;
   stage: StackingStage;
@@ -43,7 +44,7 @@ export async function createStackingEntry(input: CreateStackingInput) {
   await db.insert(stackingEntries).values({ ...input, _id });
   const entry = (await db.select().from(stackingEntries).where(eq(stackingEntries._id, _id)))[0]!;
 
-  await updateGherStatus(input.kilnId, input.gherId, "STACKING");
+  await updateGherStatus(input.kilnId, input.seasonId, input.gherId, "STACKING");
 
   emitToKiln(input.kilnId, "stacking:update", entry);
   return entry;
@@ -95,8 +96,12 @@ export interface ListStackingFilter {
   to?: Date;
 }
 
-export async function listStackingEntries(kilnId: string, filter: ListStackingFilter = {}) {
+// seasonId is nullable — pass null for an all-time, every-season view (see
+// report.service.ts's full person report, which deliberately shows a
+// person's entire history, not just one season's).
+export async function listStackingEntries(kilnId: string, seasonId: string | null, filter: ListStackingFilter = {}) {
   const conditions = [eq(stackingEntries.kilnId, kilnId)];
+  if (seasonId) conditions.push(eq(stackingEntries.seasonId, seasonId));
   if (filter.gherId) conditions.push(eq(stackingEntries.gherId, filter.gherId));
   if (filter.gangId) conditions.push(eq(stackingEntries.gangId, filter.gangId));
   if (filter.from) conditions.push(gte(stackingEntries.date, filter.from));
@@ -114,8 +119,11 @@ export async function listStackingEntries(kilnId: string, filter: ListStackingFi
   return rows.map((r) => ({ ...r, gangId: gangById.get(r.gangId) ?? r.gangId, gherId: gherById.get(r.gherId) ?? r.gherId }));
 }
 
-export async function totalStacked(kilnId: string, since: Date, until?: Date) {
-  const conditions = [eq(stackingEntries.kilnId, kilnId), gte(stackingEntries.date, since)];
+// seasonIds, not a single seasonId — see dispatch.service.ts's
+// totalDispatchedSince for the convention (cumulative-through vs. one
+// season, decided by what the caller passes in).
+export async function totalStacked(kilnId: string, seasonIds: string[], since: Date, until?: Date) {
+  const conditions = [eq(stackingEntries.kilnId, kilnId), inArray(stackingEntries.seasonId, seasonIds), gte(stackingEntries.date, since)];
   if (until) conditions.push(lte(stackingEntries.date, until));
   const entries = await db.select().from(stackingEntries).where(and(...conditions));
   return {
@@ -126,9 +134,11 @@ export async function totalStacked(kilnId: string, since: Date, until?: Date) {
 
 // Used by chamberGrading.service.ts to scope "bricks stacked this cycle" —
 // everything logged against this chamber since it last flipped to STACKING
-// (Gher.cycleStartedAt), not its entire multi-season history.
-export async function stackedSinceForGher(kilnId: string, gherId: string, since?: Date) {
-  const conditions = [eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.gherId, gherId)];
+// (Gher.cycleStartedAt) — a stacking cycle never spans a season switch in
+// practice (grading happens promptly), so this stays scoped to the one
+// season a grading is being recorded in, not cumulative.
+export async function stackedSinceForGher(kilnId: string, seasonId: string, gherId: string, since?: Date) {
+  const conditions = [eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId), eq(stackingEntries.gherId, gherId)];
   if (since) conditions.push(gte(stackingEntries.date, since));
   const entries = await db.select().from(stackingEntries).where(and(...conditions));
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
@@ -147,7 +157,7 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // same production doesn't show up twice; LABOUR_CONTRACTOR persons are
 // always covered by stackingContractorSummary (even their own direct
 // entries), never listed here.
-export async function stackingOperatorSummary(kilnId: string) {
+export async function stackingOperatorSummary(kilnId: string, seasonId: string) {
   const operators = await db
     .select()
     .from(people)
@@ -155,7 +165,7 @@ export async function stackingOperatorSummary(kilnId: string) {
     .orderBy(asc(people.name));
   const independentOperators = operators.filter((o) => !o.bharaiContractorId);
 
-  const allEntries = await db.select().from(stackingEntries).where(eq(stackingEntries.kilnId, kilnId));
+  const allEntries = await db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId)));
   const entriesByGang = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
     const id = e.gangId;
@@ -168,7 +178,7 @@ export async function stackingOperatorSummary(kilnId: string) {
     const opEntries = entriesByGang.get(operator._id) ?? [];
     if (opEntries.length === 0) continue;
 
-    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id)));
+    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), eq(ledgerEntries.personId, operator._id)));
     const { due, paid, balance } = sumByDirection(opLedgerEntries);
 
     const tractorNumbers = new Set<string>();
@@ -211,7 +221,7 @@ export async function stackingOperatorSummary(kilnId: string) {
 // entries logged against the contractor directly, e.g. gangId = the
 // contractor themself) and ledger, plus the contractor's own vehicle/driver
 // roster. Same shape as molding.service.ts's moldingContractorSummary.
-export async function stackingContractorSummary(kilnId: string) {
+export async function stackingContractorSummary(kilnId: string, seasonId: string) {
   const [contractors, laborers, vehicles] = await Promise.all([
     db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
     db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
@@ -225,8 +235,8 @@ export async function stackingContractorSummary(kilnId: string) {
       const personIds = [contractor._id, ...laborerIds];
 
       const [gangEntries, gangLedgerEntries] = await Promise.all([
-        db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), inArray(stackingEntries.gangId, personIds))),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))),
+        db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId), inArray(stackingEntries.gangId, personIds))),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), inArray(ledgerEntries.personId, personIds))),
       ]);
 
       const bricksByLaborer = new Map<string, number>();
@@ -291,11 +301,11 @@ export async function stackingContractorSummary(kilnId: string) {
 // "Which tractors are actually doing bharai work, and how much" — fleet
 // tracking distinct from the operator (who gets paid), since one tractor
 // might be used across several stacking sessions/operators.
-export async function tractorFleetSummary(kilnId: string) {
+export async function tractorFleetSummary(kilnId: string, seasonId: string) {
   const entries = await db
     .select()
     .from(stackingEntries)
-    .where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.mode, "TRACTOR"), isNotNull(stackingEntries.tractorNumber)));
+    .where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId), eq(stackingEntries.mode, "TRACTOR"), isNotNull(stackingEntries.tractorNumber)));
 
   const gangIds = [...new Set(entries.map((e) => e.gangId))];
   const gangRows = gangIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, gangIds)) : [];

@@ -19,13 +19,14 @@ export async function create(req: AuthedRequest, res: Response) {
   const log = await createJcbWorkLog({
     ...input,
     kilnId: req.kiln!.id,
+    seasonId: req.season!.id,
     date: input.date ? new Date(input.date) : undefined,
   });
   res.status(201).json(log);
 }
 
 export async function list(req: AuthedRequest, res: Response) {
-  const logs = await listJcbWorkLogs(req.kiln!.id, {
+  const logs = await listJcbWorkLogs(req.kiln!.id, req.season!.id, {
     landId: req.query.landId as string | undefined,
     driverId: req.query.driverId as string | undefined,
     contractId: req.query.contractId as string | undefined,

@@ -5,12 +5,14 @@ import { fuelPurchases, fuelLogs, people, LEDGER_PAYMENT_MODES } from "../db/sch
 import { assertPersonOfType } from "./person.service";
 import { assertFuelTypeExists } from "./fuelType.service";
 import { addLedgerEntry, listLedgerForPerson } from "./ledger.service";
+import { seasonIdsThrough } from "./season.util";
 import { emitToKiln } from "../config/socket";
 
 const WEIGHT_VARIANCE_ALERT_THRESHOLD = 0.03; // 3%
 
 export interface CreateFuelPurchaseInput {
   kilnId: string;
+  seasonId: string;
   fuelType: string;
   supplierId?: string;
   vehicleNumber?: string;
@@ -185,10 +187,10 @@ export async function deleteFuelPurchase(kilnId: string, purchaseId: string) {
   emitToKiln(kilnId, "fuelPurchase:update", { _id: purchaseId, deleted: true });
 }
 
-export async function listFuelPurchases(kilnId: string, days = 30) {
+export async function listFuelPurchases(kilnId: string, seasonId: string, days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), gte(fuelPurchases.date, since))).orderBy(desc(fuelPurchases.date));
+  const rows = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), eq(fuelPurchases.seasonId, seasonId), gte(fuelPurchases.date, since))).orderBy(desc(fuelPurchases.date));
 
   const supplierIds = [...new Set(rows.map((r) => r.supplierId).filter((v): v is string => !!v))];
   const supplierRows = supplierIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, supplierIds)) : [];
@@ -197,11 +199,14 @@ export async function listFuelPurchases(kilnId: string, days = 30) {
 }
 
 // Physical stock on hand per fuel type = everything actually weighed in,
-// minus everything fed into a chamber so far.
-export async function fuelStockBalance(kilnId: string) {
+// minus everything fed into a chamber so far — cumulative through the
+// selected season (like reconciliation.service.ts's stock figures), so
+// browsing an archived season shows stock as of that point in time.
+export async function fuelStockBalance(kilnId: string, seasonId: string) {
+  const seasonIds = await seasonIdsThrough(kilnId, seasonId);
   const [purchases, logs] = await Promise.all([
-    db.select().from(fuelPurchases).where(eq(fuelPurchases.kilnId, kilnId)),
-    db.select().from(fuelLogs).where(eq(fuelLogs.kilnId, kilnId)),
+    db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), inArray(fuelPurchases.seasonId, seasonIds))),
+    db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), inArray(fuelLogs.seasonId, seasonIds))),
   ]);
 
   const totals = new Map<string, number>();
@@ -223,9 +228,12 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // Per-supplier payment/balance rollup — every SUPPLIER who has at least one
 // fuel purchase on record, their combined fuel-purchase ledger (category
 // FUEL only, so a supplier who also sells soil or something else doesn't
-// have that mixed in here).
-export async function supplierFuelBalances(kilnId: string) {
-  const purchases = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), isNotNull(fuelPurchases.supplierId)));
+// have that mixed in here). Purchases are cumulative through the selected
+// season, matching fuelStockBalance; the ledger itself is always cumulative
+// (listLedgerForPerson never filters by season).
+export async function supplierFuelBalances(kilnId: string, seasonId: string) {
+  const seasonIds = await seasonIdsThrough(kilnId, seasonId);
+  const purchases = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), inArray(fuelPurchases.seasonId, seasonIds), isNotNull(fuelPurchases.supplierId)));
   const supplierIds = Array.from(new Set(purchases.map((p) => p.supplierId!)));
   if (supplierIds.length === 0) return [];
 

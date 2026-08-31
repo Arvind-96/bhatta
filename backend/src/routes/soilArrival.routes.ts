@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { create, list, remove, update } from "../controllers/soilArrival.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const soilArrivalRouter = Router();
 
-soilArrivalRouter.use(requireAuth, resolveKiln);
+soilArrivalRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 soilArrivalRouter.post("/", asyncHandler(create));
 soilArrivalRouter.get("/", asyncHandler(list));
 soilArrivalRouter.patch("/:id", asyncHandler(update));

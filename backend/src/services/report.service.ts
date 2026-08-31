@@ -30,20 +30,20 @@ export async function getPersonFullReport(kilnId: string, personId: string) {
 
   const [ledger, paymentReceipts] = await Promise.all([
     listLedgerForPerson(kilnId, personId),
-    listPaymentReceipts(kilnId, personId),
+    listPaymentReceipts(kilnId, null, personId),
   ]);
   sections.ledger = ledger;
   sections.paymentReceipts = paymentReceipts;
 
   const isLabourish = person.type === "WORKER" || person.type === "HELPER" || person.type === "LABOUR_CONTRACTOR";
   if (isLabourish) {
-    sections.workEntries = await listWorkEntries(kilnId, { personId });
+    sections.workEntries = await listWorkEntries(kilnId, null, { personId });
   }
 
   if (person.type === "WORKER" || person.type === "HELPER") {
     const [family, suppliedItems] = await Promise.all([
       getFamilyForPerson(kilnId, personId),
-      listSuppliedItems(kilnId, personId),
+      listSuppliedItems(kilnId, null, personId),
     ]);
     sections.family = family;
     sections.suppliedItems = suppliedItems;
@@ -63,26 +63,27 @@ export async function getPersonFullReport(kilnId: string, personId: string) {
 
   if (person.type === "LABOUR_CONTRACTOR") {
     if (person.workType === "BHARAI_TRANSPORT" || person.workType === "BHARAI_CHAMBER_STACKING") {
-      sections.stackingEntries = await listStackingEntries(kilnId, { gangId: personId });
+      sections.stackingEntries = await listStackingEntries(kilnId, null, { gangId: personId });
     } else if (person.workType === "NIKASI") {
-      sections.nikasiEntries = await listNikasiEntries(kilnId, { gangId: personId });
+      sections.nikasiEntries = await listNikasiEntries(kilnId, null, { gangId: personId });
     } else if (person.workType === "PATHAI") {
       // moldingContractorSummary is kiln-wide (every Pathai contractor at
       // once) — narrowed to this one contractor rather than writing a
       // second, single-contractor query that would have to duplicate its
-      // gang/ledger aggregation logic.
-      const summary = await moldingContractorSummary(kilnId);
+      // gang/ledger aggregation logic. null = every season, matching this
+      // report's own "from the start of records to now" scope.
+      const summary = await moldingContractorSummary(kilnId, null);
       sections.moldingContractor = summary.contractors.find((c) => c.contractor.id === personId) ?? null;
     }
   }
 
   if (person.type === "FITTER") {
-    sections.firingShifts = await listFiringShifts(kilnId, { fitterId: personId });
+    sections.firingShifts = await listFiringShifts(kilnId, null, { fitterId: personId });
   }
 
   if (person.type === "LANDOWNER") {
     const [soilArrivals, soilContracts] = await Promise.all([
-      listSoilArrivals(kilnId, { landownerId: personId }),
+      listSoilArrivals(kilnId, null, { landownerId: personId }),
       listSoilContracts(kilnId, { landownerId: personId }),
     ]);
     sections.soilArrivals = soilArrivals;
@@ -90,7 +91,7 @@ export async function getPersonFullReport(kilnId: string, personId: string) {
   }
 
   if (person.type === "DRIVER") {
-    sections.brickLoadingEntries = await listBrickLoadingEntries(kilnId, { driverId: personId });
+    sections.brickLoadingEntries = await listBrickLoadingEntries(kilnId, null, { driverId: personId });
   }
 
   if (person.type === "CUSTOMER") {

@@ -9,12 +9,12 @@ import {
   removeVehicleHandler,
   updateDieselHandler,
 } from "../controllers/kilnVehicle.controller";
-import { requireAuth, resolveKiln } from "../middleware/auth.middleware";
+import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
 export const kilnVehicleRouter = Router();
 
-kilnVehicleRouter.use(requireAuth, resolveKiln);
+kilnVehicleRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 
 kilnVehicleRouter.post("/", asyncHandler(createVehicleHandler));
 kilnVehicleRouter.get("/", asyncHandler(listVehiclesHandler));

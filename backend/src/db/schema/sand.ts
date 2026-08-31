@@ -47,6 +47,7 @@ export interface SandDeliveryTractorEntry {
 export const sandDeliveries = mysqlTable("sand_deliveries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
   sandContractorId: varchar("sandContractorId", { length: 64 }).notNull(),
   contractId: varchar("contractId", { length: 64 }),
   tractorUsed: boolean("tractorUsed").default(false),

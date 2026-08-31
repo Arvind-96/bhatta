@@ -9,6 +9,16 @@ export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number];
 
 export interface AddLedgerEntryInput {
   kilnId: string;
+  // Optional, unlike every other seasonId — addLedgerEntry is called from
+  // dozens of create/update/correction paths across the app, several of
+  // which don't have a natural "current" season in scope (a correction
+  // entry belongs with the original transaction, not necessarily today's
+  // season). Set it when it's naturally available (the handful of
+  // contractor/operator "this season's production" summaries filter by
+  // it); a ledger entry with no seasonId simply doesn't count toward any
+  // of those season-scoped tallies — it's never used for balance math,
+  // which stays deliberately all-time regardless (see listLedgerForPerson).
+  seasonId?: string;
   personId: string;
   direction: "DUE" | "PAID";
   amount: number;
@@ -71,6 +81,12 @@ export async function deleteLedgerEntry(kilnId: string, entryId: string) {
   emitToKiln(kilnId, "ledger:update", { _id: entryId, deleted: true });
 }
 
+// Deliberately season-agnostic (no seasonId filter) — a person's overall
+// ledger balance is a running total across their whole relationship with
+// the kiln, the same "carries forward, never resets" idea as a Customer's
+// openingPaid/openingDue. Every ledger entry does still carry a seasonId
+// (see AddLedgerEntryInput) for the handful of "this season's production"
+// contractor/operator summaries that filter by it directly.
 export async function listLedgerForPerson(kilnId: string, personId: string) {
   return await db
     .select()

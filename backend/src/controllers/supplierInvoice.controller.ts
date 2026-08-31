@@ -30,7 +30,7 @@ const updateSchema = createSchema.partial();
 
 export async function create(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);
-  res.status(201).json(await createSupplierInvoice(req.kiln!.id, input));
+  res.status(201).json(await createSupplierInvoice(req.kiln!.id, { ...input, seasonId: req.season!.id }));
 }
 
 export async function detailForSupplier(req: AuthedRequest, res: Response) {
