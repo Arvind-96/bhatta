@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
-import { UserPlus, X } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
+import { ModalHeader } from "@/components/ui/modal-header";
 import { api } from "@/lib/api";
 import type { PayType, Person, PersonType, ShiftType, StackingStage, WorkType } from "@/types";
 import { usePersonTypeMeta, useWorkTypeLabels, PERSON_TYPES } from "./personTypes";
@@ -168,22 +169,10 @@ export function AddPersonModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink-primary/50 p-4 backdrop-blur-sm">
       <div className="flex min-h-full items-center justify-center">
       <Card className="w-full max-w-sm">
-        <div className="-mx-6 -mt-6 mb-4 h-1.5 animate-gradient-flow gradient-brand bg-[length:200%_100%]" />
-        <div className="mb-4 flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-series-1/12 text-series-1">
-            <UserPlus className="h-4 w-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-semibold text-ink-primary">{t("people.addPerson")}</h3>
-            <p className="truncate text-xs text-ink-muted">{meta.label}</p>
-          </div>
-          <button onClick={onClose} className="shrink-0 text-ink-muted hover:text-ink-primary">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <ModalHeader icon={UserPlus} title={t("people.addPerson")} subtitle={meta.label} onClose={onClose} />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <select value={type} onChange={(e) => setType(e.target.value as PersonType)} className={inputClass}>

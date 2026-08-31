@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   addLedger,
   advances,
+  balances,
   contractorBalance,
   create,
   creditAging,
@@ -26,6 +27,7 @@ export const personRouter = Router();
 personRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason);
 personRouter.post("/", asyncHandler(create));
 personRouter.get("/", asyncHandler(list));
+personRouter.get("/balances", asyncHandler(balances));
 personRouter.get("/advances", asyncHandler(advances));
 personRouter.get("/payments-due", asyncHandler(paymentsDue));
 personRouter.get("/credit-aging", asyncHandler(creditAging));

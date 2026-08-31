@@ -624,6 +624,11 @@ export interface PaymentDue {
   amountDue: number;
 }
 
+export interface PersonBalanceEntry {
+  person: { id: string; name: string; type: PersonType; phone: string | null };
+  balance: number;
+}
+
 export interface PaymentReceipt {
   _id: string;
   personId: { _id: string; name: string; type: PersonType; phone?: string } | string;

@@ -1,8 +1,9 @@
 import { FormEvent, useState } from "react";
-import { X, Briefcase } from "lucide-react";
+import { Briefcase } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
+import { ModalHeader } from "@/components/ui/modal-header";
 import { api } from "@/lib/api";
 import type { PayType, WorkType } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -101,20 +102,7 @@ export function AddThekedarModal({ onClose, onCreated }: AddThekedarModalProps) 
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink-primary/50 p-4 backdrop-blur-sm">
       <div className="flex min-h-full items-center justify-center">
       <Card className="w-full max-w-md hover:translate-y-0">
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="gradient-brand flex h-9 w-9 items-center justify-center rounded-xl shadow-glow-1">
-              <Briefcase className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-ink-primary">{t("people.addThekedarModalTitle")}</h3>
-              <p className="text-sm text-ink-muted">{t("people.newLabourContractorRecord")}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <ModalHeader icon={Briefcase} title={t("people.addThekedarModalTitle")} subtitle={t("people.newLabourContractorRecord")} onClose={onClose} />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <Field label={t("common.name")}>

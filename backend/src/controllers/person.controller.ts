@@ -11,6 +11,7 @@ import {
   listPaymentsDue,
   listPeople,
   mergeLedgers,
+  personLedgerBalances,
   savePersonIdentityProof,
   savePersonPhoto,
   updatePerson,
@@ -111,6 +112,11 @@ export async function list(req: AuthedRequest, res: Response) {
   const type = req.query.type ? personTypeSchema.parse(req.query.type) : undefined;
   const people = await listPeople(req.kiln!.id, type);
   res.json(people);
+}
+
+export async function balances(req: AuthedRequest, res: Response) {
+  const result = await personLedgerBalances(req.kiln!.id);
+  res.json(result);
 }
 
 export async function advances(req: AuthedRequest, res: Response) {

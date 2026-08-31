@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { MapPinned, Plus, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
+import { ModalHeader } from "@/components/ui/modal-header";
 import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -207,15 +208,10 @@ export function AddLandownerModal({ onClose, onCreated }: AddLandownerModalProps
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink-primary/50 p-4 backdrop-blur-sm">
       <div className="flex min-h-full items-center justify-center">
       <Card className="w-full max-w-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink-primary">{t("people.addLandownerModalTitle")}</h3>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <ModalHeader icon={MapPinned} title={t("people.addLandownerModalTitle")} subtitle={t("people.newLandownerRecord")} onClose={onClose} />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Basic details */}

@@ -60,7 +60,7 @@ export function EditWorkEntryModal({ entry, onClose, onSaved }: EditWorkEntryMod
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
       <Card className="w-full max-w-md hover:translate-y-0">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink-primary">{t("people.editWorkEntry")}</h3>

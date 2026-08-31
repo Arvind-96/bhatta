@@ -225,6 +225,21 @@ body {
   background-image: var(--gradient-brand);
 }
 
+/* People-page card icon actions (call / ledger / view profile) — the
+   rightmost action per card gets the electric accent2 gradient on hover
+   (matching every other "highest-stakes action" treatment in the app),
+   the others get the brand gradient. Plain CSS rather than Tailwind
+   utilities since gradient-brand/gradient-accent2 aren't Tailwind-known
+   utilities, so `hover:` variant classes can't target them directly. */
+.p-icon-btn:hover {
+  color: #fff;
+  background-image: var(--gradient-brand);
+  border-color: transparent;
+}
+.p-icon-btn.pf:hover {
+  background-image: var(--gradient-accent2);
+}
+
 /* Four heading treatments (design-system Foundations section), used for
    different weights of moment across the app instead of every page
    heading looking identical: gradient for the top of a whole page,

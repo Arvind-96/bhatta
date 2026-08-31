@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { Truck } from "lucide-react";
+import { ModalHeader } from "@/components/ui/modal-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
@@ -126,15 +127,10 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink-primary/50 p-4 backdrop-blur-sm">
       <div className="flex min-h-full items-center justify-center">
       <Card className="w-full max-w-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink-primary">{t("people.addSandContractorModalTitle")}</h3>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink-primary">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+        <ModalHeader icon={Truck} title={t("people.addSandContractorModalTitle")} subtitle={t("people.newSandContractorRecord")} onClose={onClose} />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Basic details */}

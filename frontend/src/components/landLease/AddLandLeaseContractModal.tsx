@@ -89,7 +89,7 @@ export function AddLandLeaseContractModal({ landLeaseId, lands, onClose, onCreat
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-primary/50 p-4 backdrop-blur-sm">
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink-primary">{t("landLease.newContract")}</h3>
