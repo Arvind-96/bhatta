@@ -57,6 +57,7 @@ import type {
   JcbWorkLog,
   KilnIncident,
   KilnVehicle,
+  LaborReportRun,
   LabourSessionSummary,
   Land,
   LedgerCategory,
@@ -619,6 +620,9 @@ export const api = {
       });
     },
     completeOnboarding: () => post("/kilns/onboarding/complete", {}, true),
+    getLaborReportSchedule: () => get<{ days: number[] }>("/kilns/labor-report-schedule", true),
+    updateLaborReportSchedule: (days: number[]) => patch<UserKiln>("/kilns/labor-report-schedule", { days }, true),
+    laborReportRuns: () => get<LaborReportRun[]>("/kilns/labor-report-runs", true),
   },
 
   seasons: {

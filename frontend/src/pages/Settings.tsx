@@ -11,7 +11,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { PhotoCaptureInput } from "@/components/people/PhotoCaptureInput";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { cn } from "@/lib/utils";
-import type { ComplianceDocument, ComplianceDocumentType, StockAudit } from "@/types";
+import type { ComplianceDocument, ComplianceDocumentType, LaborReportRun, StockAudit } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -799,6 +799,94 @@ function StockAuditSettings() {
   );
 }
 
+const ALL_DAYS_OF_MONTH = Array.from({ length: 31 }, (_, i) => i + 1);
+
+// Lets the admin pick which day(s) of the month close a labor-work period —
+// the backend cron checks daily and, on a matching day, records a new
+// period boundary running from the day after the last one through today
+// (see laborReportSchedule.service.ts). Never computes or posts anything
+// itself; the actual date-wise wage breakdown always lives on the Reports
+// page's own Labor Work Report, filterable by any date range regardless of
+// this schedule.
+function LaborReportScheduleSettings() {
+  const { t } = useTranslation();
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [runs, setRuns] = useState<LaborReportRun[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function refresh() {
+    const [schedule, runsData] = await Promise.all([api.kilns.getLaborReportSchedule(), api.kilns.laborReportRuns()]);
+    setSelectedDays(schedule.days);
+    setRuns(runsData);
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    refresh().catch(console.error);
+  }, [activeKilnId]);
+
+  function toggleDay(day: number) {
+    setSelectedDays((days) => (days.includes(day) ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b)));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await api.kilns.updateLaborReportSchedule(selectedDays);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle>{t("settings.laborReportSchedule")}</CardTitle>
+      </CardHeader>
+      <p className="mb-4 text-sm text-ink-muted">{t("settings.laborReportScheduleDescription")}</p>
+
+      <div className="grid grid-cols-7 gap-1.5">
+        {ALL_DAYS_OF_MONTH.map((day) => (
+          <button
+            key={day}
+            type="button"
+            onClick={() => toggleDay(day)}
+            className={cn(
+              "h-8 rounded-lg border text-sm tabular-nums",
+              selectedDays.includes(day)
+                ? "border-series-1 bg-series-1/15 font-medium text-series-1"
+                : "border-border bg-ink-primary/5 text-ink-secondary hover:bg-ink-primary/10"
+            )}
+          >
+            {day}
+          </button>
+        ))}
+      </div>
+
+      <Button onClick={handleSave} disabled={saving} className="mt-4 w-full">
+        {saved ? t("settings.saved") : saving ? t("settings.savingEllipsis") : t("settings.saveSchedule")}
+      </Button>
+
+      {runs.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <p className="mb-1.5 text-sm font-medium text-ink-secondary">{t("settings.recentlyGeneratedPeriods")}</p>
+          <div className="flex flex-col gap-1">
+            {runs.slice(0, 5).map((r) => (
+              <p key={r._id} className="text-sm text-ink-muted">
+                {new Date(r.periodStart).toLocaleDateString("en-IN")} – {new Date(r.periodEnd).toLocaleDateString("en-IN")}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function Settings() {
   return (
     <div className="flex flex-wrap gap-4">
@@ -808,6 +896,7 @@ export function Settings() {
       <YardCapacitySettings />
       <BhattaSeasonSettings />
       <ShiftSettings />
+      <LaborReportScheduleSettings />
       <GstSettings />
       <BillingDetailsSettings />
       <SignatureSettings />

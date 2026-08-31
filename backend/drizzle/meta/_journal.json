@@ -260,6 +260,13 @@
       "when": 1788196308694,
       "tag": "0036_lumpy_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "5",
+      "when": 1788197314482,
+      "tag": "0037_blue_nextwave",
+      "breakpoints": true
     }
   ]
 }

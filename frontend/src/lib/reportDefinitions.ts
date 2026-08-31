@@ -42,6 +42,7 @@ export const REPORT_DEFINITIONS: ReportDefinitionMeta[] = [
   { key: "labourLedger", group: "admin", labelKey: "reports.title.labourLedger", filters: ["personType", "workType", "status", "person", "contractor", "ledgerCategory"] },
   { key: "labourByContractor", group: "admin", labelKey: "reports.title.labourByContractor", filters: ["workType", "status", "contractor"] },
   { key: "salary", group: "admin", labelKey: "reports.title.salary", filters: ["person"] },
+  { key: "labourWorkReport", group: "admin", labelKey: "reports.title.labourWorkReport", filters: ["person", "personType"] },
   { key: "debtorsAndCreditors", group: "admin", labelKey: "reports.title.debtorsAndCreditors", filters: [] },
   { key: "trialBalance", group: "admin", labelKey: "reports.title.trialBalance", filters: [] },
   { key: "nilAccounts", group: "admin", labelKey: "reports.title.nilAccounts", filters: [] },

@@ -1086,6 +1086,13 @@ export interface PathaiSiteOverviewEntry {
   bricksThisWeek: number;
 }
 
+export interface LaborReportRun {
+  _id: string;
+  periodStart: string;
+  periodEnd: string;
+  generatedAt: string;
+}
+
 export interface SaltUsageLog {
   _id: string;
   siteId: string;

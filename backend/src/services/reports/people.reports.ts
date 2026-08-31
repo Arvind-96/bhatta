@@ -1,7 +1,9 @@
+import { and, eq, gte, lte } from "drizzle-orm";
+import { db } from "../../db/client";
 import { listLedgerForKiln } from "../ledger.service";
 import { listSalarySlipsForKiln } from "../salary.service";
 import { listPeople, resolveContractorGang, findPeopleIds, PersonType, WorkType } from "../person.service";
-import { LEDGER_CATEGORIES } from "../../db/schema";
+import { LEDGER_CATEGORIES, moldingEntries, stackingEntries, nikasiEntries, people } from "../../db/schema";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
 import { personProductionTotals } from "./productionTotals";
 import { ReportDefinition, refName, round2 } from "./types";
@@ -268,4 +270,172 @@ const salary: ReportDefinition = {
   },
 };
 
-export const peopleReports: ReportDefinition[] = [labourLedger, labourByContractor, salary];
+function dateKey(d: Date | null) {
+  return d ? d.toISOString().slice(0, 10) : "unknown";
+}
+
+interface LaborWorkRow {
+  personId: string;
+  date: string;
+  moldingBricks: number;
+  moldingAmount: number;
+  stackingBricks: number;
+  stackingAmount: number;
+  nikasiBricks: number;
+  nikasiAmount: number;
+  commissionAmount: number;
+}
+
+function getOrCreateRow(map: Map<string, LaborWorkRow>, personId: string, date: string): LaborWorkRow {
+  const key = `${personId}|${date}`;
+  let row = map.get(key);
+  if (!row) {
+    row = { personId, date, moldingBricks: 0, moldingAmount: 0, stackingBricks: 0, stackingAmount: 0, nikasiBricks: 0, nikasiAmount: 0, commissionAmount: 0 };
+    map.set(key, row);
+  }
+  return row;
+}
+
+// Every laborer's piece-rate work, day by day, across the three modules
+// that actually pay by production (Pathai/molding, Bharai/stacking,
+// Nikasi/unloading) plus a thekedar's molding commission — recomputed
+// fresh from the entries themselves rather than read back off the ledger,
+// so it stays a pure "how much work got done, what would it be worth"
+// report regardless of what's actually been posted/paid. Molding's amount
+// matches the wage createMoldingEntry already posts to the ledger exactly
+// (same formula); stacking/nikasi gangs are normally paid a flat monthly
+// salary in this app, so their amount here is an estimate of the piece-
+// rate value of what they produced, not a real payable figure — the admin
+// still decides what to actually pay via the existing Ledger/Advance flow
+// (this report only ever displays, never posts).
+async function computeLaborWorkRows(kilnId: string, filters: { from?: Date; to?: Date; personId?: string; personType?: PersonType }) {
+  const moldingConditions = [eq(moldingEntries.kilnId, kilnId)];
+  if (filters.from) moldingConditions.push(gte(moldingEntries.date, filters.from));
+  if (filters.to) moldingConditions.push(lte(moldingEntries.date, filters.to));
+
+  const stackingConditions = [eq(stackingEntries.kilnId, kilnId)];
+  if (filters.from) stackingConditions.push(gte(stackingEntries.date, filters.from));
+  if (filters.to) stackingConditions.push(lte(stackingEntries.date, filters.to));
+
+  const nikasiConditions = [eq(nikasiEntries.kilnId, kilnId)];
+  if (filters.from) nikasiConditions.push(gte(nikasiEntries.date, filters.from));
+  if (filters.to) nikasiConditions.push(lte(nikasiEntries.date, filters.to));
+
+  const [moldingRows, stackingRows, nikasiRows] = await Promise.all([
+    db.select().from(moldingEntries).where(and(...moldingConditions)),
+    db.select().from(stackingEntries).where(and(...stackingConditions)),
+    db.select().from(nikasiEntries).where(and(...nikasiConditions)),
+  ]);
+
+  const relevantPersonIds = new Set<string>([
+    ...moldingRows.map((r) => r.workerId),
+    ...stackingRows.map((r) => r.gangId),
+    ...nikasiRows.map((r) => r.gangId),
+  ]);
+  const allPeople = relevantPersonIds.size ? await db.select().from(people).where(eq(people.kilnId, kilnId)) : [];
+  const peopleById = new Map(allPeople.map((p) => [p._id, p]));
+
+  const rowsByKey = new Map<string, LaborWorkRow>();
+
+  for (const entry of moldingRows) {
+    if (entry.washedOut) continue;
+    const date = dateKey(entry.date);
+    const row = getOrCreateRow(rowsByKey, entry.workerId, date);
+    row.moldingBricks += entry.bricksCount;
+    row.moldingAmount += round2((entry.bricksCount / 1000) * entry.ratePerThousand);
+
+    const worker = peopleById.get(entry.workerId);
+    if (worker?.contractorId) {
+      const contractor = peopleById.get(worker.contractorId);
+      if (contractor?.commissionPerThousand) {
+        const commissionRow = getOrCreateRow(rowsByKey, contractor._id, date);
+        commissionRow.commissionAmount += round2((entry.bricksCount / 1000) * contractor.commissionPerThousand);
+      }
+    }
+  }
+
+  for (const entry of stackingRows) {
+    const date = dateKey(entry.date);
+    const row = getOrCreateRow(rowsByKey, entry.gangId, date);
+    row.stackingBricks += entry.bricksCount;
+    const rate = entry.ratePerThousand ?? peopleById.get(entry.gangId)?.ratePerThousand ?? 0;
+    row.stackingAmount += round2((entry.bricksCount / 1000) * rate);
+  }
+
+  for (const entry of nikasiRows) {
+    const date = dateKey(entry.date);
+    const row = getOrCreateRow(rowsByKey, entry.gangId, date);
+    row.nikasiBricks += entry.bricksCount;
+    const rate = peopleById.get(entry.gangId)?.ratePerThousand ?? 0;
+    row.nikasiAmount += round2((entry.bricksCount / 1000) * rate);
+  }
+
+  let rows = [...rowsByKey.values()];
+  if (filters.personId) rows = rows.filter((r) => r.personId === filters.personId);
+  if (filters.personType) rows = rows.filter((r) => peopleById.get(r.personId)?.type === filters.personType);
+
+  return rows
+    .map((r) => {
+      const person = peopleById.get(r.personId);
+      return {
+        date: r.date === "unknown" ? null : r.date,
+        person: person?.name ?? r.personId,
+        personType: person?.type ?? "",
+        moldingBricks: r.moldingBricks,
+        moldingAmount: r.moldingAmount,
+        stackingBricks: r.stackingBricks,
+        stackingAmount: r.stackingAmount,
+        nikasiBricks: r.nikasiBricks,
+        nikasiAmount: r.nikasiAmount,
+        commissionAmount: r.commissionAmount,
+        totalAmount: round2(r.moldingAmount + r.stackingAmount + r.nikasiAmount + r.commissionAmount),
+      };
+    })
+    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || a.person.localeCompare(b.person));
+}
+
+const labourWorkReport: ReportDefinition = {
+  key: "labourWorkReport",
+  titleKey: "reports.title.labourWorkReport",
+  async run(kilnId, filters) {
+    const detail = await computeLaborWorkRows(kilnId, {
+      from: filters.from,
+      to: filters.to,
+      personId: filters.personId,
+      personType: filters.personType as PersonType | undefined,
+    });
+
+    const totals = {
+      moldingBricks: detail.reduce((s, r) => s + r.moldingBricks, 0),
+      moldingAmount: round2(detail.reduce((s, r) => s + r.moldingAmount, 0)),
+      stackingBricks: detail.reduce((s, r) => s + r.stackingBricks, 0),
+      stackingAmount: round2(detail.reduce((s, r) => s + r.stackingAmount, 0)),
+      nikasiBricks: detail.reduce((s, r) => s + r.nikasiBricks, 0),
+      nikasiAmount: round2(detail.reduce((s, r) => s + r.nikasiAmount, 0)),
+      commissionAmount: round2(detail.reduce((s, r) => s + r.commissionAmount, 0)),
+      totalAmount: round2(detail.reduce((s, r) => s + r.totalAmount, 0)),
+    };
+
+    return {
+      reportKey: "labourWorkReport",
+      titleKey: "reports.title.labourWorkReport",
+      columns: [
+        { key: "date", labelKey: "reports.col.date", format: "date" },
+        { key: "person", labelKey: "reports.col.person", format: "text" },
+        { key: "personType", labelKey: "reports.col.personType", format: "text" },
+        { key: "moldingBricks", labelKey: "reports.col.moldingBricks", format: "number" },
+        { key: "moldingAmount", labelKey: "reports.col.moldingAmount", format: "currency" },
+        { key: "stackingBricks", labelKey: "reports.col.stackingBricks", format: "number" },
+        { key: "stackingAmount", labelKey: "reports.col.stackingAmount", format: "currency" },
+        { key: "nikasiBricks", labelKey: "reports.col.nikasiBricks", format: "number" },
+        { key: "nikasiAmount", labelKey: "reports.col.nikasiAmount", format: "currency" },
+        { key: "commissionAmount", labelKey: "reports.col.commissionAmount", format: "currency" },
+        { key: "totalAmount", labelKey: "reports.col.totalAmount", format: "currency" },
+      ],
+      rows: detail,
+      totals,
+    };
+  },
+};
+
+export const peopleReports: ReportDefinition[] = [labourLedger, labourByContractor, salary, labourWorkReport];

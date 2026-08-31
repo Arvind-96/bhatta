@@ -15,6 +15,7 @@ import {
   setYardCapacity,
   updateKilnProfile,
 } from "../services/auth.service";
+import { getLaborReportScheduleDays, listLaborReportRuns, setLaborReportScheduleDays } from "../services/laborReportSchedule.service";
 import { AuthedRequest } from "../middleware/auth.middleware";
 
 const createKilnSchema = z.object({
@@ -128,4 +129,24 @@ export async function getSignature(req: AuthedRequest, res: Response) {
 export async function finishOnboarding(req: AuthedRequest, res: Response) {
   const kiln = await completeOnboarding(req.kiln!.id);
   res.json(kiln);
+}
+
+const laborReportScheduleSchema = z.object({
+  days: z.array(z.number().int().min(1).max(31)),
+});
+
+export async function updateLaborReportSchedule(req: AuthedRequest, res: Response) {
+  const input = laborReportScheduleSchema.parse(req.body);
+  const kiln = await setLaborReportScheduleDays(req.kiln!.id, input.days);
+  res.json(kiln);
+}
+
+export async function getLaborReportSchedule(req: AuthedRequest, res: Response) {
+  const days = await getLaborReportScheduleDays(req.kiln!.id);
+  res.json({ days });
+}
+
+export async function getLaborReportRuns(req: AuthedRequest, res: Response) {
+  const runs = await listLaborReportRuns(req.kiln!.id);
+  res.json(runs);
 }

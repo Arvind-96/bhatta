@@ -2,12 +2,15 @@ import { Router } from "express";
 import {
   createKiln,
   finishOnboarding,
+  getLaborReportRuns,
+  getLaborReportSchedule,
   getSignature,
   listKilns,
   publicKiln,
   updateBilling,
   updateGeofence,
   updateGst,
+  updateLaborReportSchedule,
   updateProfile,
   updateShiftTimes,
   updateYardCapacity,
@@ -33,3 +36,6 @@ kilnRouter.patch("/billing", resolveKiln, asyncHandler(updateBilling));
 kilnRouter.post("/signature", resolveKiln, uploadSignature, asyncHandler(uploadSignatureHandler));
 kilnRouter.get("/signature", resolveKiln, asyncHandler(getSignature));
 kilnRouter.post("/onboarding/complete", resolveKiln, asyncHandler(finishOnboarding));
+kilnRouter.get("/labor-report-schedule", resolveKiln, asyncHandler(getLaborReportSchedule));
+kilnRouter.patch("/labor-report-schedule", resolveKiln, asyncHandler(updateLaborReportSchedule));
+kilnRouter.get("/labor-report-runs", resolveKiln, asyncHandler(getLaborReportRuns));

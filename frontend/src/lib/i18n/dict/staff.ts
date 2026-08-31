@@ -105,6 +105,13 @@ export const staffDict: Record<string, Record<Locale, string>> = {
   "settings.shiftStart": { en: "Shift start", hi: "शिफ़्ट शुरू" },
   "settings.shiftEnd": { en: "Shift end", hi: "शिफ़्ट समाप्त" },
   "settings.saveShiftTimings": { en: "Save shift timings", hi: "शिफ़्ट समय सहेजें" },
+  "settings.laborReportSchedule": { en: "Labor Work Report Schedule", hi: "मज़दूर कार्य रिपोर्ट अनुसूची" },
+  "settings.laborReportScheduleDescription": {
+    en: "Pick day(s) of the month to close a labor-work period. The Reports page's Labor Work Report always shows any date range you pick regardless of this — this just marks when a period closed.",
+    hi: "मज़दूर-कार्य अवधि बंद करने के लिए महीने के दिन चुनें। Reports पृष्ठ की मज़दूर कार्य रिपोर्ट हमेशा आपकी चुनी हुई किसी भी तारीख सीमा को दिखाती है — यह केवल यह चिह्नित करता है कि कब एक अवधि पूरी हुई।",
+  },
+  "settings.saveSchedule": { en: "Save schedule", hi: "अनुसूची सहेजें" },
+  "settings.recentlyGeneratedPeriods": { en: "Recently closed periods", hi: "हाल ही में बंद हुई अवधियां" },
   "settings.gstNumber": { en: "GST Number", hi: "जीएसटी नंबर" },
   "settings.gstNumberDescription": {
     en: "Optional — printed on the Challan when set. Leave blank if this kiln isn't GST-registered.",

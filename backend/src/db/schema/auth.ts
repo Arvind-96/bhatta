@@ -1,4 +1,4 @@
-import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
+import { double, int, json, mysqlTable, varchar, text, datetime, uniqueIndex } from "drizzle-orm/mysql-core";
 import { idColumn, createdAtColumn } from "./_helpers";
 
 export const kilns = mysqlTable("kilns", {
@@ -36,6 +36,12 @@ export const kilns = mysqlTable("kilns", {
   // invoice's printed terms never silently change if this default is
   // edited later.
   defaultTermsAndConditions: text("defaultTermsAndConditions"),
+  // Days of the month (1-31, admin-picked on Settings) on which the system
+  // auto-generates a labor work report period boundary — see
+  // laborReportSchedule.service.ts. Null/empty = feature not turned on for
+  // this kiln; the Reports page's own labourWorkReport report works with
+  // any manual date range regardless of this setting.
+  laborReportScheduleDays: json("laborReportScheduleDays").$type<number[]>(),
   createdAt: createdAtColumn(),
 });
 

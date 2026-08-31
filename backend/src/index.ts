@@ -9,6 +9,7 @@ import { registerSocketHandlers } from "./sockets";
 import { apiRouter } from "./routes";
 import { errorMiddleware } from "./middleware/error.middleware";
 import { runMonthlySalaryGeneration } from "./services/salary.service";
+import { runScheduledLaborReportGeneration } from "./services/laborReportSchedule.service";
 
 // Last-resort safety net: every route already goes through asyncHandler
 // (see middleware/asyncHandler.ts) so a request-level error becomes a JSON
@@ -58,6 +59,19 @@ async function start() {
     runMonthlySalaryGeneration()
       .then((result) => console.log(`[salary-cron] ${result.month}: ${result.generated} generated, ${result.failed.length} failed`))
       .catch((err) => console.error("[salary-cron] failed:", err));
+  });
+
+  // 2am daily, server-local time: for every kiln that's picked at least
+  // one day-of-month on Settings, checks whether today is one of them and
+  // records a new labor-work-report period boundary if so (see
+  // laborReportSchedule.service.ts — this never posts to the ledger or
+  // duplicates production data, purely a "period closed" marker).
+  cron.schedule("0 2 * * *", () => {
+    runScheduledLaborReportGeneration()
+      .then((results) => {
+        if (results.length) console.log(`[labor-report-cron] generated ${results.length} period(s)`);
+      })
+      .catch((err) => console.error("[labor-report-cron] failed:", err));
   });
 
   httpServer.listen(env.port, () => {

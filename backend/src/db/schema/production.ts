@@ -89,6 +89,23 @@ export const saltUsageLogs = mysqlTable("salt_usage_logs", {
   createdAt: createdAtColumn(),
 }, (t) => ({ kilnDateIdx: index("saltusage_kiln_date_idx").on(t.kilnId, t.date) }));
 
+// A bookkeeping trail of when the labor-work-report period boundary
+// auto-fired (see laborReportSchedule.service.ts) — deliberately doesn't
+// duplicate any molding/stacking/nikasi data; the Reports page's
+// labourWorkReport report always computes live from those tables for
+// whatever date range is asked for. This table exists purely so Settings
+// can show "last generated on ..." and the cron never double-fires the
+// same period twice (unique index).
+export const laborReportRuns = mysqlTable("labor_report_runs", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  periodStart: datetime("periodStart", { mode: "date" }).notNull(),
+  periodEnd: datetime("periodEnd", { mode: "date" }).notNull(),
+  generatedAt: createdAtColumn(),
+}, (t) => ({
+  kilnPeriodUnique: uniqueIndex("laborreportrun_kiln_period_unique").on(t.kilnId, t.periodStart, t.periodEnd),
+}));
+
 export const moldingEntries = mysqlTable("molding_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
