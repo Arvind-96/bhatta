@@ -8,6 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
+import { ContractorNetBalanceCard } from "@/components/people/ContractorNetBalanceCard";
 import { NikasiOperatorDetailPage } from "./NikasiOperatorDetailPage";
 import { EditNikasiEntryModal } from "./EditNikasiEntryModal";
 import type { LedgerEntry, NikasiContractorEntry, NikasiEntry, Person } from "@/types";
@@ -192,6 +193,10 @@ export function NikasiContractorDetailPage({ contractorId, onBack }: NikasiContr
             </div>
           </div>
         </Card>
+
+        <div className="lg:col-span-2">
+          <ContractorNetBalanceCard contractorId={contractorId} />
+        </div>
 
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">

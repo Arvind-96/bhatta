@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import {
+  contractorNetBalance,
   createPerson,
   customerCreditAging,
   getPersonFilePath,
@@ -186,6 +187,11 @@ export async function addLedger(req: AuthedRequest, res: Response) {
 export async function listLedger(req: AuthedRequest, res: Response) {
   const entries = await listLedgerForPerson(req.kiln!.id, req.params.id);
   res.json(entries);
+}
+
+export async function contractorBalance(req: AuthedRequest, res: Response) {
+  const result = await contractorNetBalance(req.kiln!.id, req.params.id);
+  res.json(result);
 }
 
 export async function report(req: AuthedRequest, res: Response) {

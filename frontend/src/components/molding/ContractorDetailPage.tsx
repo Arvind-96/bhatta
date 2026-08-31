@@ -8,6 +8,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { LabourSessionSection } from "@/components/people/LabourSessionSection";
+import { ContractorNetBalanceCard } from "@/components/people/ContractorNetBalanceCard";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { LaborDetailPage } from "./LaborDetailPage";
 import type { LedgerEntry, MoldingContractorEntry, Person } from "@/types";
@@ -190,6 +191,10 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
             </div>
           </div>
         </Card>
+
+        <div className="lg:col-span-2">
+          <ContractorNetBalanceCard contractorId={contractorId} />
+        </div>
 
         <LabourSessionSection contractorId={contractorId} editable={false} />
 

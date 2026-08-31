@@ -522,6 +522,12 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
+export interface ContractorNetBalance {
+  ownBalance: number;
+  gangDrawdown: number;
+  netBalance: number;
+}
+
 export interface OutstandingAdvance {
   person: Person;
   outstandingAdvance: number;

@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   addLedger,
   advances,
+  contractorBalance,
   create,
   creditAging,
   getIdentityProof,
@@ -31,6 +32,7 @@ personRouter.get("/:id", asyncHandler(getOne));
 personRouter.patch("/:id", asyncHandler(update));
 personRouter.post("/:id/ledger", asyncHandler(addLedger));
 personRouter.get("/:id/ledger", asyncHandler(listLedger));
+personRouter.get("/:id/contractor-balance", asyncHandler(contractorBalance));
 personRouter.get("/:id/report", asyncHandler(report));
 personRouter.post("/:id/photo", uploadPhoto, asyncHandler(uploadPhotoHandler));
 personRouter.get("/:id/photo", asyncHandler(getPhoto));

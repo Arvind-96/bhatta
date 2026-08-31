@@ -8,6 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
+import { ContractorNetBalanceCard } from "@/components/people/ContractorNetBalanceCard";
 import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 import { OperatorDetailPage } from "./OperatorDetailPage";
 import { EditStackingEntryModal } from "./EditStackingEntryModal";
@@ -261,6 +262,10 @@ export function StackingContractorDetailPage({ contractorId, onBack }: StackingC
             </div>
           </div>
         </Card>
+
+        <div className="lg:col-span-2">
+          <ContractorNetBalanceCard contractorId={contractorId} />
+        </div>
 
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">

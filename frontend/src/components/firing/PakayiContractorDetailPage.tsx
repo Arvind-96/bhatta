@@ -8,6 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddPersonModal } from "@/components/people/AddPersonModal";
+import { ContractorNetBalanceCard } from "@/components/people/ContractorNetBalanceCard";
 import { AddWorkEntryModal } from "@/components/people/AddWorkEntryModal";
 import { EditWorkEntryModal } from "@/components/people/EditWorkEntryModal";
 import { PakayiOperatorDetailPage } from "./PakayiOperatorDetailPage";
@@ -182,6 +183,10 @@ export function PakayiContractorDetailPage({ contractorId, onBack }: PakayiContr
             </div>
           </div>
         </Card>
+
+        <div className="lg:col-span-2">
+          <ContractorNetBalanceCard contractorId={contractorId} />
+        </div>
 
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">

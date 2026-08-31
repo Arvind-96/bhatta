@@ -9,6 +9,7 @@ import { LedgerQuickActions } from "@/components/people/LedgerQuickActions";
 import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategoryHistorySections";
 import { AddLabourModal } from "@/components/people/AddLabourModal";
 import { LabourSessionSection } from "@/components/people/LabourSessionSection";
+import { ContractorNetBalanceCard } from "@/components/people/ContractorNetBalanceCard";
 import { AddWorkEntryModal } from "@/components/people/AddWorkEntryModal";
 import { EditWorkEntryModal } from "@/components/people/EditWorkEntryModal";
 import { AttendanceCalendar } from "@/components/staff/AttendanceCalendar";
@@ -427,6 +428,10 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
             </div>
           </div>
         </Card>
+
+        <div className="lg:col-span-2">
+          <ContractorNetBalanceCard contractorId={thekedarId} />
+        </div>
 
         <div className="lg:col-span-2">
           <AttendanceCalendar personId={thekedarId} />

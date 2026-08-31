@@ -6,6 +6,7 @@ import { db, DATA_DIR } from "../db/client";
 import { people, ledgerEntries, customers, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
 import { getCustomerDetail } from "./customer.service";
 import { getCurrentSeasonId } from "./season.util";
+import { listLedgerForKiln } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
 
 export type PersonType = (typeof PERSON_TYPES)[number];
@@ -198,6 +199,47 @@ export async function getBalance(kilnId: string, personId: string) {
   // other balance computation in this file and financialOverview.service.ts
   // ultimately derives from, so it doesn't have to be re-fixed per call site.
   return Math.round(balance * 100) / 100;
+}
+
+// The four "money handed out mid-cycle, not yet earned back" categories —
+// same set listOutstandingAdvances already treats as advance-like — that
+// count as drawn against a contractor's own pool when paid straight to one
+// of their gang instead of through them.
+const CONTRACTOR_DRAWDOWN_CATEGORIES = ["ADVANCE", "KHARCHI", "MEDICAL", "FESTIVAL"];
+
+export interface ContractorNetBalance {
+  ownBalance: number;
+  gangDrawdown: number;
+  netBalance: number;
+}
+
+// A LABOUR_CONTRACTOR's own ledger balance (ownBalance — their own
+// advances/commission/settlements) doesn't reflect money the kiln paid
+// directly to their gang instead of through them. Most of the time the
+// kiln pays the contractor a lump sum and the contractor distributes it;
+// when the kiln pays a gang member directly instead (Advance/Kharchi/
+// Medical/Festival), that payment is really drawn against the same pool,
+// so it's added back here to net the contractor's true remaining exposure
+// — the same idea labourSession.service.ts already applies for Pathai
+// specifically, generalized to every contractor type via
+// resolveContractorGang's union of all four contractorId fields, and
+// computed live (not a duplicated ledger entry) so it can never drift out
+// of sync with the gang's own entries, and needs no correction/reversal
+// bookkeeping when one of those entries is later edited or deleted.
+export async function contractorNetBalance(kilnId: string, contractorId: string): Promise<ContractorNetBalance> {
+  const gangIds = (await resolveContractorGang(kilnId, contractorId)).filter((id) => id !== contractorId);
+  const ownBalance = await getBalance(kilnId, contractorId);
+  if (gangIds.length === 0) return { ownBalance, gangDrawdown: 0, netBalance: ownBalance };
+
+  const gangEntries = await listLedgerForKiln(kilnId, { personIds: gangIds });
+  const gangDrawdown =
+    Math.round(
+      gangEntries
+        .filter((e) => e.direction === "PAID" && e.category && CONTRACTOR_DRAWDOWN_CATEGORIES.includes(e.category))
+        .reduce((sum, e) => sum + e.amount, 0) * 100
+    ) / 100;
+
+  return { ownBalance, gangDrawdown, netBalance: Math.round((ownBalance + gangDrawdown) * 100) / 100 };
 }
 
 export async function getPersonWithBalance(kilnId: string, personId: string) {

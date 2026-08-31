@@ -18,6 +18,7 @@ import type {
   ChamberGrading,
   ComplianceDocument,
   ComplianceDocumentType,
+  ContractorNetBalance,
   ContractDailyMovement,
   Customer,
   CustomerCreditAging,
@@ -627,6 +628,7 @@ export const api = {
       }
     ) => post<LedgerEntry>(`/people/${id}/ledger`, input, true),
     listLedger: (id: string) => get<LedgerEntry[]>(`/people/${id}/ledger`, true),
+    contractorBalance: (id: string) => get<ContractorNetBalance>(`/people/${id}/contractor-balance`, true),
     report: (id: string) => get<PersonFullReport>(`/people/${id}/report`, true),
     advances: () => get<OutstandingAdvance[]>("/people/advances", true),
     paymentsDue: () => get<PaymentDue[]>("/people/payments-due", true),
