@@ -1085,8 +1085,13 @@ export const api = {
   },
 
   stacking: {
-    list: (filter: { gangId?: string } = {}) =>
-      get<StackingEntry[]>(`/stacking${filter.gangId ? `?gangId=${filter.gangId}` : ""}`, true),
+    list: (filter: { gangId?: string; gherId?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (filter.gangId) params.set("gangId", filter.gangId);
+      if (filter.gherId) params.set("gherId", filter.gherId);
+      const qs = params.toString();
+      return get<StackingEntry[]>(`/stacking${qs ? `?${qs}` : ""}`, true);
+    },
     create: (input: {
       gherId: string;
       gangId: string;
@@ -1145,8 +1150,13 @@ export const api = {
   },
 
   nikasi: {
-    list: (filter: { gangId?: string } = {}) =>
-      get<NikasiEntry[]>(`/nikasi${filter.gangId ? `?gangId=${filter.gangId}` : ""}`, true),
+    list: (filter: { gangId?: string; gherId?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (filter.gangId) params.set("gangId", filter.gangId);
+      if (filter.gherId) params.set("gherId", filter.gherId);
+      const qs = params.toString();
+      return get<NikasiEntry[]>(`/nikasi${qs ? `?${qs}` : ""}`, true);
+    },
     create: (input: { gherId: string; gangId: string; bricksCount: number; damagedCount?: number; damageFault?: DamageFault; notes?: string }) =>
       post<NikasiEntry>("/nikasi", input, true),
     update: (id: string, input: Partial<{ bricksCount: number; damagedCount: number; damageFault: DamageFault; notes: string }>) =>

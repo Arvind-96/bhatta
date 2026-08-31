@@ -2,7 +2,7 @@ import type { Gher, GherStatus } from "@/types";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks/useTranslation";
 
-const STATUS_COLOR: Record<GherStatus, string> = {
+export const STATUS_COLOR: Record<GherStatus, string> = {
   EMPTY: "var(--ink-muted)",
   STACKING: "var(--status-warning)",
   FIRING: "var(--status-serious)",
@@ -12,21 +12,25 @@ const STATUS_COLOR: Record<GherStatus, string> = {
 
 interface GherMapProps {
   ghers: Gher[];
-  onAdvance: (gher: Gher) => void;
+  selectedId: string;
+  onSelect: (gher: Gher) => void;
 }
 
-// A Bull's Trench Kiln is one big oval divided into chambers — this mirrors
-// that shape directly instead of a generic grid/list, so an owner glancing
-// at the dashboard sees the same layout they'd see walking the site.
-export function GherMap({ ghers, onAdvance }: GherMapProps) {
+// A responsive grid of chamber tiles — one per kiln chamber, colored by
+// status. Previously this rendered as fixed-radius circles placed at equal
+// angle steps around a fixed-size oval, which mathematically overlapped
+// even at the default 24-chamber setup (fixed-size circles + a
+// fixed-size ellipse fight any chamber count beyond a handful) and got
+// dramatically worse up to the supported max of 200. A CSS grid has no
+// such ceiling — it simply wraps to more rows as the chamber count grows,
+// so it stays legible from a handful of chambers up to 200.
+// Clicking a tile SELECTS it (shows its detail panel below, where the
+// admin can see its status and choose to advance it, log activity against
+// it, etc.) rather than silently advancing its status on a stray click.
+export function GherMap({ ghers, selectedId, onSelect }: GherMapProps) {
   const { t } = useTranslation();
-  const cx = 220;
-  const cy = 130;
-  const rx = 180;
-  const ry = 95;
-  const count = ghers.length;
 
-  if (count === 0) {
+  if (ghers.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-ink-muted">
         {t("stacking.noChambersConfigured")}
@@ -35,34 +39,22 @@ export function GherMap({ ghers, onAdvance }: GherMapProps) {
   }
 
   return (
-    <svg viewBox="0 0 440 260" className="w-full max-w-2xl">
-      <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="var(--gridline)" strokeWidth={2} />
-      {ghers.map((gher, i) => {
-        const angle = (i / count) * 2 * Math.PI - Math.PI / 2;
-        const x = cx + rx * Math.cos(angle);
-        const y = cy + ry * Math.sin(angle);
-        return (
-          <g
-            key={gher._id}
-            transform={`translate(${x}, ${y})`}
-            className="cursor-pointer"
-            onClick={() => onAdvance(gher)}
-          >
-            <circle r={15} fill={STATUS_COLOR[gher.status]} className={cn("transition-colors")} />
-            <circle r={15} fill="none" stroke="var(--surface)" strokeWidth={2} />
-            <text
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={11}
-              fontWeight={600}
-              fill="#0b0b0b"
-              style={{ pointerEvents: "none" }}
-            >
-              {gher.number}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(3rem,1fr))] gap-2">
+      {ghers.map((gher) => (
+        <button
+          key={gher._id}
+          type="button"
+          onClick={() => onSelect(gher)}
+          title={t("firing.gherNumberStatus", { number: gher.number, status: gher.status })}
+          className={cn(
+            "flex aspect-square items-center justify-center rounded-lg text-xs font-semibold transition-all hover:-translate-y-0.5",
+            selectedId === gher._id ? "ring-2 ring-series-1 ring-offset-2 ring-offset-surface" : ""
+          )}
+          style={{ background: STATUS_COLOR[gher.status], color: "#0b0b0b" }}
+        >
+          {gher.number}
+        </button>
+      ))}
+    </div>
   );
 }

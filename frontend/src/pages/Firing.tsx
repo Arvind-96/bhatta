@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Flame, Layers, Plus, Warehouse } from "lucide-react";
+import { ArrowRight, Flame, Layers, Plus, Warehouse } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -145,27 +145,171 @@ const STATUS_LEGEND_COLOR: Record<GherStatus, string> = {
   UNLOADING: "var(--series-3)",
 };
 
-// One chamber's own detail — loading/firing/unloading progress this cycle,
-// plus its directly-attributable cost report (fuel + stacking wages ÷ its
-// own graded output, once graded). Selected via a plain dropdown rather
-// than rendering this for every chamber at once, so the panel stays usable
+// The gang picker shared by the Stacking and Nikasi quick-log forms below —
+// same three person types both modules' own backend gates accept
+// (stacking.service.ts / nikasi.service.ts's assertPersonOfType call).
+function useGangOptions() {
+  const [people, setPeople] = useState<Person[]>([]);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+
+  async function refresh() {
+    const [contractors, workers, helpers] = await Promise.all([
+      api.people.list("LABOUR_CONTRACTOR"),
+      api.people.list("WORKER"),
+      api.people.list("HELPER"),
+    ]);
+    setPeople([...contractors, ...workers, ...helpers]);
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    refresh().catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKilnId]);
+
+  useKilnEvent("person:update", () => refresh());
+
+  return people;
+}
+
+interface ChamberActivityItem {
+  id: string;
+  type: "STACKING" | "FUEL" | "NIKASI" | "GRADING";
+  date: string;
+  label: string;
+  quantityLabel: string;
+}
+
+// This chamber's own recent entries across every module that touches a
+// gher — the actual cross-module linkage the chamber board never had
+// before (selecting a chamber used to change nothing else on the page).
+// Stacking/Nikasi are filtered server-side (?gherId=); FuelLog/
+// ChamberGrading have no gherId filter on their list endpoints (they're
+// windowed by days instead), so those two are filtered client-side from
+// the same bounded recent-days list their own tabs already use.
+function useChamberActivity(gherId: string) {
+  const [items, setItems] = useState<ChamberActivityItem[]>([]);
+
+  async function refresh() {
+    if (!gherId) {
+      setItems([]);
+      return;
+    }
+    const [stackingEntries, nikasiEntries, fuelLogs, gradings] = await Promise.all([
+      api.stacking.list({ gherId }),
+      api.nikasi.list({ gherId }),
+      api.fuelLogs.list(),
+      api.chamberGradings.list(),
+    ]);
+    const gherIdOf = (ref: { _id: string } | string) => (typeof ref === "object" ? ref._id : ref);
+    const merged: ChamberActivityItem[] = [
+      ...stackingEntries.map((e) => ({ id: e._id, type: "STACKING" as const, date: e.date, label: "Bharai", quantityLabel: `${e.bricksCount.toLocaleString("en-IN")} bricks` })),
+      ...nikasiEntries.map((e) => ({ id: e._id, type: "NIKASI" as const, date: e.date, label: "Nikasi", quantityLabel: `${e.bricksCount.toLocaleString("en-IN")} bricks` })),
+      ...fuelLogs.filter((l) => gherIdOf(l.gherId) === gherId).map((l) => ({ id: l._id, type: "FUEL" as const, date: l.date, label: l.fuelType, quantityLabel: `${l.quantityKg.toLocaleString("en-IN")} kg` })),
+      ...gradings.filter((g) => gherIdOf(g.gherId) === gherId).map((g) => ({ id: g._id, type: "GRADING" as const, date: g.date, label: "Grading", quantityLabel: `${g.totalOutput.toLocaleString("en-IN")} bricks` })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setItems(merged.slice(0, 15));
+  }
+
+  useEffect(() => {
+    refresh().catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gherId]);
+
+  useKilnEvent("stacking:update", () => refresh());
+  useKilnEvent("nikasi:update", () => refresh());
+  useKilnEvent("fuelLog:update", () => refresh());
+  useKilnEvent("grading:update", () => refresh());
+
+  return items;
+}
+
+const ACTIVITY_TYPE_LABEL_KEY: Record<ChamberActivityItem["type"], string> = {
+  STACKING: "firing.activityStacking",
+  FUEL: "firing.activityFuel",
+  NIKASI: "firing.activityNikasi",
+  GRADING: "firing.activityGrading",
+};
+
+// One chamber's own detail — status + an explicit advance action, its
+// current-cycle progress and cost, three quick-log forms that post
+// straight against THIS chamber (previously the only way to log anything
+// against a chamber was to leave the board entirely, go find the right
+// tab, and pick the chamber again from a dropdown), and its own recent
+// activity across every module. Selected via the grid above rather than
+// rendering this for every chamber at once, so the panel stays usable
 // whether the kiln has 20 chambers or 200.
-function ChamberDetailPanel({ entry }: { entry: ChamberOverviewEntry }) {
+function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entry: ChamberOverviewEntry; gangOptions: Person[]; fuelTypes: FuelType[]; onAdvance: (gher: Gher) => void }) {
   const { t } = useTranslation();
   const [cost, setCost] = useState<ChamberCostReport | null>(null);
   const { gher, bricksLoadedThisCycle, fuelThisCycle, bricksUnloadedThisCycle } = entry;
+  const activity = useChamberActivity(gher._id);
+
+  const [openForm, setOpenForm] = useState<"" | "stacking" | "fuel" | "nikasi">("");
+  const [stackingForm, setStackingForm] = useState({ gangId: "", bricksCount: "" });
+  const [fuelForm, setFuelForm] = useState({ fuelType: "", quantityKg: "" });
+  const [nikasiForm, setNikasiForm] = useState({ gangId: "", bricksCount: "" });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     api.financialReports.chamberCost(gher._id).then(setCost).catch(console.error);
   }, [gher._id]);
 
+  useEffect(() => {
+    setOpenForm("");
+  }, [gher._id]);
+
+  async function submitStacking(e: FormEvent) {
+    e.preventDefault();
+    if (!stackingForm.gangId || !stackingForm.bricksCount) return;
+    setSaving(true);
+    try {
+      await api.stacking.create({ gherId: gher._id, gangId: stackingForm.gangId, stage: "CHAMBER_STACKING", bricksCount: Number(stackingForm.bricksCount) });
+      setStackingForm({ gangId: "", bricksCount: "" });
+      setOpenForm("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitFuel(e: FormEvent) {
+    e.preventDefault();
+    if (!fuelForm.fuelType || !fuelForm.quantityKg) return;
+    setSaving(true);
+    try {
+      await api.fuelLogs.create({ gherId: gher._id, fuelType: fuelForm.fuelType, quantityKg: Number(fuelForm.quantityKg) });
+      setFuelForm({ fuelType: "", quantityKg: "" });
+      setOpenForm("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitNikasi(e: FormEvent) {
+    e.preventDefault();
+    if (!nikasiForm.gangId || !nikasiForm.bricksCount) return;
+    setSaving(true);
+    try {
+      await api.nikasi.create({ gherId: gher._id, gangId: nikasiForm.gangId, bricksCount: Number(nikasiForm.bricksCount) });
+      setNikasiForm({ gangId: "", bricksCount: "" });
+      setOpenForm("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <Card>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-ink-primary">{t("firing.chamberNumberLabel", { number: gher.number })}</h4>
-        <Badge variant={gher.status === "FIRING" ? "critical" : gher.status === "READY" ? "good" : gher.status === "EMPTY" ? "neutral" : "warning"}>
-          {gher.status}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={gher.status === "FIRING" ? "critical" : gher.status === "READY" ? "good" : gher.status === "EMPTY" ? "neutral" : "warning"}>
+            {gher.status}
+          </Badge>
+          <Button size="sm" variant="outline" onClick={() => onAdvance(gher)}>
+            {t("firing.advanceTo", { status: NEXT_STATUS[gher.status] })} <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded-xl border border-border bg-ink-primary/[0.03] p-3 text-center">
@@ -199,6 +343,90 @@ function ChamberDetailPanel({ entry }: { entry: ChamberOverviewEntry }) {
           {t("firing.chamberCostBreakdown", { fuel: formatINR(cost.fuelCost), stacking: formatINR(cost.stackingCost), total: formatINR(cost.totalCost) })}
         </p>
       )}
+
+      <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-3">
+        <Button size="sm" variant={openForm === "stacking" ? "primary" : "outline"} onClick={() => setOpenForm((f) => (f === "stacking" ? "" : "stacking"))}>
+          <Plus className="h-3.5 w-3.5" /> {t("firing.logBharaiForChamber")}
+        </Button>
+        <Button size="sm" variant={openForm === "fuel" ? "primary" : "outline"} onClick={() => setOpenForm((f) => (f === "fuel" ? "" : "fuel"))} disabled={fuelTypes.length === 0}>
+          <Plus className="h-3.5 w-3.5" /> {t("firing.logFuelForChamber")}
+        </Button>
+        <Button size="sm" variant={openForm === "nikasi" ? "primary" : "outline"} onClick={() => setOpenForm((f) => (f === "nikasi" ? "" : "nikasi"))}>
+          <Plus className="h-3.5 w-3.5" /> {t("firing.logNikasiForChamber")}
+        </Button>
+      </div>
+
+      {openForm === "stacking" && (
+        <form onSubmit={submitStacking} className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-border bg-ink-primary/[0.02] p-3">
+          <select required value={stackingForm.gangId} onChange={(e) => setStackingForm((f) => ({ ...f, gangId: e.target.value }))} className={cn(inputClass, "col-span-2")}>
+            <option value="">{t("firing.gangPlaceholder")}</option>
+            {gangOptions.map((p) => (
+              <option key={p._id} value={p._id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <input required type="number" placeholder={t("firing.bricksLoadedThisCycleLabel")} value={stackingForm.bricksCount} onChange={(e) => setStackingForm((f) => ({ ...f, bricksCount: e.target.value }))} className={inputClass} />
+          <Button type="submit" size="sm" disabled={saving}>
+            {t("common.save")}
+          </Button>
+        </form>
+      )}
+
+      {openForm === "fuel" && (
+        <form onSubmit={submitFuel} className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-border bg-ink-primary/[0.02] p-3">
+          <select required value={fuelForm.fuelType} onChange={(e) => setFuelForm((f) => ({ ...f, fuelType: e.target.value }))} className={inputClass}>
+            <option value="">{t("firing.fuelTypePlaceholder")}</option>
+            {fuelTypes.map((ft) => (
+              <option key={ft._id} value={ft.name}>
+                {ft.name}
+              </option>
+            ))}
+          </select>
+          <input required type="number" placeholder={t("firing.quantityFedKg")} value={fuelForm.quantityKg} onChange={(e) => setFuelForm((f) => ({ ...f, quantityKg: e.target.value }))} className={inputClass} />
+          <Button type="submit" size="sm" disabled={saving} className="col-span-2">
+            {t("common.save")}
+          </Button>
+        </form>
+      )}
+
+      {openForm === "nikasi" && (
+        <form onSubmit={submitNikasi} className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-border bg-ink-primary/[0.02] p-3">
+          <select required value={nikasiForm.gangId} onChange={(e) => setNikasiForm((f) => ({ ...f, gangId: e.target.value }))} className={cn(inputClass, "col-span-2")}>
+            <option value="">{t("firing.gangPlaceholder")}</option>
+            {gangOptions.map((p) => (
+              <option key={p._id} value={p._id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <input required type="number" placeholder={t("firing.bricksUnloadedThisCycleLabel")} value={nikasiForm.bricksCount} onChange={(e) => setNikasiForm((f) => ({ ...f, bricksCount: e.target.value }))} className={inputClass} />
+          <Button type="submit" size="sm" disabled={saving}>
+            {t("common.save")}
+          </Button>
+        </form>
+      )}
+
+      <div className="mt-4 border-t border-border pt-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("firing.chamberActivityHeading")}</p>
+        {activity.length === 0 ? (
+          <p className="py-2 text-sm text-ink-muted">{t("firing.noChamberActivityYet")}</p>
+        ) : (
+          <div className="space-y-1">
+            {activity.map((a) => (
+              <div key={`${a.type}-${a.id}`} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-1.5 text-sm">
+                <span className="text-ink-secondary">
+                  <Badge variant="neutral">{t(ACTIVITY_TYPE_LABEL_KEY[a.type])}</Badge> {a.label}
+                </span>
+                <span className="flex items-center gap-2 text-xs text-ink-muted">
+                  {new Date(a.date).toLocaleDateString("en-IN")}
+                  <span className="font-medium tabular-nums text-ink-primary">{a.quantityLabel}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
@@ -214,6 +442,8 @@ function ChamberBoard() {
   const overview = useChamberOverview();
   const categories = useBrickCategories();
   const statusLegend = useChamberStatusLegend();
+  const gangOptions = useGangOptions();
+  const fuelTypes = useFuelTypes();
   const [selectedGherId, setSelectedGherId] = useState("");
 
   async function handleAdvance(gher: Gher) {
@@ -230,10 +460,10 @@ function ChamberBoard() {
       <Card>
         <CardHeader>
           <CardTitle>{t("stacking.kilnChambersGher")}</CardTitle>
-          <span className="text-sm text-ink-muted">{t("stacking.clickChamberToAdvance")}</span>
+          <span className="text-sm text-ink-muted">{t("firing.clickChamberToSelect")}</span>
         </CardHeader>
         <div className="flex flex-col items-center gap-4">
-          <GherMap ghers={ghers} onAdvance={handleAdvance} />
+          <GherMap ghers={ghers} selectedId={selectedGherId} onSelect={(g) => setSelectedGherId(g._id)} />
           <div className="flex flex-wrap justify-center gap-4">
             {statusLegend.map(({ status, label }) => (
               <div key={status} className="flex items-center gap-1.5 text-xs text-ink-secondary">
@@ -296,7 +526,7 @@ function ChamberBoard() {
         </select>
       </Card>
 
-      {selected && <ChamberDetailPanel entry={selected} />}
+      {selected && <ChamberDetailPanel entry={selected} gangOptions={gangOptions} fuelTypes={fuelTypes} onAdvance={handleAdvance} />}
     </div>
   );
 }
