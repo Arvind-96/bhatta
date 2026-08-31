@@ -21,6 +21,9 @@ import { Customers } from "@/pages/Customers";
 import { Suppliers } from "@/pages/Suppliers";
 import { Partners } from "@/pages/Partners";
 import { SalesAgents } from "@/pages/SalesAgents";
+import { SaleOrders } from "@/pages/SaleOrders";
+import { PurchaseOrders } from "@/pages/PurchaseOrders";
+import { BankReconciliation } from "@/pages/BankReconciliation";
 import { Expense } from "@/pages/Expense";
 import { Inventory } from "@/pages/Inventory";
 import { Stock } from "@/pages/Stock";
@@ -59,6 +62,8 @@ const VIEWS = {
   suppliers: Suppliers,
   partners: Partners,
   salesAgents: SalesAgents,
+  saleOrders: SaleOrders,
+  purchaseOrders: PurchaseOrders,
   expense: Expense,
   inventory: Inventory,
   stock: Stock,
@@ -66,6 +71,7 @@ const VIEWS = {
   staff: Staff,
   salary: Salary,
   attendance: Attendance,
+  bankReconciliation: BankReconciliation,
   reports: Reports,
   settings: Settings,
 };

@@ -17,6 +17,10 @@ export interface SupplierInvoiceInput {
   paymentMode?: PaymentMode;
   cashAmount?: number;
   onlineAmount?: number;
+  // Set when this invoice is (partially) fulfilling a pending Purchase
+  // Order — see purchaseOrder.service.ts's fulfillPurchaseOrder, the only
+  // caller that sets this. Purely a pass-through link.
+  purchaseOrderId?: string;
 }
 
 // MAX-based (not COUNT-based) so a deleted invoice's number is never

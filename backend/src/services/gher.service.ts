@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
-import { and, asc, desc, eq, gte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { ghers, fireMovementLogs, GHER_STATUSES } from "../db/schema";
+import { ghers, fireMovementLogs, gherCycles, GHER_STATUSES } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
 export type GherStatus = (typeof GHER_STATUSES)[number];
@@ -26,6 +26,16 @@ export async function listGhers(kilnId: string) {
   return db.select().from(ghers).where(eq(ghers.kilnId, kilnId)).orderBy(asc(ghers.number));
 }
 
+// Returns the most recently started cycle row for this chamber — the one
+// STACKING's own insert below always creates immediately before any of
+// FIRING/READY/UNLOADING/EMPTY could be reached, so this is always the
+// "open" cycle those transitions should update. Never throws when none
+// exists (a chamber whose whole lifecycle predates this table) — those
+// later transitions simply have no history row to fill in, which is fine.
+async function currentCycle(gherId: string) {
+  return (await db.select().from(gherCycles).where(eq(gherCycles.gherId, gherId)).orderBy(desc(gherCycles.cycleNumber)))[0];
+}
+
 export async function updateGherStatus(kilnId: string, seasonId: string, gherId: string, status: GherStatus) {
   const update: Record<string, unknown> = { status, updatedAt: new Date() };
   // A fresh STACKING stage marks the start of a new firing cycle — this is
@@ -41,6 +51,25 @@ export async function updateGherStatus(kilnId: string, seasonId: string, gherId:
 
   if (status === "FIRING") {
     await db.insert(fireMovementLogs).values({ _id: randomUUID(), kilnId, seasonId, gherId: gher._id, gherNumber: gher.number });
+  }
+
+  // Historical cycle tracking — see gherCycles' own doc comment in
+  // db/schema/production.ts. STACKING always starts a brand-new row (never
+  // reuses one); every later stage fills in the timestamp on whichever
+  // cycle row is currently open for this chamber.
+  const now = new Date();
+  if (status === "STACKING") {
+    const maxRow = (await db.select({ max: sql<number | null>`max(${gherCycles.cycleNumber})` }).from(gherCycles).where(eq(gherCycles.gherId, gherId)))[0];
+    const cycleNumber = (maxRow?.max ?? 0) + 1;
+    await db.insert(gherCycles).values({ _id: randomUUID(), kilnId, seasonId, gherId, cycleNumber, stackingStartedAt: now });
+  } else {
+    const open = await currentCycle(gherId);
+    if (open) {
+      if (status === "FIRING") await db.update(gherCycles).set({ firingStartedAt: now }).where(eq(gherCycles._id, open._id));
+      else if (status === "READY") await db.update(gherCycles).set({ readyAt: now }).where(eq(gherCycles._id, open._id));
+      else if (status === "UNLOADING") await db.update(gherCycles).set({ unloadingStartedAt: now }).where(eq(gherCycles._id, open._id));
+      else if (status === "EMPTY") await db.update(gherCycles).set({ completedAt: now }).where(eq(gherCycles._id, open._id));
+    }
   }
 
   emitToKiln(kilnId, "gher:update", gher);

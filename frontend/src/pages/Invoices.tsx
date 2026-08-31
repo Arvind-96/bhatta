@@ -12,7 +12,19 @@ import { printPaymentReceipt, resolveItemRows } from "@/lib/printDocument";
 import { InvoiceDetailPage } from "@/components/dispatch/InvoiceDetailPage";
 import { CreatePaymentReceiptModal } from "@/components/billing/CreatePaymentReceiptModal";
 import { EditPaymentReceiptModal } from "@/components/billing/EditPaymentReceiptModal";
+import { buildReportWorkbookBlob, downloadExcelFile } from "@/lib/exportExcel";
 import type { BrickCategory, CustomerCreditAging, Invoice, PaymentReceipt } from "@/types";
+import type { ReportColumn } from "@/types/reports";
+
+const INVOICE_EXCEL_COLUMNS: ReportColumn[] = [
+  { key: "date", labelKey: "reports.col.date", format: "date" },
+  { key: "serial", labelKey: "reports.col.serial", format: "text" },
+  { key: "customer", labelKey: "reports.col.customer", format: "text" },
+  { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
+  { key: "netAmount", labelKey: "reports.col.netAmount", format: "currency" },
+  { key: "paidNow", labelKey: "reports.col.paidThisPeriod", format: "currency" },
+  { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+];
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -107,6 +119,26 @@ export function Invoices() {
       <Card>
         <CardHeader>
           <CardTitle>{t("nav.invoices")}</CardTitle>
+          <button
+            type="button"
+            onClick={() => {
+              const rows = filteredEntries.map((e) => ({
+                date: e.invoiceDate ?? null,
+                serial: e.sequenceNumber != null ? `INV-${e.sequenceNumber}` : "",
+                customer: e.customerName,
+                bricksCount: e.bricksCount,
+                netAmount: e.netAmount,
+                paidNow: e.amountPaidNow ?? e.netAmount,
+                due: Math.round((e.netAmount - (e.amountPaidNow ?? e.netAmount)) * 100) / 100,
+              }));
+              const labels = Object.fromEntries(INVOICE_EXCEL_COLUMNS.map((c) => [c.key, t(c.labelKey)]));
+              const blob = buildReportWorkbookBlob(INVOICE_EXCEL_COLUMNS, rows, undefined, labels, t("nav.invoices"));
+              downloadExcelFile(blob, "invoices.xlsx");
+            }}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+          >
+            {t("reports.action.downloadExcel")}
+          </button>
         </CardHeader>
         <div className="relative mb-3">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />

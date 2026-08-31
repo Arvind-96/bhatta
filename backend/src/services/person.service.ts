@@ -281,6 +281,34 @@ export async function updatePerson(kilnId: string, personId: string, input: Upda
   return person;
 }
 
+// Fixes an accidental duplicate person record (e.g. the same contractor
+// entered twice under slightly different names) by reassigning every
+// ledger entry from one to the other, then deactivating the "from" record
+// — the "Ledgers-Merge" report menu item. Deliberately narrow: only
+// ledgerEntries move; no other module's rows (work entries, attendance,
+// etc.) are touched, since those represent actual attributed work and
+// merging them would rewrite history rather than just fix a bookkeeping
+// duplicate. Irreversible in the sense that entries.personId isn't
+// tracked back to its original owner afterward — the caller (a
+// confirmation dialog on the frontend) is expected to make that clear.
+export async function mergeLedgers(kilnId: string, fromPersonId: string, intoPersonId: string) {
+  if (fromPersonId === intoPersonId) throw new Error("Cannot merge a person's ledger into themselves");
+  const [fromPerson, intoPerson] = await Promise.all([
+    (await db.select().from(people).where(and(eq(people._id, fromPersonId), eq(people.kilnId, kilnId))))[0],
+    (await db.select().from(people).where(and(eq(people._id, intoPersonId), eq(people.kilnId, kilnId))))[0],
+  ]);
+  if (!fromPerson) throw new Error("Source person not found in this kiln");
+  if (!intoPerson) throw new Error("Target person not found in this kiln");
+
+  await db.update(ledgerEntries).set({ personId: intoPersonId }).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, fromPersonId)));
+  await db.update(people).set({ active: false }).where(eq(people._id, fromPersonId));
+
+  const updatedTarget = (await db.select().from(people).where(eq(people._id, intoPersonId)))[0]!;
+  emitToKiln(kilnId, "person:update", updatedTarget);
+  emitToKiln(kilnId, "person:update", { ...fromPerson, active: false });
+  return updatedTarget;
+}
+
 const PEOPLE_FILES_DIR = path.join(DATA_DIR, "people");
 
 function personFileDir(personId: string) {
@@ -377,6 +405,24 @@ export async function listOutstandingAdvances(kilnId: string) {
 // real money, no other aggregate view surfaces it) silently hides real
 // dues from the owner rather than just failing loudly. Positive balance =
 // kiln owes them.
+// Every non-customer person's ledger balance, positive, negative, and
+// zero alike — the full-population version of listPaymentsDue (which only
+// keeps balance > 0) for reports that need to see the whole roster (Trial
+// Balance, Show Nil Accounts). Same balance formula, deliberately kept as
+// its own query rather than refactoring listPaymentsDue to filter after
+// the fact, so a change here can't accidentally alter that existing,
+// already-relied-upon function's behavior.
+export async function personLedgerBalances(kilnId: string) {
+  const rows = await db.select().from(people).where(and(eq(people.kilnId, kilnId), ne(people.type, "CUSTOMER")));
+  const results = [];
+  for (const person of rows) {
+    const entries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, person._id)));
+    const balance = Math.round(entries.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0) * 100) / 100;
+    results.push({ person: { id: person._id, name: person.name, type: person.type, phone: person.phone ?? null }, balance });
+  }
+  return results;
+}
+
 export async function listPaymentsDue(kilnId: string) {
   const rows = await db
     .select()

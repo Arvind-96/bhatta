@@ -5,6 +5,10 @@ export interface SupplierInvoiceItem {
   itemName: string;
   unit: string;
   quantity: number;
+  // Optional free-text grouping (e.g. "Fuel", "Spares") — left blank on
+  // every item recorded before this existed. Powers the "Item Group Wise
+  // Purchase" report; not used for anything else.
+  itemGroup?: string;
 }
 
 // A single "goods received from this supplier" record — doubles as the
@@ -20,6 +24,10 @@ export const supplierInvoices = mysqlTable(
     kilnId: kilnIdColumn(),
     seasonId: varchar("seasonId", { length: 64 }),
     supplierId: varchar("supplierId", { length: 64 }).notNull(),
+    // Set when this invoice was created to (partially) fulfill a pending
+    // Purchase Order — see purchaseOrder.service.ts's fulfillPurchaseOrder.
+    // Null for every invoice recorded the normal, order-less way.
+    purchaseOrderId: varchar("purchaseOrderId", { length: 64 }),
     sequenceNumber: int("sequenceNumber"),
     date: dateColumn(),
     itemsReceived: json("itemsReceived").$type<SupplierInvoiceItem[]>().default([]),

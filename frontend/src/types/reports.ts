@@ -47,6 +47,8 @@ export interface ReportRunParams {
   personId?: string;
   personType?: string;
   customerId?: string;
+  supplierId?: string;
+  agentId?: string;
   vehicleId?: string;
   driverId?: string;
   category?: string;
@@ -64,6 +66,8 @@ export type ReportFilterKind =
   | "person"
   | "personType"
   | "customer"
+  | "supplier"
+  | "agent"
   | "vehicle"
   | "driver"
   | "expenseCategory"

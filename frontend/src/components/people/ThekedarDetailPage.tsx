@@ -10,6 +10,7 @@ import { LedgerCategoryHistorySections } from "@/components/people/LedgerCategor
 import { AddLabourModal } from "@/components/people/AddLabourModal";
 import { LabourSessionSection } from "@/components/people/LabourSessionSection";
 import { ContractorNetBalanceCard } from "@/components/people/ContractorNetBalanceCard";
+import { MergeLedgersModal } from "@/components/people/MergeLedgersModal";
 import { AddWorkEntryModal } from "@/components/people/AddWorkEntryModal";
 import { EditWorkEntryModal } from "@/components/people/EditWorkEntryModal";
 import { AttendanceCalendar } from "@/components/staff/AttendanceCalendar";
@@ -60,15 +61,19 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
   const [workEntries, setWorkEntries] = useState<WorkEntry[]>([]);
   const [showAddWork, setShowAddWork] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
+  const [showMerge, setShowMerge] = useState(false);
+  const [otherContractors, setOtherContractors] = useState<Person[]>([]);
 
   async function refresh() {
-    const [detail, ledger, allWorkers, allHelpers, allWorkEntries] = await Promise.all([
+    const [detail, ledger, allWorkers, allHelpers, allWorkEntries, allContractors] = await Promise.all([
       api.people.get(thekedarId),
       api.people.listLedger(thekedarId),
       api.people.list("WORKER"),
       api.people.list("HELPER"),
       api.workEntries.list({}),
+      api.people.list("LABOUR_CONTRACTOR"),
     ]);
+    setOtherContractors(allContractors);
     setThekedar(detail.person);
     setBalance(detail.balance);
     setLedgerEntries(ledger);
@@ -272,6 +277,9 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
               )}
               <Button variant="outline" size="sm" onClick={toggleAbsconded}>
                 {thekedar.status === "ABSCONDED" ? t("people.markActive") : t("people.markAbsconded")}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowMerge(true)}>
+                {t("person.mergeLedgers")}
               </Button>
               <button
                 onClick={deleteProfile}
@@ -564,6 +572,9 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
       )}
       {editingEntry && (
         <EditWorkEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} onSaved={refresh} />
+      )}
+      {showMerge && (
+        <MergeLedgersModal person={thekedar} candidates={otherContractors} onClose={() => setShowMerge(false)} onMerged={onBack} />
       )}
     </div>
   );

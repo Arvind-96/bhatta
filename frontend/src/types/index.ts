@@ -192,6 +192,7 @@ export interface SupplierInvoiceItem {
   itemName: string;
   unit: SupplyUnit;
   quantity: number;
+  itemGroup?: string;
 }
 
 export interface SupplierInvoice {
@@ -213,6 +214,88 @@ export interface SupplierDetail {
   invoices: SupplierInvoice[];
   totalPaid: number;
   totalDue: number;
+}
+
+export type OrderStatus = "PENDING" | "PARTIALLY_FULFILLED" | "FULFILLED" | "CANCELLED";
+
+export interface SaleOrder {
+  _id: string;
+  customerId?: string;
+  customerName: string;
+  customerAddress?: string;
+  customerPhone?: string;
+  categoryId?: string;
+  items?: BrickLineItem[];
+  bricksCount: number;
+  bricksFulfilled: number;
+  ratePerBrick?: number;
+  estimatedAmount?: number;
+  status: OrderStatus;
+  sequenceNumber?: number;
+  orderDate?: string;
+  expectedDeliveryDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface PurchaseOrder {
+  _id: string;
+  supplierId: string;
+  items?: SupplierInvoiceItem[];
+  expectedAmount?: number;
+  status: OrderStatus;
+  sequenceNumber?: number;
+  orderDate?: string;
+  expectedDeliveryDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface BankAccount {
+  _id: string;
+  bankName: string;
+  accountLabel?: string;
+  accountNumberLast4?: string;
+  openingBalance: number;
+  openingBalanceDate?: string;
+  createdAt: string;
+}
+
+export type BankTransactionDirection = "CREDIT" | "DEBIT";
+
+export interface BankTransaction {
+  _id: string;
+  bankAccountId: string;
+  date?: string;
+  description?: string;
+  amount: number;
+  direction: BankTransactionDirection;
+  reconciled: boolean;
+  matchedLedgerEntryId?: string;
+  matchedInvoiceId?: string;
+  matchedExpenseId?: string;
+  matchedSupplierInvoiceId?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export type BookEntryType = "LEDGER" | "INVOICE" | "EXPENSE" | "SUPPLIER_INVOICE";
+
+export interface BookEntry {
+  type: BookEntryType;
+  id: string;
+  date: string | null;
+  party: string;
+  description: string;
+  amount: number;
+  direction: BankTransactionDirection;
+}
+
+export interface BankReconciliationSummary {
+  reconciledCount: number;
+  reconciledAmount: number;
+  unreconciledCount: number;
+  unreconciledAmount: number;
 }
 
 export type PartnerAssetType = "VEHICLE" | "LAND" | "OTHER";

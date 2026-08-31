@@ -14,7 +14,17 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
+import { buildReportWorkbookBlob, downloadExcelFile } from "@/lib/exportExcel";
 import type { Supplier, SupplierInvoice, SupplyUnit } from "@/types";
+import type { ReportColumn } from "@/types/reports";
+
+const PURCHASE_EXCEL_COLUMNS: ReportColumn[] = [
+  { key: "date", labelKey: "reports.col.date", format: "date" },
+  { key: "supplier", labelKey: "reports.col.supplier", format: "text" },
+  { key: "totalBillAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
+  { key: "amountPaid", labelKey: "reports.col.amountPaid", format: "currency" },
+  { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+];
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -185,6 +195,25 @@ export function Suppliers() {
         <Card>
           <CardHeader>
             <CardTitle>{t("nav.suppliers")}</CardTitle>
+            <button
+              type="button"
+              onClick={() => {
+                const supplierById = new Map(suppliers.map((s) => [s._id, s.name]));
+                const rows = invoices.map((inv) => ({
+                  date: inv.date ?? null,
+                  supplier: supplierById.get(inv.supplierId) ?? inv.supplierId,
+                  totalBillAmount: inv.totalBillAmount,
+                  amountPaid: inv.amountPaid,
+                  due: Math.round((inv.totalBillAmount - inv.amountPaid) * 100) / 100,
+                }));
+                const labels = Object.fromEntries(PURCHASE_EXCEL_COLUMNS.map((c) => [c.key, t(c.labelKey)]));
+                const blob = buildReportWorkbookBlob(PURCHASE_EXCEL_COLUMNS, rows, undefined, labels, t("reports.title.purchaseRegister"));
+                downloadExcelFile(blob, "purchase-register.xlsx");
+              }}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+            >
+              {t("reports.action.downloadExcel")}
+            </button>
           </CardHeader>
           <div className="relative mb-3">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />

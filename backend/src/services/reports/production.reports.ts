@@ -8,6 +8,7 @@ import { listStackingEntries } from "../stacking.service";
 import { listFiringShifts } from "../firingShift.service";
 import { listNikasiEntries } from "../nikasi.service";
 import { listBrickLoadingEntries } from "../brickLoading.service";
+import { listGherCycleCrossChecks } from "../gherCycle.service";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
 import { ReportDefinition, refName, round2 } from "./types";
 
@@ -336,4 +337,78 @@ const brickLoading: ReportDefinition = {
   },
 };
 
-export const productionReports: ReportDefinition[] = [soil, sand, molding, stacking, firing, nikasi, brickLoading];
+// One row per completed (or in-progress) firing cycle — how much was
+// stacked in vs. fuel spent vs. bricks unloaded vs. bricks actually graded,
+// bounded to that cycle's own window (see gherCycle.service.ts's
+// listGherCycleCrossChecks). The historical counterpart of the Firing
+// page's live chamber board, which only ever shows the CURRENT cycle.
+const nikasiCrossCheck: ReportDefinition = {
+  key: "nikasiCrossCheck",
+  titleKey: "reports.title.nikasiCrossCheck",
+  async run(kilnId, filters) {
+    const cycles = await listGherCycleCrossChecks(kilnId, null, { from: filters.from, to: filters.to });
+    const detail = cycles.map((c) => ({
+      gher: c.gherNumber != null ? String(c.gherNumber) : "",
+      cycleNumber: c.cycle.cycleNumber,
+      stackingStartedAt: c.cycle.stackingStartedAt ? c.cycle.stackingStartedAt.toISOString() : null,
+      bricksStacked: c.bricksStacked,
+      fuelKg: round2(c.fuel.totalKg),
+      bricksUnloaded: c.bricksUnloaded,
+      bricksGraded: c.bricksGraded,
+      recoveryPercent: c.recoveryPercent ?? 0,
+      unloadedVsGradedVariance: c.unloadedVsGradedVariance,
+    }));
+    return {
+      reportKey: "nikasiCrossCheck",
+      titleKey: "reports.title.nikasiCrossCheck",
+      columns: [
+        { key: "gher", labelKey: "reports.col.gher", format: "text" },
+        { key: "cycleNumber", labelKey: "reports.col.cycleNumber", format: "number" },
+        { key: "stackingStartedAt", labelKey: "reports.col.date", format: "date" },
+        { key: "bricksStacked", labelKey: "reports.col.bricksStacked", format: "number" },
+        { key: "fuelKg", labelKey: "reports.col.fuelKg", format: "number" },
+        { key: "bricksUnloaded", labelKey: "reports.col.bricksUnloaded", format: "number" },
+        { key: "bricksGraded", labelKey: "reports.col.bricksGraded", format: "number" },
+        { key: "recoveryPercent", labelKey: "reports.col.recoveryPercent", format: "number" },
+        { key: "unloadedVsGradedVariance", labelKey: "reports.col.variance", format: "number" },
+      ],
+      rows: detail,
+    };
+  },
+};
+
+// Nikasi's own damage rate as a % of what was unloaded — the "Item Wise
+// Nikasi Summary With Percentage" report. Grouped by gang since Nikasi
+// entries don't carry a per-brick-category breakdown (the categorized
+// output only exists once a chamber is graded — see the nikasi/chamber
+// grading services' own doc comments on that division of responsibility).
+const nikasiItemWisePercent: ReportDefinition = {
+  key: "nikasiItemWisePercent",
+  titleKey: "reports.title.nikasiItemWisePercent",
+  async run(kilnId, filters) {
+    const rows = await listNikasiEntries(kilnId, null, { gangId: filters.personId, from: filters.from, to: filters.to });
+    const byGang = new Map<string, { gang: string; bricksCount: number; damagedCount: number }>();
+    for (const r of rows) {
+      const name = refName(r.gangId) ?? "Unknown";
+      const existing = byGang.get(name) ?? { gang: name, bricksCount: 0, damagedCount: 0 };
+      existing.bricksCount += r.bricksCount;
+      existing.damagedCount += r.damagedCount ?? 0;
+      byGang.set(name, existing);
+    }
+    const detail = [...byGang.values()].map((v) => ({ ...v, damagePercent: v.bricksCount > 0 ? round2((v.damagedCount / v.bricksCount) * 100) : 0 }));
+    return {
+      reportKey: "nikasiItemWisePercent",
+      titleKey: "reports.title.nikasiItemWisePercent",
+      columns: [
+        { key: "gang", labelKey: "reports.col.gang", format: "text" },
+        { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
+        { key: "damagedCount", labelKey: "reports.col.damagedCount", format: "number" },
+        { key: "damagePercent", labelKey: "reports.col.damagePercent", format: "number" },
+      ],
+      rows: detail,
+      totals: { bricksCount: detail.reduce((s, r) => s + r.bricksCount, 0), damagedCount: detail.reduce((s, r) => s + r.damagedCount, 0) },
+    };
+  },
+};
+
+export const productionReports: ReportDefinition[] = [soil, sand, molding, stacking, firing, nikasi, brickLoading, nikasiCrossCheck, nikasiItemWisePercent];

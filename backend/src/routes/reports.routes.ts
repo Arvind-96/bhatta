@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { dashboardSummaryHandler, listReportKeys, runReport } from "../controllers/reports.controller";
+import { dashboardSummaryHandler, listReportKeys, runReport, sendReportText } from "../controllers/reports.controller";
 import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
@@ -11,3 +11,4 @@ reportsRouter.get("/", asyncHandler(listReportKeys));
 // wins the match (Express resolves routes in registration order).
 reportsRouter.get("/dashboard-summary", asyncHandler(dashboardSummaryHandler));
 reportsRouter.get("/:key", asyncHandler(runReport));
+reportsRouter.post("/:key/send-text", asyncHandler(sendReportText));

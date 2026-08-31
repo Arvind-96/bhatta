@@ -28,7 +28,10 @@ export type AppView =
   | "compare"
   | "suppliers"
   | "partners"
-  | "salesAgents";
+  | "salesAgents"
+  | "saleOrders"
+  | "purchaseOrders"
+  | "bankReconciliation";
 
 interface UiState {
   view: AppView;

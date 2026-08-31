@@ -105,9 +105,10 @@ export async function listNikasiEntries(kilnId: string, seasonId: string | null,
 // chamber's own cycleStartedAt, or omitted for all-time). Labor tracking
 // only, same caveat as createNikasiEntry's own doc comment — the
 // authoritative graded/stocked count still comes from chamber grading.
-export async function unloadedSinceForGher(kilnId: string, seasonId: string, gherId: string, since?: Date) {
+export async function unloadedSinceForGher(kilnId: string, seasonId: string, gherId: string, since?: Date, until?: Date) {
   const conditions = [eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId), eq(nikasiEntries.gherId, gherId)];
   if (since) conditions.push(gte(nikasiEntries.date, since));
+  if (until) conditions.push(lte(nikasiEntries.date, until));
   const entries = await db.select().from(nikasiEntries).where(and(...conditions));
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
 }

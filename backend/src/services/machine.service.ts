@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, asc, desc, eq, gt, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { machines, machineFuelLogs, machineMaintenanceLogs, machineInstallmentPayments, MACHINE_TYPES } from "../db/schema";
 import { createExpense } from "./expense.service";
@@ -269,4 +269,34 @@ export async function listMaintenanceLogs(kilnId: string, seasonId: string, days
   since.setDate(since.getDate() - days);
   const rows = await db.select().from(machineMaintenanceLogs).where(and(eq(machineMaintenanceLogs.kilnId, kilnId), eq(machineMaintenanceLogs.seasonId, seasonId), gte(machineMaintenanceLogs.date, since))).orderBy(desc(machineMaintenanceLogs.date));
   return withMachine(rows);
+}
+
+// Per-machine rollup for the period — the machine-fleet third of the
+// unified "Vehicle Reports" (see reports/resources.reports.ts's
+// vehicleWork report), mirroring vehicleDieselSummary/tractorFleetSummary's
+// own entity-rollup shape. Report-level unification only — machines stay a
+// completely independent identity from kilnVehicles/stackingVehicles, no
+// schema/FK merge.
+export async function machineFleetSummary(kilnId: string, filter: { from?: Date; to?: Date } = {}) {
+  const allMachines = await listMachines(kilnId);
+  const fuelConditions = [eq(machineFuelLogs.kilnId, kilnId)];
+  if (filter.from) fuelConditions.push(gte(machineFuelLogs.date, filter.from));
+  if (filter.to) fuelConditions.push(lte(machineFuelLogs.date, filter.to));
+  const fuelRows = await db.select().from(machineFuelLogs).where(and(...fuelConditions));
+
+  const fuelByMachine = new Map<string, { quantity: number; logCount: number }>();
+  for (const f of fuelRows) {
+    const existing = fuelByMachine.get(f.machineId) ?? { quantity: 0, logCount: 0 };
+    existing.quantity += f.quantity;
+    existing.logCount += 1;
+    fuelByMachine.set(f.machineId, existing);
+  }
+
+  return allMachines.map((m) => ({
+    machineId: m._id,
+    machineName: m.name,
+    machineType: m.type,
+    fuelQuantity: Math.round((fuelByMachine.get(m._id)?.quantity ?? 0) * 100) / 100,
+    fillUpCount: fuelByMachine.get(m._id)?.logCount ?? 0,
+  }));
 }

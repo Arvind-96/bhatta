@@ -15,7 +15,7 @@ import { ContractorGroupedTable } from "@/components/reports/ContractorGroupedTa
 import { REPORT_DEFINITIONS } from "@/lib/reportDefinitions";
 import { printReportTable } from "@/lib/printDocument";
 import { buildReportWorkbookBlob, downloadExcelFile, shareExcelFile } from "@/lib/exportExcel";
-import type { Person, PersonFullReport, Customer, KilnVehicle, ExpenseType } from "@/types";
+import type { Person, PersonFullReport, Customer, KilnVehicle, ExpenseType, Supplier, SalesAgentSummary } from "@/types";
 import type { ReportResult, ReportRunParams, DashboardSummary } from "@/types/reports";
 
 const inputClass =
@@ -418,6 +418,8 @@ function ReportsWorkspace() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [vehicles, setVehicles] = useState<KilnVehicle[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [salesAgents, setSalesAgents] = useState<SalesAgentSummary[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -432,6 +434,8 @@ function ReportsWorkspace() {
     api.customers.list().then(setCustomers).catch(console.error);
     api.kilnVehicles.list().then(setVehicles).catch(console.error);
     api.expenseTypes.list().then(setExpenseTypes).catch(console.error);
+    api.suppliers.list().then(setSuppliers).catch(console.error);
+    api.salesAgents.list().then(setSalesAgents).catch(console.error);
     api.reports.dashboardSummary().then(setDashboard).catch(console.error);
   }, [activeKilnId]);
 
@@ -520,6 +524,24 @@ function ReportsWorkspace() {
     await shareExcelFile(blob, `${definition.key}-report.xlsx`);
   }
 
+  const [sendTextOpen, setSendTextOpen] = useState(false);
+  const [sendTextPhone, setSendTextPhone] = useState("");
+  const [sendTextStatus, setSendTextStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [sendTextError, setSendTextError] = useState<string | null>(null);
+
+  async function handleSendText() {
+    if (!definition || !sendTextPhone.trim()) return;
+    setSendTextStatus("sending");
+    setSendTextError(null);
+    try {
+      await api.reports.sendText(definition.key, sendTextPhone.trim(), params);
+      setSendTextStatus("sent");
+    } catch (err) {
+      setSendTextStatus("error");
+      setSendTextError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <div className="space-y-4">
       {dashboard && <DashboardCards dashboard={dashboard} onCategoryClick={drillIntoCategory} />}
@@ -547,6 +569,8 @@ function ReportsWorkspace() {
               customers={customers}
               vehicles={vehicles}
               expenseTypes={expenseTypes}
+              suppliers={suppliers}
+              salesAgents={salesAgents}
             />
 
             {error && (
@@ -587,8 +611,40 @@ function ReportsWorkspace() {
                     >
                       {t("reports.action.shareExcel")}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSendTextOpen((v) => !v);
+                        setSendTextStatus("idle");
+                      }}
+                      className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+                    >
+                      {t("reports.action.sendText")}
+                    </button>
                   </div>
                 </div>
+
+                {sendTextOpen && (
+                  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-ink-primary/[0.02] px-4 py-3">
+                    <input
+                      type="tel"
+                      value={sendTextPhone}
+                      onChange={(e) => setSendTextPhone(e.target.value)}
+                      placeholder={t("reports.action.sendTextPhonePlaceholder")}
+                      className="h-9 rounded-lg border border-border bg-transparent px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSendText}
+                      disabled={sendTextStatus === "sending" || !sendTextPhone.trim()}
+                      className="h-9 rounded-lg bg-gradient-to-r from-series-1 to-series-2 px-4 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      {sendTextStatus === "sending" ? t("common.loading") : t("reports.action.sendText")}
+                    </button>
+                    {sendTextStatus === "sent" && <span className="text-xs font-medium text-status-good">{t("reports.action.sendTextSent")}</span>}
+                    {sendTextStatus === "error" && <span className="text-xs font-medium text-status-critical">{sendTextError}</span>}
+                  </div>
+                )}
 
                 {definition.key === "labourLedger" && params.personId && !params.contractorId && result.totals && (
                   <div className="mb-3 flex items-center justify-between rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-3">

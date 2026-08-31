@@ -65,7 +65,7 @@ const invoices: ReportDefinition = {
   key: "invoices",
   titleKey: "reports.title.invoices",
   async run(kilnId, filters) {
-    const rows = await listInvoices(kilnId, null, { customerId: filters.customerId, from: filters.from, to: filters.to });
+    const rows = await listInvoices(kilnId, null, { customerId: filters.customerId, agentId: filters.agentId, from: filters.from, to: filters.to });
     const detail = rows.map((r) => ({
       date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
       serial: r.sequenceNumber != null ? `INV-${r.sequenceNumber}` : "",

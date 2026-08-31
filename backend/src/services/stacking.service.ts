@@ -137,9 +137,10 @@ export async function totalStacked(kilnId: string, seasonIds: string[], since: D
 // (Gher.cycleStartedAt) — a stacking cycle never spans a season switch in
 // practice (grading happens promptly), so this stays scoped to the one
 // season a grading is being recorded in, not cumulative.
-export async function stackedSinceForGher(kilnId: string, seasonId: string, gherId: string, since?: Date) {
+export async function stackedSinceForGher(kilnId: string, seasonId: string, gherId: string, since?: Date, until?: Date) {
   const conditions = [eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId), eq(stackingEntries.gherId, gherId)];
   if (since) conditions.push(gte(stackingEntries.date, since));
+  if (until) conditions.push(lte(stackingEntries.date, until));
   const entries = await db.select().from(stackingEntries).where(and(...conditions));
   return entries.reduce((sum, e) => sum + e.bricksCount, 0);
 }

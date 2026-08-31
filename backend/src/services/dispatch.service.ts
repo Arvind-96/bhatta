@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { dispatches, people, brickCategories, brickLoadingEntries, kilns, challans, gatePasses, invoices, expenses, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem, SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
@@ -161,6 +161,11 @@ export interface CreateDispatchInput {
   // row, overriding whatever the client sent for them, so the two records
   // can never drift out of sync with each other.
   loadingEntryId?: string;
+  // When given, this dispatch is (partially) fulfilling a pending Sale
+  // Order — see saleOrder.service.ts's fulfillSaleOrder, the only caller
+  // that sets this. Purely a pass-through link; createDispatch itself does
+  // not touch the sale order's own bricksFulfilled/status bookkeeping.
+  saleOrderId?: string;
 }
 
 export const MAX_NUMBER_GENERATION_ATTEMPTS = 5;
@@ -391,6 +396,17 @@ export async function recordDeliveryAdjustment(kilnId: string, dispatchId: strin
 
   emitToKiln(kilnId, "dispatch:update", updated);
   return updated;
+}
+
+// Every dispatch with a breakage or return recorded against it, across
+// every season — the "List of Cash Returns" report. seasonId-agnostic,
+// same reasoning as listDispatchesForCustomer: a return can be recorded on
+// a dispatch from an earlier season and should stay visible regardless.
+export async function listReturnedDispatches(kilnId: string, filter: { from?: Date; to?: Date } = {}) {
+  const conditions = [eq(dispatches.kilnId, kilnId), gt(sql<number>`${dispatches.breakageCount} + ${dispatches.returnedCount}`, 0)];
+  if (filter.from) conditions.push(gte(dispatches.dispatchedOn, filter.from));
+  if (filter.to) conditions.push(lte(dispatches.dispatchedOn, filter.to));
+  return db.select().from(dispatches).where(and(...conditions)).orderBy(desc(dispatches.dispatchedOn));
 }
 
 export interface UpdateDispatchInput {

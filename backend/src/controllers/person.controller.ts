@@ -10,6 +10,7 @@ import {
   listOutstandingAdvances,
   listPaymentsDue,
   listPeople,
+  mergeLedgers,
   savePersonIdentityProof,
   savePersonPhoto,
   updatePerson,
@@ -197,5 +198,12 @@ export async function contractorBalance(req: AuthedRequest, res: Response) {
 export async function report(req: AuthedRequest, res: Response) {
   const result = await getPersonFullReport(req.kiln!.id, req.params.id);
   res.json(result);
+}
+
+const mergeSchema = z.object({ intoPersonId: z.string() });
+
+export async function merge(req: AuthedRequest, res: Response) {
+  const { intoPersonId } = mergeSchema.parse(req.body);
+  res.json(await mergeLedgers(req.kiln!.id, req.params.id, intoPersonId));
 }
 

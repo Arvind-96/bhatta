@@ -133,6 +133,16 @@ import type {
   SandContractRateType,
   SandDelivery,
   SandDeliveryTractorEntry,
+  SaleOrder,
+  PurchaseOrder,
+  OrderStatus,
+  BankAccount,
+  BankTransaction,
+  BankTransactionDirection,
+  BookEntry,
+  BookEntryType,
+  BankReconciliationSummary,
+  BrickLineItem,
 } from "@/types";
 import type { ReportResult, ReportRunParams, DashboardSummary } from "@/types/reports";
 import { useAuthStore, type AuthUser, type UserKiln, type UserSeason } from "@/store/auth.store";
@@ -634,6 +644,7 @@ export const api = {
     advances: () => get<OutstandingAdvance[]>("/people/advances", true),
     paymentsDue: () => get<PaymentDue[]>("/people/payments-due", true),
     creditAging: () => get<CustomerCreditAging[]>("/people/credit-aging", true),
+    mergeInto: (id: string, intoPersonId: string) => post<Person>(`/people/${id}/merge-into`, { intoPersonId }, true),
     uploadPhoto: (id: string, file: File | Blob) => postFile<Person>(`/people/${id}/photo`, "photo", file),
     uploadIdentityProof: (id: string, file: File | Blob) => postFile<Person>(`/people/${id}/identity-proof`, "document", file),
     // Photo/ID-proof routes are kiln-scoped and read the same auth/X-Kiln-Id
@@ -1505,6 +1516,8 @@ export const api = {
       if (params.personId) q.set("personId", params.personId);
       if (params.personType) q.set("personType", params.personType);
       if (params.customerId) q.set("customerId", params.customerId);
+      if (params.supplierId) q.set("supplierId", params.supplierId);
+      if (params.agentId) q.set("agentId", params.agentId);
       if (params.vehicleId) q.set("vehicleId", params.vehicleId);
       if (params.driverId) q.set("driverId", params.driverId);
       if (params.category) q.set("category", params.category);
@@ -1517,5 +1530,119 @@ export const api = {
       return get<ReportResult>(`/reports/${key}${qs ? `?${qs}` : ""}`, true);
     },
     dashboardSummary: () => get<DashboardSummary>("/reports/dashboard-summary", true),
+    sendText: (key: string, to: string, params: ReportRunParams = {}) => {
+      const q = new URLSearchParams();
+      if (params.from) q.set("from", params.from);
+      if (params.to) q.set("to", params.to);
+      const qs = q.toString();
+      return post<{ sent: boolean }>(`/reports/${key}/send-text${qs ? `?${qs}` : ""}`, { to }, true);
+    },
+  },
+
+  saleOrders: {
+    list: (filter: { status?: string; customerId?: string } = {}) => {
+      const q = new URLSearchParams();
+      if (filter.status) q.set("status", filter.status);
+      if (filter.customerId) q.set("customerId", filter.customerId);
+      const qs = q.toString();
+      return get<SaleOrder[]>(`/sale-orders${qs ? `?${qs}` : ""}`, true);
+    },
+    detail: (id: string) => get<SaleOrder>(`/sale-orders/${id}`, true),
+    create: (input: {
+      customerId?: string;
+      customerName: string;
+      customerAddress?: string;
+      customerPhone?: string;
+      categoryId?: string;
+      items?: BrickLineItem[];
+      bricksCount?: number;
+      ratePerBrick?: number;
+      estimatedAmount?: number;
+      orderDate?: string;
+      expectedDeliveryDate?: string;
+      notes?: string;
+    }) => post<SaleOrder>("/sale-orders", input, true),
+    cancel: (id: string) => post<SaleOrder>(`/sale-orders/${id}/cancel`, {}, true),
+    fulfill: (
+      id: string,
+      input: {
+        bricksCount: number;
+        amount: number;
+        driverId?: string;
+        driverName?: string;
+        driverPhone?: string;
+        vehicleNumber?: string;
+        vehicleType?: string;
+        paymentMode?: PaymentMode;
+        cashAmount?: number;
+        onlineAmount?: number;
+        dispatchedOn?: string;
+        notes?: string;
+      }
+    ) => post<{ order: SaleOrder; dispatch: unknown }>(`/sale-orders/${id}/fulfill`, input, true),
+  },
+
+  purchaseOrders: {
+    list: (filter: { status?: string; supplierId?: string } = {}) => {
+      const q = new URLSearchParams();
+      if (filter.status) q.set("status", filter.status);
+      if (filter.supplierId) q.set("supplierId", filter.supplierId);
+      const qs = q.toString();
+      return get<PurchaseOrder[]>(`/purchase-orders${qs ? `?${qs}` : ""}`, true);
+    },
+    detail: (id: string) => get<PurchaseOrder>(`/purchase-orders/${id}`, true),
+    create: (input: {
+      supplierId: string;
+      items?: SupplierInvoiceItem[];
+      expectedAmount?: number;
+      orderDate?: string;
+      expectedDeliveryDate?: string;
+      notes?: string;
+    }) => post<PurchaseOrder>("/purchase-orders", input, true),
+    cancel: (id: string) => post<PurchaseOrder>(`/purchase-orders/${id}/cancel`, {}, true),
+    fulfill: (
+      id: string,
+      input: {
+        itemsReceived?: SupplierInvoiceItem[];
+        totalBillAmount: number;
+        amountPaid?: number;
+        paymentMode?: LaborPaymentMode;
+        cashAmount?: number;
+        onlineAmount?: number;
+        date?: string;
+        markFulfilled?: boolean;
+      }
+    ) => post<{ order: PurchaseOrder; invoice: SupplierInvoice }>(`/purchase-orders/${id}/fulfill`, input, true),
+  },
+
+  bankAccounts: {
+    list: () => get<BankAccount[]>("/bank-accounts", true),
+    create: (input: { bankName: string; accountLabel?: string; accountNumberLast4?: string; openingBalance?: number; openingBalanceDate?: string }) =>
+      post<BankAccount>("/bank-accounts", input, true),
+    update: (id: string, input: Partial<{ bankName: string; accountLabel: string; accountNumberLast4: string; openingBalance: number; openingBalanceDate: string }>) =>
+      patch<BankAccount>(`/bank-accounts/${id}`, input, true),
+  },
+
+  bankTransactions: {
+    list: (bankAccountId: string, filter: { reconciled?: boolean; from?: string; to?: string } = {}) => {
+      const q = new URLSearchParams({ bankAccountId });
+      if (filter.reconciled !== undefined) q.set("reconciled", String(filter.reconciled));
+      if (filter.from) q.set("from", filter.from);
+      if (filter.to) q.set("to", filter.to);
+      return get<BankTransaction[]>(`/bank-transactions?${q.toString()}`, true);
+    },
+    create: (input: { bankAccountId: string; date?: string; description?: string; amount: number; direction: BankTransactionDirection; notes?: string }) =>
+      post<BankTransaction>("/bank-transactions", input, true),
+    bulkCreate: (bankAccountId: string, rows: { date?: string; description?: string; amount: number; direction: BankTransactionDirection; notes?: string }[]) =>
+      post<BankTransaction[]>("/bank-transactions/bulk", { bankAccountId, rows }, true),
+    unmatchedBookEntries: (from: string, to: string) => get<BookEntry[]>(`/bank-transactions/unmatched-book-entries?from=${from}&to=${to}`, true),
+    match: (id: string, entryType: BookEntryType, entryId: string) => post<BankTransaction>(`/bank-transactions/${id}/match`, { entryType, entryId }, true),
+    unmatch: (id: string) => post<BankTransaction>(`/bank-transactions/${id}/unmatch`, {}, true),
+    summary: (bankAccountId: string, from?: string, to?: string) => {
+      const q = new URLSearchParams({ bankAccountId });
+      if (from) q.set("from", from);
+      if (to) q.set("to", to);
+      return get<BankReconciliationSummary>(`/bank-transactions/summary?${q.toString()}`, true);
+    },
   },
 };

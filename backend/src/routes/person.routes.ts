@@ -10,6 +10,7 @@ import {
   getPhoto,
   list,
   listLedger,
+  merge,
   paymentsDue,
   report,
   update,
@@ -34,6 +35,7 @@ personRouter.post("/:id/ledger", asyncHandler(addLedger));
 personRouter.get("/:id/ledger", asyncHandler(listLedger));
 personRouter.get("/:id/contractor-balance", asyncHandler(contractorBalance));
 personRouter.get("/:id/report", asyncHandler(report));
+personRouter.post("/:id/merge-into", asyncHandler(merge));
 personRouter.post("/:id/photo", uploadPhoto, asyncHandler(uploadPhotoHandler));
 personRouter.get("/:id/photo", asyncHandler(getPhoto));
 personRouter.post("/:id/identity-proof", uploadIdentityProof, asyncHandler(uploadIdentityProofHandler));

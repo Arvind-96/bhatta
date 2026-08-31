@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { fuelLogs, ghers } from "../db/schema";
 import { assertGherInKiln } from "./gher.service";
@@ -68,9 +68,10 @@ export async function listFuelLogs(kilnId: string, seasonId: string, days = 14) 
 // board's "how much fuel is going into this chamber" figure, scoped the
 // same way stackedSinceForGher scopes bricks (since = the chamber's own
 // cycleStartedAt, or omitted for all-time).
-export async function fuelConsumedForGher(kilnId: string, seasonId: string, gherId: string, since?: Date) {
+export async function fuelConsumedForGher(kilnId: string, seasonId: string, gherId: string, since?: Date, until?: Date) {
   const conditions = [eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), eq(fuelLogs.gherId, gherId)];
   if (since) conditions.push(gte(fuelLogs.date, since));
+  if (until) conditions.push(lte(fuelLogs.date, until));
   const logs = await db.select().from(fuelLogs).where(and(...conditions));
 
   const byFuelType = new Map<string, number>();

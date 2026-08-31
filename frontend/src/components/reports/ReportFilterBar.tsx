@@ -5,7 +5,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { usePersonTypeMeta, useWorkTypeLabels, PERSON_TYPES } from "@/components/people/personTypes";
 import { cn } from "@/lib/utils";
 import type { ReportDefinitionMeta, ReportGroupBy, ReportRunParams } from "@/types/reports";
-import type { Customer, ExpenseType, KilnVehicle, Person } from "@/types";
+import type { Customer, ExpenseType, KilnVehicle, Person, Supplier, SalesAgentSummary } from "@/types";
 
 const selectClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -57,13 +57,15 @@ interface ReportFilterBarProps {
   customers: Customer[];
   vehicles: KilnVehicle[];
   expenseTypes: ExpenseType[];
+  suppliers?: Supplier[];
+  salesAgents?: SalesAgentSummary[];
 }
 
 // Renders exactly the filter widgets a report needs: date range + preset
 // chips + groupBy are available to every report; the rest are a small
 // closed set of shared widgets (person/personType/customer/vehicle/driver/
 // expenseCategory) switched on by definition.filters.
-export function ReportFilterBar({ definition, params, onChange, onGenerate, loading, people, customers, vehicles, expenseTypes }: ReportFilterBarProps) {
+export function ReportFilterBar({ definition, params, onChange, onGenerate, loading, people, customers, vehicles, expenseTypes, suppliers = [], salesAgents = [] }: ReportFilterBarProps) {
   const { t } = useTranslation();
   const personTypeMeta = usePersonTypeMeta();
   const workTypeLabels = useWorkTypeLabels();
@@ -274,6 +276,30 @@ export function ReportFilterBar({ definition, params, onChange, onGenerate, load
               value={params.customerId ?? ""}
               onChange={(v) => onChange({ ...params, customerId: v || undefined })}
               options={customers.map((c) => ({ value: c._id, label: c.name }))}
+              placeholder={t("reports.filter.all")}
+            />
+          </label>
+        )}
+
+        {definition.filters.includes("supplier") && (
+          <label className="flex min-w-[200px] flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("reports.filter.supplier")}</span>
+            <SearchableSelect
+              value={params.supplierId ?? ""}
+              onChange={(v) => onChange({ ...params, supplierId: v || undefined })}
+              options={suppliers.map((s) => ({ value: s._id, label: s.name }))}
+              placeholder={t("reports.filter.all")}
+            />
+          </label>
+        )}
+
+        {definition.filters.includes("agent") && (
+          <label className="flex min-w-[200px] flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("reports.filter.agent")}</span>
+            <SearchableSelect
+              value={params.agentId ?? ""}
+              onChange={(v) => onChange({ ...params, agentId: v || undefined })}
+              options={salesAgents.map((a) => ({ value: a.agent._id, label: a.agent.name }))}
               placeholder={t("reports.filter.all")}
             />
           </label>

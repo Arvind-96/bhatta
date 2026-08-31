@@ -27,6 +27,33 @@ export const ghers = mysqlTable("ghers", {
   kilnNumberUnique: uniqueIndex("gher_kiln_number_unique").on(t.kilnId, t.number),
 }));
 
+// One row per firing cycle a chamber goes through — inserted on transition
+// to STACKING (see gher.service.ts's updateGherStatus), timestamps filled
+// in as the chamber advances, completedAt set on transition back to EMPTY.
+// ghers.cycleStartedAt only ever tracks the CURRENT cycle and gets
+// overwritten every time a new one starts; this table is what makes a
+// historical "which cycle was this" report possible (Nikasi Round/Gher
+// Wise Cross Check). stackedSinceForGher/fuelConsumedForGher/
+// unloadedSinceForGher (stacking/fuelLog/nikasi services) already take a
+// plain `since?: Date` param, so a completed cycle's own
+// stackingStartedAt/unloadingStartedAt can be passed straight in unchanged.
+export const gherCycles = mysqlTable("gher_cycles", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
+  gherId: varchar("gherId", { length: 64 }).notNull(),
+  cycleNumber: int("cycleNumber").notNull(),
+  stackingStartedAt: datetime("stackingStartedAt", { mode: "date" }),
+  firingStartedAt: datetime("firingStartedAt", { mode: "date" }),
+  readyAt: datetime("readyAt", { mode: "date" }),
+  unloadingStartedAt: datetime("unloadingStartedAt", { mode: "date" }),
+  completedAt: datetime("completedAt", { mode: "date" }),
+  createdAt: createdAtColumn(),
+}, (t) => ({
+  kilnGherIdx: index("ghercycle_kiln_gher_idx").on(t.kilnId, t.gherId),
+  gherCycleUnique: uniqueIndex("ghercycle_gher_cyclenum_unique").on(t.gherId, t.cycleNumber),
+}));
+
 export const moldingEntries = mysqlTable("molding_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),

@@ -9,3 +9,6 @@ export * from "./fleet";
 export * from "./salary";
 export * from "./supplier";
 export * from "./supplierInvoice";
+export * from "./saleOrder";
+export * from "./purchaseOrder";
+export * from "./bank";

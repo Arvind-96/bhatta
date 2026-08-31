@@ -74,6 +74,10 @@ export const dispatches = mysqlTable("dispatches", {
   notes: text("notes"),
   dispatchedOn: dateColumn("dispatchedOn"),
   localId: varchar("localId", { length: 64 }),
+  // Set when this dispatch was created to (partially) fulfill a pending
+  // Sale Order — see saleOrder.service.ts's fulfillSaleOrder. Null for
+  // every dispatch made the normal, order-less way.
+  saleOrderId: varchar("saleOrderId", { length: 64 }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   // Scoped to (kilnId, seasonId, slipNumber), not slipNumber alone — the

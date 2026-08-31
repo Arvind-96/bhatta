@@ -26,7 +26,7 @@ export interface CreateGradingInput {
   notes?: string;
 }
 
-function totalBricksOf(row: { a1Count: number; jhamaCount: number; pelaCount: number; rodaCount: number; items: BrickLineItem[] | null }): number {
+export function totalBricksOf(row: { a1Count: number; jhamaCount: number; pelaCount: number; rodaCount: number; items: BrickLineItem[] | null }): number {
   if (row.items && row.items.length > 0) return row.items.reduce((sum, i) => sum + i.bricksCount, 0);
   return row.a1Count + row.jhamaCount + row.pelaCount + row.rodaCount;
 }

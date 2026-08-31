@@ -56,6 +56,10 @@ import { seasonRouter } from "./season.routes";
 import { partnerRouter } from "./partner.routes";
 import { partnerAssetRouter } from "./partnerAsset.routes";
 import { salesAgentRouter } from "./salesAgent.routes";
+import { saleOrderRouter } from "./saleOrder.routes";
+import { purchaseOrderRouter } from "./purchaseOrder.routes";
+import { bankAccountRouter } from "./bankAccount.routes";
+import { bankTransactionRouter } from "./bankTransaction.routes";
 
 export const apiRouter = Router();
 
@@ -118,3 +122,7 @@ apiRouter.use("/seasons", seasonRouter);
 apiRouter.use("/partners", partnerRouter);
 apiRouter.use("/partner-assets", partnerAssetRouter);
 apiRouter.use("/sales-agents", salesAgentRouter);
+apiRouter.use("/sale-orders", saleOrderRouter);
+apiRouter.use("/purchase-orders", purchaseOrderRouter);
+apiRouter.use("/bank-accounts", bankAccountRouter);
+apiRouter.use("/bank-transactions", bankTransactionRouter);
