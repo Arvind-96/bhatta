@@ -36,6 +36,12 @@ export const soilTrips = mysqlTable("soil_trips", {
   driverId: varchar("driverId", { length: 64 }),
   contractId: varchar("contractId", { length: 64 }),
   landId: varchar("landId", { length: 64 }),
+  // Nullable — which Pathai site this trolley was delivered TO. Every
+  // other field on this table records where the soil came FROM
+  // (landowner/land/contract) — this is the one "destination" tag, added
+  // purely so a site's own trolleys-delivered figure can be computed;
+  // doesn't change any existing landowner-payment posting.
+  siteId: varchar("siteId", { length: 64 }),
   tractorNumber: varchar("tractorNumber", { length: 255 }),
   trolleyCount: int("trolleyCount").default(1),
   receivedTrolleyCount: int("receivedTrolleyCount"),
@@ -46,7 +52,10 @@ export const soilTrips = mysqlTable("soil_trips", {
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
-}, (t) => ({ kilnDateIdx: index("soiltrip_kiln_date_idx").on(t.kilnId, t.date) }));
+}, (t) => ({
+  kilnDateIdx: index("soiltrip_kiln_date_idx").on(t.kilnId, t.date),
+  kilnSiteIdx: index("soiltrip_kiln_site_idx").on(t.kilnId, t.siteId),
+}));
 
 export const SOIL_CONTRACT_STATUSES = ["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"] as const;
 export const SOIL_CONTRACT_RATE_TYPES = ["PER_TROLLEY", "PER_BIGHA", "PER_DEPTH", "BOTH"] as const;
@@ -105,13 +114,21 @@ export const soilArrivals = mysqlTable("soil_arrivals", {
   tractors: json("tractors").$type<SoilArrivalTractorEntry[]>(),
   trolleyCount: int("trolleyCount").notNull(),
   depthFeet: double("depthFeet"),
+  // Nullable — which Pathai site this trolley was delivered TO, so a
+  // site's trolleys-delivered figure can be computed. Purely a
+  // destination tag, same role as soilTrips.siteId; doesn't touch the
+  // landowner-payment ledger posting above.
+  siteId: varchar("siteId", { length: 64 }),
   paymentGiven: double("paymentGiven").default(0),
   paymentPending: double("paymentPending").default(0),
   soilRemaining: double("soilRemaining"),
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
-}, (t) => ({ kilnDateIdx: index("soilarrival_kiln_date_idx").on(t.kilnId, t.date) }));
+}, (t) => ({
+  kilnDateIdx: index("soilarrival_kiln_date_idx").on(t.kilnId, t.date),
+  kilnSiteIdx: index("soilarrival_kiln_site_idx").on(t.kilnId, t.siteId),
+}));
 
 export const jcbWorkLogs = mysqlTable("jcb_work_logs", {
   _id: idColumn(),

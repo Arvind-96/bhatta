@@ -15,6 +15,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import type {
   Gher,
+  PathaiSite,
   Person,
   StackingContractorSummary,
   StackingEntry,
@@ -367,6 +368,7 @@ export function Stacking() {
   const [openContractorId, setOpenContractorId] = useState<string | null>(null);
   const [addPersonConfig, setAddPersonConfig] = useState<{ type: "WORKER" | "LABOUR_CONTRACTOR"; stage: StackingStage } | null>(null);
   const [editingEntry, setEditingEntry] = useState<StackingEntry | null>(null);
+  const [sites, setSites] = useState<PathaiSite[]>([]);
   const [form, setForm] = useState({
     gherId: "",
     stage: "" as "" | StackingStage,
@@ -378,12 +380,13 @@ export function Stacking() {
     mode: "" as "" | StackingMode,
     tractorNumber: "",
     buggiCount: "",
+    siteId: "",
   });
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
-    const [ghersData, entriesData, contractors, workers, summary, contractorSummaryData, fleet] = await Promise.all([
+    const [ghersData, entriesData, contractors, workers, summary, contractorSummaryData, fleet, sitesData] = await Promise.all([
       api.ghers.list(),
       api.stacking.list(),
       api.people.list("LABOUR_CONTRACTOR"),
@@ -391,6 +394,7 @@ export function Stacking() {
       api.stacking.operatorSummary(),
       api.stacking.contractorSummary(),
       api.stacking.tractorFleet(),
+      api.pathaiSites.list(),
     ]);
     setGhers(ghersData);
     setEntries(entriesData);
@@ -398,6 +402,7 @@ export function Stacking() {
     setOperatorSummary(summary);
     setContractorSummary(contractorSummaryData);
     setTractorFleet(fleet);
+    setSites(sitesData);
   }
 
   useEffect(() => {
@@ -424,6 +429,7 @@ export function Stacking() {
       mode: stage === "CHAMBER_STACKING" ? "" : f.mode,
       tractorNumber: stage === "CHAMBER_STACKING" ? "" : f.tractorNumber,
       buggiCount: stage === "CHAMBER_STACKING" ? "" : f.buggiCount,
+      siteId: stage === "CHAMBER_STACKING" ? "" : f.siteId,
     }));
   }
 
@@ -445,6 +451,7 @@ export function Stacking() {
         mode: form.mode || undefined,
         tractorNumber: form.mode === "TRACTOR" ? form.tractorNumber || undefined : undefined,
         buggiCount: form.mode === "BUGGI" && form.buggiCount ? Number(form.buggiCount) : undefined,
+        siteId: form.stage === "TRANSPORT" ? form.siteId || undefined : undefined,
       });
       setForm({
         gherId: "",
@@ -457,6 +464,7 @@ export function Stacking() {
         mode: "",
         tractorNumber: "",
         buggiCount: "",
+        siteId: "",
       });
       setShowForm(false);
       await refresh();
@@ -625,6 +633,20 @@ export function Stacking() {
                     onChange={(e) => setForm((f) => ({ ...f, buggiCount: e.target.value }))}
                     className={cn(inputClass, "col-span-2")}
                   />
+                )}
+                {sites.length > 0 && (
+                  <select
+                    value={form.siteId}
+                    onChange={(e) => setForm((f) => ({ ...f, siteId: e.target.value }))}
+                    className={cn(inputClass, "col-span-2")}
+                  >
+                    <option value="">{t("pathaiSite.transportedFromSiteOptional")}</option>
+                    {sites.map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </>
             )}

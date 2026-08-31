@@ -17,6 +17,9 @@ export interface CreateStackingInput {
   gherId: string;
   gangId: string;
   stage: StackingStage;
+  // Nullable — only meaningful when stage is TRANSPORT: which Pathai site
+  // these raw bricks were hauled from (see pathaiSites' own doc comment).
+  siteId?: string;
   bricksCount: number;
   damageCount?: number;
   damageFault?: DamageFault;
@@ -52,6 +55,7 @@ export async function createStackingEntry(input: CreateStackingInput) {
 
 export interface UpdateStackingInput {
   stage?: StackingStage;
+  siteId?: string;
   bricksCount?: number;
   damageCount?: number;
   damageFault?: DamageFault;
@@ -92,6 +96,7 @@ export async function deleteStackingEntry(kilnId: string, entryId: string) {
 export interface ListStackingFilter {
   gherId?: string;
   gangId?: string;
+  siteId?: string;
   from?: Date;
   to?: Date;
 }
@@ -104,6 +109,7 @@ export async function listStackingEntries(kilnId: string, seasonId: string | nul
   if (seasonId) conditions.push(eq(stackingEntries.seasonId, seasonId));
   if (filter.gherId) conditions.push(eq(stackingEntries.gherId, filter.gherId));
   if (filter.gangId) conditions.push(eq(stackingEntries.gangId, filter.gangId));
+  if (filter.siteId) conditions.push(eq(stackingEntries.siteId, filter.siteId));
   if (filter.from) conditions.push(gte(stackingEntries.date, filter.from));
   if (filter.to) conditions.push(lte(stackingEntries.date, filter.to));
 

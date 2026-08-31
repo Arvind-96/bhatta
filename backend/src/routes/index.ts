@@ -61,6 +61,8 @@ import { purchaseOrderRouter } from "./purchaseOrder.routes";
 import { bankAccountRouter } from "./bankAccount.routes";
 import { bankTransactionRouter } from "./bankTransaction.routes";
 import { landLeaseContractRouter } from "./landLeaseContract.routes";
+import { pathaiSiteRouter } from "./pathaiSite.routes";
+import { saltUsageLogRouter } from "./saltUsageLog.routes";
 
 export const apiRouter = Router();
 
@@ -128,3 +130,5 @@ apiRouter.use("/purchase-orders", purchaseOrderRouter);
 apiRouter.use("/bank-accounts", bankAccountRouter);
 apiRouter.use("/bank-transactions", bankTransactionRouter);
 apiRouter.use("/land-lease-contracts", landLeaseContractRouter);
+apiRouter.use("/pathai-sites", pathaiSiteRouter);
+apiRouter.use("/salt-usage-logs", saltUsageLogRouter);

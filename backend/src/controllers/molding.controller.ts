@@ -15,6 +15,7 @@ const damageFaultSchema = z.enum(["LABOURER", "CONTRACTOR", "OTHER"]);
 
 const createSchema = z.object({
   workerId: z.string(),
+  siteId: z.string().optional(),
   bricksCount: z.number().int().positive(),
   ratePerThousand: z.number().positive(),
   damagedCount: z.number().int().nonnegative().optional(),
@@ -38,6 +39,7 @@ export async function create(req: AuthedRequest, res: Response) {
 export async function list(req: AuthedRequest, res: Response) {
   const entries = await listMoldingEntries(req.kiln!.id, req.season!.id, {
     workerId: req.query.workerId as string | undefined,
+    siteId: req.query.siteId as string | undefined,
     from: req.query.from ? new Date(String(req.query.from)) : undefined,
     to: req.query.to ? new Date(String(req.query.to)) : undefined,
   });
@@ -60,6 +62,7 @@ export async function contractorSummary(req: AuthedRequest, res: Response) {
 }
 
 const updateSchema = z.object({
+  siteId: z.string().optional(),
   bricksCount: z.number().int().positive().optional(),
   ratePerThousand: z.number().positive().optional(),
   damagedCount: z.number().int().nonnegative().optional(),

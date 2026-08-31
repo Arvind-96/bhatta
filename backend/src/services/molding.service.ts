@@ -12,6 +12,7 @@ export interface CreateMoldingInput {
   kilnId: string;
   seasonId: string;
   workerId: string;
+  siteId?: string;
   bricksCount: number;
   ratePerThousand: number;
   damagedCount?: number;
@@ -72,6 +73,7 @@ export async function createMoldingEntry(input: CreateMoldingInput) {
 }
 
 export interface UpdateMoldingInput {
+  siteId?: string;
   bricksCount?: number;
   ratePerThousand?: number;
   damagedCount?: number;
@@ -202,6 +204,7 @@ export async function deleteMoldingEntry(kilnId: string, entryId: string) {
 
 export interface ListMoldingFilter {
   workerId?: string;
+  siteId?: string;
   from?: Date;
   to?: Date;
 }
@@ -213,6 +216,7 @@ export async function listMoldingEntries(kilnId: string, seasonId: string | null
   const conditions = [eq(moldingEntries.kilnId, kilnId)];
   if (seasonId) conditions.push(eq(moldingEntries.seasonId, seasonId));
   if (filter.workerId) conditions.push(eq(moldingEntries.workerId, filter.workerId));
+  if (filter.siteId) conditions.push(eq(moldingEntries.siteId, filter.siteId));
   if (filter.from) conditions.push(gte(moldingEntries.date, filter.from));
   if (filter.to) conditions.push(lte(moldingEntries.date, filter.to));
 

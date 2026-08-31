@@ -87,9 +87,12 @@ import type {
   PartnerDetail,
   PartnerProfitShare,
   PaymentReceipt,
+  PathaiSite,
+  PathaiSiteOverviewEntry,
   Person,
   PersonFullReport,
   PersonType,
+  SaltUsageLog,
   SalesAgentDetail,
   SalesAgentSummary,
   CompareModule,
@@ -742,12 +745,14 @@ export const api = {
   },
 
   soilTrips: {
-    list: () => get<SoilTrip[]>("/soil-trips", true),
+    list: (filter: { siteId?: string } = {}) =>
+      get<SoilTrip[]>(`/soil-trips${filter.siteId ? `?siteId=${filter.siteId}` : ""}`, true),
     create: (input: {
       landownerId: string;
       driverId?: string;
       contractId?: string;
       landId?: string;
+      siteId?: string;
       tractorNumber?: string;
       trolleyCount?: number;
       receivedTrolleyCount?: number;
@@ -1037,8 +1042,13 @@ export const api = {
   },
 
   molding: {
-    list: (filter: { workerId?: string } = {}) =>
-      get<MoldingEntry[]>(`/molding${filter.workerId ? `?workerId=${filter.workerId}` : ""}`, true),
+    list: (filter: { workerId?: string; siteId?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (filter.workerId) params.set("workerId", filter.workerId);
+      if (filter.siteId) params.set("siteId", filter.siteId);
+      const qs = params.toString();
+      return get<MoldingEntry[]>(`/molding${qs ? `?${qs}` : ""}`, true);
+    },
     create: (input: {
       workerId: string;
       bricksCount: number;
@@ -1046,6 +1056,7 @@ export const api = {
       damagedCount?: number;
       damageFault?: DamageFault;
       washedOut?: boolean;
+      siteId?: string;
       notes?: string;
     }) => post<MoldingEntry>("/molding", input, true),
     today: () => get<{ total: number }>("/molding/today", true),
@@ -1053,7 +1064,7 @@ export const api = {
     contractorSummary: () => get<MoldingContractorSummary>("/molding/contractor-summary", true),
     update: (
       id: string,
-      input: Partial<{ bricksCount: number; ratePerThousand: number; damagedCount: number; damageFault: DamageFault; washedOut: boolean; notes: string }>
+      input: Partial<{ bricksCount: number; ratePerThousand: number; damagedCount: number; damageFault: DamageFault; washedOut: boolean; siteId: string; notes: string }>
     ) => patch<MoldingEntry>(`/molding/${id}`, input, true),
     remove: (id: string) => del<void>(`/molding/${id}`, true),
   },
@@ -1084,11 +1095,30 @@ export const api = {
     overview: () => get<ChamberOverviewEntry[]>("/ghers/overview", true),
   },
 
+  pathaiSites: {
+    list: (includeInactive = false) =>
+      get<PathaiSite[]>(`/pathai-sites${includeInactive ? "?includeInactive=true" : ""}`, true),
+    create: (input: { name: string; distanceKm?: number; notes?: string }) =>
+      post<PathaiSite>("/pathai-sites", input, true),
+    update: (id: string, input: Partial<{ name: string; distanceKm: number; notes: string; active: boolean }>) =>
+      patch<PathaiSite>(`/pathai-sites/${id}`, input, true),
+    overview: () => get<PathaiSiteOverviewEntry[]>("/pathai-sites/overview", true),
+  },
+
+  saltUsageLogs: {
+    list: (filter: { siteId?: string } = {}) =>
+      get<SaltUsageLog[]>(`/salt-usage-logs${filter.siteId ? `?siteId=${filter.siteId}` : ""}`, true),
+    create: (input: { siteId: string; quantityKg: number; date?: string; notes?: string }) =>
+      post<SaltUsageLog>("/salt-usage-logs", input, true),
+    remove: (id: string) => del<void>(`/salt-usage-logs/${id}`, true),
+  },
+
   stacking: {
-    list: (filter: { gangId?: string; gherId?: string } = {}) => {
+    list: (filter: { gangId?: string; gherId?: string; siteId?: string } = {}) => {
       const params = new URLSearchParams();
       if (filter.gangId) params.set("gangId", filter.gangId);
       if (filter.gherId) params.set("gherId", filter.gherId);
+      if (filter.siteId) params.set("siteId", filter.siteId);
       const qs = params.toString();
       return get<StackingEntry[]>(`/stacking${qs ? `?${qs}` : ""}`, true);
     },
@@ -1096,6 +1126,7 @@ export const api = {
       gherId: string;
       gangId: string;
       stage: StackingStage;
+      siteId?: string;
       bricksCount: number;
       damageCount?: number;
       damageFault?: DamageFault;
@@ -1109,6 +1140,7 @@ export const api = {
       id: string,
       input: Partial<{
         stage: StackingStage;
+        siteId: string;
         bricksCount: number;
         damageCount: number;
         damageFault: DamageFault;
@@ -1257,10 +1289,11 @@ export const api = {
   },
 
   soilArrivals: {
-    list: (filter: { landownerId?: string; contractId?: string } = {}) => {
+    list: (filter: { landownerId?: string; contractId?: string; siteId?: string } = {}) => {
       const params = new URLSearchParams();
       if (filter.landownerId) params.set("landownerId", filter.landownerId);
       if (filter.contractId) params.set("contractId", filter.contractId);
+      if (filter.siteId) params.set("siteId", filter.siteId);
       const qs = params.toString();
       return get<SoilArrival[]>(`/soil-arrivals${qs ? `?${qs}` : ""}`, true);
     },
@@ -1274,6 +1307,7 @@ export const api = {
       tractors?: SoilArrivalTractorEntry[];
       trolleyCount: number;
       depthFeet?: number;
+      siteId?: string;
       paymentGiven?: number;
       paymentPending?: number;
       soilRemaining?: number;
@@ -1290,6 +1324,7 @@ export const api = {
         tractors: SoilArrivalTractorEntry[];
         trolleyCount: number;
         depthFeet: number;
+        siteId: string;
         paymentGiven: number;
         paymentPending: number;
         soilRemaining: number;

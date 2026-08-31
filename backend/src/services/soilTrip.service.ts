@@ -13,6 +13,10 @@ export interface CreateSoilTripInput {
   driverId?: string;
   contractId?: string;
   landId?: string;
+  // Nullable — which Pathai site this trolley was delivered to (see
+  // pathaiSites' own doc comment). Purely a destination tag; doesn't
+  // affect any of the landowner/driver ledger postings below.
+  siteId?: string;
   tractorNumber?: string;
   trolleyCount?: number;
   receivedTrolleyCount?: number;
@@ -87,6 +91,7 @@ export interface ListSoilTripsFilter {
   landownerId?: string;
   contractId?: string;
   landId?: string;
+  siteId?: string;
   from?: Date;
   to?: Date;
 }
@@ -100,6 +105,7 @@ export async function listSoilTrips(kilnId: string, seasonId: string | null, fil
   if (filter.landownerId) conditions.push(eq(soilTrips.landownerId, filter.landownerId));
   if (filter.contractId) conditions.push(eq(soilTrips.contractId, filter.contractId));
   if (filter.landId) conditions.push(eq(soilTrips.landId, filter.landId));
+  if (filter.siteId) conditions.push(eq(soilTrips.siteId, filter.siteId));
   if (filter.from) conditions.push(gte(soilTrips.date, filter.from));
   if (filter.to) conditions.push(lte(soilTrips.date, filter.to));
 

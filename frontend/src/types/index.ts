@@ -653,6 +653,7 @@ export interface SoilTrip {
   driverId?: { _id: string; name: string } | string;
   contractId?: string;
   landId?: string;
+  siteId?: string | null;
   tractorNumber?: string;
   trolleyCount: number;
   receivedTrolleyCount?: number;
@@ -961,6 +962,7 @@ export interface MoldingEntry {
   damageFault?: DamageFault;
   date: string;
   washedOut: boolean;
+  siteId?: string | null;
   notes?: string;
 }
 
@@ -1063,6 +1065,35 @@ export interface ChamberOverviewEntry {
   bricksUnloadedThisCycle: number;
 }
 
+export interface PathaiSite {
+  _id: string;
+  name: string;
+  distanceKm?: number | null;
+  notes?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface PathaiSiteOverviewEntry {
+  site: PathaiSite;
+  totalBricksProduced: number;
+  totalTrolleysDelivered: number;
+  totalBricksTransportedAway: number;
+  totalSaltUsedKg: number;
+  currentRawStock: number;
+  bricksPerTrolley: number | null;
+  bricksToday: number;
+  bricksThisWeek: number;
+}
+
+export interface SaltUsageLog {
+  _id: string;
+  siteId: string;
+  quantityKg: number;
+  date: string;
+  notes?: string | null;
+}
+
 export type StackingQuality = "GOOD" | "AVERAGE" | "POOR";
 
 export type StackingMode = "BUGGI" | "TRACTOR";
@@ -1076,6 +1107,7 @@ export interface StackingEntry {
   gherId: { _id: string; number: number } | string;
   gangId: { _id: string; name: string; type: PersonType } | string;
   stage?: StackingStage;
+  siteId?: string | null;
   bricksCount: number;
   damageCount: number;
   damageFault?: DamageFault;
@@ -1389,6 +1421,7 @@ export interface SoilArrival {
   tractors?: SoilArrivalTractorEntry[];
   trolleyCount: number;
   depthFeet?: number;
+  siteId?: string | null;
   paymentGiven: number;
   paymentPending: number;
   soilRemaining?: number;

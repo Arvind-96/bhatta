@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { rateBasisLabel } from "@/components/soil/ContractDetailPage";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR } from "@/lib/utils";
-import type { Person, SoilArrival, SoilContract } from "@/types";
+import type { PathaiSite, Person, SoilArrival, SoilContract } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -34,6 +34,8 @@ export function EditSoilArrivalModal({ entry, drivers, onClose, onSaved }: EditS
   );
   const [trolleyCount, setTrolleyCount] = useState(String(entry.trolleyCount));
   const [depthFeet, setDepthFeet] = useState(entry.depthFeet != null ? String(entry.depthFeet) : "");
+  const [siteId, setSiteId] = useState(entry.siteId ?? "");
+  const [sites, setSites] = useState<PathaiSite[]>([]);
   const [paymentGiven, setPaymentGiven] = useState(String(entry.paymentGiven ?? 0));
   const [paymentPending, setPaymentPending] = useState(String(entry.paymentPending ?? 0));
   const [soilRemaining, setSoilRemaining] = useState(entry.soilRemaining != null ? String(entry.soilRemaining) : "");
@@ -45,6 +47,7 @@ export function EditSoilArrivalModal({ entry, drivers, onClose, onSaved }: EditS
 
   useEffect(() => {
     api.soilContracts.list({ landownerId, status: "ACTIVE" }).then(setActiveContracts).catch(console.error);
+    api.pathaiSites.list().then(setSites).catch(console.error);
   }, [landownerId]);
 
   const selectedContract = activeContracts.find((c) => c._id === contractId);
@@ -62,6 +65,7 @@ export function EditSoilArrivalModal({ entry, drivers, onClose, onSaved }: EditS
         tractorDriverId: tractorUsed && tractorDriverId ? tractorDriverId : undefined,
         trolleyCount: Number(trolleyCount),
         depthFeet: depthFeet ? Number(depthFeet) : undefined,
+        siteId: siteId || undefined,
         paymentGiven: Number(paymentGiven),
         paymentPending: Number(paymentPending),
         soilRemaining: soilRemaining ? Number(soilRemaining) : undefined,
@@ -177,6 +181,16 @@ export function EditSoilArrivalModal({ entry, drivers, onClose, onSaved }: EditS
               onChange={(e) => setDepthFeet(e.target.value)}
               className={`col-span-2 ${inputClass}`}
             />
+          )}
+          {sites.length > 0 && (
+            <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className={`col-span-2 ${inputClass}`}>
+              <option value="">{t("pathaiSite.noSpecificSite")}</option>
+              {sites.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           )}
           <input
             type="number"

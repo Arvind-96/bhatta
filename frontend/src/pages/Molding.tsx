@@ -15,7 +15,8 @@ import { AddPersonModal } from "@/components/people/AddPersonModal";
 import { ContractorDetailPage } from "@/components/molding/ContractorDetailPage";
 import { LaborDetailPage } from "@/components/molding/LaborDetailPage";
 import { EditMoldingEntryModal } from "@/components/molding/EditMoldingEntryModal";
-import type { MoldingContractorSummary, MoldingEntry, MoldingPeriodTotals, Person } from "@/types";
+import { PathaiSitesSection } from "@/components/molding/PathaiSitesSection";
+import type { MoldingContractorSummary, MoldingEntry, MoldingPeriodTotals, PathaiSite, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -150,18 +151,20 @@ export function Molding() {
   const [openContractorId, setOpenContractorId] = useState<string | null>(null);
   const [openWorkerId, setOpenWorkerId] = useState<string | null>(null);
   const [showAddThekedar, setShowAddThekedar] = useState(false);
-  const [form, setForm] = useState({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", damageFault: "", washedOut: false });
+  const [sites, setSites] = useState<PathaiSite[]>([]);
+  const [form, setForm] = useState({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", damageFault: "", washedOut: false, siteId: "" });
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
-    const [entriesData, workers, contractorsData, today, periods, summary] = await Promise.all([
+    const [entriesData, workers, contractorsData, today, periods, summary, sitesData] = await Promise.all([
       api.molding.list(),
       api.people.list("WORKER"),
       api.people.list("LABOUR_CONTRACTOR"),
       api.molding.today(),
       api.molding.periodTotals(),
       api.molding.contractorSummary(),
+      api.pathaiSites.list(),
     ]);
     setEntries(entriesData);
     setPathaiwals(workers);
@@ -169,6 +172,7 @@ export function Molding() {
     setTodayTotal(today.total);
     setPeriodTotals(periods);
     setContractorSummary(summary);
+    setSites(sitesData);
   }
 
   useEffect(() => {
@@ -211,8 +215,9 @@ export function Molding() {
         damagedCount: form.damagedCount ? Number(form.damagedCount) : undefined,
         damageFault: form.damagedCount && form.damageFault ? (form.damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         washedOut: form.washedOut,
+        siteId: form.siteId || undefined,
       });
-      setForm({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", damageFault: "", washedOut: false });
+      setForm({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", damageFault: "", washedOut: false, siteId: "" });
       setShowForm(false);
       await refresh();
     } finally {
@@ -286,6 +291,8 @@ export function Molding() {
         onAddThekedar={() => setShowAddThekedar(true)}
       />
 
+      <PathaiSitesSection />
+
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setShowForm((s) => !s)}>
           <Plus className="h-4 w-4" /> {t("molding.logHazriEntry")}
@@ -333,6 +340,20 @@ export function Molding() {
               onChange={(e) => setForm((f) => ({ ...f, damagedCount: e.target.value }))}
               className={cn(inputClass, "col-span-2")}
             />
+            {sites.length > 0 && (
+              <select
+                value={form.siteId}
+                onChange={(e) => setForm((f) => ({ ...f, siteId: e.target.value }))}
+                className={cn(inputClass, "col-span-2")}
+              >
+                <option value="">{t("pathaiSite.noSpecificSite")}</option>
+                {sites.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
             {Number(form.damagedCount) > 0 && (
               <select
                 value={form.damageFault}

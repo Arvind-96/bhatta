@@ -246,6 +246,20 @@
       "when": 1788192786949,
       "tag": "0034_vengeful_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1788195850687,
+      "tag": "0035_famous_young_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "5",
+      "when": 1788196308694,
+      "tag": "0036_lumpy_the_stranger",
+      "breakpoints": true
     }
   ]
 }

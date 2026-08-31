@@ -19,6 +19,7 @@ const createSchema = z.object({
   tractors: z.array(tractorEntrySchema).optional(),
   trolleyCount: z.number().positive(),
   depthFeet: z.number().positive().optional(),
+  siteId: z.string().optional(),
   paymentGiven: z.number().min(0).optional(),
   paymentPending: z.number().min(0).optional(),
   soilRemaining: z.number().min(0).optional(),
@@ -41,6 +42,7 @@ export async function list(req: AuthedRequest, res: Response) {
   const entries = await listSoilArrivals(req.kiln!.id, req.season!.id, {
     landownerId: req.query.landownerId as string | undefined,
     contractId: req.query.contractId as string | undefined,
+    siteId: req.query.siteId as string | undefined,
   });
   res.json(entries);
 }
@@ -54,6 +56,7 @@ const updateSchema = z.object({
   tractors: z.array(tractorEntrySchema).optional(),
   trolleyCount: z.number().positive().optional(),
   depthFeet: z.number().positive().optional(),
+  siteId: z.string().optional(),
   paymentGiven: z.number().min(0).optional(),
   paymentPending: z.number().min(0).optional(),
   soilRemaining: z.number().min(0).optional(),

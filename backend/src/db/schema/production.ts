@@ -54,11 +54,52 @@ export const gherCycles = mysqlTable("gher_cycles", {
   gherCycleUnique: uniqueIndex("ghercycle_gher_cyclenum_unique").on(t.gherId, t.cycleNumber),
 }));
 
+// A physical molding ground (Pathai site) — the kiln's own yard, or a
+// separate remote site soil gets trucked to for raw-brick molding. Same
+// shape/role as `ghers` (a simple, admin-managed physical-location master
+// table other tables reference by id), deliberately NOT folded into the
+// Soil module's `lands` table: `lands` represents where soil is EXCAVATED
+// FROM (tied to a landowner, khasra/khata numbers, a soil-excavation
+// contract) — a completely different real-world place than where molding
+// happens, and conflating the two would corrupt `lands`' landowner-payment
+// semantics on rows that are really just "the kiln's own molding yard".
+export const pathaiSites = mysqlTable("pathai_sites", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  name: varchar("name", { length: 255 }).notNull(),
+  distanceKm: double("distanceKm"),
+  notes: text("notes"),
+  active: boolean("active").default(true),
+  createdAt: createdAtColumn(),
+}, (t) => ({ kilnActiveIdx: index("pathaisite_kiln_active_idx").on(t.kilnId, t.active) }));
+
+// Salt fed into the mix at a given Pathai site — no existing table to
+// extend (nothing in this codebase tracked salt before), same shape as
+// fuelLogs (a per-site/per-chamber consumption log against a simple named
+// resource) minus a dedicated "salt types" master table, since kilns don't
+// use multiple kinds of salt the way they use multiple fuel types.
+export const saltUsageLogs = mysqlTable("salt_usage_logs", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  seasonId: varchar("seasonId", { length: 64 }),
+  siteId: varchar("siteId", { length: 64 }).notNull(),
+  quantityKg: double("quantityKg").notNull(),
+  date: dateColumn(),
+  notes: text("notes"),
+  createdAt: createdAtColumn(),
+}, (t) => ({ kilnDateIdx: index("saltusage_kiln_date_idx").on(t.kilnId, t.date) }));
+
 export const moldingEntries = mysqlTable("molding_entries", {
   _id: idColumn(),
   kilnId: kilnIdColumn(),
   seasonId: varchar("seasonId", { length: 64 }),
   workerId: varchar("workerId", { length: 64 }).notNull(),
+  // Nullable — which Pathai site this molding happened at, for the
+  // per-site production/stock breakdown. Null for every entry logged
+  // before this existed, and for kilns that never set up sites at all
+  // (the feature is fully optional — the Log Hazri form works exactly as
+  // before if no site is picked).
+  siteId: varchar("siteId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
   ratePerThousand: double("ratePerThousand").notNull(),
   damagedCount: int("damagedCount").default(0),
@@ -67,7 +108,10 @@ export const moldingEntries = mysqlTable("molding_entries", {
   washedOut: boolean("washedOut").default(false),
   notes: text("notes"),
   createdAt: createdAtColumn(),
-}, (t) => ({ kilnDateIdx: index("molding_kiln_date_idx").on(t.kilnId, t.date) }));
+}, (t) => ({
+  kilnDateIdx: index("molding_kiln_date_idx").on(t.kilnId, t.date),
+  kilnSiteIdx: index("molding_kiln_site_idx").on(t.kilnId, t.siteId),
+}));
 
 export const STACKING_MODES = ["BUGGI", "TRACTOR"] as const;
 export const STACKING_QUALITY = ["GOOD", "AVERAGE", "POOR"] as const;
@@ -79,6 +123,13 @@ export const stackingEntries = mysqlTable("stacking_entries", {
   gherId: varchar("gherId", { length: 64 }).notNull(),
   gangId: varchar("gangId", { length: 64 }).notNull(),
   stage: varchar("stage", { length: 50, enum: STACKING_STAGES }),
+  // Nullable — only meaningful when stage is TRANSPORT: which Pathai site
+  // these raw bricks were hauled FROM. TRANSPORT already means "moving raw
+  // bricks from the molding ground to the kiln" (as opposed to
+  // CHAMBER_STACKING, loading them into a gher) — this is what lets a
+  // site's current raw-brick stock be computed as molded-there minus
+  // transported-away-from-there.
+  siteId: varchar("siteId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
   damageCount: int("damageCount").default(0),
   damageFault: varchar("damageFault", { length: 50, enum: DAMAGE_FAULT_OPTIONS }),
@@ -90,7 +141,10 @@ export const stackingEntries = mysqlTable("stacking_entries", {
   date: dateColumn(),
   notes: text("notes"),
   createdAt: createdAtColumn(),
-}, (t) => ({ kilnDateIdx: index("stacking_kiln_date_idx").on(t.kilnId, t.date) }));
+}, (t) => ({
+  kilnDateIdx: index("stacking_kiln_date_idx").on(t.kilnId, t.date),
+  kilnSiteIdx: index("stacking_kiln_site_idx").on(t.kilnId, t.siteId),
+}));
 
 export const STACKING_VEHICLE_TYPES = ["TRACTOR", "BUGGI"] as const;
 export const STACKING_VEHICLE_STATUSES = ["ACTIVE", "INACTIVE"] as const;

@@ -4,6 +4,7 @@ import { db } from "../db/client";
 import { soilArrivals, soilContracts, people, SoilArrivalTractorEntry } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry } from "./ledger.service";
+import { assertPathaiSiteInKiln } from "./pathaiSite.service";
 import { emitToKiln } from "../config/socket";
 
 export interface CreateSoilArrivalInput {
@@ -18,6 +19,7 @@ export interface CreateSoilArrivalInput {
   tractors?: SoilArrivalTractorEntry[];
   trolleyCount: number;
   depthFeet?: number;
+  siteId?: string;
   paymentGiven?: number;
   paymentPending?: number;
   soilRemaining?: number;
@@ -60,6 +62,7 @@ export async function createSoilArrival(input: CreateSoilArrivalInput) {
   if (input.jcbDriverId) await assertPersonOfType(input.kilnId, input.jcbDriverId, ["DRIVER"]);
   if (input.tractorDriverId) await assertPersonOfType(input.kilnId, input.tractorDriverId, ["DRIVER"]);
   if (input.contractId) await assertContractMatchesLandowner(input.kilnId, input.contractId, input.landownerId);
+  if (input.siteId) await assertPathaiSiteInKiln(input.kilnId, input.siteId);
 
   const _id = randomUUID();
   await db.insert(soilArrivals).values({ ...input, _id });
@@ -107,6 +110,7 @@ export interface UpdateSoilArrivalInput {
   contractId?: string;
   trolleyCount?: number;
   depthFeet?: number;
+  siteId?: string;
   paymentGiven?: number;
   paymentPending?: number;
   soilRemaining?: number;
@@ -123,6 +127,7 @@ export async function updateSoilArrival(kilnId: string, entryId: string, input: 
   if (input.jcbDriverId) await assertPersonOfType(kilnId, input.jcbDriverId, ["DRIVER"]);
   if (input.tractorDriverId) await assertPersonOfType(kilnId, input.tractorDriverId, ["DRIVER"]);
   if (input.contractId) await assertContractMatchesLandowner(kilnId, input.contractId, existing.landownerId);
+  if (input.siteId) await assertPathaiSiteInKiln(kilnId, input.siteId);
 
   const oldGiven = existing.paymentGiven ?? 0;
   const oldPending = existing.paymentPending ?? 0;
@@ -229,6 +234,7 @@ export async function deleteSoilArrival(kilnId: string, entryId: string) {
 export interface ListSoilArrivalFilter {
   landownerId?: string;
   contractId?: string;
+  siteId?: string;
 }
 
 // seasonId is nullable — pass null for an all-time, every-season view (see
@@ -238,6 +244,7 @@ export async function listSoilArrivals(kilnId: string, seasonId: string | null, 
   if (seasonId) conditions.push(eq(soilArrivals.seasonId, seasonId));
   if (filter.landownerId) conditions.push(eq(soilArrivals.landownerId, filter.landownerId));
   if (filter.contractId) conditions.push(eq(soilArrivals.contractId, filter.contractId));
+  if (filter.siteId) conditions.push(eq(soilArrivals.siteId, filter.siteId));
   const rows = await db.select().from(soilArrivals).where(and(...conditions)).orderBy(desc(soilArrivals.date));
   return Promise.all(rows.map(withPeople));
 }

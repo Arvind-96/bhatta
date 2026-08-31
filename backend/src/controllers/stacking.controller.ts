@@ -16,6 +16,7 @@ const createSchema = z.object({
   gherId: z.string(),
   gangId: z.string(),
   stage: z.enum(STACKING_STAGES),
+  siteId: z.string().optional(),
   bricksCount: z.number().int().positive(),
   damageCount: z.number().int().min(0).optional(),
   damageFault: z.enum(DAMAGE_FAULT_OPTIONS).optional(),
@@ -42,6 +43,7 @@ export async function list(req: AuthedRequest, res: Response) {
   const entries = await listStackingEntries(req.kiln!.id, req.season!.id, {
     gherId: req.query.gherId as string | undefined,
     gangId: req.query.gangId as string | undefined,
+    siteId: req.query.siteId as string | undefined,
     from: req.query.from ? new Date(String(req.query.from)) : undefined,
     to: req.query.to ? new Date(String(req.query.to)) : undefined,
   });
@@ -50,6 +52,7 @@ export async function list(req: AuthedRequest, res: Response) {
 
 const updateSchema = z.object({
   stage: z.enum(STACKING_STAGES).optional(),
+  siteId: z.string().optional(),
   bricksCount: z.number().int().positive().optional(),
   damageCount: z.number().int().min(0).optional(),
   damageFault: z.enum(DAMAGE_FAULT_OPTIONS).optional(),

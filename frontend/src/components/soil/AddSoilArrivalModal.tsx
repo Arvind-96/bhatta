@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { rateBasisLabel } from "@/components/soil/ContractDetailPage";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { Person, SoilArrivalTractorEntry, SoilContract } from "@/types";
+import type { PathaiSite, Person, SoilArrivalTractorEntry, SoilContract } from "@/types";
 import { cn, formatINR } from "@/lib/utils";
 
 const inputClass =
@@ -105,6 +105,8 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
   const [jcbDriverId, setJcbDriverId] = useState("");
   const [tractors, setTractors] = useState<SoilArrivalTractorEntry[]>([]);
   const [trolleyCount, setTrolleyCount] = useState("");
+  const [siteId, setSiteId] = useState("");
+  const [sites, setSites] = useState<PathaiSite[]>([]);
   const [paymentGiven, setPaymentGiven] = useState("");
   const [paymentPending, setPaymentPending] = useState("");
   const [notes, setNotes] = useState("");
@@ -133,6 +135,7 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
 
   useEffect(() => {
     api.soilContracts.list({ status: "ACTIVE" }).then(setActiveContracts).catch(console.error);
+    api.pathaiSites.list().then(setSites).catch(console.error);
   }, []);
 
   const contractsForOwner = activeContracts.filter(
@@ -169,6 +172,7 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
           ? tractors.filter((entry) => entry.driverName || entry.driverPhone || entry.tractorNumber)
           : undefined,
         trolleyCount: Number(trolleyCount),
+        siteId: siteId || undefined,
         paymentGiven: paymentGiven ? Number(paymentGiven) : undefined,
         paymentPending: paymentPending ? Number(paymentPending) : undefined,
         notes: notes || undefined,
@@ -320,6 +324,19 @@ export function AddSoilArrivalModal({ landownerId, landowners, presetContractId,
           <Field label={t("soil.trolleysArrived")}>
             <input required type="number" min={0} placeholder={t("soil.egFive")} value={trolleyCount} onChange={(e) => setTrolleyCount(e.target.value)} className={inputClass} />
           </Field>
+
+          {sites.length > 0 && (
+            <Field label={t("pathaiSite.deliveredToSiteOptional")}>
+              <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className={inputClass}>
+                <option value="">{t("pathaiSite.noSpecificSite")}</option>
+                {sites.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("soil.paymentGivenSoFar")}>

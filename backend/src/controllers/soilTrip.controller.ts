@@ -8,6 +8,7 @@ const createSchema = z.object({
   driverId: z.string().optional(),
   contractId: z.string().optional(),
   landId: z.string().optional(),
+  siteId: z.string().optional(),
   tractorNumber: z.string().optional(),
   trolleyCount: z.number().int().positive().optional(),
   receivedTrolleyCount: z.number().int().positive().optional(),
@@ -37,6 +38,7 @@ export async function list(req: AuthedRequest, res: Response) {
     landownerId: req.query.landownerId as string | undefined,
     contractId: req.query.contractId as string | undefined,
     landId: req.query.landId as string | undefined,
+    siteId: req.query.siteId as string | undefined,
     from: req.query.from ? new Date(String(req.query.from)) : undefined,
     to: req.query.to ? new Date(String(req.query.to)) : undefined,
   });
