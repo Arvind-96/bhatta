@@ -1,0 +1,1 @@
+ALTER TABLE `people` ADD `landLeaseSerial` int;

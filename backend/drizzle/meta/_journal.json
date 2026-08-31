@@ -232,6 +232,20 @@
       "when": 1788175955340,
       "tag": "0032_shiny_pixie",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1788192174443,
+      "tag": "0033_brief_deathbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1788192786949,
+      "tag": "0034_vengeful_xorn",
+      "breakpoints": true
     }
   ]
 }

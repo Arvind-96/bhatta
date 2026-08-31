@@ -394,7 +394,8 @@ export type PersonType =
   | "MUNIM"
   | "CHOWKIDAR"
   | "SAND_CONTRACTOR"
-  | "SALES_AGENT";
+  | "SALES_AGENT"
+  | "LAND_LEASE";
 
 export type AgentCommissionType = "PERCENT_OF_SALE" | "PER_THOUSAND_BRICKS";
 
@@ -454,6 +455,7 @@ export interface Person {
   agreedDepthUnit?: string;
   landownerSerial?: number;
   sandContractorSerial?: number;
+  landLeaseSerial?: number;
   creditLimit?: number;
   nickname?: string;
   joiningDate?: string;
@@ -830,6 +832,43 @@ export interface SoilContractSummary {
   contractedDepthRemaining: number | null;
   contractedDepthPercentUsed: number | null;
   contractedDepthOverrun: boolean;
+}
+
+export type LandLeaseRateType = SoilContractRateType;
+export type LandLeaseContractStatus = SoilContractStatus;
+
+export interface LandLeaseContract {
+  _id: string;
+  contractNumber: string;
+  landId: PopulatedLandRef | string;
+  landLeaseId: { _id: string; name: string; phone?: string } | string;
+  rateType: LandLeaseRateType;
+  contractedQuantity?: number;
+  ratePerTrolley?: number;
+  contractedAreaBigha?: number;
+  ratePerBigha?: number;
+  contractedDepth?: number;
+  depthUnit?: DepthUnit;
+  ratePerDepthUnit?: number;
+  totalContractValue: number;
+  advanceAmount: number;
+  startDate?: string;
+  endDate?: string;
+  paymentTerms?: string;
+  status: LandLeaseContractStatus;
+  notes?: string;
+  createdAt: string;
+  // Present on list/get responses — always computed, never stored.
+  ledgerBalance: number;
+  isExpired: boolean;
+  isExpiringSoon: boolean;
+}
+
+export interface LandLeaseContractSummary {
+  contract: LandLeaseContract;
+  ledgerBalance: number;
+  isExpired: boolean;
+  isExpiringSoon: boolean;
 }
 
 export interface ContractDailyMovement {

@@ -143,6 +143,10 @@ import type {
   BookEntryType,
   BankReconciliationSummary,
   BrickLineItem,
+  LandLeaseContract,
+  LandLeaseContractSummary,
+  LandLeaseRateType,
+  LandLeaseContractStatus,
 } from "@/types";
 import type { ReportResult, ReportRunParams, DashboardSummary } from "@/types/reports";
 import { useAuthStore, type AuthUser, type UserKiln, type UserSeason } from "@/store/auth.store";
@@ -850,6 +854,61 @@ export const api = {
     remove: (id: string) => del(`/soil-contracts/${id}`, true),
     dashboard: () => get<SoilContractDashboard>("/soil-contracts/dashboard", true),
     dailyMovement: (id: string) => get<ContractDailyMovement[]>(`/soil-contracts/${id}/daily-movement`, true),
+  },
+
+  landLeaseContracts: {
+    list: (filter: { landLeaseId?: string; landId?: string; status?: LandLeaseContractStatus } = {}) => {
+      const params = new URLSearchParams();
+      if (filter.landLeaseId) params.set("landLeaseId", filter.landLeaseId);
+      if (filter.landId) params.set("landId", filter.landId);
+      if (filter.status) params.set("status", filter.status);
+      const qs = params.toString();
+      return get<LandLeaseContract[]>(`/land-lease-contracts${qs ? `?${qs}` : ""}`, true);
+    },
+    get: (id: string) => get<LandLeaseContractSummary>(`/land-lease-contracts/${id}`, true),
+    create: (input: {
+      landId: string;
+      landLeaseId: string;
+      rateType?: LandLeaseRateType;
+      contractedQuantity?: number;
+      ratePerTrolley?: number;
+      contractedAreaBigha?: number;
+      ratePerBigha?: number;
+      contractedDepth?: number;
+      depthUnit?: DepthUnit;
+      ratePerDepthUnit?: number;
+      totalContractValue?: number;
+      advanceAmount?: number;
+      paymentMode?: LedgerPaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
+      startDate?: string;
+      endDate?: string;
+      paymentTerms?: string;
+      notes?: string;
+    }) => post<LandLeaseContract>("/land-lease-contracts", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        rateType: LandLeaseRateType;
+        contractedQuantity: number;
+        ratePerTrolley: number;
+        contractedAreaBigha: number;
+        ratePerBigha: number;
+        contractedDepth: number;
+        depthUnit: DepthUnit;
+        ratePerDepthUnit: number;
+        totalContractValue: number;
+        advanceAmount: number;
+        startDate: string;
+        endDate: string;
+        paymentTerms: string;
+        notes: string;
+      }>
+    ) => patch<LandLeaseContract>(`/land-lease-contracts/${id}`, input, true),
+    updateStatus: (id: string, status: LandLeaseContractStatus) =>
+      patch<LandLeaseContract>(`/land-lease-contracts/${id}/status`, { status }, true),
+    remove: (id: string) => del(`/land-lease-contracts/${id}`, true),
   },
 
   sandContracts: {

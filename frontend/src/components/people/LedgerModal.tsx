@@ -48,7 +48,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
   const isPartner = person.type === "PARTNER";
   const isSalesAgent = person.type === "SALES_AGENT";
   const isContractor = person.type === "LABOUR_CONTRACTOR";
-  const isLandowner = person.type === "LANDOWNER";
+  const isLandowner = person.type === "LANDOWNER" || person.type === "LAND_LEASE";
   // Permanent bhatta admin/support staff (Main Munim, office Helpers,
   // Chowkidar, office Drivers — see Staff.tsx's roster) get their own
   // salary via the dedicated attendance-based Salary Slip system, not this

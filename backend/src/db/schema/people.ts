@@ -4,7 +4,7 @@ import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers"
 export const PERSON_TYPES = [
   "DRIVER", "LABOUR_CONTRACTOR", "SUPPLIER", "THEKEDAR", "PARTNER", "WORKER",
   "HELPER", "LANDOWNER", "FITTER", "CUSTOMER", "MUNIM", "CHOWKIDAR", "SAND_CONTRACTOR",
-  "SALES_AGENT",
+  "SALES_AGENT", "LAND_LEASE",
 ] as const;
 export const AGENT_COMMISSION_TYPES = ["PERCENT_OF_SALE", "PER_THOUSAND_BRICKS"] as const;
 export const WORK_TYPES = [
@@ -95,6 +95,12 @@ export const people = mysqlTable("people", {
   // Same idea as landownerSerial above, but for sand contractors ("Sand -
   // N") — independent counter, null for every other person type.
   sandContractorSerial: int("sandContractorSerial"),
+  // Same idea again, but for Land Lease (Patta) — a person type that
+  // copies Landowner's functionality exactly (land holdings + a
+  // soil-contract-shaped rent contract, always tracked in Bigha) for land
+  // leased for raw-brick molding rather than soil excavation. Independent
+  // counter ("Land Lease - N"), null for every other person type.
+  landLeaseSerial: int("landLeaseSerial"),
   creditLimit: double("creditLimit"),
   active: boolean("active").default(true),
   // What everyone actually calls this person day-to-day — distinct from

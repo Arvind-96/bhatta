@@ -103,9 +103,6 @@ export function Staff() {
   const [officeHelpers, setOfficeHelpers] = useState<StaffMember[]>([]);
   const [drivers, setDrivers] = useState<StaffMember[]>([]);
   const [suppliers, setSuppliers] = useState<StaffMember[]>([]);
-  const [partners, setPartners] = useState<StaffMember[]>([]);
-  const [fitters, setFitters] = useState<StaffMember[]>([]);
-  const [customers, setCustomers] = useState<StaffMember[]>([]);
   const [openStaffId, setOpenStaffId] = useState<string | null>(null);
   const [addType, setAddType] = useState<PersonType | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -116,17 +113,14 @@ export function Staff() {
   }
 
   async function refresh() {
-    const [munimList, chowkidarList, helperList, driverList, supplierList, partnerList, fitterList, customerList] = await Promise.all([
+    const [munimList, chowkidarList, helperList, driverList, supplierList] = await Promise.all([
       api.people.list("MUNIM"),
       api.people.list("CHOWKIDAR"),
       api.people.list("HELPER"),
       api.people.list("DRIVER"),
       api.people.list("SUPPLIER"),
-      api.people.list("PARTNER"),
-      api.people.list("FITTER"),
-      api.people.list("CUSTOMER"),
     ]);
-    const [munimMembers, chowkidarMembers, helperMembers, driverMembers, supplierMembers, partnerMembers, fitterMembers, customerMembers] = await Promise.all([
+    const [munimMembers, chowkidarMembers, helperMembers, driverMembers, supplierMembers] = await Promise.all([
       withBalance(munimList),
       withBalance(chowkidarList),
       withBalance(helperList.filter((h) => h.isOfficeStaff)),
@@ -135,18 +129,12 @@ export function Staff() {
       // every driver profile stays reachable from somewhere.
       withBalance(driverList),
       withBalance(supplierList),
-      withBalance(partnerList),
-      withBalance(fitterList),
-      withBalance(customerList),
     ]);
     setMunims(munimMembers);
     setChowkidars(chowkidarMembers);
     setOfficeHelpers(helperMembers);
     setDrivers(driverMembers);
     setSuppliers(supplierMembers);
-    setPartners(partnerMembers);
-    setFitters(fitterMembers);
-    setCustomers(customerMembers);
   }
 
   useEffect(() => {
@@ -161,7 +149,7 @@ export function Staff() {
     return <StaffDetailPage staffId={openStaffId} onBack={() => setOpenStaffId(null)} />;
   }
 
-  const totalOnRoster = munims.length + chowkidars.length + officeHelpers.length + drivers.length + suppliers.length + partners.length + fitters.length + customers.length;
+  const totalOnRoster = munims.length + chowkidars.length + officeHelpers.length + drivers.length + suppliers.length;
 
   return (
     <div className="space-y-6">
@@ -179,9 +167,6 @@ export function Staff() {
       <StaffSection title={t("staff.chowkidar")} members={chowkidars} onOpen={setOpenStaffId} onAdd={() => setAddType("CHOWKIDAR")} />
       <StaffSection title={t("staff.driverStaff")} members={drivers} onOpen={setOpenStaffId} onAdd={() => setAddType("DRIVER")} />
       <StaffSection title={personTypeMeta.SUPPLIER.label} members={suppliers} onOpen={setOpenStaffId} onAdd={() => setAddType("SUPPLIER")} />
-      <StaffSection title={personTypeMeta.PARTNER.label} members={partners} onOpen={setOpenStaffId} onAdd={() => setAddType("PARTNER")} />
-      <StaffSection title={personTypeMeta.FITTER.label} members={fitters} onOpen={setOpenStaffId} onAdd={() => setAddType("FITTER")} />
-      <StaffSection title={personTypeMeta.CUSTOMER.label} members={customers} onOpen={setOpenStaffId} onAdd={() => setAddType("CUSTOMER")} />
 
       {addType && (
         <AddPersonModal

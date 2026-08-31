@@ -202,6 +202,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.personType.CUSTOMER": { en: "Customer", hi: "ग्राहक" },
   "common.personType.MUNIM": { en: "Munim (Accountant)", hi: "मुनीम" },
   "common.personType.CHOWKIDAR": { en: "Chowkidar (Watchman)", hi: "चौकीदार" },
+  "common.personType.LAND_LEASE": { en: "Land Lease (Patta)", hi: "पट्टा भूमि" },
 
   "overview.bricksToday": { en: "Bricks Today", hi: "आज की ईंटें" },
   "overview.finishedStock": { en: "Finished Stock", hi: "तैयार स्टॉक" },

@@ -12,6 +12,7 @@ import { moldingContractorSummary } from "./molding.service";
 import { listFiringShifts } from "./firingShift.service";
 import { listSoilArrivals } from "./soilArrival.service";
 import { listSoilContracts } from "./soilContract.service";
+import { listLandLeaseContracts } from "./landLeaseContract.service";
 import { listBrickLoadingEntries } from "./brickLoading.service";
 import { listDispatchesForCustomer } from "./dispatch.service";
 
@@ -88,6 +89,10 @@ export async function getPersonFullReport(kilnId: string, personId: string) {
     ]);
     sections.soilArrivals = soilArrivals;
     sections.soilContracts = soilContracts;
+  }
+
+  if (person.type === "LAND_LEASE") {
+    sections.landLeaseContracts = await listLandLeaseContracts(kilnId, { landLeaseId: personId });
   }
 
   if (person.type === "DRIVER") {

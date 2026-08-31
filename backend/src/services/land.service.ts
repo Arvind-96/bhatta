@@ -27,7 +27,7 @@ export interface CreateLandInput {
 }
 
 export async function createLand(input: CreateLandInput) {
-  await assertPersonOfType(input.kilnId, input.landownerId, ["LANDOWNER"]);
+  await assertPersonOfType(input.kilnId, input.landownerId, ["LANDOWNER", "LAND_LEASE"]);
   const _id = randomUUID();
   await db.insert(lands).values({ ...input, _id });
   const land = (await db.select().from(lands).where(eq(lands._id, _id)))[0]!;

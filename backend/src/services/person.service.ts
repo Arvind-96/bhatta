@@ -117,8 +117,13 @@ export async function createPerson(input: CreatePersonInput) {
     const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "SAND_CONTRACTOR"))))[0];
     sandContractorSerial = (countRow?.count ?? 0) + 1;
   }
+  let landLeaseSerial: number | undefined;
+  if (input.type === "LAND_LEASE") {
+    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "LAND_LEASE"))))[0];
+    landLeaseSerial = (countRow?.count ?? 0) + 1;
+  }
   const _id = randomUUID();
-  await db.insert(people).values({ ...input, _id, stackingStage: deriveStackingStage(input), landownerSerial, sandContractorSerial });
+  await db.insert(people).values({ ...input, _id, stackingStage: deriveStackingStage(input), landownerSerial, sandContractorSerial, landLeaseSerial });
   const person = (await db.select().from(people).where(eq(people._id, _id)))[0]!;
   emitToKiln(input.kilnId, "person:update", person);
   return person;
@@ -139,13 +144,35 @@ async function computeLandownerSerials(kilnId: string): Promise<Map<string, numb
   return new Map(rows.map((r, i) => [r._id, i + 1]));
 }
 
+// Same idea as computeLandownerSerials above, for Land Lease (Patta).
+async function computeLandLeaseSerials(kilnId: string): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ _id: people._id })
+    .from(people)
+    .where(and(eq(people.kilnId, kilnId), eq(people.type, "LAND_LEASE"), eq(people.active, true)))
+    .orderBy(asc(people.createdAt));
+  return new Map(rows.map((r, i) => [r._id, i + 1]));
+}
+
 export async function listPeople(kilnId: string, type?: PersonType) {
   const conditions = [eq(people.kilnId, kilnId), eq(people.active, true)];
   if (type) conditions.push(eq(people.type, type));
   const rows = await db.select().from(people).where(and(...conditions)).orderBy(asc(people.name));
-  if (type && type !== "LANDOWNER") return rows;
-  const serials = await computeLandownerSerials(kilnId);
-  return rows.map((r) => (r.type === "LANDOWNER" ? { ...r, landownerSerial: serials.get(r._id) ?? r.landownerSerial } : r));
+  if (type === "LANDOWNER") {
+    const serials = await computeLandownerSerials(kilnId);
+    return rows.map((r) => ({ ...r, landownerSerial: serials.get(r._id) ?? r.landownerSerial }));
+  }
+  if (type === "LAND_LEASE") {
+    const serials = await computeLandLeaseSerials(kilnId);
+    return rows.map((r) => ({ ...r, landLeaseSerial: serials.get(r._id) ?? r.landLeaseSerial }));
+  }
+  if (type) return rows;
+  const [landownerSerials, landLeaseSerials] = await Promise.all([computeLandownerSerials(kilnId), computeLandLeaseSerials(kilnId)]);
+  return rows.map((r) => {
+    if (r.type === "LANDOWNER") return { ...r, landownerSerial: landownerSerials.get(r._id) ?? r.landownerSerial };
+    if (r.type === "LAND_LEASE") return { ...r, landLeaseSerial: landLeaseSerials.get(r._id) ?? r.landLeaseSerial };
+    return r;
+  });
 }
 
 // Everyone linked to a LABOUR_CONTRACTOR across every module they might be
@@ -249,6 +276,10 @@ export async function getPersonWithBalance(kilnId: string, personId: string) {
   if (person.type === "LANDOWNER") {
     const serials = await computeLandownerSerials(kilnId);
     person.landownerSerial = serials.get(person._id) ?? person.landownerSerial;
+  }
+  if (person.type === "LAND_LEASE") {
+    const serials = await computeLandLeaseSerials(kilnId);
+    person.landLeaseSerial = serials.get(person._id) ?? person.landLeaseSerial;
   }
   return { person, balance };
 }

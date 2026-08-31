@@ -59,6 +59,14 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
     hi: "अनुबंध {contractNumber} हटाएं? यह पूर्ववत नहीं हो सकता; इसका भुगतान इतिहास रिकॉर्ड में रहेगा।",
   },
 
+  // --- AddLandLeaseModal / LandLeaseDetailPage (Patta) ---
+  "people.landLease": { en: "Land Lease (Patta)", hi: "पट्टा भूमि" },
+  "people.addLandLease": { en: "Add land lease", hi: "पट्टा भूमि जोड़ें" },
+  "landLease.addModalTitle": { en: "Add Land Lease (Patta)", hi: "पट्टा भूमि जोड़ें" },
+  "people.noLandLeaseYet": { en: "No land lease (Patta) added yet.", hi: "अभी तक कोई पट्टा भूमि नहीं जोड़ी गई।" },
+  "landLease.newContract": { en: "New Lease Contract", hi: "नया पट्टा अनुबंध" },
+  "people.typeLandLease": { en: "Land Lease (Patta)", hi: "पट्टा भूमि" },
+
   // --- pages/People.tsx ---
   "people.absconded": { en: "Absconded", hi: "फरार" },
   "people.callPerson": { en: "Call {name}", hi: "{name} को कॉल करें" },

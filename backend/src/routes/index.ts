@@ -60,6 +60,7 @@ import { saleOrderRouter } from "./saleOrder.routes";
 import { purchaseOrderRouter } from "./purchaseOrder.routes";
 import { bankAccountRouter } from "./bankAccount.routes";
 import { bankTransactionRouter } from "./bankTransaction.routes";
+import { landLeaseContractRouter } from "./landLeaseContract.routes";
 
 export const apiRouter = Router();
 
@@ -126,3 +127,4 @@ apiRouter.use("/sale-orders", saleOrderRouter);
 apiRouter.use("/purchase-orders", purchaseOrderRouter);
 apiRouter.use("/bank-accounts", bankAccountRouter);
 apiRouter.use("/bank-transactions", bankTransactionRouter);
+apiRouter.use("/land-lease-contracts", landLeaseContractRouter);

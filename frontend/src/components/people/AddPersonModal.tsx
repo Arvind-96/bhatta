@@ -97,10 +97,10 @@ export function AddPersonModal({
         ratePerThousand: meta.hasWage && ratePerThousand ? Number(ratePerThousand) : undefined,
         vehicleNumber: type === "DRIVER" && vehicleNumber ? vehicleNumber : undefined,
         ratePerTrolley: type === "DRIVER" && ratePerTrolley ? Number(ratePerTrolley) : undefined,
-        khetArea: type === "LANDOWNER" && khetArea ? Number(khetArea) : undefined,
-        khetAreaUnit: type === "LANDOWNER" ? khetAreaUnit : undefined,
-        khetLocation: type === "LANDOWNER" && khetLocation ? khetLocation : undefined,
-        agreedDepthFeet: type === "LANDOWNER" && agreedDepthFeet ? Number(agreedDepthFeet) : undefined,
+        khetArea: (type === "LANDOWNER" || type === "LAND_LEASE") && khetArea ? Number(khetArea) : undefined,
+        khetAreaUnit: (type === "LANDOWNER" || type === "LAND_LEASE") ? khetAreaUnit : undefined,
+        khetLocation: (type === "LANDOWNER" || type === "LAND_LEASE") && khetLocation ? khetLocation : undefined,
+        agreedDepthFeet: (type === "LANDOWNER" || type === "LAND_LEASE") && agreedDepthFeet ? Number(agreedDepthFeet) : undefined,
         contractorId: (type === "WORKER" || type === "HELPER") && contractorId ? contractorId : undefined,
         // workType is only exposed as an editable select for LABOUR_CONTRACTOR
         // (below) -- for WORKER/HELPER it can still be set by a caller via
@@ -393,7 +393,7 @@ export function AddPersonModal({
             </>
           )}
 
-          {type === "LANDOWNER" && (
+          {(type === "LANDOWNER" || type === "LAND_LEASE") && (
             <>
               <input
                 placeholder={t("people.khetLocation")}

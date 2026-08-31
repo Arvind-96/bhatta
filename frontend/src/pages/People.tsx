@@ -16,16 +16,18 @@ import { AddThekedarModal } from "@/components/people/AddThekedarModal";
 import { AddLabourModal } from "@/components/people/AddLabourModal";
 import { AddLandownerModal } from "@/components/people/AddLandownerModal";
 import { AddSandContractorModal } from "@/components/people/AddSandContractorModal";
+import { AddLandLeaseModal } from "@/components/landLease/AddLandLeaseModal";
 import { LabourDetailPage } from "@/components/people/LabourDetailPage";
 import { ThekedarDetailPage } from "@/components/people/ThekedarDetailPage";
 import { LandownerDetailPage } from "@/components/people/LandownerDetailPage";
 import { SandContractorDetailPage } from "@/components/people/SandContractorDetailPage";
+import { LandLeaseDetailPage } from "@/components/landLease/LandLeaseDetailPage";
 import { Staff } from "@/pages/Staff";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 
-type PeopleTab = "labour" | "thekedar" | "staff" | "landowner" | "sandContractor";
+type PeopleTab = "labour" | "thekedar" | "staff" | "landowner" | "sandContractor" | "landLease";
 
 function PersonCard({
   person,
@@ -358,6 +360,69 @@ function LandownerTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
   );
 }
 
+function LandLeaseTab({ onOpenLandLease }: { onOpenLandLease: (id: string) => void }) {
+  const [landLeases, setLandLeases] = useState<Person[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const { t } = useTranslation();
+
+  async function refresh() {
+    setLandLeases(await api.people.list("LAND_LEASE"));
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    refresh().catch(console.error);
+  }, [activeKilnId]);
+
+  useKilnEvent("person:update", () => refresh());
+
+  const { page, setPage, pageCount, pageItems: pagedLandLeases, total } = usePagination(landLeases, 12);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-series-3/15 text-series-3">
+            <MapPinned className="h-4 w-4" />
+          </span>
+          <h3 className="font-display text-base font-bold text-ink-primary">{t("people.landLease")}</h3>
+          <Badge variant="neutral">{landLeases.length}</Badge>
+        </div>
+        <Button size="sm" onClick={() => setShowAdd(true)}>
+          <Plus className="h-4 w-4" /> {t("people.addLandLease")}
+        </Button>
+      </div>
+
+      {landLeases.length === 0 ? (
+        <Card>
+          <EmptyState icon={MapPinned} title={t("people.noLandLeaseYet")} />
+        </Card>
+      ) : (
+        <>
+          <div className="grid gap-3 md:grid-cols-3">
+            {pagedLandLeases.map((l) => (
+              <PersonCard
+                key={l._id}
+                person={l}
+                subtitle={[
+                  l.landLeaseSerial ? `${t("people.landLease")} - ${l.landLeaseSerial}` : null,
+                  l.khetLocation || (l.khetArea ? `${l.khetArea} ${t("people.unitBigha")}` : null),
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "—"}
+                onOpen={() => onOpenLandLease(l._id)}
+              />
+            ))}
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={12} />
+        </>
+      )}
+      {showAdd && <AddLandLeaseModal onClose={() => setShowAdd(false)} onCreated={refresh} />}
+    </div>
+  );
+}
+
 function SandContractorTab({ onOpenSandContractor }: { onOpenSandContractor: (id: string) => void }) {
   const [contractors, setContractors] = useState<Person[]>([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -422,6 +487,7 @@ export function People() {
   const [openThekedarId, setOpenThekedarId] = useState<string | null>(null);
   const [openLandownerId, setOpenLandownerId] = useState<string | null>(null);
   const [openSandContractorId, setOpenSandContractorId] = useState<string | null>(null);
+  const [openLandLeaseId, setOpenLandLeaseId] = useState<string | null>(null);
   const { t } = useTranslation();
 
   if (openLandownerId) {
@@ -430,6 +496,10 @@ export function People() {
 
   if (openSandContractorId) {
     return <SandContractorDetailPage sandContractorId={openSandContractorId} onBack={() => setOpenSandContractorId(null)} />;
+  }
+
+  if (openLandLeaseId) {
+    return <LandLeaseDetailPage landLeaseId={openLandLeaseId} onBack={() => setOpenLandLeaseId(null)} />;
   }
 
   if (openLabourId) {
@@ -465,6 +535,7 @@ export function People() {
     { value: "staff", label: t("nav.staff") },
     { value: "landowner", label: t("people.landowner") },
     { value: "sandContractor", label: t("people.sandContractor") },
+    { value: "landLease", label: t("people.landLease") },
   ];
 
   return (
@@ -476,6 +547,7 @@ export function People() {
       {tab === "staff" && <Staff />}
       {tab === "landowner" && <LandownerTab onOpenLandowner={setOpenLandownerId} />}
       {tab === "sandContractor" && <SandContractorTab onOpenSandContractor={setOpenSandContractorId} />}
+      {tab === "landLease" && <LandLeaseTab onOpenLandLease={setOpenLandLeaseId} />}
     </div>
   );
 }
