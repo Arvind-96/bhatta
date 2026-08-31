@@ -58,8 +58,11 @@ export const people = mysqlTable("people", {
   contractUnit: varchar("contractUnit", { length: 255 }),
   // PARTNER only — the date they formally joined as a profit-sharing
   // partner (distinct from `joiningDate`, which is a general staff-join
-  // concept used elsewhere).
-  partnershipDate: dateColumn("partnershipDate"),
+  // concept used elsewhere). Admin-set, no default — same shape as
+  // joiningDate, deliberately NOT dateColumn() (which auto-defaults to
+  // "now"; correct for firingShiftAnchorDate, wrong here — an unset
+  // partnership date should stay unset, not silently become today).
+  partnershipDate: datetime("partnershipDate", { mode: "date" }),
   profitSharePercent: double("profitSharePercent"),
   // SALES_AGENT only — which of the two commission bases this agent is
   // paid on. commissionPercent (of an invoice's netAmount) when
