@@ -57,13 +57,14 @@ export function SalesAgentDetailPage({ agentId, onBack, onDeleted }: SalesAgentD
     );
   }
 
-  const { agent, balance, invoicesThrough, customers, totalSales } = detail;
+  const { agent, balance, invoicesThrough, customers, totalSales, monthSales } = detail;
   const commissionLabel =
     agent.commissionType === "PERCENT_OF_SALE"
       ? t("salesAgent.commissionPercentOfSale", { percent: agent.commissionPercent ?? 0 })
       : agent.commissionType === "PER_THOUSAND_BRICKS"
       ? t("salesAgent.commissionPerThousand", { rate: formatINR(agent.commissionPerThousand ?? 0) })
       : "—";
+  const targetProgressPercent = agent.monthlySalesTarget ? Math.min(100, Math.round((monthSales / agent.monthlySalesTarget) * 100)) : null;
 
   return (
     <div>
@@ -82,6 +83,7 @@ export function SalesAgentDetailPage({ agentId, onBack, onDeleted }: SalesAgentD
             )}
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Badge variant="neutral">{commissionLabel}</Badge>
+              {agent.referralCode && <Badge variant="good">{t("salesAgent.referralCodeLabel")}: {agent.referralCode}</Badge>}
             </div>
           </div>
           <div className="flex gap-2">
@@ -146,6 +148,25 @@ export function SalesAgentDetailPage({ agentId, onBack, onDeleted }: SalesAgentD
         </Card>
 
         <Card className="lg:col-span-3">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("salesAgent.monthlyTargetSection")}</h4>
+            {targetProgressPercent != null && targetProgressPercent >= 100 && <Badge variant="good">{t("salesAgent.targetMetBadge")}</Badge>}
+          </div>
+          {agent.monthlySalesTarget ? (
+            <>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-ink-primary/10">
+                <div className="h-full rounded-full bg-series-1 transition-all" style={{ width: `${targetProgressPercent}%` }} />
+              </div>
+              <p className="mt-2 text-sm text-ink-secondary">
+                {t("salesAgent.targetProgressLabel", { achieved: `₹${formatINR(monthSales)}`, target: `₹${formatINR(agent.monthlySalesTarget)}` })}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-ink-muted">{t("salesAgent.noTargetSet")}</p>
+          )}
+        </Card>
+
+        <Card className="lg:col-span-3">
           <h4 className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-muted">
             <Users className="h-3.5 w-3.5" /> {t("salesAgent.customersSection")}
           </h4>
@@ -190,6 +211,8 @@ function AgentEditForm({ agentId, existing, onClose, onSaved }: { agentId: strin
   const [commissionType, setCommissionType] = useState<AgentCommissionType>(existing.commissionType ?? "PERCENT_OF_SALE");
   const [commissionPercent, setCommissionPercent] = useState(existing.commissionPercent?.toString() ?? "");
   const [commissionPerThousand, setCommissionPerThousand] = useState(existing.commissionPerThousand?.toString() ?? "");
+  const [monthlySalesTarget, setMonthlySalesTarget] = useState(existing.monthlySalesTarget?.toString() ?? "");
+  const [referralCode, setReferralCode] = useState(existing.referralCode ?? "");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
@@ -202,6 +225,8 @@ function AgentEditForm({ agentId, existing, onClose, onSaved }: { agentId: strin
         commissionType,
         commissionPercent: commissionType === "PERCENT_OF_SALE" && commissionPercent ? Number(commissionPercent) : undefined,
         commissionPerThousand: commissionType === "PER_THOUSAND_BRICKS" && commissionPerThousand ? Number(commissionPerThousand) : undefined,
+        monthlySalesTarget: monthlySalesTarget ? Number(monthlySalesTarget) : undefined,
+        referralCode: referralCode.trim() || undefined,
       });
       onSaved();
     } finally {
@@ -234,6 +259,8 @@ function AgentEditForm({ agentId, existing, onClose, onSaved }: { agentId: strin
       ) : (
         <input type="number" min={0} value={commissionPerThousand} onChange={(e) => setCommissionPerThousand(e.target.value)} className={inputClass} placeholder={t("salesAgent.commissionPerThousandPlaceholder")} />
       )}
+      <input type="number" min={0} value={monthlySalesTarget} onChange={(e) => setMonthlySalesTarget(e.target.value)} className={inputClass} placeholder={t("salesAgent.monthlyTargetPlaceholder")} />
+      <input value={referralCode} onChange={(e) => setReferralCode(e.target.value)} className={inputClass} placeholder={t("salesAgent.referralCodePlaceholder")} />
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={saving}>
           {saving ? t("settings.savingEllipsis") : t("common.save")}

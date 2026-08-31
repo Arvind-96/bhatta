@@ -46,6 +46,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
   const amountRef = useRef<HTMLInputElement>(null);
   const isCustomer = person.type === "CUSTOMER";
   const isPartner = person.type === "PARTNER";
+  const isSalesAgent = person.type === "SALES_AGENT";
   const isContractor = person.type === "LABOUR_CONTRACTOR";
   const isLandowner = person.type === "LANDOWNER";
   // Permanent bhatta admin/support staff (Main Munim, office Helpers,
@@ -149,7 +150,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
             <div>
               <h3 className="text-base font-semibold text-ink-primary">{person.name}</h3>
               <p className="text-sm text-ink-muted">
-                {t("people.ledger")} {isContractor ? t("people.dotThekedarContractor") : !isCustomer && !isPartner ? t("people.dotLabour") : ""}
+                {t("people.ledger")} {isContractor ? t("people.dotThekedarContractor") : !isCustomer && !isPartner && !isSalesAgent ? t("people.dotLabour") : ""}
               </p>
             </div>
           </div>
@@ -168,7 +169,7 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.quickActions")}</p>
-            <div className={`grid gap-2 ${isCustomer || isPartner ? "grid-cols-1" : "grid-cols-2"}`}>
+            <div className={`grid gap-2 ${isCustomer || isPartner || isSalesAgent ? "grid-cols-1" : "grid-cols-2"}`}>
               {isCustomer ? (
                 <button
                   type="button"
@@ -184,6 +185,14 @@ export function LedgerModal({ person, onClose }: LedgerModalProps) {
                   className={quickButtonClass}
                 >
                   {t("people.recordPartnerWithdrawal")}
+                </button>
+              ) : isSalesAgent ? (
+                <button
+                  type="button"
+                  onClick={() => fillQuickAction({ direction: "PAID", reason: t("salesAgent.reasonCommissionPayment"), category: "COMMISSION" })}
+                  className={quickButtonClass}
+                >
+                  {t("salesAgent.recordCommissionPayment")}
                 </button>
               ) : isStaff ? (
                 <>

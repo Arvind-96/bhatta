@@ -51,6 +51,8 @@ export interface CreatePersonInput {
   profitSharePercent?: number;
   commissionType?: "PERCENT_OF_SALE" | "PER_THOUSAND_BRICKS";
   commissionPercent?: number;
+  monthlySalesTarget?: number;
+  referralCode?: string;
   khetArea?: number;
   khetAreaUnit?: string;
   khetLocation?: string;

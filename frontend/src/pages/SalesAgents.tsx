@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Pencil, Phone, Plus, Search, Trash2, UserCheck } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, Phone, Plus, Search, Trash2, UserCheck } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Pagination, usePagination } from "@/components/ui/pagination";
@@ -29,6 +29,8 @@ function AddAgentForm({ existing, onClose, onSaved }: { existing: Person | null;
   const [commissionType, setCommissionType] = useState<AgentCommissionType>(existing?.commissionType ?? "PERCENT_OF_SALE");
   const [commissionPercent, setCommissionPercent] = useState(existing?.commissionPercent?.toString() ?? "");
   const [commissionPerThousand, setCommissionPerThousand] = useState(existing?.commissionPerThousand?.toString() ?? "");
+  const [monthlySalesTarget, setMonthlySalesTarget] = useState(existing?.monthlySalesTarget?.toString() ?? "");
+  const [referralCode, setReferralCode] = useState(existing?.referralCode ?? "");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
@@ -43,6 +45,8 @@ function AddAgentForm({ existing, onClose, onSaved }: { existing: Person | null;
         commissionType,
         commissionPercent: commissionType === "PERCENT_OF_SALE" && commissionPercent ? Number(commissionPercent) : undefined,
         commissionPerThousand: commissionType === "PER_THOUSAND_BRICKS" && commissionPerThousand ? Number(commissionPerThousand) : undefined,
+        monthlySalesTarget: monthlySalesTarget ? Number(monthlySalesTarget) : undefined,
+        referralCode: referralCode.trim() || undefined,
       };
       if (existing) await api.people.update(existing._id, input);
       else await api.people.create(input);
@@ -81,6 +85,8 @@ function AddAgentForm({ existing, onClose, onSaved }: { existing: Person | null;
         ) : (
           <input type="number" min={0} placeholder={t("salesAgent.commissionPerThousandPlaceholder")} value={commissionPerThousand} onChange={(e) => setCommissionPerThousand(e.target.value)} className={inputClass} />
         )}
+        <input type="number" min={0} placeholder={t("salesAgent.monthlyTargetPlaceholder")} value={monthlySalesTarget} onChange={(e) => setMonthlySalesTarget(e.target.value)} className={inputClass} />
+        <input placeholder={t("salesAgent.referralCodePlaceholder")} value={referralCode} onChange={(e) => setReferralCode(e.target.value)} className={inputClass} />
         <div className="flex gap-2">
           <Button type="submit" disabled={saving || !name.trim()}>
             {saving ? t("settings.savingEllipsis") : t("common.save")}
@@ -91,6 +97,30 @@ function AddAgentForm({ existing, onClose, onSaved }: { existing: Person | null;
         </div>
       </form>
     </Card>
+  );
+}
+
+function SortableHeader<T extends string>({
+  label,
+  column,
+  sortBy,
+  sortDir,
+  onSort,
+}: {
+  label: string;
+  column: T;
+  sortBy: T;
+  sortDir: "asc" | "desc";
+  onSort: (column: T) => void;
+}) {
+  const active = sortBy === column;
+  return (
+    <th className="pb-2 text-right font-medium">
+      <button type="button" onClick={() => onSort(column)} className={cn("inline-flex items-center gap-1 hover:text-ink-primary", active && "text-ink-primary")}>
+        {label}
+        {active ? sortDir === "desc" ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" /> : null}
+      </button>
+    </th>
   );
 }
 
@@ -117,11 +147,25 @@ export function SalesAgents() {
   useKilnEvent("person:update", () => refresh());
   useKilnEvent("invoice:update", () => refresh());
 
-  const filtered = agents.filter((row) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return row.agent.name.toLowerCase().includes(q) || (row.agent.phone ?? "").includes(q);
-  });
+  const [sortBy, setSortBy] = useState<"customerCount" | "totalSales" | "balance">("balance");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  function toggleSort(column: typeof sortBy) {
+    if (sortBy === column) {
+      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    } else {
+      setSortBy(column);
+      setSortDir("desc");
+    }
+  }
+
+  const filtered = agents
+    .filter((row) => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return row.agent.name.toLowerCase().includes(q) || (row.agent.phone ?? "").includes(q);
+    })
+    .sort((a, b) => (sortDir === "desc" ? b[sortBy] - a[sortBy] : a[sortBy] - b[sortBy]));
   const { page, setPage, pageCount, pageItems: paged, total } = usePagination(filtered, 10);
   const pendingDeleteAgent = agents.find((row) => row.agent._id === pendingDeleteId)?.agent ?? null;
 
@@ -186,9 +230,9 @@ export function SalesAgents() {
                     <th className="pb-2 font-medium">{t("salesAgent.namePlaceholder")}</th>
                     <th className="pb-2 font-medium">{t("salesAgent.phonePlaceholder")}</th>
                     <th className="pb-2 font-medium">{t("salesAgent.commissionHeader")}</th>
-                    <th className="pb-2 font-medium text-right">{t("salesAgent.customersHeader")}</th>
-                    <th className="pb-2 font-medium text-right">{t("salesAgent.totalSalesHeader")}</th>
-                    <th className="pb-2 font-medium text-right">{t("salesAgent.balanceHeader")}</th>
+                    <SortableHeader label={t("salesAgent.customersHeader")} column="customerCount" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+                    <SortableHeader label={t("salesAgent.totalSalesHeader")} column="totalSales" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+                    <SortableHeader label={t("salesAgent.balanceHeader")} column="balance" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
                     <th className="pb-2 font-medium text-right">{t("common.actions")}</th>
                   </tr>
                 </thead>

@@ -71,6 +71,15 @@ export const people = mysqlTable("people", {
   // own unrelated per-1000 commission) when PER_THOUSAND_BRICKS.
   commissionType: varchar("commissionType", { length: 30, enum: AGENT_COMMISSION_TYPES }),
   commissionPercent: double("commissionPercent"),
+  // SALES_AGENT only — an optional monthly sales-value goal (₹), shown as
+  // a progress bar against that agent's actual current-month sales on
+  // their detail page. Null = no target tracked for this agent.
+  monthlySalesTarget: double("monthlySalesTarget"),
+  // SALES_AGENT only — a short admin-set code the agent can hand out /
+  // customers can mention, so a sale can be attributed to them even before
+  // the munim looks the agent up by name. Purely a reference string — this
+  // app has no public/customer-facing surface for it to actually link to.
+  referralCode: varchar("referralCode", { length: 100 }),
   khetArea: double("khetArea"),
   khetAreaUnit: varchar("khetAreaUnit", { length: 50 }).default("bigha"),
   khetLocation: varchar("khetLocation", { length: 255 }),

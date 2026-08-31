@@ -259,6 +259,7 @@ export interface SalesAgentDetail {
   invoicesThrough: Invoice[];
   customers: SalesAgentCustomerSummary[];
   totalSales: number;
+  monthSales: number;
 }
 
 export interface SalesAgentSummary {
@@ -361,6 +362,8 @@ export interface Person {
   profitSharePercent?: number;
   commissionType?: AgentCommissionType;
   commissionPercent?: number;
+  monthlySalesTarget?: number;
+  referralCode?: string;
   khetArea?: number;
   khetAreaUnit?: string;
   khetLocation?: string;

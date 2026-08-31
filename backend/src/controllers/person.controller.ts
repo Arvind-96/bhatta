@@ -66,6 +66,8 @@ const createSchema = z.object({
   profitSharePercent: z.number().optional(),
   commissionType: z.enum(AGENT_COMMISSION_TYPES).optional(),
   commissionPercent: z.number().optional(),
+  monthlySalesTarget: z.number().optional(),
+  referralCode: z.string().optional(),
   khetArea: z.number().optional(),
   khetAreaUnit: z.string().optional(),
   khetLocation: z.string().optional(),

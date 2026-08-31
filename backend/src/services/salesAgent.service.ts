@@ -23,10 +23,27 @@ function customersFromInvoices(invoicesThrough: Awaited<ReturnType<typeof listIn
   return Array.from(byCustomer.values()).sort((a, b) => (b.lastSaleDate?.getTime() ?? 0) - (a.lastSaleDate?.getTime() ?? 0));
 }
 
-// Full agent profile: the person record (commission type/rate), their
-// running ledger balance (COMMISSION due/paid, same shared ledgerEntries
-// table every other person type uses), every invoice attributed to them,
-// and that invoice list rolled up per customer.
+// This calendar month's sales against monthlySalesTarget — a real
+// calendar-month figure (like Overview's own "this month" widgets),
+// deliberately not season-scoped, since a sales target is a fixed-period
+// goal independent of when a Bhatta Season happens to start or end.
+function currentMonthSales(invoicesThrough: Awaited<ReturnType<typeof listInvoices>>): number {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const total = invoicesThrough
+    .filter((inv) => {
+      const saleDate = inv.invoiceDate ?? inv.createdAt;
+      return saleDate != null && saleDate >= startOfMonth;
+    })
+    .reduce((sum, inv) => sum + inv.netAmount, 0);
+  return Math.round(total * 100) / 100;
+}
+
+// Full agent profile: the person record (commission type/rate, monthly
+// target, referral code), their running ledger balance (COMMISSION due/
+// paid, same shared ledgerEntries table every other person type uses),
+// every invoice attributed to them, and that invoice list rolled up per
+// customer.
 export async function getSalesAgentDetail(kilnId: string, agentId: string) {
   const agent = (await db.select().from(people).where(and(eq(people._id, agentId), eq(people.kilnId, kilnId))))[0];
   if (!agent) throw new Error("Sales agent not found in this kiln");
@@ -38,8 +55,9 @@ export async function getSalesAgentDetail(kilnId: string, agentId: string) {
 
   const customers = customersFromInvoices(invoicesThrough);
   const totalSales = Math.round(invoicesThrough.reduce((sum, inv) => sum + inv.netAmount, 0) * 100) / 100;
+  const monthSales = currentMonthSales(invoicesThrough);
 
-  return { agent, balance, invoicesThrough, customers, totalSales };
+  return { agent, balance, invoicesThrough, customers, totalSales, monthSales };
 }
 
 // Every SALES_AGENT, ranked by total commission ledger balance (due minus

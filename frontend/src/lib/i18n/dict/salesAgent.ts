@@ -30,4 +30,13 @@ export const salesAgentDict: Record<string, Record<Locale, string>> = {
   "salesAgent.invoiceCountHeader": { en: "Invoices", hi: "इनवॉइस" },
   "salesAgent.lastSaleHeader": { en: "Last sale", hi: "आखिरी बिक्री" },
   "salesAgent.linkToAgentPlaceholder": { en: "Sold through Sales Agent (optional)", hi: "बिक्री एजेंट के माध्यम से बेचा (वैकल्पिक)" },
+  "salesAgent.reasonCommissionPayment": { en: "Commission payment", hi: "कमीशन भुगतान" },
+  "salesAgent.recordCommissionPayment": { en: "Record commission payment", hi: "कमीशन भुगतान दर्ज करें" },
+  "salesAgent.monthlyTargetPlaceholder": { en: "Monthly sales target (₹, optional)", hi: "मासिक बिक्री लक्ष्य (₹, वैकल्पिक)" },
+  "salesAgent.referralCodePlaceholder": { en: "Referral code (optional)", hi: "रेफ़रल कोड (वैकल्पिक)" },
+  "salesAgent.referralCodeLabel": { en: "Referral code", hi: "रेफ़रल कोड" },
+  "salesAgent.monthlyTargetSection": { en: "This month's target", hi: "इस महीने का लक्ष्य" },
+  "salesAgent.targetProgressLabel": { en: "{achieved} of {target}", hi: "{target} में से {achieved}" },
+  "salesAgent.noTargetSet": { en: "No monthly target set", hi: "कोई मासिक लक्ष्य निर्धारित नहीं" },
+  "salesAgent.targetMetBadge": { en: "Target met", hi: "लक्ष्य पूरा" },
 };
