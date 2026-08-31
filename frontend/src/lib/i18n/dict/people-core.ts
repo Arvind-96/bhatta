@@ -89,6 +89,7 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   "people.typeMunim": { en: "Munim (Accountant)", hi: "मुनीम (हिसाब-किताब)" },
   "people.typeChowkidar": { en: "Chowkidar (Watchman)", hi: "चौकीदार" },
   "people.typeSandContractor": { en: "Sand Contractor", hi: "रेत ठेकेदार" },
+  "people.typeSalesAgent": { en: "Sales Agent", hi: "बिक्री एजेंट" },
   "people.thekedarContractor": { en: "Thekedar / Contractor", hi: "ठेकेदार" },
   "people.thekedarTabLabel": { en: "Thekedar (Contractor)", hi: "ठेकेदार (कॉन्ट्रैक्टर)" },
   "people.addThekedar": { en: "Add thekedar", hi: "ठेकेदार जोड़ें" },

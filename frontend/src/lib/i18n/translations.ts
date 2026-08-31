@@ -34,6 +34,8 @@ import { salaryDict } from "./dict/salary";
 import { reportsDict } from "./dict/reports";
 import { compareDict } from "./dict/compare";
 import { supplierDict } from "./dict/supplier";
+import { partnerDict } from "./dict/partner";
+import { salesAgentDict } from "./dict/salesAgent";
 
 const coreDict: Record<string, Record<Locale, string>> = {
   "app.name": { en: "Bhatta Cloud", hi: "भट्टा क्लाउड" },
@@ -142,6 +144,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.all": { en: "All", hi: "सभी" },
   "common.edit": { en: "Edit", hi: "संपादित करें" },
   "common.delete": { en: "Delete", hi: "हटाएं" },
+  "common.ledger": { en: "Ledger", hi: "बही खाता" },
   "common.remove": { en: "Remove", hi: "हटाएं" },
   "common.dismiss": { en: "Dismiss", hi: "खारिज करें" },
   "common.search": { en: "Search", hi: "खोजें" },
@@ -229,6 +232,8 @@ export const translations: Record<string, Record<Locale, string>> = {
   ...reportsDict,
   ...compareDict,
   ...supplierDict,
+  ...partnerDict,
+  ...salesAgentDict,
 };
 
 // params supports simple {name}-style interpolation for strings that embed

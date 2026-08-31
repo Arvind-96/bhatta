@@ -204,6 +204,13 @@
       "when": 1788155674226,
       "tag": "0028_clammy_sheva_callister",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "5",
+      "when": 1788167873930,
+      "tag": "0029_bright_ricochet",
+      "breakpoints": true
     }
   ]
 }

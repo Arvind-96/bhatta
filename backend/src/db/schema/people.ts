@@ -4,7 +4,9 @@ import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers"
 export const PERSON_TYPES = [
   "DRIVER", "LABOUR_CONTRACTOR", "SUPPLIER", "THEKEDAR", "PARTNER", "WORKER",
   "HELPER", "LANDOWNER", "FITTER", "CUSTOMER", "MUNIM", "CHOWKIDAR", "SAND_CONTRACTOR",
+  "SALES_AGENT",
 ] as const;
+export const AGENT_COMMISSION_TYPES = ["PERCENT_OF_SALE", "PER_THOUSAND_BRICKS"] as const;
 export const WORK_TYPES = [
   "PATHAI", "BHARAI_TRANSPORT", "PAKAYI", "NIKASI", "LOADING", "BHARAI_CHAMBER_STACKING",
   "TUDI", "RAWAS", "BELDAR",
@@ -54,7 +56,18 @@ export const people = mysqlTable("people", {
   gstNumber: varchar("gstNumber", { length: 255 }),
   contractRate: double("contractRate"),
   contractUnit: varchar("contractUnit", { length: 255 }),
+  // PARTNER only — the date they formally joined as a profit-sharing
+  // partner (distinct from `joiningDate`, which is a general staff-join
+  // concept used elsewhere).
+  partnershipDate: dateColumn("partnershipDate"),
   profitSharePercent: double("profitSharePercent"),
+  // SALES_AGENT only — which of the two commission bases this agent is
+  // paid on. commissionPercent (of an invoice's netAmount) when
+  // PERCENT_OF_SALE; the pre-existing commissionPerThousand column (bricks
+  // sold, not molded — same column LABOUR_CONTRACTOR already uses for its
+  // own unrelated per-1000 commission) when PER_THOUSAND_BRICKS.
+  commissionType: varchar("commissionType", { length: 30, enum: AGENT_COMMISSION_TYPES }),
+  commissionPercent: double("commissionPercent"),
   khetArea: double("khetArea"),
   khetAreaUnit: varchar("khetAreaUnit", { length: 50 }).default("bigha"),
   khetLocation: varchar("khetLocation", { length: 255 }),
@@ -131,9 +144,37 @@ export const familyMembers = mysqlTable("family_members", {
   kilnHeadIdx: index("family_kiln_head_idx").on(t.kilnId, t.headPersonId),
 }));
 
+export const PARTNER_ASSET_TYPES = ["VEHICLE", "LAND", "OTHER"] as const;
+
+// What a PARTNER has actually contributed to the kiln — a vehicle, a
+// parcel of land, or something else — one row per item, since a partner
+// can contribute more than one (unlike LANDOWNER's single khetArea/
+// khetLocation pair on the person row itself). Deliberately NOT
+// season-scoped: a contributed asset is an ongoing fact about the
+// partnership, not a per-season transaction, same reasoning as `people`
+// itself never carrying a seasonId.
+export const partnerAssets = mysqlTable("partner_assets", {
+  _id: idColumn(),
+  kilnId: kilnIdColumn(),
+  partnerId: varchar("partnerId", { length: 64 }).notNull(),
+  assetType: varchar("assetType", { length: 20, enum: PARTNER_ASSET_TYPES }).notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  // Land-specific — null for VEHICLE/OTHER.
+  landAreaBigha: double("landAreaBigha"),
+  // What the kiln owes the partner for this asset's use, and over what
+  // period ("per month", "per trip", "per season", free text) — null on
+  // either means "contributed free of charge, no rent tracked."
+  rentalRate: double("rentalRate"),
+  rentalRateUnit: varchar("rentalRateUnit", { length: 100 }),
+  notes: text("notes"),
+  createdAt: createdAtColumn(),
+}, (t) => ({
+  kilnPartnerIdx: index("partner_asset_kiln_partner_idx").on(t.kilnId, t.partnerId),
+}));
+
 export const LEDGER_CATEGORIES = [
   "WAGE", "COMMISSION", "SALARY", "TIP", "ADVANCE", "KHARCHI", "MEDICAL",
-  "FESTIVAL", "SALE", "SOIL", "SAND", "FUEL", "FARE", "OTHER",
+  "FESTIVAL", "SALE", "SOIL", "SAND", "FUEL", "FARE", "OTHER", "PARTNER_DUE",
 ] as const;
 export const LEDGER_PAYMENT_MODES = ["CASH", "BANK", "UPI", "CASH_AND_ONLINE"] as const;
 

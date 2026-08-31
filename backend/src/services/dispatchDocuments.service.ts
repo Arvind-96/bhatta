@@ -1,13 +1,83 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { challans, gatePasses, invoices, dispatches, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import { challans, gatePasses, invoices, dispatches, people, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem } from "../db/schema/_helpers";
 import { isDuplicateEntryError } from "./dispatch.service";
 import { summarizeItems } from "./brickLineItems.util";
+import { addLedgerEntry, type LedgerCategory } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
 
 type PaymentMode = (typeof DISPATCH_PAYMENT_MODES)[number];
+
+// The pending balance a PARTNER-attributed invoice hands off to that
+// partner (the kiln looks to the partner to recover it, not the
+// customer) — same "unset amountPaidNow = fully paid" convention as
+// getCustomerDetail.
+function partnerPendingAmount(netAmount: number, amountPaidNow?: number | null): number {
+  const paid = amountPaidNow ?? netAmount;
+  return Math.max(0, Math.round((netAmount - paid) * 100) / 100);
+}
+
+// What a SALES_AGENT earns on one invoice, per that agent's own commission
+// basis (see people.commissionType) — 0 for an unset/deleted agent, same
+// as the rest of this app's "no rate set = nothing computed" convention.
+async function agentCommissionAmount(kilnId: string, agentId: string | null | undefined, netAmount: number, bricksCount: number): Promise<number> {
+  if (!agentId) return 0;
+  const agent = (await db.select().from(people).where(and(eq(people._id, agentId), eq(people.kilnId, kilnId))))[0];
+  if (!agent) return 0;
+  if (agent.commissionType === "PERCENT_OF_SALE") {
+    return Math.round(netAmount * ((agent.commissionPercent ?? 0) / 100) * 100) / 100;
+  }
+  if (agent.commissionType === "PER_THOUSAND_BRICKS") {
+    return Math.round((bricksCount / 1000) * (agent.commissionPerThousand ?? 0) * 100) / 100;
+  }
+  return 0;
+}
+
+// Keeps one attributed person's ledger (partner liability or agent
+// commission) in sync with an invoice's current state — handles all three
+// shapes with the same delta-correction convention used everywhere else in
+// this file (updateFuelPurchase, updatePaymentReceipt, ...): unattributed
+// -> attributed (post in full), attributed -> unattributed or reattributed
+// to someone else (reverse the old person's amount in full, post the new
+// one in full), same person with a changed amount (post just the delta).
+async function syncAttributionLedger(
+  kilnId: string,
+  category: LedgerCategory,
+  reason: string,
+  date: Date | undefined,
+  oldPersonId: string | null | undefined,
+  oldAmount: number,
+  newPersonId: string | null | undefined,
+  newAmount: number
+) {
+  const oldId = oldPersonId ?? null;
+  const newId = newPersonId ?? null;
+
+  if (oldId === newId) {
+    if (!oldId) return;
+    const delta = Math.round((newAmount - oldAmount) * 100) / 100;
+    if (delta === 0) return;
+    await addLedgerEntry({
+      kilnId,
+      personId: oldId,
+      direction: delta > 0 ? "DUE" : "PAID",
+      amount: Math.abs(delta),
+      reason: `${reason} (correction)`,
+      category,
+      date,
+    });
+    return;
+  }
+
+  if (oldId && oldAmount > 0) {
+    await addLedgerEntry({ kilnId, personId: oldId, direction: "PAID", amount: oldAmount, reason: `${reason} (reversed — reattributed)`, category, date });
+  }
+  if (newId && newAmount > 0) {
+    await addLedgerEntry({ kilnId, personId: newId, direction: "DUE", amount: newAmount, reason, category, date });
+  }
+}
 
 // MAX-based, not COUNT-based — see brickLoading.service.ts's
 // generateTripNumber for the exact collision-after-delete bug this avoids.
@@ -211,6 +281,12 @@ export interface InvoiceInput {
   dispatchId?: string;
   sequenceNumber?: number;
   customerId?: string;
+  // Sale attributed to a PARTNER and/or a SALES_AGENT — see
+  // syncAttributionLedger's doc comment above for what each drives.
+  // Nullable (not just optional) so an update can explicitly clear an
+  // attribution, not just leave it unset.
+  partnerId?: string | null;
+  agentId?: string | null;
   customerName: string;
   customerAddress?: string;
   customerPhone?: string;
@@ -280,6 +356,36 @@ export async function createInvoice(kilnId: string, seasonId: string, rawInput: 
     throw err;
   }
   const row = (await db.select().from(invoices).where(eq(invoices._id, _id)))[0]!;
+
+  if (input.partnerId) {
+    const pending = partnerPendingAmount(row.netAmount, row.amountPaidNow);
+    if (pending > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: input.partnerId,
+        direction: "DUE",
+        amount: pending,
+        reason: `Pending customer due on sale to ${row.customerName}${row.sequenceNumber != null ? ` (Invoice ${row.sequenceNumber})` : ""}`,
+        category: "PARTNER_DUE",
+        date: invoiceDate,
+      });
+    }
+  }
+  if (input.agentId) {
+    const commission = await agentCommissionAmount(kilnId, input.agentId, row.netAmount, row.bricksCount);
+    if (commission > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: input.agentId,
+        direction: "DUE",
+        amount: commission,
+        reason: `Commission: sale to ${row.customerName}${row.sequenceNumber != null ? ` (Invoice ${row.sequenceNumber})` : ""}`,
+        category: "COMMISSION",
+        date: invoiceDate,
+      });
+    }
+  }
+
   emitToKiln(kilnId, "invoice:update", row);
   return row;
 }
@@ -287,6 +393,8 @@ export async function createInvoice(kilnId: string, seasonId: string, rawInput: 
 export interface ListInvoicesFilter {
   dispatchId?: string;
   customerId?: string;
+  partnerId?: string;
+  agentId?: string;
   from?: Date;
   to?: Date;
 }
@@ -299,6 +407,8 @@ export async function listInvoices(kilnId: string, seasonId: string | null, filt
   if (seasonId) conditions.push(eq(invoices.seasonId, seasonId));
   if (f.dispatchId) conditions.push(eq(invoices.dispatchId, f.dispatchId));
   if (f.customerId) conditions.push(eq(invoices.customerId, f.customerId));
+  if (f.partnerId) conditions.push(eq(invoices.partnerId, f.partnerId));
+  if (f.agentId) conditions.push(eq(invoices.agentId, f.agentId));
   if (f.from) conditions.push(gte(invoices.invoiceDate, f.from));
   if (f.to) conditions.push(lte(invoices.invoiceDate, f.to));
   return db.select().from(invoices).where(and(...conditions)).orderBy(desc(invoices.createdAt));
@@ -334,6 +444,39 @@ export async function updateInvoice(kilnId: string, id: string, rawInput: Partia
     throw err;
   }
   const updated = (await db.select().from(invoices).where(eq(invoices._id, id)))[0]!;
+
+  // Only re-sync partner/agent ledgers when something that actually
+  // changes the posted amount was touched — avoids a no-op correction
+  // entry on every unrelated edit (e.g. just fixing a phone number).
+  if (input.partnerId !== undefined || input.netAmount !== undefined || input.amountPaidNow !== undefined) {
+    const oldPending = partnerPendingAmount(existing.netAmount, existing.amountPaidNow);
+    const newPending = partnerPendingAmount(updated.netAmount, updated.amountPaidNow);
+    await syncAttributionLedger(
+      kilnId,
+      "PARTNER_DUE",
+      `Pending customer due on sale to ${updated.customerName}${updated.sequenceNumber != null ? ` (Invoice ${updated.sequenceNumber})` : ""}`,
+      updated.invoiceDate ?? undefined,
+      existing.partnerId,
+      existing.partnerId ? oldPending : 0,
+      updated.partnerId,
+      updated.partnerId ? newPending : 0
+    );
+  }
+  if (input.agentId !== undefined || input.netAmount !== undefined || input.items !== undefined || input.bricksCount !== undefined) {
+    const oldCommission = await agentCommissionAmount(kilnId, existing.agentId, existing.netAmount, existing.bricksCount);
+    const newCommission = await agentCommissionAmount(kilnId, updated.agentId, updated.netAmount, updated.bricksCount);
+    await syncAttributionLedger(
+      kilnId,
+      "COMMISSION",
+      `Commission: sale to ${updated.customerName}${updated.sequenceNumber != null ? ` (Invoice ${updated.sequenceNumber})` : ""}`,
+      updated.invoiceDate ?? undefined,
+      existing.agentId,
+      oldCommission,
+      updated.agentId,
+      newCommission
+    );
+  }
+
   emitToKiln(kilnId, "invoice:update", updated);
   return updated;
 }
@@ -341,6 +484,34 @@ export async function updateInvoice(kilnId: string, id: string, rawInput: Partia
 export async function deleteInvoice(kilnId: string, id: string) {
   const existing = (await db.select().from(invoices).where(and(eq(invoices._id, id), eq(invoices.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Invoice not found in this kiln");
+
+  if (existing.partnerId) {
+    const pending = partnerPendingAmount(existing.netAmount, existing.amountPaidNow);
+    if (pending > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.partnerId,
+        direction: "PAID",
+        amount: pending,
+        reason: `Invoice deleted — reversing pending due on sale to ${existing.customerName}`,
+        category: "PARTNER_DUE",
+      });
+    }
+  }
+  if (existing.agentId) {
+    const commission = await agentCommissionAmount(kilnId, existing.agentId, existing.netAmount, existing.bricksCount);
+    if (commission > 0) {
+      await addLedgerEntry({
+        kilnId,
+        personId: existing.agentId,
+        direction: "PAID",
+        amount: commission,
+        reason: `Invoice deleted — reversing commission on sale to ${existing.customerName}`,
+        category: "COMMISSION",
+      });
+    }
+  }
+
   await db.delete(invoices).where(eq(invoices._id, id));
   emitToKiln(kilnId, "invoice:update", { _id: id, deleted: true });
 }

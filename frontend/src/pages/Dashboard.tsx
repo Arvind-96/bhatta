@@ -19,6 +19,8 @@ import { Challan } from "@/pages/Challan";
 import { Invoices } from "@/pages/Invoices";
 import { Customers } from "@/pages/Customers";
 import { Suppliers } from "@/pages/Suppliers";
+import { Partners } from "@/pages/Partners";
+import { SalesAgents } from "@/pages/SalesAgents";
 import { Expense } from "@/pages/Expense";
 import { Inventory } from "@/pages/Inventory";
 import { Stock } from "@/pages/Stock";
@@ -55,6 +57,8 @@ const VIEWS = {
   invoices: Invoices,
   customers: Customers,
   suppliers: Suppliers,
+  partners: Partners,
+  salesAgents: SalesAgents,
   expense: Expense,
   inventory: Inventory,
   stock: Stock,

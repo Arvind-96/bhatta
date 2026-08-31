@@ -80,10 +80,16 @@ import type {
   PakayiOperatorSummary,
   PaymentDue,
   PaymentMode,
+  PartnerAsset,
+  PartnerAssetType,
+  PartnerDetail,
+  PartnerProfitShare,
   PaymentReceipt,
   Person,
   PersonFullReport,
   PersonType,
+  SalesAgentDetail,
+  SalesAgentSummary,
   CompareModule,
   SeasonYearResult,
   ProductionLog,
@@ -374,6 +380,8 @@ export const api = {
       dispatchId?: string;
       sequenceNumber?: number;
       customerId?: string;
+      partnerId?: string;
+      agentId?: string;
       customerName: string;
       customerAddress?: string;
       customerPhone?: string;
@@ -398,6 +406,8 @@ export const api = {
       input: Partial<{
         sequenceNumber: number;
         customerId: string;
+        partnerId: string | null;
+        agentId: string | null;
         customerName: string;
         customerAddress: string;
         customerPhone: string;
@@ -458,6 +468,41 @@ export const api = {
       input: Partial<{ name: string; phone: string; address: string; suppliesList: SupplyListItem[]; dateAdded: string }>
     ) => patch<Supplier>(`/suppliers/${id}`, input, true),
     remove: (id: string) => del<void>(`/suppliers/${id}`, true),
+  },
+
+  partners: {
+    detail: (id: string, days?: number) => get<PartnerDetail>(`/partners/${id}${days ? `?days=${days}` : ""}`, true),
+    profitShare: (id: string, days?: number) => get<PartnerProfitShare>(`/partners/${id}/profit-share${days ? `?days=${days}` : ""}`, true),
+  },
+
+  partnerAssets: {
+    list: (partnerId: string) => get<PartnerAsset[]>(`/partner-assets?partnerId=${partnerId}`, true),
+    create: (input: {
+      partnerId: string;
+      assetType: PartnerAssetType;
+      description: string;
+      landAreaBigha?: number;
+      rentalRate?: number;
+      rentalRateUnit?: string;
+      notes?: string;
+    }) => post<PartnerAsset>("/partner-assets", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        assetType: PartnerAssetType;
+        description: string;
+        landAreaBigha: number | null;
+        rentalRate: number | null;
+        rentalRateUnit: string | null;
+        notes: string | null;
+      }>
+    ) => patch<PartnerAsset>(`/partner-assets/${id}`, input, true),
+    remove: (id: string) => del<void>(`/partner-assets/${id}`, true),
+  },
+
+  salesAgents: {
+    list: () => get<SalesAgentSummary[]>("/sales-agents", true),
+    detail: (id: string) => get<SalesAgentDetail>(`/sales-agents/${id}`, true),
   },
 
   supplierInvoices: {

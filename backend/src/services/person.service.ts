@@ -47,7 +47,10 @@ export interface CreatePersonInput {
   gstNumber?: string;
   contractRate?: number;
   contractUnit?: string;
+  partnershipDate?: Date;
   profitSharePercent?: number;
+  commissionType?: "PERCENT_OF_SALE" | "PER_THOUSAND_BRICKS";
+  commissionPercent?: number;
   khetArea?: number;
   khetAreaUnit?: string;
   khetLocation?: string;

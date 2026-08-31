@@ -26,7 +26,9 @@ export type AppView =
   | "reports"
   | "settings"
   | "compare"
-  | "suppliers";
+  | "suppliers"
+  | "partners"
+  | "salesAgents";
 
 interface UiState {
   view: AppView;

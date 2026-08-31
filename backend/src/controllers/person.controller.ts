@@ -23,6 +23,7 @@ import {
   LEDGER_CATEGORIES,
   LEDGER_PAYMENT_MODES,
   STACKING_STAGES,
+  AGENT_COMMISSION_TYPES,
 } from "../db/schema";
 import { validateCashOnlineSplit } from "../utils/paymentSplit";
 
@@ -61,7 +62,10 @@ const createSchema = z.object({
   gstNumber: z.string().optional(),
   contractRate: z.number().optional(),
   contractUnit: z.string().optional(),
+  partnershipDate: z.string().optional(),
   profitSharePercent: z.number().optional(),
+  commissionType: z.enum(AGENT_COMMISSION_TYPES).optional(),
+  commissionPercent: z.number().optional(),
   khetArea: z.number().optional(),
   khetAreaUnit: z.string().optional(),
   khetLocation: z.string().optional(),
@@ -94,6 +98,7 @@ export async function create(req: AuthedRequest, res: Response) {
     kilnId: req.kiln!.id,
     firingShiftAnchorDate: input.firingShiftAnchorDate ? new Date(input.firingShiftAnchorDate) : undefined,
     joiningDate: input.joiningDate ? new Date(input.joiningDate) : undefined,
+    partnershipDate: input.partnershipDate ? new Date(input.partnershipDate) : undefined,
   });
   res.status(201).json(person);
 }
@@ -130,6 +135,7 @@ export async function update(req: AuthedRequest, res: Response) {
     ...input,
     firingShiftAnchorDate: input.firingShiftAnchorDate ? new Date(input.firingShiftAnchorDate) : undefined,
     joiningDate: input.joiningDate ? new Date(input.joiningDate) : undefined,
+    partnershipDate: input.partnershipDate ? new Date(input.partnershipDate) : undefined,
   });
   res.json(person);
 }

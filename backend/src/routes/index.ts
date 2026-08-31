@@ -53,6 +53,9 @@ import { reportsRouter } from "./reports.routes";
 import { supplierRouter } from "./supplier.routes";
 import { supplierInvoiceRouter } from "./supplierInvoice.routes";
 import { seasonRouter } from "./season.routes";
+import { partnerRouter } from "./partner.routes";
+import { partnerAssetRouter } from "./partnerAsset.routes";
+import { salesAgentRouter } from "./salesAgent.routes";
 
 export const apiRouter = Router();
 
@@ -112,3 +115,6 @@ apiRouter.use("/reports", reportsRouter);
 apiRouter.use("/suppliers", supplierRouter);
 apiRouter.use("/supplier-invoices", supplierInvoiceRouter);
 apiRouter.use("/seasons", seasonRouter);
+apiRouter.use("/partners", partnerRouter);
+apiRouter.use("/partner-assets", partnerAssetRouter);
+apiRouter.use("/sales-agents", salesAgentRouter);

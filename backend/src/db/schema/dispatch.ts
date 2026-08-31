@@ -179,6 +179,15 @@ export const invoices = mysqlTable("invoices", {
   // customerName), so pre-existing Dispatch-linked invoices still surface
   // under a same-named Customer without needing a data migration.
   customerId: varchar("customerId", { length: 64 }),
+  // Nullable — set when this sale is attributed to a PARTNER and/or a
+  // SALES_AGENT (see partner.service.ts/salesAgent.service.ts). Drives two
+  // things: a pending due on this invoice posts a PARTNER_DUE ledger entry
+  // to partnerId (the kiln recovers it from the partner directly, not the
+  // customer), and netAmount/bricksCount post a COMMISSION ledger entry to
+  // agentId per that agent's own commission basis. Both independent of one
+  // another — an invoice can have either, both, or neither.
+  partnerId: varchar("partnerId", { length: 64 }),
+  agentId: varchar("agentId", { length: 64 }),
   sequenceNumber: int("sequenceNumber"),
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerAddress: varchar("customerAddress", { length: 255 }),

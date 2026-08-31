@@ -12,7 +12,7 @@ import { formatINR, formatVehicleNumber } from "@/lib/utils";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
 import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
-import type { BrickCategory, Customer, Dispatch as DispatchEntry, Invoice, PaymentMode } from "@/types";
+import type { BrickCategory, Customer, Dispatch as DispatchEntry, Invoice, PaymentMode, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -90,6 +90,10 @@ export function CreateInvoiceForm({
   const dispatchGstNumber = dispatch && typeof dispatch.customerId === "object" ? dispatch.customerId?.gstNumber ?? "" : "";
   const defaultCustomer = customers?.find((c) => c._id === defaultCustomerId);
   const [selectedCustomerId, setSelectedCustomerId] = useState(fixedCustomerId ?? existing?.customerId ?? defaultCustomerId ?? "");
+  const [partners, setPartners] = useState<Person[]>([]);
+  const [agents, setAgents] = useState<Person[]>([]);
+  const [partnerId, setPartnerId] = useState(existing?.partnerId ?? "");
+  const [agentId, setAgentId] = useState(existing?.agentId ?? "");
   const [customerName, setCustomerName] = useState(existing?.customerName ?? fixedCustomer?.name ?? defaultCustomer?.name ?? dispatch?.customerName ?? "");
   const [customerAddress, setCustomerAddress] = useState(existing?.customerAddress ?? fixedCustomer?.addresses[0] ?? defaultCustomer?.addresses[0] ?? dispatch?.customerAddress ?? "");
   const [customerPhone, setCustomerPhone] = useState(existing?.customerPhone ?? fixedCustomer?.phones[0] ?? defaultCustomer?.phones[0] ?? dispatch?.customerPhone ?? "");
@@ -125,6 +129,11 @@ export function CreateInvoiceForm({
     if (existing) return;
     api.invoices.nextSequenceNumber().then((r) => setSequenceNumber(String(r.nextSequenceNumber)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    api.people.list("PARTNER").then(setPartners).catch(console.error);
+    api.people.list("SALES_AGENT").then(setAgents).catch(console.error);
   }, []);
 
   // Live balance for whichever customer is currently linked (fixed,
@@ -200,6 +209,8 @@ export function CreateInvoiceForm({
       const payload = {
         sequenceNumber: sequenceNumber ? Number(sequenceNumber) : undefined,
         customerId: selectedCustomerId || undefined,
+        partnerId: partnerId || undefined,
+        agentId: agentId || undefined,
         customerName,
         customerAddress: customerAddress || undefined,
         customerPhone: customerPhone || undefined,
@@ -224,7 +235,9 @@ export function CreateInvoiceForm({
         invoiceDate,
         notes: notes || undefined,
       };
-      const row = existing ? await api.invoices.update(existing._id, payload) : await api.invoices.create({ dispatchId: dispatch?._id, ...payload });
+      const row = existing
+        ? await api.invoices.update(existing._id, { ...payload, partnerId: partnerId || null, agentId: agentId || null })
+        : await api.invoices.create({ dispatchId: dispatch?._id, ...payload });
       // Resolved fresh, post-save, rather than reusing the pre-submit
       // overallDueAfter preview — this invoice is already persisted by now,
       // so api.customers.detail() already reflects it, giving an accurate
@@ -275,6 +288,26 @@ export function CreateInvoiceForm({
               </option>
             ))}
           </select>
+        )}
+        {(partners.length > 0 || agents.length > 0) && (
+          <div className="col-span-2 grid grid-cols-2 gap-2">
+            <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)} className={inputClass}>
+              <option value="">{t("partner.linkToPartnerPlaceholder")}</option>
+              {partners.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <select value={agentId} onChange={(e) => setAgentId(e.target.value)} className={inputClass}>
+              <option value="">{t("salesAgent.linkToAgentPlaceholder")}</option>
+              {agents.map((a) => (
+                <option key={a._id} value={a._id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
         <input required placeholder={t("brickLoading.customerNamePlaceholder")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} className={inputClass} />
         <input placeholder={t("brickLoading.customerPhonePlaceholder")} value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className={inputClass} />

@@ -119,6 +119,8 @@ export interface Invoice {
   _id: string;
   dispatchId?: string;
   customerId?: string;
+  partnerId?: string;
+  agentId?: string;
   sequenceNumber?: number;
   customerName: string;
   customerAddress?: string;
@@ -213,6 +215,60 @@ export interface SupplierDetail {
   totalDue: number;
 }
 
+export type PartnerAssetType = "VEHICLE" | "LAND" | "OTHER";
+
+export interface PartnerAsset {
+  _id: string;
+  kilnId: string;
+  partnerId: string;
+  assetType: PartnerAssetType;
+  description: string;
+  landAreaBigha?: number;
+  rentalRate?: number;
+  rentalRateUnit?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface PartnerProfitShare {
+  days: number;
+  sharePercent: number;
+  kilnNetProfit: number;
+  shareAmount: number;
+}
+
+export interface PartnerDetail {
+  partner: Person;
+  assets: PartnerAsset[];
+  balance: number;
+  profitShare: PartnerProfitShare;
+  invoicesThrough: Invoice[];
+}
+
+export interface SalesAgentCustomerSummary {
+  customerId: string | null;
+  customerName: string;
+  totalSales: number;
+  invoiceCount: number;
+  lastSaleDate: string | null;
+}
+
+export interface SalesAgentDetail {
+  agent: Person;
+  balance: number;
+  invoicesThrough: Invoice[];
+  customers: SalesAgentCustomerSummary[];
+  totalSales: number;
+}
+
+export interface SalesAgentSummary {
+  agent: Person;
+  balance: number;
+  totalSales: number;
+  customerCount: number;
+  invoiceCount: number;
+}
+
 export interface Customer {
   _id: string;
   name: string;
@@ -253,7 +309,10 @@ export type PersonType =
   | "CUSTOMER"
   | "MUNIM"
   | "CHOWKIDAR"
-  | "SAND_CONTRACTOR";
+  | "SAND_CONTRACTOR"
+  | "SALES_AGENT";
+
+export type AgentCommissionType = "PERCENT_OF_SALE" | "PER_THOUSAND_BRICKS";
 
 export type PersonStatus = "ACTIVE" | "ABSCONDED";
 export type PayType = "MONTHLY" | "PER_THOUSAND";
@@ -298,7 +357,10 @@ export interface Person {
   gstNumber?: string;
   contractRate?: number;
   contractUnit?: string;
+  partnershipDate?: string;
   profitSharePercent?: number;
+  commissionType?: AgentCommissionType;
+  commissionPercent?: number;
   khetArea?: number;
   khetAreaUnit?: string;
   khetLocation?: string;

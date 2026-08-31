@@ -117,6 +117,8 @@ const invoiceSchema = z.object({
   dispatchId: z.string().optional(),
   sequenceNumber: z.number().int().positive().optional(),
   customerId: z.string().optional(),
+  partnerId: z.string().optional(),
+  agentId: z.string().optional(),
   customerName: z.string(),
   customerAddress: z.string().optional(),
   customerPhone: z.string().optional(),
@@ -141,7 +143,10 @@ const invoiceSchema = z.object({
   invoiceDate: z.string().min(1, "Transaction date is required"),
   notes: z.string().optional(),
 });
-const invoiceUpdateSchema = invoiceSchema.omit({ dispatchId: true }).partial();
+const invoiceUpdateSchema = invoiceSchema
+  .omit({ dispatchId: true, partnerId: true, agentId: true })
+  .partial()
+  .extend({ partnerId: z.string().nullable().optional(), agentId: z.string().nullable().optional() });
 
 export async function createInvoiceHandler(req: AuthedRequest, res: Response) {
   const input = invoiceSchema.parse(req.body);
