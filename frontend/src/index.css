@@ -191,6 +191,21 @@ body {
   }
 }
 
+/* The topbar's own glass treatment — same frosted-surface idea as
+   .glass-panel, but a lighter blur (14px/160% vs the card's 20px/180%),
+   no shine-sweep, and no rounded corners: a full-width bar that stays
+   subtly see-through over the page's mesh background as you scroll,
+   rather than the flat opaque bar it used to be. */
+.topbar-glass {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border-bottom: 1px solid var(--glass-border);
+}
+.dark .topbar-glass {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+
 /* Light-shimmer sweep for primary/accent buttons — applied via the
    `btn-shine` class from components/ui/button.tsx. Additive-only: a
    button that doesn't use this class is completely unaffected. */

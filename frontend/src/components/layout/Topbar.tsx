@@ -74,7 +74,7 @@ export function Topbar() {
           )}
         </div>
       )}
-      <header className="sticky top-0 z-40 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-4 sm:px-6">
+      <header className="topbar-glass sticky top-0 z-40 flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <button
           onClick={() => setMobileNavOpen(true)}
@@ -104,7 +104,7 @@ export function Topbar() {
             if (e.key === "Escape") { setQuery(""); (e.target as HTMLInputElement).blur(); }
           }}
           placeholder={t("topbar.searchPlaceholder")}
-          className="h-9 w-full rounded-xl border border-border bg-ink-primary/5 pl-9 pr-3 text-sm text-ink-primary outline-none transition-colors focus:border-series-1 focus:bg-surface focus:ring-2 focus:ring-series-1/30"
+          className="h-9 w-full rounded-xl border border-border bg-ink-primary/5 pl-9 pr-3 text-sm text-ink-primary outline-none transition-all focus:border-[var(--neon)] focus:bg-surface focus:shadow-[0_0_0_3px_var(--neon-glow)]"
         />
         {searchFocused && query.trim() && (
           <div className="glass-panel absolute left-0 right-0 top-full z-30 mt-1.5 rounded-xl p-1 shadow-glass">
@@ -166,7 +166,7 @@ export function Topbar() {
         <div className="relative">
           <button
             onClick={() => setNotifOpen((o) => !o)}
-            className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-secondary transition-colors hover:bg-ink-primary/5 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border text-ink-secondary transition-all hover:-translate-y-px hover:border-series-1/40 hover:text-series-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             aria-label={t("topbar.notifications")}
           >
             <Bell className="h-4 w-4" />
