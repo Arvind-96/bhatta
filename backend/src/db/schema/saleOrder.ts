@@ -1,4 +1,4 @@
-import { double, int, mysqlTable, varchar, text, uniqueIndex, index } from "drizzle-orm/mysql-core";
+import { double, int, mysqlTable, varchar, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn } from "./_helpers";
 
 export const SALE_ORDER_STATUSES = ["PENDING", "PARTIALLY_FULFILLED", "FULFILLED", "CANCELLED"] as const;
@@ -31,7 +31,12 @@ export const saleOrders = mysqlTable("sale_orders", {
   status: varchar("status", { length: 30, enum: SALE_ORDER_STATUSES }).notNull().default("PENDING"),
   sequenceNumber: int("sequenceNumber"),
   orderDate: dateColumn("orderDate"),
-  expectedDeliveryDate: dateColumn("expectedDeliveryDate"),
+  // No $defaultFn — an admin-set, genuinely optional future date. Unlike
+  // orderDate (defaults to "now", correct for "booked today"), silently
+  // defaulting this to today would misleadingly claim delivery is expected
+  // immediately whenever the admin leaves it blank (the exact bug already
+  // fixed once this session for people.partnershipDate).
+  expectedDeliveryDate: datetime("expectedDeliveryDate", { mode: "date" }),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({

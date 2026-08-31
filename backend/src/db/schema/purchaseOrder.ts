@@ -1,4 +1,4 @@
-import { double, int, json, mysqlTable, varchar, text, uniqueIndex, index } from "drizzle-orm/mysql-core";
+import { double, int, json, mysqlTable, varchar, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
 
 export const PURCHASE_ORDER_STATUSES = ["PENDING", "PARTIALLY_FULFILLED", "FULFILLED", "CANCELLED"] as const;
@@ -26,7 +26,8 @@ export const purchaseOrders = mysqlTable("purchase_orders", {
   status: varchar("status", { length: 30, enum: PURCHASE_ORDER_STATUSES }).notNull().default("PENDING"),
   sequenceNumber: int("sequenceNumber"),
   orderDate: dateColumn("orderDate"),
-  expectedDeliveryDate: dateColumn("expectedDeliveryDate"),
+  // No $defaultFn — see saleOrders.expectedDeliveryDate's identical comment.
+  expectedDeliveryDate: datetime("expectedDeliveryDate", { mode: "date" }),
   notes: text("notes"),
   createdAt: createdAtColumn(),
 }, (t) => ({
