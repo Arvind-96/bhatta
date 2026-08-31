@@ -10,6 +10,7 @@
 // pass confirming zero NULL seasonId rows remain anywhere.
 //
 // Run with: npx tsx src/scripts/backfillSeasons.ts
+import "dotenv/config";
 import { randomUUID } from "crypto";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "../db/client";
