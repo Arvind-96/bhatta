@@ -79,7 +79,7 @@ export async function assertPersonOfType(kilnId: string, personId: string, allow
   return person;
 }
 
-// The three Bharai work types correspond 1:1 to stackingStage, which is
+// The two Bharai work types correspond 1:1 to stackingStage, which is
 // what actually drives the Bharai page's gang filtering — kept in sync so
 // a labourer created from the simplified Add Labour form immediately shows
 // up in the right Bharai stage without a second edit. Only fills the gap

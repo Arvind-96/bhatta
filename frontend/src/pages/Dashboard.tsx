@@ -145,6 +145,7 @@ export function Dashboard() {
   const ActiveView = VIEWS[view];
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const activeSeasonId = useAuthStore((s) => s.activeSeasonId);
   const setSeasons = useAuthStore((s) => s.setSeasons);
   const needsSetup = kilns.find((k) => k.kilnId === activeKilnId)?.needsSetup ?? false;
 
@@ -171,7 +172,13 @@ export function Dashboard() {
       <div className="flex min-w-0 flex-1">
         <Sidebar />
         <main className="min-w-0 flex-1 p-4 sm:p-6 sm:m-4 sm:bg-surface sm:rounded-2xl sm:border sm:border-border sm:shadow-sm">
-          <ActiveView />
+          {/* Remounting on activeSeasonId forces every page's data-fetch
+              effects to re-run from scratch when the admin switches season
+              — pages only key their own fetches off activeKilnId, so
+              without this a page already mounted before a season switch
+              would keep showing the old season's data until the user
+              navigated away and back. */}
+          <ActiveView key={activeSeasonId} />
         </main>
       </div>
       <QuickActionButton />

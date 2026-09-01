@@ -231,7 +231,14 @@ body {
   border-bottom: 1px solid var(--glass-border);
 }
 .dark .topbar-glass {
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  /* Same Chromium SVG-backdrop compositing bug .dark .glass-panel documents
+     above: the Overview page's hero illustration sits right under this
+     sticky bar, and a translucent background + active backdrop-filter
+     renders as solid white over it in dark mode. Fully opaque, no blur —
+     identical fix, same trigger condition. */
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Light-shimmer sweep for primary/accent buttons — applied via the

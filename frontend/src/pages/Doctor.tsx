@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Plus, Trash2, Stethoscope } from "lucide-react";
+import { Pencil, Plus, Trash2, Stethoscope } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
@@ -50,10 +50,12 @@ export function Doctor() {
   const [showDoctorForm, setShowDoctorForm] = useState(false);
   const [doctorForm, setDoctorForm] = useState(emptyDoctorForm);
   const [savingDoctor, setSavingDoctor] = useState(false);
+  const [editingDoctorId, setEditingDoctorId] = useState<string | null>(null);
   const [showVisitForm, setShowVisitForm] = useState(false);
   const [visitForm, setVisitForm] = useState(emptyVisitForm);
   const [savingVisit, setSavingVisit] = useState(false);
   const [visitFormError, setVisitFormError] = useState("");
+  const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
@@ -79,19 +81,43 @@ export function Doctor() {
     if (!doctorForm.name.trim()) return;
     setSavingDoctor(true);
     try {
-      await api.doctors.create({
+      const payload = {
         name: doctorForm.name.trim(),
         phone: doctorForm.phone || undefined,
         qualification: doctorForm.qualification || undefined,
         clinicAddress: doctorForm.clinicAddress || undefined,
         notes: doctorForm.notes || undefined,
-      });
+      };
+      if (editingDoctorId) {
+        await api.doctors.update(editingDoctorId, payload);
+      } else {
+        await api.doctors.create(payload);
+      }
       setDoctorForm(emptyDoctorForm());
+      setEditingDoctorId(null);
       setShowDoctorForm(false);
       await refresh();
     } finally {
       setSavingDoctor(false);
     }
+  }
+
+  function startEditDoctor(doctor: DoctorRecord) {
+    setEditingDoctorId(doctor._id);
+    setDoctorForm({
+      name: doctor.name,
+      phone: doctor.phone ?? "",
+      qualification: doctor.qualification ?? "",
+      clinicAddress: doctor.clinicAddress ?? "",
+      notes: doctor.notes ?? "",
+    });
+    setShowDoctorForm(true);
+  }
+
+  function cancelDoctorForm() {
+    setDoctorForm(emptyDoctorForm());
+    setEditingDoctorId(null);
+    setShowDoctorForm(false);
   }
 
   async function deleteDoctor(doctor: DoctorRecord) {
@@ -113,7 +139,7 @@ export function Doctor() {
     setVisitFormError("");
     setSavingVisit(true);
     try {
-      await api.doctorVisits.create({
+      const payload = {
         doctorId: visitForm.doctorId,
         personId: visitForm.personId,
         ailment: visitForm.ailment || undefined,
@@ -124,13 +150,43 @@ export function Doctor() {
         cashAmount: total > 0 && visitForm.paymentMode === "CASH_AND_ONLINE" ? Number(visitForm.cashAmount) : undefined,
         onlineAmount: total > 0 && visitForm.paymentMode === "CASH_AND_ONLINE" ? Number(visitForm.onlineAmount) : undefined,
         notes: visitForm.notes || undefined,
-      });
+      };
+      if (editingVisitId) {
+        await api.doctorVisits.update(editingVisitId, payload);
+      } else {
+        await api.doctorVisits.create(payload);
+      }
       setVisitForm(emptyVisitForm());
+      setEditingVisitId(null);
       setShowVisitForm(false);
       await refresh();
     } finally {
       setSavingVisit(false);
     }
+  }
+
+  function startEditVisit(visit: DoctorVisit) {
+    setEditingVisitId(visit._id);
+    setVisitForm({
+      doctorId: typeof visit.doctorId === "object" ? visit.doctorId._id : visit.doctorId,
+      personId: typeof visit.personId === "object" ? visit.personId._id : visit.personId,
+      ailment: visit.ailment ?? "",
+      medicineCost: visit.medicineCost ? String(visit.medicineCost) : "",
+      consultationFee: visit.consultationFee ? String(visit.consultationFee) : "",
+      date: visit.date ? visit.date.slice(0, 10) : "",
+      paymentMode: visit.paymentMode ?? "CASH",
+      cashAmount: visit.cashAmount != null ? String(visit.cashAmount) : "",
+      onlineAmount: visit.onlineAmount != null ? String(visit.onlineAmount) : "",
+      notes: visit.notes ?? "",
+    });
+    setShowVisitForm(true);
+  }
+
+  function cancelVisitForm() {
+    setVisitForm(emptyVisitForm());
+    setEditingVisitId(null);
+    setVisitFormError("");
+    setShowVisitForm(false);
   }
 
   async function deleteVisit(visit: DoctorVisit) {
@@ -144,7 +200,13 @@ export function Doctor() {
       <Card>
         <CardHeader>
           <CardTitle>{t("doctor.rosterHeading")}</CardTitle>
-          <Button size="sm" onClick={() => setShowDoctorForm((s) => !s)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              if (editingDoctorId) cancelDoctorForm();
+              else setShowDoctorForm((s) => !s);
+            }}
+          >
             <Plus className="h-4 w-4" /> {t("doctor.addDoctor")}
           </Button>
         </CardHeader>
@@ -156,9 +218,16 @@ export function Doctor() {
             <input placeholder={t("doctor.qualificationPlaceholder")} value={doctorForm.qualification} onChange={(e) => setDoctorForm((f) => ({ ...f, qualification: e.target.value }))} className={inputClass} />
             <input placeholder={t("doctor.clinicAddressPlaceholder")} value={doctorForm.clinicAddress} onChange={(e) => setDoctorForm((f) => ({ ...f, clinicAddress: e.target.value }))} className={inputClass} />
             <input placeholder={t("common.notesOptional")} value={doctorForm.notes} onChange={(e) => setDoctorForm((f) => ({ ...f, notes: e.target.value }))} className={cn(inputClass, "col-span-2")} />
-            <Button type="submit" disabled={savingDoctor} className="col-span-2">
-              {t("common.add")}
-            </Button>
+            <div className="col-span-2 flex gap-2">
+              {editingDoctorId && (
+                <button type="button" onClick={cancelDoctorForm} className="h-10 shrink-0 rounded-xl border border-border px-4 text-sm font-medium text-ink-secondary hover:bg-ink-primary/5">
+                  {t("common.cancel")}
+                </button>
+              )}
+              <Button type="submit" disabled={savingDoctor} className="flex-1">
+                {editingDoctorId ? t("common.saveChanges") : t("common.add")}
+              </Button>
+            </div>
           </form>
         )}
 
@@ -177,9 +246,14 @@ export function Doctor() {
                       {d.qualification && <p className="truncate text-sm text-ink-muted">{d.qualification}</p>}
                       {d.phone && <p className="truncate text-sm text-ink-muted">{d.phone}</p>}
                     </div>
-                    <button onClick={() => deleteDoctor(d)} className="shrink-0 text-ink-muted hover:text-status-critical">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button onClick={() => startEditDoctor(d)} className="text-ink-muted hover:text-ink-primary" aria-label={t("common.edit")}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => deleteDoctor(d)} className="text-ink-muted hover:text-status-critical" aria-label={t("common.delete")}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -192,7 +266,14 @@ export function Doctor() {
       <Card>
         <CardHeader>
           <CardTitle>{t("doctor.visitLogHeading")}</CardTitle>
-          <Button size="sm" onClick={() => setShowVisitForm((s) => !s)} disabled={doctors.length === 0}>
+          <Button
+            size="sm"
+            onClick={() => {
+              if (editingVisitId) cancelVisitForm();
+              else setShowVisitForm((s) => !s);
+            }}
+            disabled={doctors.length === 0}
+          >
             <Plus className="h-4 w-4" /> {t("doctor.logVisit")}
           </Button>
         </CardHeader>
@@ -240,9 +321,16 @@ export function Doctor() {
 
             <input placeholder={t("common.notesOptional")} value={visitForm.notes} onChange={(e) => setVisitForm((f) => ({ ...f, notes: e.target.value }))} className={cn(inputClass, "col-span-2")} />
             {visitFormError && <p className="col-span-2 text-sm text-status-critical">{visitFormError}</p>}
-            <Button type="submit" disabled={savingVisit} className="col-span-2">
-              {t("doctor.saveVisit")}
-            </Button>
+            <div className="col-span-2 flex gap-2">
+              {editingVisitId && (
+                <button type="button" onClick={cancelVisitForm} className="h-10 shrink-0 rounded-xl border border-border px-4 text-sm font-medium text-ink-secondary hover:bg-ink-primary/5">
+                  {t("common.cancel")}
+                </button>
+              )}
+              <Button type="submit" disabled={savingVisit} className="flex-1">
+                {editingVisitId ? t("common.saveChanges") : t("doctor.saveVisit")}
+              </Button>
+            </div>
           </form>
         )}
 
@@ -270,6 +358,9 @@ export function Doctor() {
                     <td className="py-3 text-ink-secondary">{v.ailment || "—"}</td>
                     <td className="py-3 tabular-nums text-ink-secondary">₹{formatINR(v.medicineCost + v.consultationFee)}</td>
                     <td className="py-3 text-right">
+                      <button onClick={() => startEditVisit(v)} className="mr-3 text-xs font-medium text-series-1 hover:underline">
+                        {t("common.edit")}
+                      </button>
                       <button onClick={() => deleteVisit(v)} className="text-xs font-medium text-status-critical hover:underline">
                         {t("common.delete")}
                       </button>
