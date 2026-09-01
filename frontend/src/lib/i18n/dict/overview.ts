@@ -40,6 +40,8 @@ export const overviewDict: Record<string, Record<Locale, string>> = {
   "overview.fuelStockUnit": { en: "kg, all fuel types", hi: "किग्रा, सभी ईंधन प्रकार" },
   "overview.bricksByCategory": { en: "Bricks by category", hi: "श्रेणी अनुसार ईंटें" },
   "overview.noBrickCategoriesLogged": { en: "No brick categories logged yet.", hi: "अभी तक कोई ईंट श्रेणी दर्ज नहीं की गई।" },
+  "overview.bricksSoldByCategory": { en: "Bricks Sold by Category", hi: "श्रेणी अनुसार बिकी ईंटें" },
+  "overview.noBricksSoldYet": { en: "No bricks sold yet.", hi: "अभी तक कोई ईंट नहीं बिकी।" },
   "overview.whosePaymentDue": { en: "Whose payment is due", hi: "किसका भुगतान बाकी है" },
   "overview.noPendingPayments": { en: "No pending payments.", hi: "कोई लंबित भुगतान नहीं।" },
   "overview.resolveDue": { en: "Open {name}'s ledger to resolve this due amount", hi: "यह बकाया राशि ठीक करने के लिए {name} का खाता खोलें" },

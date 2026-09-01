@@ -1869,6 +1869,31 @@ export interface PersonFullReport {
   };
 }
 
+export interface ProfitLossPartnerShare {
+  partnerId: string;
+  name: string;
+  sharePercent: number;
+  shareAmount: number;
+}
+
+export interface ProfitLossStatement {
+  totalSales: number;
+  totalExpenses: number;
+  totalAdvancesGiven: number;
+  totalAdvancesReceived: number;
+  cashReceived: number;
+  cashGiven: number;
+  onlinePaymentsReceived: number;
+  onlinePaymentsMade: number;
+  totalMoneyIn: number;
+  totalMoneyOut: number;
+  netProfit: number;
+  partnerShares: ProfitLossPartnerShare[];
+  totalSharedPercent: number;
+  unallocatedPercent: number;
+  unallocatedAmount: number;
+}
+
 export interface Doctor {
   _id: string;
   name: string;

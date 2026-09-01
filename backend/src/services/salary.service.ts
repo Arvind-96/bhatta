@@ -146,9 +146,11 @@ function renderPdf(data: SlipData, filePath: string, lang: "en" | "hi"): Promise
         [t("Gross Salary", "सकल वेतन"), `Rs. ${data.grossSalary.toLocaleString("en-IN")}`],
         [t("Deductions (Absence)", "कटौती (अनुपस्थिति)"), `Rs. ${data.deductions.toLocaleString("en-IN")}`],
         ...(data.advanceDeducted > 0
-          ? [[t("Advance Deducted", "एडवांस काटा गया"), `Rs. ${data.advanceDeducted.toLocaleString("en-IN")}`] as [string, string]]
+          ? [[t("Advance/Kharchi/Medical Deducted", "एडवांस/खर्ची/मेडिकल काटा गया"), `Rs. ${data.advanceDeducted.toLocaleString("en-IN")}`] as [string, string]]
           : []),
-        [t("Net Salary", "कुल वेतन"), `Rs. ${data.netSalary.toLocaleString("en-IN")}`],
+        data.netSalary < 0
+          ? [t("Overdrawn (owed back)", "अधिक लिया गया (वापस देय)"), `Rs. ${Math.abs(data.netSalary).toLocaleString("en-IN")}`]
+          : [t("Net Salary", "कुल वेतन"), `Rs. ${data.netSalary.toLocaleString("en-IN")}`],
       ],
       { boldLastRow: true }
     );
@@ -173,9 +175,14 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
 
   const summary = await attendanceSummaryForMonth(kilnId, personId, year, monthNum);
 
-  // ADVANCE-category ledger entries dated within this slip's month — money
-  // already handed to this person this month, recovered against pay the
-  // same way a real payroll advance is settled at salary time.
+  // Advance/Kharchi/Medical-category ledger entries dated within this
+  // slip's month — money already handed to this person this month,
+  // recovered against pay the same way a real payroll advance is settled
+  // at salary time. Previously ADVANCE-only, which silently ignored
+  // Kharchi (daily allowance) and Medical payments made the same month,
+  // understating how much had already been drawn — same 3-category
+  // "money already given" bucket molding.service.ts's
+  // advanceDeductedForWorkers already uses for gang workers.
   const { start, end } = monthDateRange(year, monthNum);
   const advanceRows = await db
     .select()
@@ -185,7 +192,7 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
         eq(ledgerEntries.kilnId, kilnId),
         eq(ledgerEntries.personId, personId),
         eq(ledgerEntries.direction, "PAID"),
-        eq(ledgerEntries.category, "ADVANCE"),
+        inArray(ledgerEntries.category, ["ADVANCE", "KHARCHI", "MEDICAL"]),
         gte(ledgerEntries.date, start),
         lte(ledgerEntries.date, end)
       )

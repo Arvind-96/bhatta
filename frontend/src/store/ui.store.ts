@@ -22,6 +22,7 @@ export type AppView =
   | "stock"
   | "fleet"
   | "doctor"
+  | "profitLoss"
   | "staff"
   | "salary"
   | "attendance"

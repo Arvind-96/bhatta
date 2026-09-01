@@ -1,4 +1,4 @@
-import { Flame, LayoutGrid, Layers, CalendarCheck, Settings as SettingsIcon, Thermometer, Truck, Users, UserSquare2, Hammer, PackageCheck, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, FileText, Receipt, Wallet, Boxes, Warehouse, PieChart, Banknote, FileSearch, GitCompare, Mountain, Container, Handshake, UserCheck, ClipboardList, Landmark, MapPinned, Wrench, Stethoscope, X } from "lucide-react";
+import { Flame, LayoutGrid, Layers, CalendarCheck, Settings as SettingsIcon, Thermometer, Truck, Users, UserSquare2, Hammer, PackageCheck, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, FileText, Receipt, Wallet, Boxes, Warehouse, PieChart, Banknote, FileSearch, GitCompare, Mountain, Container, Handshake, UserCheck, ClipboardList, Landmark, MapPinned, Wrench, Stethoscope, TrendingUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KilnSwitcher } from "./KilnSwitcher";
 import { useUiStore, type AppView } from "@/store/ui.store";
@@ -21,6 +21,7 @@ const CHIP_BG: Record<SeriesTone, string> = {
 export const navItems: { key: string; icon: typeof LayoutGrid; view: AppView; group: string }[] = [
   { key: "nav.overview", icon: LayoutGrid, view: "overview", group: "nav.group.dashboard" },
   { key: "nav.financialOverview", icon: PieChart, view: "financialOverview", group: "nav.group.dashboard" },
+  { key: "nav.profitLoss", icon: TrendingUp, view: "profitLoss", group: "nav.group.dashboard" },
   { key: "nav.compare", icon: GitCompare, view: "compare", group: "nav.group.dashboard" },
 
   { key: "nav.people", icon: Users, view: "people", group: "nav.group.production" },

@@ -77,7 +77,7 @@ function splitByPaymentMode<T extends { paymentMode?: string | null; cashAmount?
 // seasonId is nullable — pass null for an all-time, every-season view
 // (Compare needs to see across a season boundary to compare two
 // admin-picked date ranges at all, so it never passes a single season).
-async function flowForRange(kilnId: string, seasonId: string | null, since: Date, until?: Date) {
+export async function flowForRange(kilnId: string, seasonId: string | null, since: Date, until?: Date) {
   const dateRange = (col: any) => (until ? and(gte(col, since), lte(col, until)) : gte(col, since));
   // invoiceDate is nullable on older rows — fall back to createdAt so a
   // legacy invoice with no explicit date still lands in the right period

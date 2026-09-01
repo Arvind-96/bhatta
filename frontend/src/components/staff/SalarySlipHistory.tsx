@@ -73,8 +73,16 @@ export function SalarySlipHistory({ personId, ledgerEntries }: SalarySlipHistory
   // numbers the slip itself shows once generated.
   const daysPresent = days.filter((d) => d.status === "PRESENT" || d.status === "LATE").length;
   const daysAbsent = days.filter((d) => d.status === "ABSENT").length;
+  // Advance/Kharchi/Medical combined — matches generateSalarySlip's own
+  // deduction query exactly (see salary.service.ts), so this live preview
+  // never disagrees with what the slip itself will show once generated.
   const advanceThisMonth = ledgerEntries
-    .filter((e) => e.direction === "PAID" && e.category === "ADVANCE" && e.date.slice(0, 7) === cursorMonth)
+    .filter(
+      (e) =>
+        e.direction === "PAID" &&
+        (e.category === "ADVANCE" || e.category === "KHARCHI" || e.category === "MEDICAL") &&
+        e.date.slice(0, 7) === cursorMonth
+    )
     .reduce((sum, e) => sum + e.amount, 0);
 
   const slipForMonth = slips.find((s) => s.month === cursorMonth) ?? null;
@@ -127,7 +135,7 @@ export function SalarySlipHistory({ personId, ledgerEntries }: SalarySlipHistory
         </div>
         <div>
           <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(advanceThisMonth)}</p>
-          <p className="text-xs text-ink-muted">{t("salary.totalAdvanceGivenLabel")}</p>
+          <p className="text-xs text-ink-muted">{t("salary.totalAdvanceKharchiMedicalGivenLabel")}</p>
         </div>
       </div>
 
@@ -153,7 +161,13 @@ export function SalarySlipHistory({ personId, ledgerEntries }: SalarySlipHistory
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-semibold tabular-nums text-ink-primary">₹{formatINR(slip.netSalary)}</span>
+                  {slip.netSalary < 0 ? (
+                    <span className="font-semibold tabular-nums text-status-critical">
+                      {t("salary.overdrawnBy", { amount: formatINR(Math.abs(slip.netSalary)) })}
+                    </span>
+                  ) : (
+                    <span className="font-semibold tabular-nums text-ink-primary">₹{formatINR(slip.netSalary)}</span>
+                  )}
                   <a
                     href={api.salary.pdfUrl(slip._id, "en")}
                     target="_blank"

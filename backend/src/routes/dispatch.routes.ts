@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { adjustment, create, list, remove, totals, update } from "../controllers/dispatch.controller";
+import { adjustment, create, list, remove, soldByCategory, totals, update } from "../controllers/dispatch.controller";
 import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
@@ -9,6 +9,7 @@ dispatchRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArchive
 dispatchRouter.post("/", asyncHandler(create));
 dispatchRouter.get("/", asyncHandler(list));
 dispatchRouter.get("/totals", asyncHandler(totals));
+dispatchRouter.get("/sold-by-category", asyncHandler(soldByCategory));
 dispatchRouter.patch("/:id/adjustment", asyncHandler(adjustment));
 dispatchRouter.patch("/:id", asyncHandler(update));
 dispatchRouter.delete("/:id", asyncHandler(remove));

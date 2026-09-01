@@ -30,6 +30,7 @@ import type {
   Dispatch,
   Doctor,
   DoctorVisit,
+  ProfitLossStatement,
   DispatchTotals,
   Expense,
   ExpenseCategory,
@@ -279,6 +280,7 @@ export const api = {
       dispatchedOn?: string;
     }) => post<Dispatch>("/dispatch", input, true),
     totals: (days = 7) => get<DispatchTotals>(`/dispatch/totals?days=${days}`, true),
+    soldByCategory: () => get<{ categoryId: string; category: string; grade: string | null; bricksSold: number }[]>("/dispatch/sold-by-category", true),
     adjustment: (id: string, input: { breakageCount?: number; returnedCount?: number; returnReason?: string }) =>
       patch<Dispatch>(`/dispatch/${id}/adjustment`, input, true),
     update: (
@@ -1654,6 +1656,13 @@ export const api = {
     get: () => get<FinancialOverview>("/financial-overview", true),
     customRange: (from: string, to: string) =>
       get<FinancialFlow>(`/financial-overview/custom-range?from=${from}&to=${to}`, true),
+  },
+
+  profitLoss: {
+    get: (range?: { from: string; to: string }) => {
+      const qs = range ? `?from=${range.from}&to=${range.to}` : "";
+      return get<ProfitLossStatement>(`/profit-loss${qs}`, true);
+    },
   },
 
   compare: {

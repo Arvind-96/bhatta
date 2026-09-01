@@ -238,6 +238,7 @@ function SeasonSummaryCard() {
 function DashboardStockPanel() {
   const [stockSummary, setStockSummary] = useState<DashboardStockSummary | null>(null);
   const [brickCategories, setBrickCategories] = useState<BrickCategory[]>([]);
+  const [bricksSold, setBricksSold] = useState<{ categoryId: string; category: string; grade: string | null; bricksSold: number }[]>([]);
   const [fuelStock, setFuelStock] = useState<Record<string, number>>({});
   const [paymentsDue, setPaymentsDue] = useState<PaymentDue[]>([]);
   const [ledgerFor, setLedgerFor] = useState<Person | null>(null);
@@ -257,14 +258,16 @@ function DashboardStockPanel() {
   }
 
   async function refresh() {
-    const [summary, categories, fuel, dues] = await Promise.all([
+    const [summary, categories, sold, fuel, dues] = await Promise.all([
       api.reconciliation.dashboardStock(),
       api.brickCategories.list(),
+      api.dispatch.soldByCategory(),
       api.fuelPurchases.stockBalance(),
       api.people.paymentsDue(),
     ]);
     setStockSummary(summary);
     setBrickCategories(categories);
+    setBricksSold(sold);
     setFuelStock(fuel);
     setPaymentsDue(dues);
   }
@@ -283,8 +286,10 @@ function DashboardStockPanel() {
   useKilnEvent("fuelLog:update", () => refresh());
   useKilnEvent("ledger:update", () => refresh());
   useKilnEvent("person:update", () => refresh());
+  useKilnEvent("dispatch:update", () => refresh());
 
   const firedBrickStock = brickCategories.reduce((sum, c) => sum + c.quantity, 0);
+  const totalBricksSold = bricksSold.reduce((sum, c) => sum + c.bricksSold, 0);
   const totalFuelStock = Object.values(fuelStock).reduce((sum, v) => sum + v, 0);
   const totalDuesAmount = paymentsDue.reduce((sum, d) => sum + d.amountDue, 0);
 
@@ -349,6 +354,40 @@ function DashboardStockPanel() {
                   <span className="text-ink-secondary">{c.grade ? `${c.category} (${c.grade})` : c.category}</span>
                   <span className="font-semibold tabular-nums text-ink-primary">
                     {c.quantity.toLocaleString("en-IN")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-series-1/10">
+                <TrendingUp className="h-4 w-4 text-series-1" />
+              </div>
+              <CardTitle>{t("overview.bricksSoldByCategory")}</CardTitle>
+            </div>
+            <span className="text-sm font-semibold tabular-nums text-ink-primary">
+              {totalBricksSold.toLocaleString("en-IN")}
+            </span>
+          </CardHeader>
+          {bricksSold.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <TrendingUp className="h-6 w-6 text-ink-muted/50" />
+              <p className="text-sm text-ink-muted">{t("overview.noBricksSoldYet")}</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {bricksSold.map((c) => (
+                <li
+                  key={c.categoryId}
+                  className="-mx-2 flex items-center justify-between rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-ink-primary/5"
+                >
+                  <span className="text-ink-secondary">{c.grade ? `${c.category} (${c.grade})` : c.category}</span>
+                  <span className="font-semibold tabular-nums text-ink-primary">
+                    {c.bricksSold.toLocaleString("en-IN")}
                   </span>
                 </li>
               ))}

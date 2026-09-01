@@ -813,6 +813,45 @@ export async function dispatchTotals(kilnId: string, seasonId: string, days = 7)
   };
 }
 
+// Cumulative across every season through the current one (seasonIdsThrough
+// — same convention as totalDispatchedSince/brickCategories.quantity, an
+// always-cumulative running total, not a time-boxed window), grouped by
+// brick category — the Overview page's "Bricks Sold by Category" panel,
+// mirroring "Bricks by category" (live stock) with the same all-time
+// scope. Prefers the per-line-item breakdown (items[]) for a multi-
+// category dispatch; falls back to the scalar categoryId/bricksCount pair
+// for older rows created before items[] existed.
+export async function bricksSoldByCategory(kilnId: string, seasonIds: string[]) {
+  const rows = await db
+    .select({ categoryId: dispatches.categoryId, bricksCount: dispatches.bricksCount, items: dispatches.items })
+    .from(dispatches)
+    .where(and(eq(dispatches.kilnId, kilnId), inArray(dispatches.seasonId, seasonIds)));
+
+  const totals = new Map<string, number>();
+  for (const r of rows) {
+    if (r.items && r.items.length > 0) {
+      for (const item of r.items) {
+        if (!item.categoryId) continue;
+        totals.set(item.categoryId, (totals.get(item.categoryId) ?? 0) + item.bricksCount);
+      }
+    } else if (r.categoryId) {
+      totals.set(r.categoryId, (totals.get(r.categoryId) ?? 0) + r.bricksCount);
+    }
+  }
+
+  const categoryIds = [...totals.keys()];
+  const categoryRows = categoryIds.length
+    ? await db
+        .select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade })
+        .from(brickCategories)
+        .where(inArray(brickCategories._id, categoryIds))
+    : [];
+
+  return categoryRows
+    .map((c) => ({ categoryId: c._id, category: c.category, grade: c.grade, bricksSold: totals.get(c._id) ?? 0 }))
+    .sort((a, b) => b.bricksSold - a.bricksSold);
+}
+
 // Separate from dispatchTotals — that one's `days` is always relative to
 // now, which isn't what a season-year comparison needs (an absolute,
 // possibly-past window). Same shape otherwise.

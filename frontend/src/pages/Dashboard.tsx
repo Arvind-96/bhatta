@@ -30,6 +30,7 @@ import { Inventory } from "@/pages/Inventory";
 import { Stock } from "@/pages/Stock";
 import { Fleet } from "@/pages/Fleet";
 import { Doctor } from "@/pages/Doctor";
+import { ProfitLoss } from "@/pages/ProfitLoss";
 import { Staff } from "@/pages/Staff";
 import { Salary } from "@/pages/Salary";
 import { Attendance } from "@/pages/Attendance";
@@ -72,6 +73,7 @@ const VIEWS = {
   stock: Stock,
   fleet: Fleet,
   doctor: Doctor,
+  profitLoss: ProfitLoss,
   staff: Staff,
   salary: Salary,
   attendance: Attendance,

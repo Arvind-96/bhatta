@@ -27,8 +27,10 @@ export const salaryDict: Record<string, Record<Locale, string>> = {
   "salary.noSlipsYet": { en: "No salary slips generated yet.", hi: "अभी तक कोई वेतन पर्ची जनरेट नहीं हुई।" },
   "salary.generateForMonth": { en: "Generate salary for this month", hi: "इस महीने का वेतन जनरेट करें" },
   "salary.regenerateForMonth": { en: "Regenerate salary for this month", hi: "इस महीने का वेतन फिर से जनरेट करें" },
-  "salary.advanceDeductedLabel": { en: "Advance deducted", hi: "एडवांस काटा गया" },
+  "salary.advanceDeductedLabel": { en: "Advance/Kharchi/Medical deducted", hi: "एडवांस/खर्ची/मेडिकल काटा गया" },
   "salary.totalAdvanceGivenLabel": { en: "Advance given", hi: "एडवांस दिया गया" },
+  "salary.totalAdvanceKharchiMedicalGivenLabel": { en: "Advance/Kharchi/Medical given", hi: "एडवांस/खर्ची/मेडिकल दिया गया" },
+  "salary.overdrawnBy": { en: "Overdrawn by ₹{amount}", hi: "₹{amount} अधिक लिया गया" },
   "salary.confirmDeleteSlip": { en: "Delete the {month} salary slip? This can't be undone.", hi: "{month} की वेतन पर्ची हटाएं? यह पूर्ववत नहीं किया जा सकता।" },
   "salary.editSlipTitle": { en: "Edit Salary Slip", hi: "वेतन पर्ची संपादित करें" },
   "salary.editSlipNote": {

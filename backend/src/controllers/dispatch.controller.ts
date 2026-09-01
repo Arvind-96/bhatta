@@ -1,7 +1,8 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { createDispatch, deleteDispatch, dispatchTotals, listDispatches, recordDeliveryAdjustment, updateDispatch } from "../services/dispatch.service";
+import { bricksSoldByCategory, createDispatch, deleteDispatch, dispatchTotals, listDispatches, recordDeliveryAdjustment, updateDispatch } from "../services/dispatch.service";
+import { seasonIdsThrough } from "../services/season.util";
 import { BRICK_GRADES, DISPATCH_PAYMENT_MODES as PAYMENT_MODES } from "../db/schema";
 import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { validateCashOnlineSplit } from "../utils/paymentSplit";
@@ -181,6 +182,12 @@ export async function list(req: AuthedRequest, res: Response) {
 export async function totals(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 7;
   const result = await dispatchTotals(req.kiln!.id, req.season!.id, days);
+  res.json(result);
+}
+
+export async function soldByCategory(req: AuthedRequest, res: Response) {
+  const seasonIds = await seasonIdsThrough(req.kiln!.id, req.season!.id);
+  const result = await bricksSoldByCategory(req.kiln!.id, seasonIds);
   res.json(result);
 }
 

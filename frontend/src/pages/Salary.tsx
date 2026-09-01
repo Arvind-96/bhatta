@@ -112,7 +112,13 @@ export function Salary() {
                 </div>
                 <div className="flex items-center gap-3">
                   {slip ? (
-                    <span className="font-semibold tabular-nums text-ink-primary">₹{formatINR(slip.netSalary)}</span>
+                    slip.netSalary < 0 ? (
+                      <span className="font-semibold tabular-nums text-status-critical">
+                        {t("salary.overdrawnBy", { amount: formatINR(Math.abs(slip.netSalary)) })}
+                      </span>
+                    ) : (
+                      <span className="font-semibold tabular-nums text-ink-primary">₹{formatINR(slip.netSalary)}</span>
+                    )
                   ) : (
                     <span className="rounded-full bg-ink-primary/5 px-2.5 py-1 text-sm text-ink-muted">{t("salary.status.pending")}</span>
                   )}
