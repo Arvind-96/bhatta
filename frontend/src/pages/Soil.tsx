@@ -175,6 +175,7 @@ function ContractsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
   const { t } = useTranslation();
   const [contracts, setContracts] = useState<SoilContract[]>([]);
   const [dashboard, setDashboard] = useState<SoilContractDashboard | null>(null);
+  const [landowners, setLandowners] = useState<Person[]>([]);
   const [editingContract, setEditingContract] = useState<SoilContract | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<SoilContractStatus | "ALL">("ALL");
@@ -182,13 +183,22 @@ function ContractsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   // Contracts are only ever created via the People page's Add Landowner
-  // flow now (its embedded, optional Contract Details section) — this tab
-  // is a read-only listing of whatever contracts already exist there, so
-  // this Contracts tab has no creation form of its own.
+  // flow, or later from a landowner's own profile ("New Contract") — this
+  // tab is a read-only listing of whatever contracts already exist, so it
+  // has no creation form of its own. It also fetches every landowner
+  // (not just ones with a contract) so a landowner added on the People
+  // page without filling in the optional contract fields still shows up
+  // here — as a "no contract yet" card, one click from their profile's
+  // own New Contract button — instead of silently disappearing.
   async function refresh() {
-    const [contractsData, dashboardData] = await Promise.all([api.soilContracts.list(), api.soilContracts.dashboard()]);
+    const [contractsData, dashboardData, landownersData] = await Promise.all([
+      api.soilContracts.list(),
+      api.soilContracts.dashboard(),
+      api.people.list("LANDOWNER"),
+    ]);
     setContracts(contractsData);
     setDashboard(dashboardData);
+    setLandowners(landownersData);
   }
 
   useEffect(() => {
@@ -200,6 +210,7 @@ function ContractsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
   useKilnEvent("soilTrip:update", () => refresh());
   useKilnEvent("land:update", () => refresh());
   useKilnEvent("soilArrival:update", () => refresh());
+  useKilnEvent("person:update", () => refresh());
 
   async function settle(contract: SoilContract, e: MouseEvent) {
     e.stopPropagation();
@@ -227,6 +238,11 @@ function ContractsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
     await api.soilContracts.remove(contract._id);
     refresh();
   }
+
+  const landownerIdsWithContract = new Set(
+    contracts.map((c) => (typeof c.landownerId === "object" ? c.landownerId._id : c.landownerId))
+  );
+  const landownersWithoutContract = landowners.filter((l) => !landownerIdsWithContract.has(l._id));
 
   const filteredContracts = contracts.filter((c) => {
     if (statusFilter !== "ALL" && c.status !== statusFilter) return false;
@@ -313,6 +329,24 @@ function ContractsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
           />
         </div>
       </div>
+
+      {landownersWithoutContract.length > 0 && (
+        <Card>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("soil.landownersNoContractYet")}</p>
+          <div className="flex flex-wrap gap-2">
+            {landownersWithoutContract.map((l) => (
+              <button
+                key={l._id}
+                onClick={() => onOpenLandowner(l._id)}
+                className="flex items-center gap-2 rounded-full border border-border bg-ink-primary/5 px-3 py-1.5 text-sm text-ink-secondary hover:border-series-1/40 hover:bg-series-1/5 hover:text-ink-primary"
+              >
+                {l.name}
+                <Badge variant="neutral">{t("soil.noContractYet")}</Badge>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-ink-primary/10 bg-surface/60 px-3 py-2.5 shadow-sm">
         <FilterChips

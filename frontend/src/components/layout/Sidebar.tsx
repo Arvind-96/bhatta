@@ -1,4 +1,4 @@
-import { Flame, LayoutGrid, Layers, CalendarCheck, Settings as SettingsIcon, Thermometer, Truck, Users, UserSquare2, Hammer, PackageCheck, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, FileText, Receipt, Wallet, Boxes, Warehouse, PieChart, Banknote, FileSearch, GitCompare, Mountain, Container, Handshake, UserCheck, ClipboardList, Landmark, X } from "lucide-react";
+import { Flame, LayoutGrid, Layers, CalendarCheck, Settings as SettingsIcon, Thermometer, Truck, Users, UserSquare2, Hammer, PackageCheck, ArrowDownToLine, PackagePlus, UserCog, ClipboardCheck, FileText, Receipt, Wallet, Boxes, Warehouse, PieChart, Banknote, FileSearch, GitCompare, Mountain, Container, Handshake, UserCheck, ClipboardList, Landmark, MapPinned, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { KilnSwitcher } from "./KilnSwitcher";
 import { useUiStore, type AppView } from "@/store/ui.store";
@@ -26,6 +26,7 @@ export const navItems: { key: string; icon: typeof LayoutGrid; view: AppView; gr
   { key: "nav.people", icon: Users, view: "people", group: "nav.group.production" },
   { key: "nav.soil", icon: Truck, view: "soil", group: "nav.group.production" },
   { key: "nav.sand", icon: Mountain, view: "sand", group: "nav.group.production" },
+  { key: "nav.landLease", icon: MapPinned, view: "landLease", group: "nav.group.production" },
   { key: "nav.molding", icon: Hammer, view: "molding", group: "nav.group.production" },
   { key: "nav.stacking", icon: Layers, view: "stacking", group: "nav.group.production" },
   { key: "nav.firing", icon: Thermometer, view: "firing", group: "nav.group.production" },

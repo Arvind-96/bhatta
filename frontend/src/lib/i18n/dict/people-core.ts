@@ -63,6 +63,7 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   "people.landLease": { en: "Land Lease (Patta)", hi: "पट्टा भूमि" },
   "people.addLandLease": { en: "Add land lease", hi: "पट्टा भूमि जोड़ें" },
   "landLease.addModalTitle": { en: "Add Land Lease (Patta)", hi: "पट्टा भूमि जोड़ें" },
+  "landLease.noContractYetHeading": { en: "Land Lease (Patta) without a contract yet — tap to add one", hi: "बिना ठेके वाले पट्टा भूमि — जोड़ने के लिए टैप करें" },
   "people.noLandLeaseYet": { en: "No land lease (Patta) added yet.", hi: "अभी तक कोई पट्टा भूमि नहीं जोड़ी गई।" },
   "landLease.newContract": { en: "New Lease Contract", hi: "नया पट्टा अनुबंध" },
   "people.typeLandLease": { en: "Land Lease (Patta)", hi: "पट्टा भूमि" },
@@ -196,7 +197,7 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
     en: "Bharai — field se lekar ghere ke bahar tak",
     hi: "भराई — खेत से घेर के बाहर तक",
   },
-  "people.workTypePakayi": { en: "Pakayi", hi: "पकाई" },
+  "people.workTypePakayi": { en: "Pakai", hi: "पकाई" },
   "people.workTypeNikasi": { en: "Nikasi", hi: "निकासी" },
   "people.workTypeLoading": { en: "Loading", hi: "लदाई" },
   "people.workTypeBharaiChamberStacking": {

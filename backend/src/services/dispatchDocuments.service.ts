@@ -3,7 +3,7 @@ import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { challans, gatePasses, invoices, dispatches, people, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem } from "../db/schema/_helpers";
-import { isDuplicateEntryError } from "./dispatch.service";
+import { isDuplicateEntryError, kilnPrefix } from "./dispatch.service";
 import { summarizeItems } from "./brickLineItems.util";
 import { addLedgerEntry, type LedgerCategory } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
@@ -101,6 +101,17 @@ export async function nextGatePassSequenceNumber(kilnId: string, seasonId: strin
 }
 export async function nextInvoiceSequenceNumber(kilnId: string, seasonId: string) {
   return generateSequenceNumber(invoices, kilnId, seasonId);
+}
+
+// The same "what number does this invoice go by" formula the frontend's
+// formatInvoiceNumber (printDocument.ts) uses — kept in sync deliberately,
+// same short pure rule either side — so any backend-generated view of an
+// invoice's serial (reports, exports) matches what's on the printout
+// instead of showing the older, non-session INV-{sequenceNumber} counter.
+export function formatInvoiceNumber(invoice: { session: string | null; sessionSerialNumber: number | null; sequenceNumber: number | null }, kilnName: string): string {
+  return invoice.session && invoice.sessionSerialNumber != null
+    ? `${kilnPrefix(kilnName)}/${invoice.session}/${invoice.sessionSerialNumber}`
+    : `INV-${invoice.sequenceNumber ?? "—"}`;
 }
 
 async function assertDispatch(kilnId: string, dispatchId: string) {

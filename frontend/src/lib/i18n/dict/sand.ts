@@ -46,6 +46,7 @@ export const sandDict: Record<string, Record<Locale, string>> = {
   "sand.trolleysDelivered": { en: "Trolleys delivered", hi: "आपूर्ति की गई ट्रॉलियां" },
   "sand.trolleysDeliveredAllTime": { en: "trolleys delivered (all time)", hi: "अभी तक आपूर्ति की गई ट्रॉलियां (कुल)" },
   "sand.tabDeliveries": { en: "Deliveries", hi: "आपूर्ति" },
+  "sand.contractorsNoContractYet": { en: "Sand contractors without a contract yet — tap to add one", hi: "बिना ठेके वाले रेत ठेकेदार — जोड़ने के लिए टैप करें" },
   "sand.againstContract": { en: "Against contract", hi: "किस अनुबंध के तहत" },
   "sand.noContractNotTracked": { en: "No contract (not tracked against a contract)", hi: "कोई अनुबंध नहीं (किसी अनुबंध से नहीं जुड़ा)" },
   "sand.editDelivery": { en: "Edit sand delivery", hi: "रेत आपूर्ति संपादित करें" },

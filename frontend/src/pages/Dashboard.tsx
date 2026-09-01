@@ -8,6 +8,7 @@ import { Compare } from "@/pages/Compare";
 import { People } from "@/pages/People";
 import { Soil } from "@/pages/Soil";
 import { Sand } from "@/pages/Sand";
+import { LandLease } from "@/pages/LandLease";
 import { Molding } from "@/pages/Molding";
 import { Stacking } from "@/pages/Stacking";
 import { Firing } from "@/pages/Firing";
@@ -49,6 +50,7 @@ const VIEWS = {
   people: People,
   soil: Soil,
   sand: Sand,
+  landLease: LandLease,
   molding: Molding,
   stacking: Stacking,
   firing: Firing,

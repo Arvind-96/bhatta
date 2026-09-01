@@ -401,6 +401,22 @@ function invoiceKilnPrefix(kilnName: string) {
   return alnum || "KILN";
 }
 
+// The single source of truth for "what number does this invoice go by" —
+// used both for the printed document below and everywhere the software
+// itself displays an invoice's serial (Invoices.tsx's list/search/Excel
+// export, InvoiceDetailPage), so what's shown on screen always matches
+// what's on the printout instead of the two silently drifting apart
+// (the software used to show the plain, non-session INV-{sequenceNumber}
+// counter while the print used {kilnPrefix}/{session}/{sessionSerialNumber}
+// — same underlying invoice, two different-looking numbers). Falls back to
+// INV-{sequenceNumber} only for an invoice created before the session-based
+// numbering existed (no session/sessionSerialNumber recorded on it).
+export function formatInvoiceNumber(invoice: Invoice, kilnName: string): string {
+  return invoice.session && invoice.sessionSerialNumber != null
+    ? `${invoiceKilnPrefix(kilnName)}/${invoice.session}/${invoice.sessionSerialNumber}`
+    : `INV-${invoice.sequenceNumber ?? "—"}`;
+}
+
 // The priced, GST-oriented commercial bill — its own editable/deletable
 // record (see CreateInvoiceForm.tsx). Uses INVOICE_RECORD_ACCENT so it
 // never looks like the delivery-note Challan above. `customerOverallDue`
@@ -412,15 +428,7 @@ function invoiceKilnPrefix(kilnName: string) {
 // this invoice's own paid/remaining amount.
 export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, categories: BrickCategory[], paymentStamp?: PaymentStamp, fallbackLabel = "—") {
   const logoLetter = kilnLogoLetter(kiln.name);
-  // {kilnPrefix}/{session}/{sessionSerialNumber} (e.g. "JVS/26-27/04") once
-  // an invoice has both (every invoice created after this feature shipped)
-  // — falls back to the pre-existing INV-{sequenceNumber} format for any
-  // older invoice being reprinted, so a historical reprint never breaks or
-  // silently shows a wrong/missing number.
-  const number =
-    invoice.session && invoice.sessionSerialNumber != null
-      ? `${invoiceKilnPrefix(kiln.name)}/${invoice.session}/${invoice.sessionSerialNumber}`
-      : `INV-${invoice.sequenceNumber ?? "—"}`;
+  const number = formatInvoiceNumber(invoice, kiln.name);
   const date = invoice.invoiceDate ?? invoice.createdAt;
   const gross = invoice.grossAmount ?? invoice.netAmount + (invoice.discountAmount ?? 0);
   const amountPaidNow = invoice.amountPaidNow ?? invoice.netAmount;

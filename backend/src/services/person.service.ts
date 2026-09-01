@@ -103,23 +103,30 @@ export async function createPerson(input: CreatePersonInput) {
   if (input.pakayiContractorId) {
     await assertPersonOfType(input.kilnId, input.pakayiContractorId, ["LABOUR_CONTRACTOR"]);
   }
-  // "Landowner - N" / "Sand - N", simple per-kiln count-based sequences —
-  // both types are added one at a time by a single admin, not a
-  // high-concurrency flow like dispatch slip numbers, so this skips that
-  // flow's retry-on-collision machinery as unnecessary complexity here.
+  // "Landowner - N" / "Sand - N" / "Land Lease - N", simple per-kiln
+  // count-based sequences — both types are added one at a time by a
+  // single admin, not a high-concurrency flow like dispatch slip numbers,
+  // so this skips that flow's retry-on-collision machinery as unnecessary
+  // complexity here. Filtered to active=true so this starting value
+  // agrees with computeLandownerSerials/computeSandContractorSerials/
+  // computeLandLeaseSerials below (which only ever count active records)
+  // — otherwise a kiln with any deactivated record of this type would get
+  // a stored value here that's immediately wrong the moment the list is
+  // next read back, since count(*) without the active filter counts
+  // deactivated rows the recompute never will.
   let landownerSerial: number | undefined;
   if (input.type === "LANDOWNER") {
-    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "LANDOWNER"))))[0];
+    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "LANDOWNER"), eq(people.active, true))))[0];
     landownerSerial = (countRow?.count ?? 0) + 1;
   }
   let sandContractorSerial: number | undefined;
   if (input.type === "SAND_CONTRACTOR") {
-    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "SAND_CONTRACTOR"))))[0];
+    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "SAND_CONTRACTOR"), eq(people.active, true))))[0];
     sandContractorSerial = (countRow?.count ?? 0) + 1;
   }
   let landLeaseSerial: number | undefined;
   if (input.type === "LAND_LEASE") {
-    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "LAND_LEASE"))))[0];
+    const countRow = (await db.select({ count: sql<number>`count(*)` }).from(people).where(and(eq(people.kilnId, input.kilnId), eq(people.type, "LAND_LEASE"), eq(people.active, true))))[0];
     landLeaseSerial = (countRow?.count ?? 0) + 1;
   }
   const _id = randomUUID();
@@ -154,6 +161,19 @@ async function computeLandLeaseSerials(kilnId: string): Promise<Map<string, numb
   return new Map(rows.map((r, i) => [r._id, i + 1]));
 }
 
+// Same idea again, for Sand Contractor — previously missing entirely, so
+// sandContractorSerial only ever held its stale creation-time value
+// forever, with no recompute to close the gap left by a deactivated
+// contractor the way Landowner/Land Lease already did.
+async function computeSandContractorSerials(kilnId: string): Promise<Map<string, number>> {
+  const rows = await db
+    .select({ _id: people._id })
+    .from(people)
+    .where(and(eq(people.kilnId, kilnId), eq(people.type, "SAND_CONTRACTOR"), eq(people.active, true)))
+    .orderBy(asc(people.createdAt));
+  return new Map(rows.map((r, i) => [r._id, i + 1]));
+}
+
 export async function listPeople(kilnId: string, type?: PersonType) {
   const conditions = [eq(people.kilnId, kilnId), eq(people.active, true)];
   if (type) conditions.push(eq(people.type, type));
@@ -166,11 +186,20 @@ export async function listPeople(kilnId: string, type?: PersonType) {
     const serials = await computeLandLeaseSerials(kilnId);
     return rows.map((r) => ({ ...r, landLeaseSerial: serials.get(r._id) ?? r.landLeaseSerial }));
   }
+  if (type === "SAND_CONTRACTOR") {
+    const serials = await computeSandContractorSerials(kilnId);
+    return rows.map((r) => ({ ...r, sandContractorSerial: serials.get(r._id) ?? r.sandContractorSerial }));
+  }
   if (type) return rows;
-  const [landownerSerials, landLeaseSerials] = await Promise.all([computeLandownerSerials(kilnId), computeLandLeaseSerials(kilnId)]);
+  const [landownerSerials, landLeaseSerials, sandContractorSerials] = await Promise.all([
+    computeLandownerSerials(kilnId),
+    computeLandLeaseSerials(kilnId),
+    computeSandContractorSerials(kilnId),
+  ]);
   return rows.map((r) => {
     if (r.type === "LANDOWNER") return { ...r, landownerSerial: landownerSerials.get(r._id) ?? r.landownerSerial };
     if (r.type === "LAND_LEASE") return { ...r, landLeaseSerial: landLeaseSerials.get(r._id) ?? r.landLeaseSerial };
+    if (r.type === "SAND_CONTRACTOR") return { ...r, sandContractorSerial: sandContractorSerials.get(r._id) ?? r.sandContractorSerial };
     return r;
   });
 }
@@ -280,6 +309,10 @@ export async function getPersonWithBalance(kilnId: string, personId: string) {
   if (person.type === "LAND_LEASE") {
     const serials = await computeLandLeaseSerials(kilnId);
     person.landLeaseSerial = serials.get(person._id) ?? person.landLeaseSerial;
+  }
+  if (person.type === "SAND_CONTRACTOR") {
+    const serials = await computeSandContractorSerials(kilnId);
+    person.sandContractorSerial = serials.get(person._id) ?? person.sandContractorSerial;
   }
   return { person, balance };
 }

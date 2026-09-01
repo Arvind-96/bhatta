@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useAuthStore } from "@/store/auth.store";
 import { formatINR } from "@/lib/utils";
+import { formatInvoiceNumber } from "@/lib/printDocument";
 import { AddCustomerForm } from "./AddCustomerForm";
 import { AddCustomerPaymentModal } from "./AddCustomerPaymentModal";
 import { InvoiceDetailPage } from "@/components/dispatch/InvoiceDetailPage";
@@ -27,6 +29,9 @@ interface CustomerDetailPageProps {
 // fetch, so it can never drift (item 8).
 export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDetailPageProps) {
   const { t } = useTranslation();
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const kilnName = kilns.find((k) => k.kilnId === activeKilnId)?.name ?? "Bhatta Cloud";
   const [detail, setDetail] = useState<CustomerDetail | null>(null);
   const [categories, setCategories] = useState<BrickCategory[]>([]);
   const [editing, setEditing] = useState(false);
@@ -201,7 +206,7 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
                     <tbody>
                       {invoices.map((inv) => (
                         <tr key={inv._id} onClick={() => setOpenInvoiceId(inv._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                          <td className="py-3 text-ink-primary hover:underline">INV-{inv.sequenceNumber ?? "—"}</td>
+                          <td className="py-3 text-ink-primary hover:underline">{formatInvoiceNumber(inv, kilnName)}</td>
                           <td className="py-3 text-ink-secondary">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString("en-IN") : "—"}</td>
                           <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(inv.netAmount)}</td>
                           <td className="py-3 text-right tabular-nums text-ink-secondary">₹{formatINR(inv.amountPaidNow ?? inv.netAmount)}</td>

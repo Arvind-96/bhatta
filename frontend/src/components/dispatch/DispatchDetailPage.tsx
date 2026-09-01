@@ -7,7 +7,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { formatDateTime, formatINR } from "@/lib/utils";
-import { printChallanRecord, printGatePassRecord, printInvoiceRecord, resolveItemRows } from "@/lib/printDocument";
+import { formatInvoiceNumber, printChallanRecord, printGatePassRecord, printInvoiceRecord, resolveItemRows } from "@/lib/printDocument";
 import { resolvePaymentInfo } from "@/lib/paymentStatus";
 import { LineItemsDetailTable } from "@/components/dispatch/BrickLineItemsEditor";
 import { CreateChallanForm } from "./CreateChallanForm";
@@ -140,7 +140,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
     await refreshDocs();
   }
   async function deleteInvoice(i: Invoice) {
-    if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: i.sequenceNumber ?? "—" }))) return;
+    if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: formatInvoiceNumber(i, kilnInfo.name) }))) return;
     await api.invoices.remove(i._id);
     await refreshDocs();
   }
@@ -388,7 +388,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               {invoicesList.map((i) => (
                 <div key={i._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                   <div>
-                    <p className="text-ink-primary">INV-{i.sequenceNumber ?? "—"}</p>
+                    <p className="text-ink-primary">{formatInvoiceNumber(i, kilnInfo.name)}</p>
                     <p className="text-sm text-ink-muted">₹{formatINR(i.netAmount)} · {i.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">

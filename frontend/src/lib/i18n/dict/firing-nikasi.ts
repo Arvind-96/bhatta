@@ -168,7 +168,7 @@ export const firingNikasiDict: Record<string, Record<Locale, string>> = {
   "firing.night": { en: "Night", hi: "रात" },
 
   // ---- Firing.tsx: Pakayi tab (thekedar/labor roster) ----
-  "firing.tabPakayi": { en: "Pakayi", hi: "पकाई" },
+  "firing.tabPakayi": { en: "Pakai", hi: "पकाई" },
   "firing.thekedarWise": { en: "Thekedar-wise (contractor)", hi: "ठेकेदार अनुसार" },
   "firing.thekedarWiseSubtitle": {
     en: "Every Pakayi thekedar and their gang, with combined output and ledger balance",

@@ -8,7 +8,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn, formatDateTime, formatINR } from "@/lib/utils";
-import { printPaymentReceipt, resolveItemRows } from "@/lib/printDocument";
+import { formatInvoiceNumber, printPaymentReceipt, resolveItemRows } from "@/lib/printDocument";
 import { InvoiceDetailPage } from "@/components/dispatch/InvoiceDetailPage";
 import { CreatePaymentReceiptModal } from "@/components/billing/CreatePaymentReceiptModal";
 import { EditPaymentReceiptModal } from "@/components/billing/EditPaymentReceiptModal";
@@ -81,7 +81,11 @@ export function Invoices() {
   const filteredEntries = entries.filter((e) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    return (e.sequenceNumber != null && String(e.sequenceNumber).includes(q)) || e.customerName.toLowerCase().includes(q) || (e.customerPhone ?? "").includes(q);
+    return (
+      formatInvoiceNumber(e, kilnName).toLowerCase().includes(q) ||
+      e.customerName.toLowerCase().includes(q) ||
+      (e.customerPhone ?? "").includes(q)
+    );
   });
   const { page, setPage, pageCount, pageItems: pagedEntries, total } = usePagination(filteredEntries, 10);
   const receiptsPg = usePagination(receipts, 10);
@@ -124,7 +128,7 @@ export function Invoices() {
             onClick={() => {
               const rows = filteredEntries.map((e) => ({
                 date: e.invoiceDate ?? null,
-                serial: e.sequenceNumber != null ? `INV-${e.sequenceNumber}` : "",
+                serial: formatInvoiceNumber(e, kilnName),
                 customer: e.customerName,
                 bricksCount: e.bricksCount,
                 netAmount: e.netAmount,
@@ -171,7 +175,7 @@ export function Invoices() {
                   const itemRows = resolveItemRows(e.items, categories, { categoryId: e.categoryId, bricksCount: e.bricksCount });
                   return (
                   <tr key={e._id} onClick={() => setOpenId(e._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                    <td className="py-3 text-ink-primary hover:underline">INV-{e.sequenceNumber ?? "—"}</td>
+                    <td className="py-3 text-ink-primary hover:underline">{formatInvoiceNumber(e, kilnName)}</td>
                     <td className="py-3 text-ink-secondary">{e.invoiceDate ? new Date(e.invoiceDate).toLocaleDateString("en-IN") : "—"}</td>
                     <td className="py-3 text-ink-primary">{e.customerName}</td>
                     <td className="py-3 text-ink-secondary">

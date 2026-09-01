@@ -1,5 +1,8 @@
+import { eq } from "drizzle-orm";
+import { db } from "../../db/client";
+import { kilns } from "../../db/schema";
 import { listCustomers } from "../customer.service";
-import { listInvoices, listGatePasses, listChallans } from "../dispatchDocuments.service";
+import { listInvoices, listGatePasses, listChallans, formatInvoiceNumber } from "../dispatchDocuments.service";
 import { listExpenses } from "../expense.service";
 import { listExpenseTypes } from "../expenseType.service";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
@@ -65,10 +68,14 @@ const invoices: ReportDefinition = {
   key: "invoices",
   titleKey: "reports.title.invoices",
   async run(kilnId, filters) {
-    const rows = await listInvoices(kilnId, null, { customerId: filters.customerId, agentId: filters.agentId, from: filters.from, to: filters.to });
+    const [rows, kiln] = await Promise.all([
+      listInvoices(kilnId, null, { customerId: filters.customerId, agentId: filters.agentId, from: filters.from, to: filters.to }),
+      db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)).then((r) => r[0]),
+    ]);
+    const kilnName = kiln?.name ?? "Bhatta Cloud";
     const detail = rows.map((r) => ({
       date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
-      serial: r.sequenceNumber != null ? `INV-${r.sequenceNumber}` : "",
+      serial: formatInvoiceNumber(r, kilnName),
       customer: r.customerName,
       bricksCount: r.bricksCount,
       netAmount: r.netAmount,

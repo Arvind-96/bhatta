@@ -92,6 +92,8 @@ export const soilDict: Record<string, Record<Locale, string>> = {
 
   // Soil.tsx — ContractsTab: table
   "soil.noContractsYet": { en: "No soil contracts yet.", hi: "अभी तक कोई मिट्टी ठेका नहीं है।" },
+  "soil.landownersNoContractYet": { en: "Landowners without a contract yet — tap to add one", hi: "बिना ठेके वाले खेत मालिक — जोड़ने के लिए टैप करें" },
+  "soil.noContractYet": { en: "No contract", hi: "कोई ठेका नहीं" },
   "soil.noContractsMatchSearch": { en: "No contracts match your search.", hi: "आपकी खोज से कोई ठेका नहीं मिला।" },
   "soil.contractHeader": { en: "Contract", hi: "ठेका" },
   "soil.landOwnerHeader": { en: "Land / Owner", hi: "खेत / मालिक" },

@@ -6,6 +6,7 @@ export type AppView =
   | "people"
   | "soil"
   | "sand"
+  | "landLease"
   | "molding"
   | "stacking"
   | "firing"

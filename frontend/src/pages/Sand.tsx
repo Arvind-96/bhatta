@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Printer, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FilterChips } from "@/components/ui/filter-chips";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { Pagination, usePagination } from "@/components/ui/pagination";
@@ -150,17 +151,24 @@ const CONTRACT_RATE_TYPE_FILTERS: { value: SandContractRateType | "ALL"; labelKe
 function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string) => void }) {
   const { t } = useTranslation();
   const [contracts, setContracts] = useState<SandContract[]>([]);
+  const [contractors, setContractors] = useState<Person[]>([]);
   const [editingContract, setEditingContract] = useState<SandContract | null>(null);
   const [search, setSearch] = useState("");
   const [rateTypeFilter, setRateTypeFilter] = useState<SandContractRateType | "ALL">("ALL");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   // Contracts are only ever created via the People page's Add Sand
-  // Contractor flow now (its embedded, optional Contract Details section)
-  // — this tab is a read-only listing of whatever contracts already exist
-  // there, so it has no creation form of its own.
+  // Contractor flow, or later from a contractor's own profile ("New
+  // Contract") — this tab is a read-only listing of whatever contracts
+  // already exist, so it has no creation form of its own. It also fetches
+  // every sand contractor (not just ones with a contract) so one added on
+  // the People page without filling in the optional contract fields still
+  // shows up here — as a "no contract yet" card, one click from their
+  // profile's own New Contract button — instead of silently disappearing.
   async function refresh() {
-    setContracts(await api.sandContracts.list());
+    const [contractsData, contractorsData] = await Promise.all([api.sandContracts.list(), api.people.list("SAND_CONTRACTOR")]);
+    setContracts(contractsData);
+    setContractors(contractorsData);
   }
 
   useEffect(() => {
@@ -190,6 +198,11 @@ function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string)
       ledger.filter((e) => e.contractId === contract._id)
     );
   }
+
+  const contractorIdsWithContract = new Set(
+    contracts.map((c) => (typeof c.sandContractorId === "object" ? c.sandContractorId._id : c.sandContractorId))
+  );
+  const contractorsWithoutContract = contractors.filter((c) => !contractorIdsWithContract.has(c._id));
 
   const filteredContracts = contracts.filter((c) => {
     if (rateTypeFilter !== "ALL" && c.rateType !== rateTypeFilter) return false;
@@ -232,6 +245,24 @@ function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string)
           />
         </div>
       </div>
+
+      {contractorsWithoutContract.length > 0 && (
+        <Card>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("sand.contractorsNoContractYet")}</p>
+          <div className="flex flex-wrap gap-2">
+            {contractorsWithoutContract.map((c) => (
+              <button
+                key={c._id}
+                onClick={() => onOpenContractor(c._id)}
+                className="flex items-center gap-2 rounded-full border border-border bg-ink-primary/5 px-3 py-1.5 text-sm text-ink-secondary hover:border-series-1/40 hover:bg-series-1/5 hover:text-ink-primary"
+              >
+                {c.name}
+                <Badge variant="neutral">{t("soil.noContractYet")}</Badge>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-ink-primary/10 bg-surface/60 px-3 py-2.5 shadow-sm">
         <FilterChips
