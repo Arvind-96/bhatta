@@ -159,6 +159,13 @@ export function SalarySlipHistory({ personId, ledgerEntries }: SalarySlipHistory
                     {slip.daysLate > 0 ? ` · ${t("salary.daysLate")} ${slip.daysLate}` : ""}
                     {slip.advanceDeducted > 0 ? ` · ${t("salary.advanceDeductedLabel")} ₹${formatINR(slip.advanceDeducted)}` : ""}
                   </p>
+                  {slip.carriedForward !== 0 && (
+                    <p className={`text-sm ${slip.carriedForward < 0 ? "text-status-critical" : "text-status-good"}`}>
+                      {slip.carriedForward < 0
+                        ? t("salary.carriedForwardOverdrawn", { amount: formatINR(Math.abs(slip.carriedForward)) })
+                        : t("salary.carriedForwardOwed", { amount: formatINR(slip.carriedForward) })}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   {slip.netSalary < 0 ? (

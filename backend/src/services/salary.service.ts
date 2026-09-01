@@ -2,10 +2,11 @@ import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lt, lte } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
 import { kilns, people, salarySlips, ledgerEntries } from "../db/schema";
 import { attendanceSummaryForMonth, MonthAttendanceSummary } from "./attendance.service";
+import { addLedgerEntry, deleteLedgerEntry, updateLedgerEntry } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
 
 const SLIPS_DIR = path.join(DATA_DIR, "salary-slips");
@@ -41,15 +42,25 @@ function isStaffPerson(person: { type: string; isOfficeStaff?: boolean | null })
 // Absent/Half-day reduce pay proportionally against the monthly rate; Late
 // is tracked on the slip but doesn't reduce pay by default (see plan —
 // easy to change to a fixed penalty later if that's wrong for this kiln).
-// `advanceAmount` (ADVANCE-category ledger entries dated within this same
-// month — see generateSalarySlip) is netted separately from the
-// attendance-based `deductions` so the two can be shown as distinct line
-// items on the slip.
-function computeSalary(monthlySalary: number, year: number, month: number, summary: MonthAttendanceSummary, advanceAmount: number) {
+function computeAbsenceDeduction(monthlySalary: number, year: number, month: number, summary: MonthAttendanceSummary) {
   const dailyRate = monthlySalary / daysInMonth(year, month);
-  const deductions = Math.round((summary.daysAbsent * dailyRate + summary.daysHalfDay * dailyRate * 0.5) * 100) / 100;
-  const netSalary = Math.round((monthlySalary - deductions - advanceAmount) * 100) / 100;
-  return { deductions, netSalary };
+  return Math.round((summary.daysAbsent * dailyRate + summary.daysHalfDay * dailyRate * 0.5) * 100) / 100;
+}
+
+// This person's ledger balance using only entries dated strictly before
+// `beforeDate` — same sum(DUE) - sum(PAID) convention as
+// listLedgerForPerson's own balance (positive = kiln owes them, negative
+// = they've drawn more than earned). Used as the "carried forward"
+// starting point for a given month's slip: as long as every month gets
+// its own SALARY ledger entry posted (see generateSalarySlip below), this
+// naturally accumulates an overdrawn or owed balance across months
+// without any separate month-to-month bookkeeping.
+async function ledgerBalanceBefore(kilnId: string, personId: string, beforeDate: Date): Promise<number> {
+  const rows = await db
+    .select({ direction: ledgerEntries.direction, amount: ledgerEntries.amount })
+    .from(ledgerEntries)
+    .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, personId), lt(ledgerEntries.date, beforeDate)));
+  return Math.round(rows.reduce((sum, e) => sum + (e.direction === "DUE" ? e.amount : -e.amount), 0) * 100) / 100;
 }
 
 const MONTH_NAMES_EN = [
@@ -71,6 +82,7 @@ interface SlipData {
   grossSalary: number;
   deductions: number;
   advanceDeducted: number;
+  carriedForward: number;
   netSalary: number;
 }
 
@@ -148,6 +160,13 @@ function renderPdf(data: SlipData, filePath: string, lang: "en" | "hi"): Promise
         ...(data.advanceDeducted > 0
           ? [[t("Advance/Kharchi/Medical Deducted", "एडवांस/खर्ची/मेडिकल काटा गया"), `Rs. ${data.advanceDeducted.toLocaleString("en-IN")}`] as [string, string]]
           : []),
+        ...(data.carriedForward !== 0
+          ? [
+              data.carriedForward < 0
+                ? ([t("Carried Forward (overdrawn last month)", "पिछले महीने से अधिक लिया (आगे बढ़ाया गया)"), `Rs. ${Math.abs(data.carriedForward).toLocaleString("en-IN")}`] as [string, string])
+                : ([t("Carried Forward (owed from last month)", "पिछले महीने से बकाया (आगे बढ़ाया गया)"), `Rs. ${data.carriedForward.toLocaleString("en-IN")}`] as [string, string]),
+            ]
+          : []),
         data.netSalary < 0
           ? [t("Overdrawn (owed back)", "अधिक लिया गया (वापस देय)"), `Rs. ${Math.abs(data.netSalary).toLocaleString("en-IN")}`]
           : [t("Net Salary", "कुल वेतन"), `Rs. ${data.netSalary.toLocaleString("en-IN")}`],
@@ -199,7 +218,51 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
     );
   const advanceDeducted = Math.round(advanceRows.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
 
-  const { deductions, netSalary } = computeSalary(person.monthlySalary, year, monthNum, summary, advanceDeducted);
+  const deductions = computeAbsenceDeduction(person.monthlySalary, year, monthNum, summary);
+  const thisMonthEarned = Math.round((person.monthlySalary - deductions) * 100) / 100;
+
+  // Carried forward from every prior month's own SALARY-vs-advances net,
+  // via this person's real ledger balance as of the start of this month —
+  // see ledgerBalanceBefore's own comment. Positive = kiln still owed
+  // them from before, negative = they'd drawn more than earned, either
+  // way folded straight into this month's net pay below rather than
+  // resetting every month.
+  const carriedForward = await ledgerBalanceBefore(kilnId, personId, start);
+  const netSalary = Math.round((carriedForward + thisMonthEarned - advanceDeducted) * 100) / 100;
+
+  const existingBeforeSlip = (
+    await db
+      .select()
+      .from(salarySlips)
+      .where(and(eq(salarySlips.personId, personId), eq(salarySlips.month, month)))
+  )[0];
+
+  // Posts (or updates, on regeneration) the ledger entry that makes the
+  // carry-forward above actually work: this month's earned pay as a real
+  // SALARY-category DUE entry, so it nets against whatever
+  // Advance/Kharchi/Medical was PAID out — and so this person's own
+  // Financial Ledger ("Total Earnings") reflects real salary instead of
+  // staying at zero forever. `end` (last calendar day) is used rather
+  // than `start` so this entry always sorts after every other entry
+  // dated within the same month, matching a real "posted at month-end"
+  // payroll run.
+  const monthLabel = `${MONTH_NAMES_EN[monthNum - 1]} ${year}`;
+  const salaryLedgerReason = `Salary earned — ${monthLabel}`;
+  let salaryLedgerEntryId = existingBeforeSlip?.salaryLedgerEntryId ?? null;
+  if (salaryLedgerEntryId) {
+    await updateLedgerEntry(kilnId, salaryLedgerEntryId, { amount: thisMonthEarned, date: end, reason: salaryLedgerReason });
+  } else {
+    const entry = await addLedgerEntry({
+      kilnId,
+      personId,
+      direction: "DUE",
+      amount: thisMonthEarned,
+      reason: salaryLedgerReason,
+      date: end,
+      category: "SALARY",
+    });
+    salaryLedgerEntryId = entry._id;
+  }
 
   const dir = path.join(SLIPS_DIR, kilnId, personId);
   fs.mkdirSync(dir, { recursive: true });
@@ -216,16 +279,10 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
     grossSalary: person.monthlySalary,
     deductions,
     advanceDeducted,
+    carriedForward,
     netSalary,
   };
   await Promise.all([renderPdf(slipData, pdfPathEn, "en"), renderPdf(slipData, pdfPathHi, "hi")]);
-
-  const existing = (
-    await db
-      .select()
-      .from(salarySlips)
-      .where(and(eq(salarySlips.personId, personId), eq(salarySlips.month, month)))
-  )[0];
 
   const values = {
     kilnId,
@@ -238,13 +295,15 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
     grossSalary: person.monthlySalary,
     deductions,
     advanceDeducted,
+    carriedForward,
     netSalary,
     pdfPathEn,
     pdfPathHi,
+    salaryLedgerEntryId,
   };
 
-  if (existing) {
-    await db.update(salarySlips).set(values).where(eq(salarySlips._id, existing._id));
+  if (existingBeforeSlip) {
+    await db.update(salarySlips).set(values).where(eq(salarySlips._id, existingBeforeSlip._id));
   } else {
     await db.insert(salarySlips).values({ _id: randomUUID(), ...values });
   }
@@ -398,6 +457,13 @@ export async function deleteSalarySlip(kilnId: string, slipId: string) {
   const existing = (await db.select().from(salarySlips).where(and(eq(salarySlips._id, slipId), eq(salarySlips.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Salary slip not found in this kiln");
   await db.delete(salarySlips).where(eq(salarySlips._id, slipId));
+  // Also removes the linked SALARY ledger entry (see generateSalarySlip's
+  // salaryLedgerEntryId) — otherwise this month's "earned" entry would
+  // linger in the ledger even though the slip claiming it now doesn't
+  // exist, corrupting every later month's carried-forward balance.
+  if (existing.salaryLedgerEntryId) {
+    await deleteLedgerEntry(kilnId, existing.salaryLedgerEntryId).catch(() => {});
+  }
   for (const p of [existing.pdfPathEn, existing.pdfPathHi]) {
     fs.rm(p, { force: true }, () => {});
   }

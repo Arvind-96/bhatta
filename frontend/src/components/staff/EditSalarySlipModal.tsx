@@ -54,6 +54,13 @@ export function EditSalarySlipModal({ slip, onClose, onSaved }: EditSalarySlipMo
           </button>
         </div>
         <p className="mb-3 text-sm text-ink-muted">{t("salary.editSlipNote")}</p>
+        {slip.carriedForward !== 0 && (
+          <p className={`mb-3 text-sm ${slip.carriedForward < 0 ? "text-status-critical" : "text-status-good"}`}>
+            {slip.carriedForward < 0
+              ? t("salary.carriedForwardOverdrawn", { amount: String(Math.abs(slip.carriedForward)) })
+              : t("salary.carriedForwardOwed", { amount: String(slip.carriedForward) })}
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
           <label className="flex flex-col gap-1">
             <span className="text-xs text-ink-muted">{t("salary.deductions")}</span>

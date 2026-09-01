@@ -31,6 +31,8 @@ export const salaryDict: Record<string, Record<Locale, string>> = {
   "salary.totalAdvanceGivenLabel": { en: "Advance given", hi: "एडवांस दिया गया" },
   "salary.totalAdvanceKharchiMedicalGivenLabel": { en: "Advance/Kharchi/Medical given", hi: "एडवांस/खर्ची/मेडिकल दिया गया" },
   "salary.overdrawnBy": { en: "Overdrawn by ₹{amount}", hi: "₹{amount} अधिक लिया गया" },
+  "salary.carriedForwardOverdrawn": { en: "Carried forward — overdrawn ₹{amount} from last month", hi: "आगे बढ़ाया गया — पिछले महीने से ₹{amount} अधिक लिया गया" },
+  "salary.carriedForwardOwed": { en: "Carried forward — ₹{amount} owed from last month", hi: "आगे बढ़ाया गया — पिछले महीने से ₹{amount} बकाया" },
   "salary.confirmDeleteSlip": { en: "Delete the {month} salary slip? This can't be undone.", hi: "{month} की वेतन पर्ची हटाएं? यह पूर्ववत नहीं किया जा सकता।" },
   "salary.editSlipTitle": { en: "Edit Salary Slip", hi: "वेतन पर्ची संपादित करें" },
   "salary.editSlipNote": {

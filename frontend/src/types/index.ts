@@ -1805,6 +1805,7 @@ export interface SalarySlip {
   grossSalary: number;
   deductions: number;
   advanceDeducted: number;
+  carriedForward: number;
   netSalary: number;
   generatedAt: string;
 }
