@@ -34,6 +34,8 @@ export async function list(req: AuthedRequest, res: Response) {
 }
 
 const updateDoctorVisitSchema = z.object({
+  doctorId: z.string().min(1).optional(),
+  personId: z.string().min(1).optional(),
   ailment: z.string().optional(),
   medicineCost: z.number().min(0).optional(),
   consultationFee: z.number().min(0).optional(),

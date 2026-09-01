@@ -1643,6 +1643,8 @@ export const api = {
     update: (
       id: string,
       input: Partial<{
+        doctorId: string;
+        personId: string;
         ailment: string;
         medicineCost: number;
         consultationFee: number;

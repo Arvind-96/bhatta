@@ -1,6 +1,6 @@
 import { formatINR } from "@/lib/utils";
 import { amountInWords } from "@/lib/numberToWords";
-import type { BrickCategory, BrickLineItem, Challan, Expense, GatePassRecord, Invoice, LandLeaseContract, LedgerEntry, Machine, MachineInstallmentPayment, PaymentReceipt, SandContract, SoilContract, Supplier, SupplierInvoice, VehicleDieselEntry } from "@/types";
+import type { BrickCategory, BrickLineItem, Challan, DoctorVisit, Expense, GatePassRecord, Invoice, LandLeaseContract, LedgerEntry, Machine, MachineInstallmentPayment, PaymentReceipt, SandContract, SoilContract, Supplier, SupplierInvoice, VehicleDieselEntry } from "@/types";
 
 // Gate Pass, Challan, Invoice, and Payment Receipt all share one visual
 // language (accent bars, a logo mark, a colored "who this is for" box, a
@@ -221,6 +221,7 @@ const INVOICE_RECORD_ACCENT = `:root { --doc-accent: #2a4d8f; --doc-accent-soft:
 const EXPENSE_ACCENT = `:root { --doc-accent: #6b4c9a; --doc-accent-soft: #9a7dc0; --doc-accent-tint: #f4f0fa; }`;
 const DIESEL_ACCENT = `:root { --doc-accent: #b8860b; --doc-accent-soft: #d4a836; --doc-accent-tint: #faf5e6; }`;
 const SUPPLIER_INVOICE_ACCENT = `:root { --doc-accent: #0f766e; --doc-accent-soft: #4fa89f; --doc-accent-tint: #eef8f7; }`;
+const DOCTOR_VISIT_ACCENT = `:root { --doc-accent: #0e7490; --doc-accent-soft: #4ba3ba; --doc-accent-tint: #eaf6f8; }`;
 
 function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
   const html = `<!doctype html>
@@ -1025,6 +1026,61 @@ export function printDieselEntry(entry: VehicleDieselEntry, vehicleName: string,
     <div class="doc-bottombar"></div>
   `;
   openPrintWindow(`Diesel Fill-up — ${vehicleName}`, body, DIESEL_ACCENT);
+}
+
+// A single doctor visit's own printout — from the Doctor page's visit
+// detail view. Same shape as printDieselEntry/printExpenseRecord: this is
+// a lightweight log entry, not a running-ledger record, so it prints as
+// one receipt-style page rather than a full profile.
+export function printDoctorVisit(visit: DoctorVisit, doctorName: string, personName: string, kiln: KilnPrintInfo) {
+  const logoLetter = kilnLogoLetter(kiln.name);
+  const total = visit.medicineCost + visit.consultationFee;
+
+  const body = `
+    <div class="doc-topbar"></div>
+    <div class="doc-header">
+      <div class="doc-brand">
+        <span class="doc-logo">${escapeHtml(logoLetter)}</span>
+        <div>
+          <h1 class="doc-kiln-name">${escapeHtml(kiln.name)}</h1>
+          ${kiln.location ? `<p class="doc-address">${escapeHtml(kiln.location)}</p>` : ""}
+          ${kiln.phone ? `<p class="doc-phone">Phone: ${escapeHtml(kiln.phone)}</p>` : ""}
+        </div>
+      </div>
+      <div class="doc-meta">
+        <span class="doc-badge">Doctor Visit</span>
+        <p class="doc-date">${new Date(visit.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+      </div>
+    </div>
+
+    <div class="doc-box">
+      <div>
+        <p class="doc-box-label">Treated</p>
+        <p class="doc-box-name">${escapeHtml(personName)}</p>
+        <p class="doc-box-detail">Doctor: ${escapeHtml(doctorName)}</p>
+        ${visit.paymentMode ? `<p class="doc-box-detail">${escapeHtml(paymentModeLabel(visit))}</p>` : ""}
+      </div>
+      <div class="doc-totalbox">
+        <p class="doc-total-label">Total cost</p>
+        <p class="doc-total-amount">₹${formatINR(total)}</p>
+        <p class="doc-amount-words">${escapeHtml(amountInWords(total))}</p>
+      </div>
+    </div>
+
+    <table class="doc-table">
+      ${visit.ailment ? `<tr><td class="doc-table-label">Ailment</td><td class="doc-table-value">${escapeHtml(visit.ailment)}</td></tr>` : ""}
+      <tr><td class="doc-table-label">Medicine cost</td><td class="doc-table-value">₹${formatINR(visit.medicineCost)}</td></tr>
+      <tr><td class="doc-table-label">Consultation fee</td><td class="doc-table-value">₹${formatINR(visit.consultationFee)}</td></tr>
+      ${visit.notes ? `<tr><td class="doc-table-label">Notes</td><td class="doc-table-value">${escapeHtml(visit.notes)}</td></tr>` : ""}
+    </table>
+
+    <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED RECORD ~</p>
+    <div class="doc-sign-row doc-sign-row-single">
+      <div class="doc-sign-box">Bhatta owner / Munim<br />(Stamp &amp; Signature)</div>
+    </div>
+    <div class="doc-bottombar"></div>
+  `;
+  openPrintWindow(`Doctor Visit — ${personName}`, body, DOCTOR_VISIT_ACCENT);
 }
 
 function contractRateBasisText(contract: SoilContract) {

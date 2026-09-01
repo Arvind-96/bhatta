@@ -85,6 +85,8 @@ export async function listDoctorVisits(kilnId: string, filter: ListDoctorVisitsF
 }
 
 export interface UpdateDoctorVisitInput {
+  doctorId?: string;
+  personId?: string;
   ailment?: string;
   medicineCost?: number;
   consultationFee?: number;
@@ -96,17 +98,26 @@ export interface UpdateDoctorVisitInput {
 }
 
 // Keeps the linked Expense row (matched via expenses.doctorVisitId) in
-// sync with any cost/date/payment edit — same reasoning as
+// sync with any cost/date/payment/doctor/person edit — same reasoning as
 // updateLinkedExpensePaymentInfo, but also carries the recomputed amount
-// through, which that helper doesn't (it only ever touches payment info).
+// and reason text through, which that helper doesn't (it only ever
+// touches payment info). Unlike a soil/sand/land-lease contract's
+// landId/landownerId, doctorId/personId carry no downstream aggregation
+// keyed off them — just descriptive labels — so reassigning either here
+// is safe and doesn't misattribute any tracked history.
 export async function updateDoctorVisit(kilnId: string, visitId: string, input: UpdateDoctorVisitInput) {
   const existing = (await db.select().from(doctorVisits).where(and(eq(doctorVisits._id, visitId), eq(doctorVisits.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Doctor visit not found in this kiln");
+
+  if (input.doctorId) await assertDoctorInKiln(kilnId, input.doctorId);
+  const person = input.personId ? await assertPersonInKiln(kilnId, input.personId) : await assertPersonInKiln(kilnId, existing.personId);
 
   await db.update(doctorVisits).set(input).where(eq(doctorVisits._id, visitId));
   const updated = (await db.select().from(doctorVisits).where(eq(doctorVisits._id, visitId)))[0]!;
 
   const newTotal = (input.medicineCost ?? existing.medicineCost) + (input.consultationFee ?? existing.consultationFee);
+  const ailment = input.ailment ?? existing.ailment;
+  const reason = `Doctor visit for ${person.name}${ailment ? ` — ${ailment}` : ""}`;
   const linkedExpense = (await db.select().from(expenses).where(eq(expenses.doctorVisitId, visitId)))[0];
   if (linkedExpense) {
     await db
@@ -114,6 +125,7 @@ export async function updateDoctorVisit(kilnId: string, visitId: string, input: 
       .set({
         amount: newTotal,
         date: input.date ?? existing.date,
+        notes: reason,
         paymentMode: input.paymentMode ?? existing.paymentMode ?? undefined,
         cashAmount: input.cashAmount ?? existing.cashAmount ?? undefined,
         onlineAmount: input.onlineAmount ?? existing.onlineAmount ?? undefined,
@@ -124,14 +136,13 @@ export async function updateDoctorVisit(kilnId: string, visitId: string, input: 
   } else if (newTotal > 0) {
     // The original visit had a zero cost (no expense was auto-logged),
     // but the edit gave it a real one — log it now instead of losing it.
-    const person = await assertPersonInKiln(kilnId, existing.personId);
     await autoLogExpense(
       kilnId,
       existing.seasonId ?? "",
       "Doctor / Medical",
       newTotal,
       input.date ?? existing.date ?? undefined,
-      `Doctor visit for ${person.name}${(input.ailment ?? existing.ailment) ? ` — ${input.ailment ?? existing.ailment}` : ""}`,
+      reason,
       { doctorVisitId: visitId, paymentMode: input.paymentMode, cashAmount: input.cashAmount, onlineAmount: input.onlineAmount }
     );
   }

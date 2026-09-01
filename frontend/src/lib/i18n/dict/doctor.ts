@@ -26,4 +26,11 @@ export const doctorDict: Record<string, Record<Locale, string>> = {
   "doctor.treatedPersonColumn": { en: "Person Treated", hi: "इलाज किया गया व्यक्ति" },
   "doctor.ailmentColumn": { en: "Ailment", hi: "बीमारी" },
   "doctor.totalCostColumn": { en: "Total Cost", hi: "कुल खर्च" },
+
+  "doctor.backToDoctors": { en: "Back to Doctors", hi: "डॉक्टरों की सूची पर वापस जाएं" },
+  "doctor.backToVisitLog": { en: "Back to Visit Log", hi: "इलाज रिकॉर्ड पर वापस जाएं" },
+  "doctor.profileSection": { en: "Profile", hi: "प्रोफ़ाइल" },
+  "doctor.visitHistorySection": { en: "Visit History", hi: "इलाज इतिहास" },
+  "doctor.noVisitsForDoctorYet": { en: "No visits logged with this doctor yet.", hi: "इस डॉक्टर के साथ अभी तक कोई इलाज दर्ज नहीं हुआ।" },
+  "doctor.visitDetailsSection": { en: "Visit Details", hi: "इलाज का विवरण" },
 };

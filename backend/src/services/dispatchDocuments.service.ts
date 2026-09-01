@@ -341,7 +341,7 @@ export interface InvoiceInput {
 // db/schema/season.ts) — that's a brick-production-cycle concept the
 // admin starts/ends on their own schedule, not the fixed calendar
 // GST/accounting year.
-function financialYearSession(date: Date): string {
+export function financialYearSession(date: Date): string {
   const year = date.getFullYear();
   const startYear = date.getMonth() >= 3 ? year : year - 1; // getMonth() is 0-based; 3 = April
   const shortStart = String(startYear).slice(-2);
