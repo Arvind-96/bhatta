@@ -550,10 +550,10 @@ function OverviewHero({ kilnName, dateLabel, todayBricks }: { kilnName: string; 
 
 export function Overview() {
   const todayBricks = useDashboardStore((s) => s.todayBricks);
-  const stock = useDashboardStore((s) => s.stock);
   const productionSeries = useDashboardStore((s) => s.productionSeries);
   const { t } = useTranslation();
   const [dispatchTotals, setDispatchTotals] = useState<DispatchTotals | null>(null);
+  const [brickCategories, setBrickCategories] = useState<BrickCategory[]>([]);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const kilns = useAuthStore((s) => s.kilns);
   const kiln = kilns.find((k) => k.kilnId === activeKilnId);
@@ -561,13 +561,22 @@ export function Overview() {
   useEffect(() => {
     if (!activeKilnId) return;
     api.dispatch.totals(7).then(setDispatchTotals).catch(console.error);
+    api.brickCategories.list().then(setBrickCategories).catch(console.error);
   }, [activeKilnId]);
 
   useKilnEvent("dispatch:update", () => {
     api.dispatch.totals(7).then(setDispatchTotals).catch(console.error);
   });
+  useKilnEvent("brickCategory:update", () => {
+    api.brickCategories.list().then(setBrickCategories).catch(console.error);
+  });
 
-  const finishedGoods = stock.find((s) => s.itemName.toLowerCase().includes("brick"))?.quantity ?? 0;
+  // brickCategories.quantity (produced minus dispatched, per category) is
+  // the one finished-goods figure that's actually kept correct here — the
+  // older stockEntries/"Bricks (A-1 Grade)" ledger this used to read from
+  // only ever recorded dispatch deductions with no matching production
+  // credit, so it drifted to a large, meaningless negative number.
+  const finishedGoods = brickCategories.reduce((sum, c) => sum + c.quantity, 0);
 
   const avgDailyOutput =
     productionSeries.length > 0
@@ -628,8 +637,8 @@ export function Overview() {
         <SectionHeading icon={LineChart} title={t("overview.sectionTrends")} />
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ProductionChart />
-          <StockCompositionDonut />
-          <StockOverview />
+          <StockCompositionDonut categories={brickCategories} />
+          <StockOverview categories={brickCategories} />
         </div>
       </div>
 

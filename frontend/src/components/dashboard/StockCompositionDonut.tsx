@@ -1,8 +1,8 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { PieChart as PieChartIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { useDashboardStore } from "@/store/dashboard.store";
 import { useTranslation } from "@/hooks/useTranslation";
+import type { BrickCategory } from "@/types";
 
 const SLICE_COLORS = ["var(--series-1)", "var(--series-5)", "var(--series-3)", "var(--series-2)", "var(--series-6)", "var(--series-4)"];
 
@@ -19,16 +19,19 @@ function ChartTooltip({ active, payload }: any) {
   );
 }
 
-// The exact same `stock` array StockOverview's bar chart already plots —
-// this is a different shape (share of total, not absolute quantity) of
-// the same real numbers, not a second data source.
-export function StockCompositionDonut() {
-  const stock = useDashboardStore((s) => s.stock);
+interface StockCompositionDonutProps {
+  categories: BrickCategory[];
+}
+
+// The exact same brickCategories array StockOverview's bar chart already
+// plots — this is a different shape (share of total, not absolute
+// quantity) of the same real numbers, not a second data source.
+export function StockCompositionDonut({ categories }: StockCompositionDonutProps) {
   const { t } = useTranslation();
-  const total = stock.reduce((sum, s) => sum + s.quantity, 0);
-  const data = stock
-    .filter((s) => s.quantity > 0)
-    .map((s, i) => ({ name: s.itemName, value: s.quantity, fill: SLICE_COLORS[i % SLICE_COLORS.length] }));
+  const total = categories.reduce((sum, c) => sum + c.quantity, 0);
+  const data = categories
+    .filter((c) => c.quantity > 0)
+    .map((c, i) => ({ name: c.category, value: c.quantity, fill: SLICE_COLORS[i % SLICE_COLORS.length] }));
 
   return (
     <Card>

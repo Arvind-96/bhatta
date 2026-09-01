@@ -1,8 +1,8 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Boxes } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { useDashboardStore } from "@/store/dashboard.store";
 import { useTranslation } from "@/hooks/useTranslation";
+import type { BrickCategory } from "@/types";
 
 function ChartTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
@@ -17,9 +17,17 @@ function ChartTooltip({ active, payload }: any) {
   );
 }
 
-export function StockOverview() {
-  const stock = useDashboardStore((s) => s.stock);
+interface StockOverviewProps {
+  categories: BrickCategory[];
+}
+
+// Sourced from brickCategories.quantity (produced minus dispatched, per
+// category) — the one finished-goods stock figure this app keeps correct;
+// see Overview.tsx's finishedGoods comment for why the older stockEntries
+// ledger this used to read isn't used here anymore.
+export function StockOverview({ categories }: StockOverviewProps) {
   const { t } = useTranslation();
+  const stock = categories.map((c) => ({ itemName: c.category, quantity: c.quantity }));
 
   return (
     <Card>

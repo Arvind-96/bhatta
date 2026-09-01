@@ -1,5 +1,6 @@
 import { listDieselEntries, vehicleDieselSummary } from "../kilnVehicle.service";
 import { listStockEntries } from "../stock.service";
+import { listBrickCategories } from "../brickCategory.service";
 import { listInventoryItemsForPeriod } from "../inventory.service";
 import { tractorFleetSummary } from "../stacking.service";
 import { machineFleetSummary } from "../machine.service";
@@ -82,46 +83,54 @@ const diesel: ReportDefinition = {
   },
 };
 
+// A current-stock snapshot, not a movement log — finished goods come from
+// brickCategories.quantity (produced minus dispatched, kept correct on
+// every dispatch/production entry; same source Overview's stock cards
+// use). The older stockEntries ledger only ever recorded FINISHED_GOODS
+// dispatch deductions with no matching production credit anywhere in the
+// app, so summing it the way a movement log normally would drifted to a
+// large, meaningless negative number — it's kept here for RAW_MATERIAL
+// items only, which don't have a brickCategories-style running total of
+// their own. No date/groupBy filters: a snapshot is a point-in-time
+// total, not a filtered period (reportDefinitions.ts sends none for this
+// report already).
 const stock: ReportDefinition = {
   key: "stock",
   titleKey: "reports.title.stock",
-  async run(kilnId, filters) {
-    const rows = await listStockEntries(kilnId, null, { from: filters.from, to: filters.to });
-    const detail = rows.map((r) => ({
-      date: r.recordedOn ? r.recordedOn.toISOString() : null,
-      type: r.type,
-      itemName: r.itemName,
-      quantity: r.quantity,
-      unit: r.unit ?? "",
+  async run(kilnId) {
+    const [categories, rawEntries] = await Promise.all([listBrickCategories(kilnId), listStockEntries(kilnId, null, {})]);
+
+    const finishedRows = categories.map((c) => ({
+      type: "FINISHED_GOODS",
+      itemName: c.category,
+      quantity: c.quantity,
+      unit: "bricks",
     }));
 
-    if (filters.groupBy && filters.groupBy !== "none") {
-      const grouped = groupRowsByPeriod(detail, "date", ["quantity"], filters.groupBy);
-      return {
-        reportKey: "stock",
-        titleKey: "reports.title.stock",
-        columns: [
-          { key: "period", labelKey: "reports.col.period", format: "text" },
-          { key: "count", labelKey: "reports.col.entries", format: "number" },
-          { key: "quantity", labelKey: "reports.col.netQuantity", format: "number" },
-        ],
-        rows: grouped,
-        totals: { quantity: round2(grouped.reduce((s, r) => s + (r.quantity as number), 0)) },
-      };
+    const rawTotals = new Map<string, number>();
+    for (const e of rawEntries) {
+      if (e.type !== "RAW_MATERIAL") continue;
+      rawTotals.set(e.itemName, round2((rawTotals.get(e.itemName) ?? 0) + e.quantity));
     }
+    const rawRows = [...rawTotals.entries()].map(([itemName, quantity]) => ({
+      type: "RAW_MATERIAL",
+      itemName,
+      quantity,
+      unit: "",
+    }));
+
+    const detail = [...finishedRows, ...rawRows];
 
     return {
       reportKey: "stock",
       titleKey: "reports.title.stock",
       columns: [
-        { key: "date", labelKey: "reports.col.date", format: "date" },
         { key: "type", labelKey: "reports.col.stockType", format: "text" },
         { key: "itemName", labelKey: "reports.col.itemName", format: "text" },
         { key: "quantity", labelKey: "reports.col.quantity", format: "number" },
         { key: "unit", labelKey: "reports.col.unit", format: "text" },
       ],
       rows: detail,
-      totals: { quantity: round2(detail.reduce((s, r) => s + r.quantity, 0)) },
     };
   },
 };
