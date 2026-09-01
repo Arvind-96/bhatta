@@ -17,15 +17,18 @@ function daysInMonth(year: number, month: number) {
 }
 
 function monthDateRange(year: number, month: number) {
-  // `end`'s time is 23:59:59 with NO fractional milliseconds: the
-  // `ledger_entries.date` column is a DATETIME(0) (see dateColumn() in
-  // schema/_helpers.ts), and MySQL rounds rather than truncates a stored
-  // value's fractional seconds — 23:59:59.999 rounds up to 00:00:00 of the
-  // *next* day, silently pushing this month's SALARY ledger entry (see
-  // generateSalarySlip below) into next month and making
-  // ledgerBalanceBefore's strict `lt` skip it entirely when computing next
-  // month's carriedForward.
-  return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59) };
+  // `end` is midnight (00:00:00) on the month's last calendar day — the
+  // same time-of-day convention every other ledger entry in this app
+  // already uses (see the sample data: every non-salary entry is dated at
+  // 00:00:00). A non-midnight time here is NOT safe: `ledger_entries.date`
+  // round-trips through the DB as a naive datetime and gets displayed in
+  // the *viewer's* local zone (India, UTC+5:30) — 23:59:59 shifts forward
+  // across midnight into the next calendar day for any such viewer,
+  // visibly mis-dating this month's SALARY ledger entry (see
+  // generateSalarySlip below) by one day, and would even push it past
+  // ledgerBalanceBefore's strict `lt` cutoff into the next month's
+  // carriedForward instead of this one's.
+  return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0) };
 }
 
 // The Salary module's population: MUNIM/CHOWKIDAR, office-flagged HELPER,
