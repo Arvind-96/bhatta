@@ -106,6 +106,12 @@ export interface UpdateSandContractInput {
   contractPrice?: number;
   totalContractValue?: number;
   advanceAmount?: number;
+  // How the *additional* advance (if the edit raises advanceAmount) was
+  // paid — same "posted on the delta's PAID entry only" convention as
+  // CreateSandContractInput's own paymentMode/cashAmount/onlineAmount.
+  paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   startDate?: Date;
   endDate?: Date;
 }
@@ -123,8 +129,20 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
   const newTotalValue = input.totalContractValue ?? existing.totalContractValue;
   const oldAdvance = existing.advanceAmount ?? 0;
   const newAdvance = input.advanceAmount ?? oldAdvance;
+  const advanceDelta = Math.round((newAdvance - oldAdvance) * 100) / 100;
 
-  await db.update(sandContracts).set({ ...input, rateType, totalContractValue: newTotalValue }).where(eq(sandContracts._id, contractId));
+  // paymentMode/cashAmount/onlineAmount describe the delta's PAID entry
+  // below, not a sandContracts column — never persisted on the contract
+  // row itself, same exclusion createSandContract applies on insert.
+  const { paymentMode, cashAmount, onlineAmount, ...persistableInput } = input;
+  if (paymentMode === "CASH_AND_ONLINE" && advanceDelta > 0) {
+    const sum = Math.round(((cashAmount ?? 0) + (onlineAmount ?? 0)) * 100) / 100;
+    if (sum !== advanceDelta) {
+      throw new Error(`cashAmount + onlineAmount (₹${sum}) must equal the additional advance amount (₹${advanceDelta})`);
+    }
+  }
+
+  await db.update(sandContracts).set({ ...persistableInput, rateType, totalContractValue: newTotalValue }).where(eq(sandContracts._id, contractId));
   const updated = await withContractor((await db.select().from(sandContracts).where(eq(sandContracts._id, contractId)))[0]!);
 
   if (rateType !== "PER_TROLLEY") {
@@ -152,7 +170,6 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
     }
   }
 
-  const advanceDelta = Math.round((newAdvance - oldAdvance) * 100) / 100;
   if (advanceDelta > 0) {
     await addLedgerEntry({
       kilnId,
@@ -162,6 +179,9 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
       reason: `Sand contract ${existing.contractNumber}: additional advance`,
       category: "ADVANCE",
       contractId,
+      paymentMode,
+      cashAmount: paymentMode === "CASH_AND_ONLINE" ? cashAmount : undefined,
+      onlineAmount: paymentMode === "CASH_AND_ONLINE" ? onlineAmount : undefined,
     });
   } else if (advanceDelta < 0) {
     await addLedgerEntry({

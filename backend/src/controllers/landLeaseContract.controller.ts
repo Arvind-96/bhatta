@@ -69,6 +69,10 @@ export async function getOne(req: AuthedRequest, res: Response) {
   res.json(summary);
 }
 
+// paymentMode/cashAmount/onlineAmount describe the delta if advanceAmount
+// is raised — the cash+online-must-sum check happens in the service
+// (updateLandLeaseContract) against that delta, same reasoning as
+// soilContract.controller.ts's updateSchema.
 const updateSchema = z.object({
   rateType: z.enum(LAND_LEASE_RATE_TYPES).optional(),
   contractedQuantity: z.number().positive().optional(),
@@ -80,6 +84,9 @@ const updateSchema = z.object({
   ratePerDepthUnit: z.number().positive().optional(),
   totalContractValue: z.number().positive().optional(),
   advanceAmount: z.number().nonnegative().optional(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
+  cashAmount: z.number().min(0).optional(),
+  onlineAmount: z.number().min(0).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   paymentTerms: z.string().optional(),

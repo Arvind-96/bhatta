@@ -857,6 +857,9 @@ export const api = {
         ratePerDepthUnit: number;
         totalContractValue: number;
         advanceAmount: number;
+        paymentMode: LedgerPaymentMode;
+        cashAmount: number;
+        onlineAmount: number;
         startDate: string;
         endDate: string;
         paymentTerms: string;
@@ -915,6 +918,9 @@ export const api = {
         ratePerDepthUnit: number;
         totalContractValue: number;
         advanceAmount: number;
+        paymentMode: LedgerPaymentMode;
+        cashAmount: number;
+        onlineAmount: number;
         startDate: string;
         endDate: string;
         paymentTerms: string;
@@ -950,6 +956,9 @@ export const api = {
         contractPrice: number;
         totalContractValue: number;
         advanceAmount: number;
+        paymentMode: LedgerPaymentMode;
+        cashAmount: number;
+        onlineAmount: number;
         startDate: string;
         endDate: string;
       }>

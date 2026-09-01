@@ -384,6 +384,12 @@ export interface UpdateSoilContractInput {
   ratePerDepthUnit?: number;
   totalContractValue?: number;
   advanceAmount?: number;
+  // How the *additional* advance (if the edit raises advanceAmount) was
+  // paid — same "posted on the delta's PAID entry only" convention as
+  // CreateSoilContractInput's own paymentMode/cashAmount/onlineAmount.
+  paymentMode?: LedgerPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
   startDate?: Date;
   endDate?: Date;
   agreedDepthFeet?: number;
@@ -432,8 +438,20 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
 
   const oldAdvance = existing.advanceAmount ?? 0;
   const newAdvance = input.advanceAmount ?? oldAdvance;
+  const advanceDelta = Math.round((newAdvance - oldAdvance) * 100) / 100;
 
-  await db.update(soilContracts).set({ ...input, rateType, totalContractValue: newTotalValue }).where(eq(soilContracts._id, contractId));
+  // paymentMode/cashAmount/onlineAmount describe the delta's PAID entry
+  // below, not a soilContracts column — never persisted on the contract
+  // row itself, same exclusion createSoilContract applies on insert.
+  const { paymentMode, cashAmount, onlineAmount, ...persistableInput } = input;
+  if (paymentMode === "CASH_AND_ONLINE" && advanceDelta > 0) {
+    const sum = Math.round(((cashAmount ?? 0) + (onlineAmount ?? 0)) * 100) / 100;
+    if (sum !== advanceDelta) {
+      throw new Error(`cashAmount + onlineAmount (₹${sum}) must equal the additional advance amount (₹${advanceDelta})`);
+    }
+  }
+
+  await db.update(soilContracts).set({ ...persistableInput, rateType, totalContractValue: newTotalValue }).where(eq(soilContracts._id, contractId));
   const updated = await withLandownerAndLand((await db.select().from(soilContracts).where(eq(soilContracts._id, contractId)))[0]!);
 
   if (rateType !== "PER_TROLLEY") {
@@ -461,7 +479,6 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
     }
   }
 
-  const advanceDelta = Math.round((newAdvance - oldAdvance) * 100) / 100;
   if (advanceDelta > 0) {
     await addLedgerEntry({
       kilnId,
@@ -471,6 +488,9 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
       reason: `Soil contract ${existing.contractNumber}: additional advance`,
       category: "ADVANCE",
       contractId,
+      paymentMode,
+      cashAmount: paymentMode === "CASH_AND_ONLINE" ? cashAmount : undefined,
+      onlineAmount: paymentMode === "CASH_AND_ONLINE" ? onlineAmount : undefined,
     });
   } else if (advanceDelta < 0) {
     await addLedgerEntry({

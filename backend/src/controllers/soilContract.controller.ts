@@ -84,6 +84,11 @@ export async function getOne(req: AuthedRequest, res: Response) {
   res.json(summary);
 }
 
+// paymentMode/cashAmount/onlineAmount describe the delta if advanceAmount
+// is raised — since the delta depends on the existing contract's current
+// advanceAmount (not known at the schema level), the cash+online-must-sum
+// check is done in the service (updateSoilContract) against that delta,
+// not here via validateCashOnlineSplit like createSchema does.
 const updateSchema = z.object({
   soilType: z.string().optional(),
   rateType: z.enum(SOIL_CONTRACT_RATE_TYPES).optional(),
@@ -96,6 +101,9 @@ const updateSchema = z.object({
   ratePerDepthUnit: z.number().positive().optional(),
   totalContractValue: z.number().positive().optional(),
   advanceAmount: z.number().nonnegative().optional(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).optional(),
+  cashAmount: z.number().min(0).optional(),
+  onlineAmount: z.number().min(0).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   agreedDepthFeet: z.number().positive().optional(),

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
-import type { DepthUnit, LandLeaseContract, LandLeaseRateType } from "@/types";
+import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import type { DepthUnit, LandLeaseContract, LandLeaseRateType, LedgerPaymentMode } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const inputClass =
@@ -34,7 +35,16 @@ export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditL
   const [endDate, setEndDate] = useState(contract.endDate ? contract.endDate.slice(0, 10) : "");
   const [paymentTerms, setPaymentTerms] = useState(contract.paymentTerms ?? "");
   const [notes, setNotes] = useState(contract.notes ?? "");
+  const [paymentMode, setPaymentMode] = useState<LedgerPaymentMode>("CASH");
+  const [cashAmount, setCashAmount] = useState("");
+  const [onlineAmount, setOnlineAmount] = useState("");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  // Only the *increase* in advance (if any) posts a new PAID ledger entry
+  // (see updateLandLeaseContract) — the payment-mode picker below describes
+  // that increase specifically, not the contract's full advance-to-date.
+  const advanceDelta = Math.round(((Number(advanceAmount) || 0) - (contract.advanceAmount ?? 0)) * 100) / 100;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -42,6 +52,11 @@ export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditL
     if (rateType === "PER_BIGHA" && (!contractedAreaBigha || !ratePerBigha)) return;
     if (rateType === "PER_DEPTH" && (!contractedDepth || !ratePerDepthUnit)) return;
     if (rateType === "BOTH" && (!contractedAreaBigha || !ratePerBigha || !contractedDepth || !ratePerDepthUnit)) return;
+    if (advanceDelta > 0 && isPaymentSplitMismatched(paymentMode, advanceDelta, cashAmount, onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: advanceDelta.toLocaleString("en-IN") }));
+      return;
+    }
+    setFormError("");
     setSaving(true);
     try {
       await api.landLeaseContracts.update(contract._id, {
@@ -55,6 +70,9 @@ export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditL
         depthUnit: (rateType === "PER_DEPTH" || rateType === "PER_BIGHA" || rateType === "BOTH") && contractedDepth ? depthUnit : undefined,
         ratePerDepthUnit: rateType === "PER_DEPTH" || rateType === "BOTH" ? Number(ratePerDepthUnit) : undefined,
         advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
+        paymentMode: advanceDelta > 0 ? paymentMode : undefined,
+        cashAmount: advanceDelta > 0 && paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
+        onlineAmount: advanceDelta > 0 && paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         paymentTerms: paymentTerms || undefined,
@@ -62,6 +80,8 @@ export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditL
       });
       onSaved();
       onClose();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -137,10 +157,36 @@ export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditL
           )}
 
           <input type="number" placeholder={t("soil.advanceAmountRupees")} value={advanceAmount} onChange={(e) => setAdvanceAmount(e.target.value)} className={cn(inputClass, "col-span-2")} />
+
+          {advanceDelta > 0 && (
+            <div className="col-span-2 flex flex-col gap-2">
+              <label className="text-xs text-ink-muted">{t("common.howWasThisPaid")}</label>
+              <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as LedgerPaymentMode)} className={inputClass}>
+                <option value="CASH">{t("dispatch.paymentCash")}</option>
+                <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
+                <option value="UPI">{t("dispatch.paymentUpi")}</option>
+                <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
+              </select>
+              {paymentMode === "CASH_AND_ONLINE" && (
+                <PaymentSplitFields
+                  totalAmount={advanceDelta}
+                  cashAmount={cashAmount}
+                  onlineAmount={onlineAmount}
+                  onCashAmountChange={setCashAmount}
+                  onOnlineAmountChange={setOnlineAmount}
+                  inputClassName={inputClass}
+                />
+              )}
+            </div>
+          )}
+
           <DateInput value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
           <DateInput value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputClass} />
           <input placeholder={t("soil.paymentTerms")} value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className={cn(inputClass, "col-span-2")} />
           <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={cn(inputClass, "col-span-2")} />
+
+          {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
+
           <Button type="submit" disabled={saving} className="col-span-2">
             {t("common.saveChanges")}
           </Button>
