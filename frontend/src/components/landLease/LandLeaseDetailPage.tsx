@@ -232,13 +232,18 @@ export function LandLeaseDetailPage({ landLeaseId, onBack }: LandLeaseDetailPage
     );
   }
 
-  // Prefers the sum of per-Khasra Lands entries (added via a contract),
-  // falling back to the legacy person-level khetArea field for land-lease
-  // profiles created before any Lands entry existed — same reasoning as
-  // LandownerDetailPage.tsx's own fieldAreaDisplay.
+  // A Land Lease person's area is entered on the contract itself
+  // (contractedAreaBigha, same field the Contracts list's own "Land
+  // holdings" stat tile sums) — the per-Khasra Lands entries and the
+  // person-level khetArea field are essentially never populated for this
+  // person type in practice, so those are kept only as fallbacks for a
+  // profile with neither a contract's area nor Lands entries recorded.
+  const contractsTotalArea = contracts.reduce((sum, c) => sum + (c.contractedAreaBigha ?? 0), 0);
   const landsTotalArea = lands.reduce((sum, l) => sum + (l.area ?? 0), 0);
   const fieldAreaDisplay =
-    landsTotalArea > 0
+    contractsTotalArea > 0
+      ? `${contractsTotalArea} ${t("people.unitBigha")}`
+      : landsTotalArea > 0
       ? `${landsTotalArea} ${landLease.khetAreaUnit ?? "bigha"}`
       : landLease.khetArea
       ? `${landLease.khetArea} ${landLease.khetAreaUnit ?? "bigha"}`
