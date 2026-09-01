@@ -196,7 +196,14 @@ body {
     transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .dark .glass-panel {
-    background: color-mix(in srgb, var(--surface) 55%, transparent);
+    /* Notably more opaque than light mode's 70% (rather than the 55% this
+       used to be) — a translucent panel floating over bright/colorful
+       content (a stat icon chip, the hero illustration, a coloured badge)
+       let too much of that color bleed through in dark mode, making the
+       panel read as a washed-out, wrong-looking box instead of a legible
+       dark surface — most visible on the topbar's search-suggestions
+       dropdown, which sits directly over the Overview hero art. */
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
   }
   @media (prefers-reduced-motion: reduce) {
     .glass-panel:hover::after {
