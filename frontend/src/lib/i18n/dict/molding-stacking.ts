@@ -156,15 +156,20 @@ export const moldingStackingDict: Record<string, Record<Locale, string>> = {
   "stacking.statusBharaiInProgress": { en: "Bharai in progress", hi: "भराई जारी" },
   "stacking.statusFiring": { en: "Firing", hi: "पकाई" },
   "stacking.statusReadyUnloading": { en: "Ready / unloading", hi: "तैयार / निकासी" },
-  "stacking.stage1Label": { en: "Stage 1: Ground Lifting & Transport", hi: "चरण 1: उठान व परिवहन" },
+  "stacking.stage1Label": { en: "Stage 1: Phad to Raw Brick Stock", hi: "चरण 1: फड़ से कच्ची ईंट स्टॉक तक" },
   "stacking.stage1Sublabel": {
-    en: "Yard → outside the chamber (ghera). Tractor/buggi trips.",
-    hi: "यार्ड → घेर के बाहर तक। ट्रैक्टर/बग्गी फेरे।",
+    en: "Phad (molding ground) → raw brick stock, on-site. Tractor/buggi trips.",
+    hi: "फड़ (पथाई ज़मीन) → कच्ची ईंट स्टॉक, साइट पर ही। ट्रैक्टर/बग्गी फेरे।",
   },
-  "stacking.stage2Label": { en: "Stage 2: Chamber Stacking", hi: "चरण 2: घेर भराई" },
+  "stacking.stage2Label": { en: "Stage 2: Phad to Chamber", hi: "चरण 2: फड़ से घेर तक" },
   "stacking.stage2Sublabel": {
-    en: "Outside area → inside the chamber (ghera). Manual labor.",
-    hi: "बाहर के क्षेत्र से → घेर के अंदर। हाथ से मज़दूरी।",
+    en: "Phad (molding ground) → straight into the chamber (ghera). Tractor/buggi trips.",
+    hi: "फड़ (पथाई ज़मीन) → सीधे घेर के अंदर। ट्रैक्टर/बग्गी फेरे।",
+  },
+  "stacking.stage3Label": { en: "Stage 3: Stock to Chamber", hi: "चरण 3: स्टॉक से घेर तक" },
+  "stacking.stage3Sublabel": {
+    en: "Raw brick stock → inside the chamber (ghera). Manual labor.",
+    hi: "कच्ची ईंट स्टॉक से → घेर के अंदर। हाथ से मज़दूरी।",
   },
   "stacking.contractorWiseHeading": { en: "Thekedar-wise (contractor)", hi: "ठेकेदार-वार" },
   "stacking.totalLabel": { en: "Total:", hi: "कुल:" },
@@ -243,6 +248,7 @@ export const moldingStackingDict: Record<string, Record<Locale, string>> = {
   "stacking.qualityColumn": { en: "Quality", hi: "गुणवत्ता" },
   "stacking.stage1Bare": { en: "Stage 1", hi: "चरण 1" },
   "stacking.stage2Bare": { en: "Stage 2", hi: "चरण 2" },
+  "stacking.stage3Bare": { en: "Stage 3", hi: "चरण 3" },
   "stacking.qualityGood": { en: "GOOD", hi: "अच्छी" },
   "stacking.qualityAverage": { en: "AVERAGE", hi: "औसत" },
   "stacking.qualityPoor": { en: "POOR", hi: "खराब" },
@@ -252,7 +258,6 @@ export const moldingStackingDict: Record<string, Record<Locale, string>> = {
   "stacking.confirmDeleteEntry": { en: "Delete this bharai entry? This cannot be undone.", hi: "यह भराई एंट्री हटाएं? इसे वापस नहीं लाया जा सकता।" },
   "stacking.damagedCountPlaceholder": { en: "Damaged count", hi: "टूट-फूट की गिनती" },
   "stacking.stageNotSet": { en: "Stage — not set", hi: "चरण — सेट नहीं" },
-  "stacking.stage1TransportShort": { en: "Stage 1: Transport", hi: "चरण 1: परिवहन" },
 
   // ---- components/stacking/GherMap.tsx ----
   "stacking.noChambersConfigured": {
@@ -281,8 +286,6 @@ export const moldingStackingDict: Record<string, Record<Locale, string>> = {
   "stacking.advanceOutstandingLabel": { en: "advance outstanding", hi: "पेशगी बकाया" },
   "stacking.stackingWorkHistory": { en: "Stacking work history", hi: "भराई कार्य इतिहास" },
   "stacking.noBharaiEntriesLoggedYet": { en: "No bharai entries logged yet.", hi: "अभी तक कोई भराई एंट्री दर्ज नहीं हुई।" },
-  "stacking.transportBare": { en: "Transport", hi: "परिवहन" },
-  "stacking.chamberStackingBare": { en: "Chamber Stacking", hi: "घेर भराई" },
 
   // ---- components/stacking/StackingContractorDetailPage.tsx ----
   "stacking.bharaiThekedarLabel": { en: "Bharai thekedar (Labour Contractor)", hi: "भराई ठेकेदार (श्रम ठेकेदार)" },

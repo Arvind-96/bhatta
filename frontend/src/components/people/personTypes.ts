@@ -26,14 +26,15 @@ export function useWorkTypeLabels(): Record<WorkType, string> {
   const { t } = useTranslation();
   return {
     PATHAI: t("people.workTypePathai"),
-    BHARAI_TRANSPORT: t("people.workTypeBharaiTransport"),
+    BHARAI_PHAD_TO_STOCK: t("people.workTypeBharaiPhadToStock"),
     PAKAYI: t("people.workTypePakayi"),
     NIKASI: t("people.workTypeNikasi"),
     LOADING: t("people.workTypeLoading"),
-    BHARAI_CHAMBER_STACKING: t("people.workTypeBharaiChamberStacking"),
+    BHARAI_PHAD_TO_CHAMBER: t("people.workTypeBharaiPhadToChamber"),
     TUDI: t("people.workTypeTudi"),
     RAWAS: t("people.workTypeRawas"),
     BELDAR: t("people.workTypeBeldar"),
+    BHARAI_STOCK_TO_CHAMBER: t("people.workTypeBharaiStockToChamber"),
   };
 }
 
@@ -42,7 +43,7 @@ export function useWorkTypeLabels(): Record<WorkType, string> {
 // Beldar are classification-only categories with no dedicated tracking
 // module, so they must never appear as a loggable work-entry choice.
 export const LOGGABLE_WORK_TYPES: WorkType[] = [
-  "PATHAI", "BHARAI_TRANSPORT", "PAKAYI", "NIKASI", "LOADING", "BHARAI_CHAMBER_STACKING",
+  "PATHAI", "BHARAI_PHAD_TO_STOCK", "PAKAYI", "NIKASI", "LOADING", "BHARAI_PHAD_TO_CHAMBER", "BHARAI_STOCK_TO_CHAMBER",
 ];
 
 export function useFamilyRelationLabels(): Record<FamilyRelation, string> {

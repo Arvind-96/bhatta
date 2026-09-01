@@ -16,8 +16,9 @@ import { usePersonTypeMeta } from "@/components/people/personTypes";
 function useStageLabels(): Record<StackingStage, string> {
   const { t } = useTranslation();
   return {
-    TRANSPORT: t("stacking.stage1TransportShort"),
-    CHAMBER_STACKING: t("stacking.stage2Label"),
+    PHAD_TO_STOCK: t("stacking.stage1Label"),
+    PHAD_TO_CHAMBER: t("stacking.stage2Label"),
+    STOCK_TO_CHAMBER: t("stacking.stage3Label"),
   };
 }
 
@@ -171,8 +172,9 @@ export function OperatorDetailPage({ operatorId, onBack }: OperatorDetailPagePro
             </div>
             <select value={stageInput} onChange={(e) => setStageInput(e.target.value as "" | StackingStage)} className={inputClass}>
               <option value="">{t("stacking.stageNotSet")}</option>
-              <option value="TRANSPORT">{stageLabels.TRANSPORT}</option>
-              <option value="CHAMBER_STACKING">{stageLabels.CHAMBER_STACKING}</option>
+              <option value="PHAD_TO_STOCK">{stageLabels.PHAD_TO_STOCK}</option>
+              <option value="PHAD_TO_CHAMBER">{stageLabels.PHAD_TO_CHAMBER}</option>
+              <option value="STOCK_TO_CHAMBER">{stageLabels.STOCK_TO_CHAMBER}</option>
             </select>
           </form>
           <p className="mt-2 text-sm text-ink-muted">{t("stacking.settledManuallyHint")}</p>
@@ -222,7 +224,7 @@ export function OperatorDetailPage({ operatorId, onBack }: OperatorDetailPagePro
                     <tr key={entry._id} className="border-b border-border/60 last:border-0">
                       <td className="py-3 text-ink-secondary">{new Date(entry.date).toLocaleDateString("en-IN")}</td>
                       <td className="py-3 text-ink-secondary">#{typeof entry.gherId === "object" ? entry.gherId.number : "—"}</td>
-                      <td className="py-3 text-ink-secondary">{entry.stage ? (entry.stage === "TRANSPORT" ? t("stacking.transportBare") : t("stacking.chamberStackingBare")) : "—"}</td>
+                      <td className="py-3 text-ink-secondary">{entry.stage ? stageLabels[entry.stage] : "—"}</td>
                       <td className="py-3 text-ink-secondary">
                         {entry.mode === "TRACTOR" ? `${t("stacking.tractorOption")} · ${entry.tractorNumber ?? "—"}` : entry.mode === "BUGGI" ? `${t("stacking.buggiOption")} × ${entry.buggiCount ?? "—"}` : "—"}
                       </td>

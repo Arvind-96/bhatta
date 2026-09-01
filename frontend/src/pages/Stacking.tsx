@@ -28,16 +28,23 @@ import type {
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
-function useStageMeta(): Record<StackingStage, { label: string; sublabel: string }> {
+function useStageMeta(): Record<StackingStage, { label: string; sublabel: string; bare: string }> {
   const { t } = useTranslation();
   return {
-    TRANSPORT: {
+    PHAD_TO_STOCK: {
       label: t("stacking.stage1Label"),
       sublabel: t("stacking.stage1Sublabel"),
+      bare: t("stacking.stage1Bare"),
     },
-    CHAMBER_STACKING: {
+    PHAD_TO_CHAMBER: {
       label: t("stacking.stage2Label"),
       sublabel: t("stacking.stage2Sublabel"),
+      bare: t("stacking.stage2Bare"),
+    },
+    STOCK_TO_CHAMBER: {
+      label: t("stacking.stage3Label"),
+      sublabel: t("stacking.stage3Sublabel"),
+      bare: t("stacking.stage3Bare"),
     },
   };
 }
@@ -235,9 +242,9 @@ function OperatorSummarySection({
   );
 }
 
-// One physical stage of bharai (Transport or Chamber Stacking) — its own
-// contractor-wise and independent-operator summaries, scoped to gangs
-// tagged with this stage (Person.stackingStage).
+// One physical stage of bharai (Phad-to-Stock, Phad-to-Chamber, or
+// Stock-to-Chamber) — its own contractor-wise and independent-operator
+// summaries, scoped to gangs tagged with this stage (Person.stackingStage).
 function StageSection({
   stage,
   contractorSummary,
@@ -294,7 +301,7 @@ function StageSection({
       </CardHeader>
       <div className="mb-5 rounded-xl border border-border bg-ink-primary/5 px-4 py-3">
         <p className="text-sm text-ink-muted">
-          {stage === "CHAMBER_STACKING" ? t("stacking.totalRawBricksStackedInsideChamber") : t("stacking.totalBricksMovedOutsideChamber")}
+          {stage === "PHAD_TO_STOCK" ? t("stacking.totalBricksMovedOutsideChamber") : t("stacking.totalRawBricksStackedInsideChamber")}
         </p>
         <p className="text-2xl font-semibold tabular-nums text-ink-primary">{stageGrandTotal.toLocaleString("en-IN")}</p>
       </div>
@@ -422,14 +429,15 @@ export function Stacking() {
   }
 
   function handleStageChange(stage: "" | StackingStage) {
+    const usesVehicle = stage === "PHAD_TO_STOCK" || stage === "PHAD_TO_CHAMBER";
     setForm((f) => ({
       ...f,
       stage,
       gangId: "",
-      mode: stage === "CHAMBER_STACKING" ? "" : f.mode,
-      tractorNumber: stage === "CHAMBER_STACKING" ? "" : f.tractorNumber,
-      buggiCount: stage === "CHAMBER_STACKING" ? "" : f.buggiCount,
-      siteId: stage === "CHAMBER_STACKING" ? "" : f.siteId,
+      mode: usesVehicle ? f.mode : "",
+      tractorNumber: usesVehicle ? f.tractorNumber : "",
+      buggiCount: usesVehicle ? f.buggiCount : "",
+      siteId: stage ? f.siteId : "",
     }));
   }
 
@@ -451,7 +459,7 @@ export function Stacking() {
         mode: form.mode || undefined,
         tractorNumber: form.mode === "TRACTOR" ? form.tractorNumber || undefined : undefined,
         buggiCount: form.mode === "BUGGI" && form.buggiCount ? Number(form.buggiCount) : undefined,
-        siteId: form.stage === "TRANSPORT" ? form.siteId || undefined : undefined,
+        siteId: form.siteId || undefined,
       });
       setForm({
         gherId: "",
@@ -494,25 +502,36 @@ export function Stacking() {
   return (
     <div className="space-y-4">
       <StageSection
-        stage="TRANSPORT"
+        stage="PHAD_TO_STOCK"
         contractorSummary={contractorSummary}
         operatorSummary={operatorSummary}
         onOpenLedger={openLedgerFor}
         onOpenContractor={setOpenContractorId}
         onOpenOperator={setOpenOperatorId}
-        onAddThekedar={() => setAddPersonConfig({ type: "LABOUR_CONTRACTOR", stage: "TRANSPORT" })}
-        onAddOperator={() => setAddPersonConfig({ type: "WORKER", stage: "TRANSPORT" })}
+        onAddThekedar={() => setAddPersonConfig({ type: "LABOUR_CONTRACTOR", stage: "PHAD_TO_STOCK" })}
+        onAddOperator={() => setAddPersonConfig({ type: "WORKER", stage: "PHAD_TO_STOCK" })}
       />
 
       <StageSection
-        stage="CHAMBER_STACKING"
+        stage="PHAD_TO_CHAMBER"
         contractorSummary={contractorSummary}
         operatorSummary={operatorSummary}
         onOpenLedger={openLedgerFor}
         onOpenContractor={setOpenContractorId}
         onOpenOperator={setOpenOperatorId}
-        onAddThekedar={() => setAddPersonConfig({ type: "LABOUR_CONTRACTOR", stage: "CHAMBER_STACKING" })}
-        onAddOperator={() => setAddPersonConfig({ type: "WORKER", stage: "CHAMBER_STACKING" })}
+        onAddThekedar={() => setAddPersonConfig({ type: "LABOUR_CONTRACTOR", stage: "PHAD_TO_CHAMBER" })}
+        onAddOperator={() => setAddPersonConfig({ type: "WORKER", stage: "PHAD_TO_CHAMBER" })}
+      />
+
+      <StageSection
+        stage="STOCK_TO_CHAMBER"
+        contractorSummary={contractorSummary}
+        operatorSummary={operatorSummary}
+        onOpenLedger={openLedgerFor}
+        onOpenContractor={setOpenContractorId}
+        onOpenOperator={setOpenOperatorId}
+        onAddThekedar={() => setAddPersonConfig({ type: "LABOUR_CONTRACTOR", stage: "STOCK_TO_CHAMBER" })}
+        onAddOperator={() => setAddPersonConfig({ type: "WORKER", stage: "STOCK_TO_CHAMBER" })}
       />
 
       {unassigned.length > 0 && (
@@ -540,8 +559,9 @@ export function Stacking() {
               className={cn(inputClass, "col-span-2")}
             >
               <option value="">{t("stacking.stagePlaceholder")}</option>
-              <option value="TRANSPORT">{stageMeta.TRANSPORT.label}</option>
-              <option value="CHAMBER_STACKING">{stageMeta.CHAMBER_STACKING.label}</option>
+              <option value="PHAD_TO_STOCK">{stageMeta.PHAD_TO_STOCK.label}</option>
+              <option value="PHAD_TO_CHAMBER">{stageMeta.PHAD_TO_CHAMBER.label}</option>
+              <option value="STOCK_TO_CHAMBER">{stageMeta.STOCK_TO_CHAMBER.label}</option>
             </select>
             <select
               required
@@ -606,7 +626,7 @@ export function Stacking() {
               <option value="AVERAGE">{t("stacking.averageSetting")}</option>
               <option value="POOR">{t("stacking.poorSetting")}</option>
             </select>
-            {form.stage === "TRANSPORT" && (
+            {(form.stage === "PHAD_TO_STOCK" || form.stage === "PHAD_TO_CHAMBER") && (
               <>
                 <select
                   value={form.mode}
@@ -634,21 +654,21 @@ export function Stacking() {
                     className={cn(inputClass, "col-span-2")}
                   />
                 )}
-                {sites.length > 0 && (
-                  <select
-                    value={form.siteId}
-                    onChange={(e) => setForm((f) => ({ ...f, siteId: e.target.value }))}
-                    className={cn(inputClass, "col-span-2")}
-                  >
-                    <option value="">{t("pathaiSite.transportedFromSiteOptional")}</option>
-                    {sites.map((s) => (
-                      <option key={s._id} value={s._id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
               </>
+            )}
+            {form.stage && sites.length > 0 && (
+              <select
+                value={form.siteId}
+                onChange={(e) => setForm((f) => ({ ...f, siteId: e.target.value }))}
+                className={cn(inputClass, "col-span-2")}
+              >
+                <option value="">{t("pathaiSite.transportedFromSiteOptional")}</option>
+                {sites.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
             )}
             <Button type="submit" disabled={loading} className="col-span-2">
               {t("stacking.saveEntry")}
@@ -699,7 +719,7 @@ export function Stacking() {
                         )}
                       </td>
                       <td className="py-3 text-ink-secondary">
-                        {entry.stage ? (entry.stage === "TRANSPORT" ? t("stacking.stage1Bare") : t("stacking.stage2Bare")) : "—"}
+                        {entry.stage ? stageMeta[entry.stage].bare : "—"}
                       </td>
                       <td className="py-3 text-ink-secondary">
                         {entry.mode === "TRACTOR" ? `🚜 ${entry.tractorNumber ?? "—"}` : entry.mode === "BUGGI" ? `🛒 × ${entry.buggiCount ?? "—"}` : "—"}

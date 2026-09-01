@@ -97,7 +97,7 @@ async function main() {
       name: "Rajesh Thekedar",
       phone: randPhone(),
       monthlySalary: 18000,
-      stackingStage: "TRANSPORT",
+      stackingStage: "PHAD_TO_STOCK",
     });
     const chamberContractor = await createPerson({
       kilnId,
@@ -105,7 +105,7 @@ async function main() {
       name: "Suresh Thekedar",
       phone: randPhone(),
       monthlySalary: 17000,
-      stackingStage: "CHAMBER_STACKING",
+      stackingStage: "STOCK_TO_CHAMBER",
     });
 
     const transportLaborers = await Promise.all(
@@ -117,7 +117,7 @@ async function main() {
           phone: randPhone(),
           monthlySalary: randInt(7000, 9000),
           bharaiContractorId: transportContractor._id,
-          stackingStage: "TRANSPORT",
+          stackingStage: "PHAD_TO_STOCK",
         })
       )
     );
@@ -130,7 +130,7 @@ async function main() {
           phone: randPhone(),
           monthlySalary: randInt(7000, 9000),
           bharaiContractorId: chamberContractor._id,
-          stackingStage: "CHAMBER_STACKING",
+          stackingStage: "STOCK_TO_CHAMBER",
         })
       )
     );
@@ -142,7 +142,7 @@ async function main() {
       name: "Ishwar Singh",
       phone: randPhone(),
       monthlySalary: 8500,
-      stackingStage: "TRANSPORT",
+      stackingStage: "PHAD_TO_STOCK",
     });
     const independentChamber = await createPerson({
       kilnId,
@@ -150,7 +150,7 @@ async function main() {
       name: "Mange Ram",
       phone: randPhone(),
       monthlySalary: 8000,
-      stackingStage: "CHAMBER_STACKING",
+      stackingStage: "STOCK_TO_CHAMBER",
     });
 
     await createStackingVehicle({
@@ -175,7 +175,7 @@ async function main() {
         seasonId,
         gherId: gher._id,
         gangId: randChoice([...transportLaborers, transportContractor])._id,
-        stage: "TRANSPORT",
+        stage: "PHAD_TO_STOCK",
         bricksCount: randInt(3000, 6000),
         mode: randChoice(["TRACTOR", "BUGGI"] as const),
         tractorNumber: `HR-46-A-${randInt(1000, 9999)}`,
@@ -186,7 +186,7 @@ async function main() {
         seasonId,
         gherId: gher._id,
         gangId: randChoice(chamberLaborers)._id,
-        stage: "CHAMBER_STACKING",
+        stage: "STOCK_TO_CHAMBER",
         bricksCount: randInt(3000, 6000),
         date: dateAtOffset(d),
       });
@@ -196,7 +196,7 @@ async function main() {
         seasonId,
           gherId: randChoice(ghers)._id,
           gangId: independentTransport._id,
-          stage: "TRANSPORT",
+          stage: "PHAD_TO_STOCK",
           bricksCount: randInt(2000, 4000),
           mode: "BUGGI",
           buggiCount: 2,
@@ -207,7 +207,7 @@ async function main() {
         seasonId,
           gherId: randChoice(ghers)._id,
           gangId: independentChamber._id,
-          stage: "CHAMBER_STACKING",
+          stage: "STOCK_TO_CHAMBER",
           bricksCount: randInt(2000, 4000),
           date: dateAtOffset(d),
         });

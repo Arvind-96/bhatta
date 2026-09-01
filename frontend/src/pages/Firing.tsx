@@ -264,7 +264,7 @@ function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entr
     if (!stackingForm.gangId || !stackingForm.bricksCount) return;
     setSaving(true);
     try {
-      await api.stacking.create({ gherId: gher._id, gangId: stackingForm.gangId, stage: "CHAMBER_STACKING", bricksCount: Number(stackingForm.bricksCount) });
+      await api.stacking.create({ gherId: gher._id, gangId: stackingForm.gangId, stage: "STOCK_TO_CHAMBER", bricksCount: Number(stackingForm.bricksCount) });
       setStackingForm({ gangId: "", bricksCount: "" });
       setOpenForm("");
     } finally {

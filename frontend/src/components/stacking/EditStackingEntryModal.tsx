@@ -105,8 +105,9 @@ export function EditStackingEntryModal({ entry, onClose, onSaved }: EditStacking
           )}
           <select value={stage} onChange={(e) => setStage(e.target.value as "" | StackingStage)} className={inputClass}>
             <option value="">{t("stacking.stageNotSet")}</option>
-            <option value="TRANSPORT">{t("stacking.stage1TransportShort")}</option>
-            <option value="CHAMBER_STACKING">{t("stacking.stage2Label")}</option>
+            <option value="PHAD_TO_STOCK">{t("stacking.stage1Label")}</option>
+            <option value="PHAD_TO_CHAMBER">{t("stacking.stage2Label")}</option>
+            <option value="STOCK_TO_CHAMBER">{t("stacking.stage3Label")}</option>
           </select>
           <select value={qualityRating} onChange={(e) => setQualityRating(e.target.value as StackingEntry["qualityRating"])} className={inputClass}>
             <option value="GOOD">{t("stacking.goodSetting")}</option>

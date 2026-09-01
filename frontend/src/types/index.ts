@@ -403,8 +403,8 @@ export type PersonStatus = "ACTIVE" | "ABSCONDED";
 export type PayType = "MONTHLY" | "PER_THOUSAND";
 export type Sex = "MALE" | "FEMALE" | "OTHER";
 export type WorkType =
-  | "PATHAI" | "BHARAI_TRANSPORT" | "PAKAYI" | "NIKASI" | "LOADING" | "BHARAI_CHAMBER_STACKING"
-  | "TUDI" | "RAWAS" | "BELDAR";
+  | "PATHAI" | "BHARAI_PHAD_TO_STOCK" | "PAKAYI" | "NIKASI" | "LOADING" | "BHARAI_PHAD_TO_CHAMBER"
+  | "TUDI" | "RAWAS" | "BELDAR" | "BHARAI_STOCK_TO_CHAMBER";
 
 export interface Person {
   _id: string;
@@ -1110,9 +1110,10 @@ export type StackingQuality = "GOOD" | "AVERAGE" | "POOR";
 
 export type StackingMode = "BUGGI" | "TRACTOR";
 
-// TRANSPORT = Stage 1: ground lifting & transport (yard -> outside chamber).
-// CHAMBER_STACKING = Stage 2: chamber stacking (outside -> inside chamber).
-export type StackingStage = "TRANSPORT" | "CHAMBER_STACKING";
+// PHAD_TO_STOCK = Stage 1: phad (molding ground) to raw brick stock, on-site reshuffle.
+// PHAD_TO_CHAMBER = Stage 2: phad straight into the chamber, no stock stop.
+// STOCK_TO_CHAMBER = Stage 3: raw brick stock into the chamber.
+export type StackingStage = "PHAD_TO_STOCK" | "PHAD_TO_CHAMBER" | "STOCK_TO_CHAMBER";
 
 export interface StackingEntry {
   _id: string;

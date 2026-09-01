@@ -10,14 +10,15 @@ export type WorkType = (typeof WORK_TYPES)[number];
 
 const WORK_TYPE_LABELS: Record<WorkType, string> = {
   PATHAI: "Pathai",
-  BHARAI_TRANSPORT: "Bharai (field → outside ghera)",
+  BHARAI_PHAD_TO_STOCK: "Bharai (Phad → raw brick stock)",
   PAKAYI: "Pakayi",
   NIKASI: "Nikasi",
   LOADING: "Loading",
-  BHARAI_CHAMBER_STACKING: "Bharai (outside → inside ghera)",
+  BHARAI_PHAD_TO_CHAMBER: "Bharai (Phad → inside chamber)",
   TUDI: "Tudi",
   RAWAS: "Rawas",
   BELDAR: "Beldar",
+  BHARAI_STOCK_TO_CHAMBER: "Bharai (raw brick stock → inside chamber)",
 };
 
 function wageFor(quantity: number, ratePerThousand: number) {

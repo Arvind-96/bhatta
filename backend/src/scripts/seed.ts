@@ -397,7 +397,7 @@ async function main() {
     seasonId,
           gherId: ghers[c.gherIdx]._id,
           gangId: gang._id,
-          stage: randChoice(["TRANSPORT", "CHAMBER_STACKING"] as const),
+          stage: randChoice(["PHAD_TO_STOCK", "PHAD_TO_CHAMBER", "STOCK_TO_CHAMBER"] as const),
           bricksCount: randInt(8000, 15000),
           damageCount: randInt(0, 150),
           qualityRating: randChoice(["GOOD", "GOOD", "AVERAGE", "POOR"] as const),

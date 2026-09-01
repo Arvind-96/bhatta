@@ -285,8 +285,9 @@ export function AddPersonModal({
               className={inputClass}
             >
               <option value="">{t("people.bharaiStageOptional")}</option>
-              <option value="TRANSPORT">{t("people.stage1GroundLifting")}</option>
-              <option value="CHAMBER_STACKING">{t("people.stage2ChamberStacking")}</option>
+              <option value="PHAD_TO_STOCK">{t("people.stage1PhadToStock")}</option>
+              <option value="PHAD_TO_CHAMBER">{t("people.stage2PhadToChamber")}</option>
+              <option value="STOCK_TO_CHAMBER">{t("people.stage3StockToChamber")}</option>
             </select>
           )}
 

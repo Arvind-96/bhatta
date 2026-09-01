@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
-import { people, ledgerEntries, customers, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES } from "../db/schema";
+import { people, ledgerEntries, customers, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES, STACKING_STAGES } from "../db/schema";
 import { getCustomerDetail } from "./customer.service";
 import { getCurrentSeasonId } from "./season.util";
 import { listLedgerForKiln } from "./ledger.service";
@@ -12,6 +12,7 @@ import { emitToKiln } from "../config/socket";
 export type PersonType = (typeof PERSON_TYPES)[number];
 export type Sex = (typeof SEX_OPTIONS)[number];
 export type WorkType = (typeof WORK_TYPES)[number];
+export type StackingStage = (typeof STACKING_STAGES)[number];
 
 export interface CreatePersonInput {
   kilnId: string;
@@ -34,7 +35,7 @@ export interface CreatePersonInput {
   defaultRatePerThousand?: number;
   bharaiRatePerThousand?: number;
   monthlySalary?: number;
-  stackingStage?: "TRANSPORT" | "CHAMBER_STACKING";
+  stackingStage?: StackingStage;
   bharaiContractorId?: string;
   nikasiContractorId?: string;
   pakayiContractorId?: string;
@@ -78,15 +79,16 @@ export async function assertPersonOfType(kilnId: string, personId: string, allow
   return person;
 }
 
-// The two Bharai work types correspond 1:1 to stackingStage, which is what
-// actually drives the Bharai page's gang filtering — kept in sync so a
-// labourer created from the simplified Add Labour form immediately shows
+// The three Bharai work types correspond 1:1 to stackingStage, which is
+// what actually drives the Bharai page's gang filtering — kept in sync so
+// a labourer created from the simplified Add Labour form immediately shows
 // up in the right Bharai stage without a second edit. Only fills the gap
 // when the caller hasn't set stackingStage explicitly themselves.
-function deriveStackingStage(input: { workType?: WorkType; stackingStage?: "TRANSPORT" | "CHAMBER_STACKING" }) {
+function deriveStackingStage(input: { workType?: WorkType; stackingStage?: "PHAD_TO_STOCK" | "PHAD_TO_CHAMBER" | "STOCK_TO_CHAMBER" }) {
   if (input.stackingStage) return input.stackingStage;
-  if (input.workType === "BHARAI_TRANSPORT") return "TRANSPORT" as const;
-  if (input.workType === "BHARAI_CHAMBER_STACKING") return "CHAMBER_STACKING" as const;
+  if (input.workType === "BHARAI_PHAD_TO_STOCK") return "PHAD_TO_STOCK" as const;
+  if (input.workType === "BHARAI_PHAD_TO_CHAMBER") return "PHAD_TO_CHAMBER" as const;
+  if (input.workType === "BHARAI_STOCK_TO_CHAMBER") return "STOCK_TO_CHAMBER" as const;
   return input.stackingStage;
 }
 

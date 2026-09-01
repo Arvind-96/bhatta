@@ -63,7 +63,7 @@ export async function getPersonFullReport(kilnId: string, personId: string) {
   }
 
   if (person.type === "LABOUR_CONTRACTOR") {
-    if (person.workType === "BHARAI_TRANSPORT" || person.workType === "BHARAI_CHAMBER_STACKING") {
+    if (person.workType === "BHARAI_PHAD_TO_STOCK" || person.workType === "BHARAI_PHAD_TO_CHAMBER" || person.workType === "BHARAI_STOCK_TO_CHAMBER") {
       sections.stackingEntries = await listStackingEntries(kilnId, null, { gangId: personId });
     } else if (person.workType === "NIKASI") {
       sections.nikasiEntries = await listNikasiEntries(kilnId, null, { gangId: personId });

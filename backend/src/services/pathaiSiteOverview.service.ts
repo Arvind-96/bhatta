@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
 import { pathaiSites, moldingEntries, soilArrivals, stackingEntries, saltUsageLogs } from "../db/schema";
 
@@ -19,10 +19,26 @@ export async function pathaiSiteOverview(kilnId: string, seasonId: string) {
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
 
+  // Only PHAD_TO_CHAMBER and STOCK_TO_CHAMBER actually remove bricks from
+  // a site's own raw stock — both end with the bricks gone from the site
+  // (one straight to the chamber, one via an already-staged pile).
+  // PHAD_TO_STOCK is a same-site reshuffle (molding spot -> the site's own
+  // stock pile) and deliberately excluded here, or every brick would get
+  // subtracted from the site's stock twice: once when staged, again when
+  // it later leaves for the chamber.
   const [allMolding, allArrivals, allTransport, allSalt] = await Promise.all([
     db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), eq(moldingEntries.seasonId, seasonId))),
     db.select().from(soilArrivals).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.seasonId, seasonId))),
-    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId), eq(stackingEntries.stage, "TRANSPORT"))),
+    db
+      .select()
+      .from(stackingEntries)
+      .where(
+        and(
+          eq(stackingEntries.kilnId, kilnId),
+          eq(stackingEntries.seasonId, seasonId),
+          inArray(stackingEntries.stage, ["PHAD_TO_CHAMBER", "STOCK_TO_CHAMBER"])
+        )
+      ),
     db.select().from(saltUsageLogs).where(eq(saltUsageLogs.kilnId, kilnId)),
   ]);
 

@@ -7,13 +7,26 @@ export const PERSON_TYPES = [
   "SALES_AGENT", "LAND_LEASE",
 ] as const;
 export const AGENT_COMMISSION_TYPES = ["PERCENT_OF_SALE", "PER_THOUSAND_BRICKS"] as const;
+// Bharai (stacking) used to be a single "get it from the molding ground to
+// the chamber" job — now split into the three real, separately-paid labor
+// tasks it's actually made of: raw bricks either go from the Phad
+// (molding ground) into a raw-brick-stock pile first (BHARAI_PHAD_TO_STOCK),
+// or straight from the Phad into the kiln chamber in one trip
+// (BHARAI_PHAD_TO_CHAMBER), or from an already-staged raw-stock pile into
+// the chamber (BHARAI_STOCK_TO_CHAMBER) — three distinct rates, three
+// distinct work types. Mirrors STACKING_STAGES below exactly.
 export const WORK_TYPES = [
-  "PATHAI", "BHARAI_TRANSPORT", "PAKAYI", "NIKASI", "LOADING", "BHARAI_CHAMBER_STACKING",
-  "TUDI", "RAWAS", "BELDAR",
+  "PATHAI", "BHARAI_PHAD_TO_STOCK", "PAKAYI", "NIKASI", "LOADING", "BHARAI_PHAD_TO_CHAMBER",
+  "TUDI", "RAWAS", "BELDAR", "BHARAI_STOCK_TO_CHAMBER",
 ] as const;
 export const SEX_OPTIONS = ["MALE", "FEMALE", "OTHER"] as const;
 export const PERSON_STATUSES = ["ACTIVE", "ABSCONDED"] as const;
-export const STACKING_STAGES = ["TRANSPORT", "CHAMBER_STACKING"] as const;
+// See WORK_TYPES' doc comment above — same three-way split, same reasoning.
+// PHAD_TO_STOCK/PHAD_TO_CHAMBER both originate at a Pathai site (bricks
+// leaving it); STOCK_TO_CHAMBER moves bricks already staged off-site, not
+// a further departure from the site itself — see
+// pathaiSiteOverview.service.ts's own comment on exactly this distinction.
+export const STACKING_STAGES = ["PHAD_TO_STOCK", "PHAD_TO_CHAMBER", "STOCK_TO_CHAMBER"] as const;
 
 // Single-table-inheritance across 12 person types, same as the Mongoose
 // model — most columns are only meaningful for one or two types (e.g.

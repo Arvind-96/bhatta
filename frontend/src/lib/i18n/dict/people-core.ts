@@ -147,8 +147,9 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   },
   "people.bharaiThekedarOptional": { en: "Bharai thekedar / contractor (optional)", hi: "भराई ठेकेदार (वैकल्पिक)" },
   "people.bharaiStageOptional": { en: "Bharai stage (optional)", hi: "भराई चरण (वैकल्पिक)" },
-  "people.stage1GroundLifting": { en: "Stage 1: Ground Lifting & Transport", hi: "चरण 1: ज़मीन से उठाई व परिवहन" },
-  "people.stage2ChamberStacking": { en: "Stage 2: Chamber Stacking", hi: "चरण 2: घेर भराई" },
+  "people.stage1PhadToStock": { en: "Stage 1: Phad to Raw Brick Stock", hi: "चरण 1: फड़ से कच्ची ईंट स्टॉक तक" },
+  "people.stage2PhadToChamber": { en: "Stage 2: Phad to Chamber", hi: "चरण 2: फड़ से घेर तक" },
+  "people.stage3StockToChamber": { en: "Stage 3: Stock to Chamber", hi: "चरण 3: स्टॉक से घेर तक" },
   "people.nikasiThekedarOptional": { en: "Nikasi thekedar / contractor (optional)", hi: "निकासी ठेकेदार (वैकल्पिक)" },
   "people.pakayiThekedarOptional": { en: "Pakayi thekedar / contractor (optional)", hi: "पकाई ठेकेदार (वैकल्पिक)" },
   "people.workTypeThekedarOptional": {
@@ -193,20 +194,24 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
 
   // --- components/people/AddLabourModal.tsx ---
   "people.workTypePathai": { en: "Pathai", hi: "पथाई" },
-  "people.workTypeBharaiTransport": {
-    en: "Bharai — field se lekar ghere ke bahar tak",
-    hi: "भराई — खेत से घेर के बाहर तक",
+  "people.workTypeBharaiPhadToStock": {
+    en: "Bharai — phad se kachi eent stock tak",
+    hi: "भराई — फड़ से कच्ची ईंट स्टॉक तक",
   },
   "people.workTypePakayi": { en: "Pakai", hi: "पकाई" },
   "people.workTypeNikasi": { en: "Nikasi", hi: "निकासी" },
   "people.workTypeLoading": { en: "Loading", hi: "लदाई" },
-  "people.workTypeBharaiChamberStacking": {
-    en: "Bharai — bahar ghere se andar ghere tak",
-    hi: "भराई — बाहर घेर से अंदर घेर तक",
+  "people.workTypeBharaiPhadToChamber": {
+    en: "Bharai — phad se seedhe ghere tak",
+    hi: "भराई — फड़ से सीधे घेर तक",
   },
   "people.workTypeTudi": { en: "Tudi", hi: "तुड़ी" },
   "people.workTypeRawas": { en: "Rawas", hi: "रवास" },
   "people.workTypeBeldar": { en: "Beldar", hi: "बेलदार" },
+  "people.workTypeBharaiStockToChamber": {
+    en: "Bharai — stock se ghere ke andar tak",
+    hi: "भराई — स्टॉक से घेर के अंदर तक",
+  },
   "people.addLabourModalTitle": { en: "Add Labour", hi: "मज़दूर जोड़ें" },
   "people.newLabourRecord": { en: "New labour record", hi: "नया मज़दूर रिकॉर्ड" },
   "people.labourNamePlaceholder": { en: "Labour's name", hi: "मज़दूर का नाम" },

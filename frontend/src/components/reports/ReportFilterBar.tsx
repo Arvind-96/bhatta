@@ -44,7 +44,7 @@ function presetRange(preset: Exclude<Preset, "custom">): { from: string; to: str
 
 const GROUP_BY_OPTIONS: ReportGroupBy[] = ["none", "day", "week", "month", "quarter", "year"];
 const LEDGER_CATEGORIES = ["WAGE", "COMMISSION", "SALARY", "TIP", "ADVANCE", "KHARCHI", "MEDICAL", "FESTIVAL", "SALE", "SOIL", "SAND", "FUEL", "FARE", "OTHER"] as const;
-const WORK_TYPES = ["PATHAI", "BHARAI_TRANSPORT", "PAKAYI", "NIKASI", "LOADING", "BHARAI_CHAMBER_STACKING", "TUDI", "RAWAS", "BELDAR"] as const;
+const WORK_TYPES = ["PATHAI", "BHARAI_PHAD_TO_STOCK", "PAKAYI", "NIKASI", "LOADING", "BHARAI_PHAD_TO_CHAMBER", "TUDI", "RAWAS", "BELDAR", "BHARAI_STOCK_TO_CHAMBER"] as const;
 const DAMAGE_FAULT_OPTIONS = ["LABOURER", "CONTRACTOR", "OTHER"] as const;
 
 interface ReportFilterBarProps {

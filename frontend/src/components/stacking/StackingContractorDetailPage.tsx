@@ -29,8 +29,9 @@ const inputClass =
 function useStageLabels(): Record<StackingStage, string> {
   const { t } = useTranslation();
   return {
-    TRANSPORT: t("stacking.stage1Label"),
-    CHAMBER_STACKING: t("stacking.stage2Label"),
+    PHAD_TO_STOCK: t("stacking.stage1Label"),
+    PHAD_TO_CHAMBER: t("stacking.stage2Label"),
+    STOCK_TO_CHAMBER: t("stacking.stage3Label"),
   };
 }
 
@@ -224,8 +225,9 @@ export function StackingContractorDetailPage({ contractorId, onBack }: StackingC
             </div>
             <select value={stageInput} onChange={(e) => setStageInput(e.target.value as "" | StackingStage)} className={inputClass}>
               <option value="">{t("stacking.stageNotSet")}</option>
-              <option value="TRANSPORT">{stageLabels.TRANSPORT}</option>
-              <option value="CHAMBER_STACKING">{stageLabels.CHAMBER_STACKING}</option>
+              <option value="PHAD_TO_STOCK">{stageLabels.PHAD_TO_STOCK}</option>
+              <option value="PHAD_TO_CHAMBER">{stageLabels.PHAD_TO_CHAMBER}</option>
+              <option value="STOCK_TO_CHAMBER">{stageLabels.STOCK_TO_CHAMBER}</option>
             </select>
           </form>
           <p className="mt-2 text-sm text-ink-muted">
@@ -433,7 +435,7 @@ export function StackingContractorDetailPage({ contractorId, onBack }: StackingC
                       <td className="py-3 text-ink-secondary">{new Date(e.date).toLocaleDateString("en-IN")}</td>
                       <td className="py-3 text-ink-secondary">#{typeof e.gherId === "object" ? e.gherId.number : "—"}</td>
                       <td className="py-3 text-ink-primary">{typeof e.gangId === "object" ? e.gangId.name : "—"}</td>
-                      <td className="py-3 text-ink-secondary">{e.stage ? (e.stage === "TRANSPORT" ? t("stacking.transportBare") : t("stacking.chamberStackingBare")) : "—"}</td>
+                      <td className="py-3 text-ink-secondary">{e.stage ? stageLabels[e.stage] : "—"}</td>
                       <td className="py-3 text-ink-secondary">
                         {e.mode === "TRACTOR" ? `🚜 ${e.tractorNumber ?? "—"}` : e.mode === "BUGGI" ? `🛒 × ${e.buggiCount ?? "—"}` : "—"}
                       </td>

@@ -16,14 +16,15 @@ const inputClass =
 function getWorkTypeOptions(t: (key: string) => string): { value: WorkType; label: string }[] {
   return [
     { value: "PATHAI", label: t("people.workTypePathai") },
-    { value: "BHARAI_TRANSPORT", label: t("people.workTypeBharaiTransport") },
+    { value: "BHARAI_PHAD_TO_STOCK", label: t("people.workTypeBharaiPhadToStock") },
     { value: "PAKAYI", label: t("people.workTypePakayi") },
     { value: "NIKASI", label: t("people.workTypeNikasi") },
     { value: "LOADING", label: t("people.workTypeLoading") },
-    { value: "BHARAI_CHAMBER_STACKING", label: t("people.workTypeBharaiChamberStacking") },
+    { value: "BHARAI_PHAD_TO_CHAMBER", label: t("people.workTypeBharaiPhadToChamber") },
     { value: "TUDI", label: t("people.workTypeTudi") },
     { value: "RAWAS", label: t("people.workTypeRawas") },
     { value: "BELDAR", label: t("people.workTypeBeldar") },
+    { value: "BHARAI_STOCK_TO_CHAMBER", label: t("people.workTypeBharaiStockToChamber") },
   ];
 }
 
