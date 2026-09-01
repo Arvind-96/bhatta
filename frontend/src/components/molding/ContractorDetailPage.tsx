@@ -106,8 +106,10 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
   // Per explicit admin request: Gang Summary's money figures stay at 0 --
   // the admin fills those in manually themselves. Bricks Produced/Damaged
   // (production data, not money) are unaffected and still come from
-  // `entry` live below. The Bhada/advance session itself now lives in
-  // LabourSessionSection (People page = editable, here = read-only).
+  // `entry` live below. The Bhada/advance session itself lives in
+  // LabourSessionSection, editable from both here and the People page's
+  // Thekedar profile -- same labour_sessions row either way, so an edit
+  // made from one page shows up on the other immediately.
   const balance = 0;
   const totalDue = 0;
   const totalPaid = 0;
@@ -196,7 +198,7 @@ export function ContractorDetailPage({ contractorId, onBack }: ContractorDetailP
           <ContractorNetBalanceCard contractorId={contractorId} />
         </div>
 
-        <LabourSessionSection contractorId={contractorId} editable={false} />
+        <LabourSessionSection contractorId={contractorId} editable={true} />
 
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
