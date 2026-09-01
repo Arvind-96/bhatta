@@ -10,11 +10,10 @@ export type WorkType = (typeof WORK_TYPES)[number];
 
 const WORK_TYPE_LABELS: Record<WorkType, string> = {
   PATHAI: "Pathai",
-  BHARAI_PHAD_TO_STOCK: "Bharai (Phad → raw brick stock)",
+  BHARAI_PHAD_TO_STOCK: "Bharai (Phad → stock/chamber)",
   PAKAYI: "Pakayi",
   NIKASI: "Nikasi",
   LOADING: "Loading",
-  BHARAI_PHAD_TO_CHAMBER: "Bharai (Phad → inside chamber)",
   TUDI: "Tudi",
   RAWAS: "Rawas",
   BELDAR: "Beldar",

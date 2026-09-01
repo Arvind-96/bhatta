@@ -48,6 +48,8 @@ export function LandLeaseDetailPage({ landLeaseId, onBack }: LandLeaseDetailPage
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [idNumber, setIdNumber] = useState("");
+  const [khetArea, setKhetArea] = useState("");
+  const [khetAreaUnit, setKhetAreaUnit] = useState("bigha");
   const [khetLocation, setKhetLocation] = useState("");
   const [agreedDepthFeet, setAgreedDepthFeet] = useState("");
   const [agreedDepthUnit, setAgreedDepthUnit] = useState<DepthUnit>("feet");
@@ -87,6 +89,8 @@ export function LandLeaseDetailPage({ landLeaseId, onBack }: LandLeaseDetailPage
     setPhone(detail.person.phone ?? "");
     setAddress(detail.person.address ?? "");
     setIdNumber(detail.person.idNumber ?? "");
+    setKhetArea(detail.person.khetArea ? String(detail.person.khetArea) : "");
+    setKhetAreaUnit(detail.person.khetAreaUnit ?? "bigha");
     setKhetLocation(detail.person.khetLocation ?? "");
     setAgreedDepthFeet(detail.person.agreedDepthFeet ? String(detail.person.agreedDepthFeet) : "");
     setAgreedDepthUnit((detail.person.agreedDepthUnit as DepthUnit) ?? "feet");
@@ -111,7 +115,8 @@ export function LandLeaseDetailPage({ landLeaseId, onBack }: LandLeaseDetailPage
         phone: phone || undefined,
         address: address || undefined,
         idNumber: idNumber || undefined,
-        khetAreaUnit: "bigha",
+        khetArea: khetArea ? Number(khetArea) : undefined,
+        khetAreaUnit: khetAreaUnit || undefined,
         khetLocation: khetLocation || undefined,
         agreedDepthFeet: agreedDepthFeet ? Number(agreedDepthFeet) : undefined,
         agreedDepthUnit: agreedDepthFeet ? agreedDepthUnit : undefined,
@@ -157,6 +162,8 @@ export function LandLeaseDetailPage({ landLeaseId, onBack }: LandLeaseDetailPage
       setPhone(landLease.phone ?? "");
       setAddress(landLease.address ?? "");
       setIdNumber(landLease.idNumber ?? "");
+      setKhetArea(landLease.khetArea ? String(landLease.khetArea) : "");
+      setKhetAreaUnit(landLease.khetAreaUnit ?? "bigha");
       setKhetLocation(landLease.khetLocation ?? "");
       setAgreedDepthFeet(landLease.agreedDepthFeet ? String(landLease.agreedDepthFeet) : "");
       setAgreedDepthUnit((landLease.agreedDepthUnit as DepthUnit) ?? "feet");
@@ -225,8 +232,17 @@ export function LandLeaseDetailPage({ landLeaseId, onBack }: LandLeaseDetailPage
     );
   }
 
+  // Prefers the sum of per-Khasra Lands entries (added via a contract),
+  // falling back to the legacy person-level khetArea field for land-lease
+  // profiles created before any Lands entry existed — same reasoning as
+  // LandownerDetailPage.tsx's own fieldAreaDisplay.
   const landsTotalArea = lands.reduce((sum, l) => sum + (l.area ?? 0), 0);
-  const fieldAreaDisplay = landsTotalArea > 0 ? `${landsTotalArea} ${t("people.unitBigha")}` : undefined;
+  const fieldAreaDisplay =
+    landsTotalArea > 0
+      ? `${landsTotalArea} ${landLease.khetAreaUnit ?? "bigha"}`
+      : landLease.khetArea
+      ? `${landLease.khetArea} ${landLease.khetAreaUnit ?? "bigha"}`
+      : undefined;
 
   const totalContractPayment = contracts.reduce((sum, c) => sum + c.totalContractValue, 0);
   const totalPaidSoFar = ledgerEntries.filter((e) => e.direction === "PAID").reduce((sum, e) => sum + e.amount, 0);
@@ -322,21 +338,28 @@ export function LandLeaseDetailPage({ landLeaseId, onBack }: LandLeaseDetailPage
               <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
               <input placeholder={t("people.aadharIdNumber")} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className={inputClass} />
               <input placeholder={t("people.khetLocation")} value={khetLocation} onChange={(e) => setKhetLocation(e.target.value)} className={inputClass} />
-              <div className="flex flex-col gap-2 rounded-xl border border-border p-2.5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.landHoldings")}</p>
-                {landDrafts.map((draft, i) => (
-                  <div key={draft._id ?? `new-${i}`} className="grid grid-cols-[3.5rem_1fr_8rem] items-center gap-2">
-                    <span className="text-xs text-ink-muted">
-                      {t("people.fieldLabel")} {i + 1}
-                    </span>
-                    <input placeholder={t("people.khasraNumber")} value={draft.khasraNumber} onChange={(e) => updateLandDraft(i, { khasraNumber: e.target.value })} className={inputClass} />
-                    <input type="number" placeholder={t("people.fieldAreaBigha")} value={draft.area} onChange={(e) => updateLandDraft(i, { area: e.target.value })} className={inputClass} />
-                  </div>
-                ))}
-                <button type="button" onClick={addLandDraft} className="flex w-fit items-center gap-1 text-xs font-medium text-series-1 hover:underline">
-                  <Plus className="h-3.5 w-3.5" /> {t("people.addAnotherField")}
-                </button>
-              </div>
+              {landDrafts.length > 0 ? (
+                <div className="flex flex-col gap-2 rounded-xl border border-border p-2.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.landHoldings")}</p>
+                  {landDrafts.map((draft, i) => (
+                    <div key={draft._id ?? `new-${i}`} className="grid grid-cols-[3.5rem_1fr_8rem] items-center gap-2">
+                      <span className="text-xs text-ink-muted">
+                        {t("people.fieldLabel")} {i + 1}
+                      </span>
+                      <input placeholder={t("people.khasraNumber")} value={draft.khasraNumber} onChange={(e) => updateLandDraft(i, { khasraNumber: e.target.value })} className={inputClass} />
+                      <input type="number" placeholder={t("people.fieldAreaBigha")} value={draft.area} onChange={(e) => updateLandDraft(i, { area: e.target.value })} className={inputClass} />
+                    </div>
+                  ))}
+                  <button type="button" onClick={addLandDraft} className="flex w-fit items-center gap-1 text-xs font-medium text-series-1 hover:underline">
+                    <Plus className="h-3.5 w-3.5" /> {t("people.addAnotherField")}
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" min={0} placeholder={t("people.khetArea")} value={khetArea} onChange={(e) => setKhetArea(e.target.value)} className={inputClass} />
+                  <input placeholder={t("people.unitBigha")} value={khetAreaUnit} onChange={(e) => setKhetAreaUnit(e.target.value)} className={inputClass} />
+                </div>
+              )}
               <div className="flex gap-2">
                 <input type="number" min={0} placeholder={t("people.agreedDigDepth")} value={agreedDepthFeet} onChange={(e) => setAgreedDepthFeet(e.target.value)} className={cn(inputClass, "flex-1")} />
                 <select value={agreedDepthUnit} onChange={(e) => setAgreedDepthUnit(e.target.value as DepthUnit)} className={cn(inputClass, "w-24")}>

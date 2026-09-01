@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, desc, eq, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { landLeaseContracts, lands, people, LAND_LEASE_CONTRACT_STATUSES, LAND_LEASE_RATE_TYPES, LAND_LEASE_DEPTH_UNITS } from "../db/schema";
 import { assertLandInKiln } from "./land.service";
@@ -13,11 +13,14 @@ export type LandLeaseDepthUnit = (typeof LAND_LEASE_DEPTH_UNITS)[number];
 
 const EXPIRY_WARNING_DAYS = 14;
 
-// Same shape as soilContract.service.ts's generateContractNumber — a
-// separate "LL-" prefix so the two number spaces can never collide even
-// though they're now stored in different tables anyway.
-function generateContractNumber() {
-  return `LL-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+// A plain per-kiln sequential number (LL-1, LL-2, ...) — see
+// soilContract.service.ts's generateContractNumber for the same
+// reasoning. Separate "LL-" prefix so the number space can never be
+// confused with Soil/Sand contract numbers even though they're stored in
+// different tables anyway.
+async function generateContractNumber(kilnId: string) {
+  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(landLeaseContracts).where(eq(landLeaseContracts.kilnId, kilnId)))[0];
+  return `LL-${(countRow?.count ?? 0) + 1}`;
 }
 
 export interface CreateLandLeaseContractInput {
@@ -102,7 +105,7 @@ export async function createLandLeaseContract(input: CreateLandLeaseContractInpu
   await assertPersonOfType(input.kilnId, input.landLeaseId, ["LAND_LEASE"]);
 
   const rateType = input.rateType ?? "PER_BIGHA";
-  const contractNumber = generateContractNumber();
+  const contractNumber = await generateContractNumber(input.kilnId);
   const totalContractValue = computeTotalContractValue(input);
 
   const { paymentMode, cashAmount, onlineAmount, ...insertableInput } = input;

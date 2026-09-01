@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { soilContracts, soilTrips, soilArrivals, lands, people, SOIL_CONTRACT_STATUSES, SOIL_CONTRACT_RATE_TYPES, DEPTH_UNITS } from "../db/schema";
 import { assertLandInKiln } from "./land.service";
@@ -13,10 +13,16 @@ export type DepthUnit = (typeof DEPTH_UNITS)[number];
 
 const EXPIRY_WARNING_DAYS = 14;
 
-// Same shape as Dispatch.generateSlipNumber — timestamp + random suffix,
-// no counter to race on.
-function generateContractNumber() {
-  return `SC-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+// A plain per-kiln sequential number (SC-1, SC-2, ...) — matches the
+// serial format used everywhere else (Landowner/Sand Contractor/Land
+// Lease people, Sale/Purchase Orders), not the old opaque
+// timestamp+random string. Contract creation is a rare, manual, admin
+// action, so the unguarded count-then-insert race that a high-frequency
+// path like Dispatch's slip number has to defend against isn't a real
+// concern here.
+async function generateContractNumber(kilnId: string) {
+  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(soilContracts).where(eq(soilContracts.kilnId, kilnId)))[0];
+  return `SC-${(countRow?.count ?? 0) + 1}`;
 }
 
 export interface CreateSoilContractInput {
@@ -110,7 +116,7 @@ export async function createSoilContract(input: CreateSoilContractInput) {
   await assertPersonOfType(input.kilnId, input.landownerId, ["LANDOWNER"]);
 
   const rateType = input.rateType ?? "PER_TROLLEY";
-  const contractNumber = generateContractNumber();
+  const contractNumber = await generateContractNumber(input.kilnId);
   const totalContractValue = computeTotalContractValue(input);
 
   const { paymentMode, cashAmount, onlineAmount, ...insertableInput } = input;

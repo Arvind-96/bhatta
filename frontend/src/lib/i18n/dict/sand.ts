@@ -40,6 +40,7 @@ export const sandDict: Record<string, Record<Locale, string>> = {
   "sand.deliveries": { en: "Sand Deliveries", hi: "रेत आपूर्ति" },
   "sand.logDelivery": { en: "Log delivery", hi: "आपूर्ति दर्ज करें" },
   "sand.noDeliveriesYet": { en: "No sand deliveries logged yet.", hi: "अभी तक कोई रेत आपूर्ति दर्ज नहीं हुई।" },
+  "sand.noContractsYet": { en: "No sand contracts yet.", hi: "अभी तक कोई रेत ठेका नहीं है।" },
   "sand.logSandDelivery": { en: "Log sand delivery", hi: "रेत आपूर्ति दर्ज करें" },
   "sand.deliverySubtitle": { en: "Trolleys delivered by the sand contractor", hi: "रेत ठेकेदार द्वारा दी गई ट्रॉलियां" },
   "sand.selectSandContractor": { en: "Select sand contractor…", hi: "रेत ठेकेदार चुनें…" },

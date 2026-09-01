@@ -3,6 +3,7 @@ import { ArrowLeft, Pencil, Plus, Printer, Trash2, X } from "lucide-react";
 import { EditLedgerEntryModal } from "@/components/people/EditLedgerEntryModal";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
@@ -64,6 +65,9 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [idNumber, setIdNumber] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -97,6 +101,9 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
     setName(detail.person.name);
     setPhone(detail.person.phone ?? "");
     setAddress(detail.person.address ?? "");
+    setIdNumber(detail.person.idNumber ?? "");
+    setNickname(detail.person.nickname ?? "");
+    setJoiningDate(detail.person.joiningDate ? detail.person.joiningDate.slice(0, 10) : "");
   }
 
   useEffect(() => {
@@ -116,6 +123,9 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
         name: name.trim(),
         phone: phone || undefined,
         address: address || undefined,
+        idNumber: idNumber || undefined,
+        nickname: nickname.trim() || undefined,
+        joiningDate: joiningDate || undefined,
       });
       await refresh();
       setIsEditing(false);
@@ -129,6 +139,9 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
       setName(contractor.name);
       setPhone(contractor.phone ?? "");
       setAddress(contractor.address ?? "");
+      setIdNumber(contractor.idNumber ?? "");
+      setNickname(contractor.nickname ?? "");
+      setJoiningDate(contractor.joiningDate ? contractor.joiningDate.slice(0, 10) : "");
     }
     setIsEditing(false);
   }
@@ -138,6 +151,17 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
     setUploadingPhoto(true);
     try {
       await api.people.uploadPhoto(sandContractorId, file);
+      await refresh();
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  async function handleIdentityProofChange(file: File | null) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      await api.people.uploadIdentityProof(sandContractorId, file);
       await refresh();
     } finally {
       setUploadingPhoto(false);
@@ -262,10 +286,18 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
           <div className="flex items-start gap-3">
             <PersonAvatar personId={sandContractorId} hasPhoto={!!contractor.photoPath} name={contractor.name} />
             <div>
-              <h3 className="text-lg font-semibold text-ink-primary">{contractor.name}</h3>
+              <h3 className="text-lg font-semibold text-ink-primary">
+                {contractor.name}
+                {contractor.nickname && <span className="ml-1.5 font-normal text-ink-muted">"{contractor.nickname}"</span>}
+              </h3>
               <p className="text-sm text-ink-muted">
                 {contractor.sandContractorSerial ? `${t("people.sandContractor")} - ${contractor.sandContractorSerial}` : t("people.sandContractor")}
               </p>
+              {contractor.joiningDate && (
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  {t("people.joiningDate")}: {new Date(contractor.joiningDate).toLocaleDateString("en-IN")}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -300,8 +332,14 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
           {isEditing ? (
             <form onSubmit={saveProfile} className="flex flex-col gap-2">
               <input required placeholder={t("common.name")} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.nickname")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
               <input placeholder={t("people.mobileNumber")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
               <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.aadharIdNumber")} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className={inputClass} />
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
+                <DateInput value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+              </label>
               <Button type="submit" size="sm" disabled={savingProfile}>
                 {t("people.saveProfile")}
               </Button>
@@ -311,11 +349,36 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
                 <PhotoCaptureInput value={null} onChange={handlePhotoChange} />
                 {uploadingPhoto && <p className="mt-1 text-sm text-ink-muted">{t("common.saving")}</p>}
               </div>
+              <div className="border-t border-border pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("people.identityProof")}</p>
+                <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-ink-muted hover:border-series-1/40 hover:text-series-1">
+                  <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => handleIdentityProofChange(e.target.files?.[0] ?? null)} />
+                  {contractor.identityProofPath ? t("people.replaceIdentityProof") : t("people.uploadIdentityProofHint")}
+                </label>
+              </div>
             </form>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <ProfileViewField label={t("people.mobileNumber")} value={contractor.phone} />
               <ProfileViewField label={t("people.address")} value={contractor.address} />
+              <ProfileViewField label={t("people.aadharIdNumber")} value={contractor.idNumber} />
+              <ProfileViewField
+                label={t("people.identityProof")}
+                value={
+                  contractor.identityProofPath ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const blob = await api.people.fetchIdentityProofBlob(sandContractorId);
+                        if (blob) window.open(URL.createObjectURL(blob), "_blank");
+                      }}
+                      className="text-series-1 hover:underline"
+                    >
+                      {t("common.view")}
+                    </button>
+                  ) : undefined
+                }
+              />
             </div>
           )}
         </Card>

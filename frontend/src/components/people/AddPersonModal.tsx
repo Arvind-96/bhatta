@@ -286,8 +286,7 @@ export function AddPersonModal({
             >
               <option value="">{t("people.bharaiStageOptional")}</option>
               <option value="PHAD_TO_STOCK">{t("people.stage1PhadToStock")}</option>
-              <option value="PHAD_TO_CHAMBER">{t("people.stage2PhadToChamber")}</option>
-              <option value="STOCK_TO_CHAMBER">{t("people.stage3StockToChamber")}</option>
+              <option value="STOCK_TO_CHAMBER">{t("people.stage2StockToChamber")}</option>
             </select>
           )}
 

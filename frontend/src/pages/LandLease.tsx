@@ -135,7 +135,7 @@ export function LandLease() {
       <Card>
         {filteredContracts.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-muted">
-            {contracts.length === 0 ? t("soil.noContractsYet") : t("soil.noContractsMatchSearch")}
+            {contracts.length === 0 ? t("landLease.noContractsYet") : t("soil.noContractsMatchSearch")}
           </p>
         ) : (
           <div className="overflow-x-auto">

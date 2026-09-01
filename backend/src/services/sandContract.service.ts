@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { sandContracts, people, SAND_CONTRACT_RATE_TYPES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
@@ -8,10 +8,11 @@ import { emitToKiln } from "../config/socket";
 
 export type SandContractRateType = (typeof SAND_CONTRACT_RATE_TYPES)[number];
 
-// Same shape as soilContract.service.ts's generateContractNumber —
-// timestamp + random suffix, no counter to race on.
-function generateContractNumber() {
-  return `SD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+// A plain per-kiln sequential number (SD-1, SD-2, ...) — see
+// soilContract.service.ts's generateContractNumber for the same reasoning.
+async function generateContractNumber(kilnId: string) {
+  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(sandContracts).where(eq(sandContracts.kilnId, kilnId)))[0];
+  return `SD-${(countRow?.count ?? 0) + 1}`;
 }
 
 export interface CreateSandContractInput {
@@ -46,7 +47,7 @@ export async function createSandContract(input: CreateSandContractInput) {
   await assertPersonOfType(input.kilnId, input.sandContractorId, ["SAND_CONTRACTOR"]);
 
   const rateType = input.rateType ?? "PER_TROLLEY";
-  const contractNumber = generateContractNumber();
+  const contractNumber = await generateContractNumber(input.kilnId);
 
   const { paymentMode, cashAmount, onlineAmount, ...insertableInput } = input;
 

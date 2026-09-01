@@ -30,8 +30,7 @@ function useStageLabels(): Record<StackingStage, string> {
   const { t } = useTranslation();
   return {
     PHAD_TO_STOCK: t("stacking.stage1Label"),
-    PHAD_TO_CHAMBER: t("stacking.stage2Label"),
-    STOCK_TO_CHAMBER: t("stacking.stage3Label"),
+    STOCK_TO_CHAMBER: t("stacking.stage2Label"),
   };
 }
 
@@ -226,7 +225,6 @@ export function StackingContractorDetailPage({ contractorId, onBack }: StackingC
             <select value={stageInput} onChange={(e) => setStageInput(e.target.value as "" | StackingStage)} className={inputClass}>
               <option value="">{t("stacking.stageNotSet")}</option>
               <option value="PHAD_TO_STOCK">{stageLabels.PHAD_TO_STOCK}</option>
-              <option value="PHAD_TO_CHAMBER">{stageLabels.PHAD_TO_CHAMBER}</option>
               <option value="STOCK_TO_CHAMBER">{stageLabels.STOCK_TO_CHAMBER}</option>
             </select>
           </form>

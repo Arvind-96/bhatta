@@ -64,6 +64,7 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   "people.addLandLease": { en: "Add land lease", hi: "पट्टा भूमि जोड़ें" },
   "landLease.addModalTitle": { en: "Add Land Lease (Patta)", hi: "पट्टा भूमि जोड़ें" },
   "landLease.noContractYetHeading": { en: "Land Lease (Patta) without a contract yet — tap to add one", hi: "बिना ठेके वाले पट्टा भूमि — जोड़ने के लिए टैप करें" },
+  "landLease.noContractsYet": { en: "No land lease contracts yet.", hi: "अभी तक कोई पट्टा ठेका नहीं है।" },
   "people.noLandLeaseYet": { en: "No land lease (Patta) added yet.", hi: "अभी तक कोई पट्टा भूमि नहीं जोड़ी गई।" },
   "landLease.newContract": { en: "New Lease Contract", hi: "नया पट्टा अनुबंध" },
   "people.typeLandLease": { en: "Land Lease (Patta)", hi: "पट्टा भूमि" },
@@ -147,9 +148,8 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   },
   "people.bharaiThekedarOptional": { en: "Bharai thekedar / contractor (optional)", hi: "भराई ठेकेदार (वैकल्पिक)" },
   "people.bharaiStageOptional": { en: "Bharai stage (optional)", hi: "भराई चरण (वैकल्पिक)" },
-  "people.stage1PhadToStock": { en: "Stage 1: Phad to Raw Brick Stock", hi: "चरण 1: फड़ से कच्ची ईंट स्टॉक तक" },
-  "people.stage2PhadToChamber": { en: "Stage 2: Phad to Chamber", hi: "चरण 2: फड़ से घेर तक" },
-  "people.stage3StockToChamber": { en: "Stage 3: Stock to Chamber", hi: "चरण 3: स्टॉक से घेर तक" },
+  "people.stage1PhadToStock": { en: "Stage 1: Phad to Stock/Chamber (Gher)", hi: "चरण 1: फड़ से स्टॉक/घेर तक" },
+  "people.stage2StockToChamber": { en: "Stage 2: Stock to Chamber (Gher)", hi: "चरण 2: स्टॉक से घेर तक" },
   "people.nikasiThekedarOptional": { en: "Nikasi thekedar / contractor (optional)", hi: "निकासी ठेकेदार (वैकल्पिक)" },
   "people.pakayiThekedarOptional": { en: "Pakayi thekedar / contractor (optional)", hi: "पकाई ठेकेदार (वैकल्पिक)" },
   "people.workTypeThekedarOptional": {
@@ -195,16 +195,12 @@ export const peopleCoreDict: Record<string, Record<Locale, string>> = {
   // --- components/people/AddLabourModal.tsx ---
   "people.workTypePathai": { en: "Pathai", hi: "पथाई" },
   "people.workTypeBharaiPhadToStock": {
-    en: "Bharai — phad se kachi eent stock tak",
-    hi: "भराई — फड़ से कच्ची ईंट स्टॉक तक",
+    en: "Bharai — phad se stock/ghere tak",
+    hi: "भराई — फड़ से स्टॉक/घेर तक",
   },
   "people.workTypePakayi": { en: "Pakai", hi: "पकाई" },
   "people.workTypeNikasi": { en: "Nikasi", hi: "निकासी" },
   "people.workTypeLoading": { en: "Loading", hi: "लदाई" },
-  "people.workTypeBharaiPhadToChamber": {
-    en: "Bharai — phad se seedhe ghere tak",
-    hi: "भराई — फड़ से सीधे घेर तक",
-  },
   "people.workTypeTudi": { en: "Tudi", hi: "तुड़ी" },
   "people.workTypeRawas": { en: "Rawas", hi: "रवास" },
   "people.workTypeBeldar": { en: "Beldar", hi: "बेलदार" },

@@ -36,15 +36,10 @@ function useStageMeta(): Record<StackingStage, { label: string; sublabel: string
       sublabel: t("stacking.stage1Sublabel"),
       bare: t("stacking.stage1Bare"),
     },
-    PHAD_TO_CHAMBER: {
+    STOCK_TO_CHAMBER: {
       label: t("stacking.stage2Label"),
       sublabel: t("stacking.stage2Sublabel"),
       bare: t("stacking.stage2Bare"),
-    },
-    STOCK_TO_CHAMBER: {
-      label: t("stacking.stage3Label"),
-      sublabel: t("stacking.stage3Sublabel"),
-      bare: t("stacking.stage3Bare"),
     },
   };
 }
@@ -429,15 +424,18 @@ export function Stacking() {
   }
 
   function handleStageChange(stage: "" | StackingStage) {
-    const usesVehicle = stage === "PHAD_TO_STOCK" || stage === "PHAD_TO_CHAMBER";
+    // PHAD_TO_STOCK is the only stage that leaves a Pathai site (see
+    // pathaiSiteOverview.service.ts) — vehicle mode and the site picker
+    // both only apply there.
+    const fromPhad = stage === "PHAD_TO_STOCK";
     setForm((f) => ({
       ...f,
       stage,
       gangId: "",
-      mode: usesVehicle ? f.mode : "",
-      tractorNumber: usesVehicle ? f.tractorNumber : "",
-      buggiCount: usesVehicle ? f.buggiCount : "",
-      siteId: stage ? f.siteId : "",
+      mode: fromPhad ? f.mode : "",
+      tractorNumber: fromPhad ? f.tractorNumber : "",
+      buggiCount: fromPhad ? f.buggiCount : "",
+      siteId: fromPhad ? f.siteId : "",
     }));
   }
 
@@ -513,17 +511,6 @@ export function Stacking() {
       />
 
       <StageSection
-        stage="PHAD_TO_CHAMBER"
-        contractorSummary={contractorSummary}
-        operatorSummary={operatorSummary}
-        onOpenLedger={openLedgerFor}
-        onOpenContractor={setOpenContractorId}
-        onOpenOperator={setOpenOperatorId}
-        onAddThekedar={() => setAddPersonConfig({ type: "LABOUR_CONTRACTOR", stage: "PHAD_TO_CHAMBER" })}
-        onAddOperator={() => setAddPersonConfig({ type: "WORKER", stage: "PHAD_TO_CHAMBER" })}
-      />
-
-      <StageSection
         stage="STOCK_TO_CHAMBER"
         contractorSummary={contractorSummary}
         operatorSummary={operatorSummary}
@@ -560,7 +547,6 @@ export function Stacking() {
             >
               <option value="">{t("stacking.stagePlaceholder")}</option>
               <option value="PHAD_TO_STOCK">{stageMeta.PHAD_TO_STOCK.label}</option>
-              <option value="PHAD_TO_CHAMBER">{stageMeta.PHAD_TO_CHAMBER.label}</option>
               <option value="STOCK_TO_CHAMBER">{stageMeta.STOCK_TO_CHAMBER.label}</option>
             </select>
             <select
@@ -626,7 +612,7 @@ export function Stacking() {
               <option value="AVERAGE">{t("stacking.averageSetting")}</option>
               <option value="POOR">{t("stacking.poorSetting")}</option>
             </select>
-            {(form.stage === "PHAD_TO_STOCK" || form.stage === "PHAD_TO_CHAMBER") && (
+            {form.stage === "PHAD_TO_STOCK" && (
               <>
                 <select
                   value={form.mode}
@@ -656,7 +642,7 @@ export function Stacking() {
                 )}
               </>
             )}
-            {form.stage && sites.length > 0 && (
+            {form.stage === "PHAD_TO_STOCK" && sites.length > 0 && (
               <select
                 value={form.siteId}
                 onChange={(e) => setForm((f) => ({ ...f, siteId: e.target.value }))}

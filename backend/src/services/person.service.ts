@@ -84,10 +84,9 @@ export async function assertPersonOfType(kilnId: string, personId: string, allow
 // a labourer created from the simplified Add Labour form immediately shows
 // up in the right Bharai stage without a second edit. Only fills the gap
 // when the caller hasn't set stackingStage explicitly themselves.
-function deriveStackingStage(input: { workType?: WorkType; stackingStage?: "PHAD_TO_STOCK" | "PHAD_TO_CHAMBER" | "STOCK_TO_CHAMBER" }) {
+function deriveStackingStage(input: { workType?: WorkType; stackingStage?: "PHAD_TO_STOCK" | "STOCK_TO_CHAMBER" }) {
   if (input.stackingStage) return input.stackingStage;
   if (input.workType === "BHARAI_PHAD_TO_STOCK") return "PHAD_TO_STOCK" as const;
-  if (input.workType === "BHARAI_PHAD_TO_CHAMBER") return "PHAD_TO_CHAMBER" as const;
   if (input.workType === "BHARAI_STOCK_TO_CHAMBER") return "STOCK_TO_CHAMBER" as const;
   return input.stackingStage;
 }

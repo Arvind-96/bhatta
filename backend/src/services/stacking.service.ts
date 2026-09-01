@@ -17,9 +17,10 @@ export interface CreateStackingInput {
   gherId: string;
   gangId: string;
   stage: StackingStage;
-  // Nullable — only meaningful when stage is PHAD_TO_STOCK or PHAD_TO_CHAMBER
-  // (both originate at a Pathai site): which site these raw bricks were
-  // hauled from (see pathaiSites' own doc comment).
+  // Nullable — only meaningful when stage is PHAD_TO_STOCK (bricks leaving
+  // the Pathai site, to either stock or straight to the chamber): which
+  // site these raw bricks were hauled from (see pathaiSites' own doc
+  // comment).
   siteId?: string;
   bricksCount: number;
   damageCount?: number;

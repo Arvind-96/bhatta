@@ -140,15 +140,14 @@ export const stackingEntries = mysqlTable("stacking_entries", {
   gherId: varchar("gherId", { length: 64 }).notNull(),
   gangId: varchar("gangId", { length: 64 }).notNull(),
   stage: varchar("stage", { length: 50, enum: STACKING_STAGES }),
-  // Nullable — only meaningful when stage is PHAD_TO_STOCK or PHAD_TO_CHAMBER:
-  // which Pathai site these raw bricks were hauled FROM. Both stages mean
-  // "moving raw bricks off the molding ground" (as opposed to
-  // STOCK_TO_CHAMBER, which moves bricks already off-site into a gher) —
-  // this is what lets a site's current raw-brick stock be computed as
-  // molded-there minus moved-away-from-there. See
-  // pathaiSiteOverview.service.ts for why only PHAD_TO_CHAMBER and
-  // STOCK_TO_CHAMBER count as bricks actually leaving the site, while
-  // PHAD_TO_STOCK is an internal same-site reshuffle.
+  // Nullable — only meaningful when stage is PHAD_TO_STOCK: which Pathai
+  // site these raw bricks were hauled FROM. PHAD_TO_STOCK means "moving
+  // raw bricks off the molding ground" — to either stock or straight to
+  // the chamber, either way leaving the site — as opposed to
+  // STOCK_TO_CHAMBER, a purely kiln-side move (already-staged stock into
+  // a gher) that never touches a Pathai site. This is what lets a site's
+  // current raw-brick stock be computed as molded-there minus
+  // moved-away-from-there. See pathaiSiteOverview.service.ts.
   siteId: varchar("siteId", { length: 64 }),
   bricksCount: int("bricksCount").notNull(),
   damageCount: int("damageCount").default(0),
