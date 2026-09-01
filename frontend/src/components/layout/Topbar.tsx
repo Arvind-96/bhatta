@@ -156,7 +156,7 @@ export function Topbar() {
           >
             <span
               className={cn(
-                "absolute top-0.5 h-[18px] w-[18px] rounded-full bg-gradient-accent2 shadow-sm transition-transform",
+                "absolute left-0 top-0.5 h-[18px] w-[18px] rounded-full bg-gradient-accent2 shadow-sm transition-transform",
                 isDark ? "translate-x-[18px]" : "translate-x-0.5"
               )}
             />
