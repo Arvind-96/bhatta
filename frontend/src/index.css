@@ -139,55 +139,70 @@ body {
    (the way real frosted glass catches light from above) and a diagonal
    light-sweep that crosses the card once on hover. Every element that
    already uses .glass-panel (Card and anything built on it) picks this
-   up automatically — no per-component changes needed. */
-.glass-panel {
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  position: relative;
-}
-/* Both pseudo-elements get their own border-radius so the highlight ring
-   and sweep respect the card's rounded corners WITHOUT the parent needing
-   overflow:hidden — deliberately avoided, since several cards across the
-   app host absolutely-positioned dropdowns/menus/tooltips that need to
-   overflow their card's bounds, and clipping the parent would break them. */
-.glass-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 30%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-}
-.glass-panel::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  z-index: 2;
-  pointer-events: none;
-  overflow: hidden;
-  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.3) 48%, rgba(255, 255, 255, 0) 58%);
-  transform: translateX(-140%);
-  transition: transform 0.1s linear;
-}
-.glass-panel:hover::after {
-  transform: translateX(140%);
-  transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.dark .glass-panel {
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
-}
-@media (prefers-reduced-motion: reduce) {
-  .glass-panel:hover::after {
-    transition: none;
+   up automatically — no per-component changes needed.
+
+   Wrapped in @layer components (rather than left as plain CSS after the
+   @tailwind directives) so Tailwind's own utilities always win a
+   specificity tie against it. Without this, `.glass-panel`'s own
+   `position: relative` — same 0,1,0 specificity as Tailwind's
+   `.absolute{position:absolute}`, but textually later in the compiled
+   stylesheet — silently overrode `absolute`/`fixed` on any element using
+   both classes together (every dropdown/menu built as
+   `className="glass-panel absolute ..."`: Topbar's profile and
+   notification menus, Reports' filter panel, KilnSwitcher). Each one
+   rendered in normal document flow instead of floating, inflating its
+   sticky header/container by the menu's own height and pushing the rest
+   of the page down every time it opened. */
+@layer components {
+  .glass-panel {
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    position: relative;
+  }
+  /* Both pseudo-elements get their own border-radius so the highlight ring
+     and sweep respect the card's rounded corners WITHOUT the parent needing
+     overflow:hidden — deliberately avoided, since several cards across the
+     app host absolutely-positioned dropdowns/menus/tooltips that need to
+     overflow their card's bounds, and clipping the parent would break them. */
+  .glass-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    border-radius: inherit;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 30%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+  .glass-panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    z-index: 2;
+    pointer-events: none;
+    overflow: hidden;
+    background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.3) 48%, rgba(255, 255, 255, 0) 58%);
     transform: translateX(-140%);
+    transition: transform 0.1s linear;
+  }
+  .glass-panel:hover::after {
+    transform: translateX(140%);
+    transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .dark .glass-panel {
+    background: color-mix(in srgb, var(--surface) 55%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .glass-panel:hover::after {
+      transition: none;
+      transform: translateX(-140%);
+    }
   }
 }
 
