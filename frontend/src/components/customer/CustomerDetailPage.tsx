@@ -199,19 +199,26 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
                       <tr className="border-b border-border text-left text-sm text-ink-muted">
                         <th className="pb-2 font-medium">{t("dispatchDocs.numberHeader")}</th>
                         <th className="pb-2 font-medium">{t("common.date")}</th>
-                        <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
-                        <th className="pb-2 font-medium text-right">{t("customer.amountPayingNowPlaceholder")}</th>
+                        <th className="pb-2 font-medium text-right">{t("customer.invoiceTotalHeader")}</th>
+                        <th className="pb-2 font-medium text-right">{t("customer.invoicePaidHeader")}</th>
+                        <th className="pb-2 font-medium text-right">{t("customer.invoiceDueHeader")}</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {invoices.map((inv) => (
-                        <tr key={inv._id} onClick={() => setOpenInvoiceId(inv._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                          <td className="py-3 text-ink-primary hover:underline">{formatInvoiceNumber(inv, kilnName)}</td>
-                          <td className="py-3 text-ink-secondary">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString("en-IN") : "—"}</td>
-                          <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(inv.netAmount)}</td>
-                          <td className="py-3 text-right tabular-nums text-ink-secondary">₹{formatINR(inv.amountPaidNow ?? inv.netAmount)}</td>
-                        </tr>
-                      ))}
+                      {invoices.map((inv) => {
+                        const charge = inv.bricksCount > 0 ? inv.netAmount : 0;
+                        const paid = inv.amountPaidNow ?? inv.netAmount;
+                        const due = Math.round((charge - paid) * 100) / 100;
+                        return (
+                          <tr key={inv._id} onClick={() => setOpenInvoiceId(inv._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
+                            <td className="py-3 text-ink-primary hover:underline">{formatInvoiceNumber(inv, kilnName)}</td>
+                            <td className="py-3 text-ink-secondary">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString("en-IN") : "—"}</td>
+                            <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(charge)}</td>
+                            <td className="py-3 text-right tabular-nums text-status-good">₹{formatINR(paid)}</td>
+                            <td className="py-3 text-right tabular-nums text-status-critical">₹{formatINR(due)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
