@@ -402,6 +402,11 @@ export const expenses = mysqlTable("expenses", {
   // above, lets deleteDoctorVisit/updateDoctorVisit find and keep this row
   // in sync with the visit it came from.
   doctorVisitId: varchar("doctorVisitId", { length: 64 }),
+  // Set only for the row auto-logged from a Supplier Invoice's amountPaid
+  // — same purpose as doctorVisitId above, lets
+  // updateSupplierInvoice/deleteSupplierInvoice find and keep this row in
+  // sync with the invoice it came from.
+  supplierInvoiceId: varchar("supplierInvoiceId", { length: 64 }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDateIdx: index("expense_kiln_date_idx").on(t.kilnId, t.date),

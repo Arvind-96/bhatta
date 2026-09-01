@@ -939,6 +939,8 @@ export interface Expense {
   soilTripId?: string;
   dispatchId?: string;
   brickLoadingEntryId?: string;
+  doctorVisitId?: string;
+  supplierInvoiceId?: string;
 }
 
 export interface ExpenseType {

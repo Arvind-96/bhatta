@@ -1,0 +1,1 @@
+ALTER TABLE `expenses` ADD `supplierInvoiceId` varchar(64);

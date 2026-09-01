@@ -29,6 +29,7 @@ export interface CreateExpenseInput {
   dispatchId?: string;
   brickLoadingEntryId?: string;
   doctorVisitId?: string;
+  supplierInvoiceId?: string;
 }
 
 export async function createExpense(input: CreateExpenseInput) {
@@ -48,12 +49,13 @@ export async function createExpense(input: CreateExpenseInput) {
   return expense;
 }
 
-// Auto-logs a cost that already lives on a Brick Loading trip or Dispatch
-// row (driver reward/inam, loading charge, unloading charge) as a first-
-// class Expense the moment that row is created — see brickLoading.service.ts
-// createBrickLoadingEntry and dispatch.service.ts createDispatch, the only
-// two call sites. Silently no-ops for a zero/missing amount so callers
-// don't need their own guard.
+// Auto-logs a cost that already lives on another record (a Brick Loading
+// trip or Dispatch's driver reward/inam/loading/unloading charge, a Doctor
+// Visit's medicine+consultation cost, a Supplier Invoice's amountPaid) as
+// a first-class Expense the moment that record is created — see
+// brickLoading.service.ts/dispatch.service.ts/doctorVisit.service.ts/
+// supplierInvoice.service.ts. Silently no-ops for a zero/missing amount so
+// callers don't need their own guard.
 export async function autoLogExpense(
   kilnId: string,
   seasonId: string,
@@ -65,6 +67,7 @@ export async function autoLogExpense(
     dispatchId?: string;
     brickLoadingEntryId?: string;
     doctorVisitId?: string;
+    supplierInvoiceId?: string;
     paymentMode?: ExpensePaymentMode;
     cashAmount?: number;
     onlineAmount?: number;

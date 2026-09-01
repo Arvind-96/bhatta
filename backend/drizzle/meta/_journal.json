@@ -281,6 +281,13 @@
       "when": 1788264100650,
       "tag": "0039_safe_orphan",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "5",
+      "when": 1788283279732,
+      "tag": "0040_panoramic_tempest",
+      "breakpoints": true
     }
   ]
 }

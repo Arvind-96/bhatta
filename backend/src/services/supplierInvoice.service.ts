@@ -1,9 +1,10 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { supplierInvoices, suppliers, type SupplierInvoiceItem } from "../db/schema";
+import { supplierInvoices, suppliers, expenses, type SupplierInvoiceItem } from "../db/schema";
 import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { emitToKiln } from "../config/socket";
+import { autoLogExpense } from "./expense.service";
 
 type PaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 
@@ -32,6 +33,12 @@ async function nextSequenceNumber(kilnId: string, seasonId: string) {
   return (maxRow?.max ?? 0) + 1;
 }
 
+// What the kiln has actually paid a supplier for goods received — real
+// money out, same as a Doctor Visit's cost, so it's auto-logged as a first
+// -class Expense the moment it's paid (see autoLogExpense). Previously
+// invisible everywhere in the app's cost accounting: amountPaid just sat
+// on this row with no ledger entry and no Expense, unlike every other
+// payment type in the app.
 export async function createSupplierInvoice(kilnId: string, input: SupplierInvoiceInput) {
   const supplier = (await db.select().from(suppliers).where(and(eq(suppliers._id, input.supplierId), eq(suppliers.kilnId, kilnId))))[0];
   if (!supplier) throw new Error("Supplier not found in this kiln");
@@ -40,6 +47,17 @@ export async function createSupplierInvoice(kilnId: string, input: SupplierInvoi
   const sequenceNumber = await nextSequenceNumber(kilnId, input.seasonId);
   await db.insert(supplierInvoices).values({ ...input, _id, kilnId, sequenceNumber });
   const row = (await db.select().from(supplierInvoices).where(eq(supplierInvoices._id, _id)))[0]!;
+
+  await autoLogExpense(
+    kilnId,
+    input.seasonId,
+    "Supplier Purchase",
+    input.amountPaid,
+    input.date,
+    `Supplier invoice #${sequenceNumber} — ${supplier.name}`,
+    { supplierInvoiceId: _id, paymentMode: input.paymentMode, cashAmount: input.cashAmount, onlineAmount: input.onlineAmount }
+  );
+
   emitToKiln(kilnId, "supplierInvoice:update", row);
   return row;
 }
@@ -80,11 +98,44 @@ export async function getSupplierDetail(kilnId: string, supplierId: string) {
   return { supplier, invoices: invoiceRows, totalPaid, totalDue };
 }
 
+// Keeps the linked Expense row (matched via expenses.supplierInvoiceId) in
+// sync with any amountPaid/date/payment edit — same reasoning as
+// updateDoctorVisit. An invoice that had no payment yet (no linked
+// Expense) but is now given one gets logged for the first time here,
+// rather than the edit's payment silently never reaching the Expense page.
 export async function updateSupplierInvoice(kilnId: string, invoiceId: string, input: Partial<SupplierInvoiceInput>) {
   const existing = (await db.select().from(supplierInvoices).where(and(eq(supplierInvoices._id, invoiceId), eq(supplierInvoices.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Supplier invoice not found in this kiln");
   await db.update(supplierInvoices).set(input).where(eq(supplierInvoices._id, invoiceId));
   const updated = (await db.select().from(supplierInvoices).where(eq(supplierInvoices._id, invoiceId)))[0]!;
+
+  const newAmountPaid = input.amountPaid ?? existing.amountPaid;
+  const linkedExpense = (await db.select().from(expenses).where(eq(expenses.supplierInvoiceId, invoiceId)))[0];
+  const paymentMode = input.paymentMode ?? existing.paymentMode ?? undefined;
+  const cashAmount = input.cashAmount ?? existing.cashAmount ?? undefined;
+  const onlineAmount = input.onlineAmount ?? existing.onlineAmount ?? undefined;
+  const date = input.date ?? existing.date ?? undefined;
+
+  if (linkedExpense) {
+    await db
+      .update(expenses)
+      .set({ amount: newAmountPaid, date, paymentMode, cashAmount, onlineAmount })
+      .where(eq(expenses._id, linkedExpense._id));
+    const updatedExpense = (await db.select().from(expenses).where(eq(expenses._id, linkedExpense._id)))[0]!;
+    emitToKiln(kilnId, "expense:update", updatedExpense);
+  } else if (newAmountPaid > 0) {
+    const supplier = (await db.select().from(suppliers).where(eq(suppliers._id, existing.supplierId)))[0];
+    await autoLogExpense(
+      kilnId,
+      existing.seasonId ?? "",
+      "Supplier Purchase",
+      newAmountPaid,
+      date,
+      `Supplier invoice #${existing.sequenceNumber} — ${supplier?.name ?? "—"}`,
+      { supplierInvoiceId: invoiceId, paymentMode, cashAmount, onlineAmount }
+    );
+  }
+
   emitToKiln(kilnId, "supplierInvoice:update", updated);
   return updated;
 }
@@ -93,6 +144,13 @@ export async function deleteSupplierInvoice(kilnId: string, invoiceId: string) {
   const existing = (await db.select().from(supplierInvoices).where(and(eq(supplierInvoices._id, invoiceId), eq(supplierInvoices.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Supplier invoice not found in this kiln");
   await db.delete(supplierInvoices).where(eq(supplierInvoices._id, invoiceId));
+
+  const linkedExpense = (await db.select().from(expenses).where(eq(expenses.supplierInvoiceId, invoiceId)))[0];
+  if (linkedExpense) {
+    await db.delete(expenses).where(eq(expenses._id, linkedExpense._id));
+    emitToKiln(kilnId, "expense:update", { _id: linkedExpense._id, deleted: true });
+  }
+
   emitToKiln(kilnId, "supplierInvoice:update", { _id: invoiceId, deleted: true });
   return existing;
 }
