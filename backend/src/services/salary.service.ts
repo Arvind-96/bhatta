@@ -17,7 +17,15 @@ function daysInMonth(year: number, month: number) {
 }
 
 function monthDateRange(year: number, month: number) {
-  return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59, 999) };
+  // `end`'s time is 23:59:59 with NO fractional milliseconds: the
+  // `ledger_entries.date` column is a DATETIME(0) (see dateColumn() in
+  // schema/_helpers.ts), and MySQL rounds rather than truncates a stored
+  // value's fractional seconds — 23:59:59.999 rounds up to 00:00:00 of the
+  // *next* day, silently pushing this month's SALARY ledger entry (see
+  // generateSalarySlip below) into next month and making
+  // ledgerBalanceBefore's strict `lt` skip it entirely when computing next
+  // month's carriedForward.
+  return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59) };
 }
 
 // The Salary module's population: MUNIM/CHOWKIDAR, office-flagged HELPER,
