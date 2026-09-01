@@ -1868,3 +1868,29 @@ export interface PersonFullReport {
     dispatches?: Dispatch[];
   };
 }
+
+export interface Doctor {
+  _id: string;
+  name: string;
+  phone?: string;
+  qualification?: string;
+  clinicAddress?: string;
+  notes?: string;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface DoctorVisit {
+  _id: string;
+  doctorId: { _id: string; name: string } | string;
+  personId: { _id: string; name: string; type: PersonType } | string;
+  ailment?: string;
+  medicineCost: number;
+  consultationFee: number;
+  paymentMode?: LaborPaymentMode;
+  cashAmount?: number;
+  onlineAmount?: number;
+  date: string;
+  notes?: string;
+  createdAt: string;
+}

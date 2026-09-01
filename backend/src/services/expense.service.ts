@@ -28,6 +28,7 @@ export interface CreateExpenseInput {
   incidentId?: string;
   dispatchId?: string;
   brickLoadingEntryId?: string;
+  doctorVisitId?: string;
 }
 
 export async function createExpense(input: CreateExpenseInput) {
@@ -63,6 +64,7 @@ export async function autoLogExpense(
   links: {
     dispatchId?: string;
     brickLoadingEntryId?: string;
+    doctorVisitId?: string;
     paymentMode?: ExpensePaymentMode;
     cashAmount?: number;
     onlineAmount?: number;

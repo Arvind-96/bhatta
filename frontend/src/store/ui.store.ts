@@ -21,6 +21,7 @@ export type AppView =
   | "inventory"
   | "stock"
   | "fleet"
+  | "doctor"
   | "staff"
   | "salary"
   | "attendance"

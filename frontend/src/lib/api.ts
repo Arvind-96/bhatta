@@ -28,6 +28,8 @@ import type {
   DepthUnit,
   DieselPeriodTotals,
   Dispatch,
+  Doctor,
+  DoctorVisit,
   DispatchTotals,
   Expense,
   ExpenseCategory,
@@ -1596,6 +1598,51 @@ export const api = {
       create: (input: { machineId: string; description: string; cost?: number; downtimeHours?: number; notes?: string }) =>
         post<MachineMaintenanceLog>("/machines/maintenance", input, true),
     },
+  },
+
+  doctors: {
+    list: () => get<Doctor[]>("/doctors", true),
+    create: (input: { name: string; phone?: string; qualification?: string; clinicAddress?: string; notes?: string }) =>
+      post<Doctor>("/doctors", input, true),
+    update: (id: string, input: Partial<{ name: string; phone: string; qualification: string; clinicAddress: string; notes: string; active: boolean }>) =>
+      patch<Doctor>(`/doctors/${id}`, input, true),
+    remove: (id: string) => del(`/doctors/${id}`, true),
+  },
+
+  doctorVisits: {
+    list: (filter: { doctorId?: string; personId?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (filter.doctorId) params.set("doctorId", filter.doctorId);
+      if (filter.personId) params.set("personId", filter.personId);
+      const qs = params.toString();
+      return get<DoctorVisit[]>(`/doctor-visits${qs ? `?${qs}` : ""}`, true);
+    },
+    create: (input: {
+      doctorId: string;
+      personId: string;
+      ailment?: string;
+      medicineCost?: number;
+      consultationFee?: number;
+      paymentMode?: LaborPaymentMode;
+      cashAmount?: number;
+      onlineAmount?: number;
+      date?: string;
+      notes?: string;
+    }) => post<DoctorVisit>("/doctor-visits", input, true),
+    update: (
+      id: string,
+      input: Partial<{
+        ailment: string;
+        medicineCost: number;
+        consultationFee: number;
+        paymentMode: LaborPaymentMode;
+        cashAmount: number;
+        onlineAmount: number;
+        date: string;
+        notes: string;
+      }>
+    ) => patch<DoctorVisit>(`/doctor-visits/${id}`, input, true),
+    remove: (id: string) => del(`/doctor-visits/${id}`, true),
   },
 
   financialReports: {

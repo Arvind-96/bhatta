@@ -13,3 +13,4 @@ export * from "./saleOrder";
 export * from "./purchaseOrder";
 export * from "./bank";
 export * from "./landLease";
+export * from "./doctor";
