@@ -1,46 +1,75 @@
 import type { Config } from "tailwindcss";
 
+// Every design-token color below resolves through a CSS custom property
+// (so both themes/.dark can repaint it at runtime) — but a bare `var(--x)`
+// string is opaque to Tailwind's opacity-modifier machinery (`bg-x/15`,
+// `border-x/40`, ...): Tailwind can't inject an alpha channel into a
+// variable it can't see inside, so it silently drops the utility instead
+// of erroring. That's why every `/N`-suffixed utility on these colors —
+// bg-ink-primary/15, bg-series-1/15, border-status-critical/25, and every
+// other opacity-modified use of these tokens app-wide — has been
+// generating no CSS at all. Wrapping each color in this Tailwind
+// "color as a function" form (documented for exactly this case) fixes
+// every one of those utilities at once: full-strength (`bg-ink-primary`)
+// still resolves to the plain variable unchanged, while an opacity
+// modifier switches it to color-mix (already used by hand throughout
+// index.css, so the same browser-support baseline applies).
+function withOpacity(variable: string) {
+  return ({ opacityValue }: { opacityValue?: string }) =>
+    opacityValue === undefined ? `var(${variable})` : `color-mix(in srgb, var(${variable}) calc(${opacityValue} * 100%), transparent)`;
+}
+
 export default {
   darkMode: "class",
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        surface: "var(--surface)",
-        "surface-raised": "var(--surface-raised)",
-        plane: "var(--plane)",
-        border: "var(--border-hairline)",
+        surface: withOpacity("--surface"),
+        "surface-raised": withOpacity("--surface-raised"),
+        plane: withOpacity("--plane"),
+        border: withOpacity("--border-hairline"),
         ink: {
-          primary: "var(--ink-primary)",
-          secondary: "var(--ink-secondary)",
-          muted: "var(--ink-muted)",
+          primary: withOpacity("--ink-primary"),
+          secondary: withOpacity("--ink-secondary"),
+          muted: withOpacity("--ink-muted"),
         },
         sidebar: {
-          DEFAULT: "var(--sidebar)",
-          raised: "var(--sidebar-raised)",
-          ink: "var(--sidebar-ink)",
-          "ink-soft": "var(--sidebar-ink-soft)",
-          "ink-faint": "var(--sidebar-ink-faint)",
-          line: "var(--sidebar-line)",
+          DEFAULT: withOpacity("--sidebar"),
+          raised: withOpacity("--sidebar-raised"),
+          ink: withOpacity("--sidebar-ink"),
+          "ink-soft": withOpacity("--sidebar-ink-soft"),
+          "ink-faint": withOpacity("--sidebar-ink-faint"),
+          line: withOpacity("--sidebar-line"),
         },
         series: {
-          1: "var(--series-1)",
-          2: "var(--series-2)",
-          3: "var(--series-3)",
-          4: "var(--series-4)",
-          5: "var(--series-5)",
-          6: "var(--series-6)",
+          1: withOpacity("--series-1"),
+          2: withOpacity("--series-2"),
+          3: withOpacity("--series-3"),
+          4: withOpacity("--series-4"),
+          5: withOpacity("--series-5"),
+          6: withOpacity("--series-6"),
         },
         status: {
-          good: "var(--status-good)",
-          warning: "var(--status-warning)",
-          serious: "var(--status-serious)",
-          critical: "var(--status-critical)",
+          good: withOpacity("--status-good"),
+          warning: withOpacity("--status-warning"),
+          serious: withOpacity("--status-serious"),
+          critical: withOpacity("--status-critical"),
         },
       },
       borderRadius: {
         xl: "0.75rem",
         "2xl": "1rem",
+      },
+      // Registers the app's two brand gradients as real Tailwind
+      // `bg-gradient-*` utilities (bg-gradient-brand, bg-gradient-accent2,
+      // usable with hover:/dark: variants like any other utility) — the
+      // plain `.gradient-brand`/`.gradient-accent2` CSS classes in
+      // index.css still exist unchanged for the many components that use
+      // them as bare classNames; this is purely additive.
+      backgroundImage: {
+        "gradient-brand": "var(--gradient-brand)",
+        "gradient-accent2": "var(--gradient-accent2)",
       },
       boxShadow: {
         glass: "var(--shadow-glass)",
