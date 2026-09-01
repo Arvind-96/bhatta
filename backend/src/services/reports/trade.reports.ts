@@ -22,14 +22,17 @@ const customers: ReportDefinition = {
 
     const rows = await Promise.all(
       scoped.map(async (c) => {
-        // Both totals sum every invoice in the period, brick sale or
-        // 0-brick advance/adjustment (see AddCustomerPaymentModal.tsx) alike
-        // — invoicedThisPeriod used to skip 0-brick rows while
-        // paidThisPeriod counted them, so an advance payment made
-        // dueThisPeriod go negative for that customer even though nothing
-        // was actually overpaid.
+        // Same charge/paid split getCustomerDetail uses (customer.service.ts)
+        // and the Customer profile's own Invoices table: a 0-brick row (see
+        // AddCustomerPaymentModal.tsx) is an advance/general payment, not a
+        // real sale, so it contributes to paidThisPeriod but not to
+        // invoicedThisPeriod — counting its netAmount as "invoiced" too
+        // double-weighted every advance payment into dueThisPeriod (e.g. a
+        // customer whose only 0-brick row was a ₹4,000 advance showed
+        // ₹4,000 too much due, since that ₹4,000 was being added as a
+        // charge AND already subtracted back out as a payment).
         const invoices = await listInvoices(kilnId, null, { customerId: c._id, from: filters.from, to: filters.to });
-        const invoicedThisPeriod = round2(invoices.reduce((s, i) => s + i.netAmount, 0));
+        const invoicedThisPeriod = round2(invoices.reduce((s, i) => s + (i.bricksCount > 0 ? i.netAmount : 0), 0));
         const paidThisPeriod = round2(invoices.reduce((s, i) => s + (i.amountPaidNow ?? i.netAmount), 0));
         return {
           customer: c.name,
@@ -73,15 +76,25 @@ const invoices: ReportDefinition = {
       db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)).then((r) => r[0]),
     ]);
     const kilnName = kiln?.name ?? "Bhatta Cloud";
-    const detail = rows.map((r) => ({
-      date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
-      serial: formatInvoiceNumber(r, kilnName),
-      customer: r.customerName,
-      bricksCount: r.bricksCount,
-      netAmount: r.netAmount,
-      paidNow: r.amountPaidNow ?? r.netAmount,
-      due: round2(r.netAmount - (r.amountPaidNow ?? r.netAmount)),
-    }));
+    const detail = rows.map((r) => {
+      // netAmount/paidNow stay as the invoice's own raw figures (a 0-brick
+      // row's netAmount is literally the advance/general-payment amount,
+      // same transparency the Customer profile's Invoices table keeps) —
+      // only `due` is charge-gated like getCustomerDetail, so a 0-brick
+      // row nets out as the credit it actually is instead of always
+      // reading 0 and silently dropping out of the report's Due total.
+      const charge = r.bricksCount > 0 ? r.netAmount : 0;
+      const paidNow = r.amountPaidNow ?? r.netAmount;
+      return {
+        date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
+        serial: formatInvoiceNumber(r, kilnName),
+        customer: r.customerName,
+        bricksCount: r.bricksCount,
+        netAmount: r.netAmount,
+        paidNow,
+        due: round2(charge - paidNow),
+      };
+    });
 
     if (filters.groupBy && filters.groupBy !== "none") {
       const grouped = groupRowsByPeriod(detail, "date", ["netAmount", "paidNow", "due"], filters.groupBy);
