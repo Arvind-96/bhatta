@@ -147,6 +147,7 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "stock.grade": { en: "Grade", hi: "ग्रेड" },
   "stock.gradePlaceholder": { en: "Grade (e.g. A1, optional)", hi: "ग्रेड (जैसे A1, वैकल्पिक)" },
   "stock.pricePerBrick": { en: "Price per brick", hi: "प्रति ईंट कीमत" },
+  "stock.stockValue": { en: "Stock value", hi: "स्टॉक मूल्य" },
   "stock.selectCategoryPlaceholder": { en: "Select category…", hi: "श्रेणी चुनें…" },
   "stock.noCategoriesYet": {
     en: "No brick categories added yet — add one above to start tracking its stock.",
@@ -262,6 +263,7 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "fleet.fuelElectricityTab": { en: "Fuel & Electricity", hi: "ईंधन व बिजली" },
   "fleet.maintenanceBreakdownTab": { en: "Maintenance & Breakdown", hi: "मरम्मत व खराबी" },
 
+  "fleet.identifierColumn": { en: "Registration / Identifier", hi: "पंजीकरण / पहचान" },
   "fleet.purchaseDate": { en: "Date of purchase", hi: "खरीद की तारीख" },
   "fleet.price": { en: "Price (₹)", hi: "कीमत (₹)" },
   "fleet.purchasedByName": { en: "Purchased by — name", hi: "किसने खरीदा — नाम" },

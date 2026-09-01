@@ -12,7 +12,19 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { MachineDetailPage } from "@/components/fleet/MachineDetailPage";
 import { useMachineTypeLabels } from "@/components/fleet/machineTypes";
+import { buildReportWorkbookBlob, downloadExcelFile } from "@/lib/exportExcel";
 import type { Machine, MachineType } from "@/types";
+import type { ReportColumn } from "@/types/reports";
+
+const FLEET_EXCEL_COLUMNS: ReportColumn[] = [
+  { key: "name", labelKey: "common.name", format: "text" },
+  { key: "type", labelKey: "common.type", format: "text" },
+  { key: "identifier", labelKey: "fleet.identifierColumn", format: "text" },
+  { key: "purchaseDate", labelKey: "fleet.purchaseDate", format: "date" },
+  { key: "price", labelKey: "fleet.price", format: "currency" },
+  { key: "totalPaid", labelKey: "fleet.totalPaidLabel", format: "currency" },
+  { key: "remainingDue", labelKey: "fleet.remainingDueLabel", format: "currency" },
+];
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -93,7 +105,29 @@ export function Fleet() {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {machines.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              const rows = machines.map((m) => ({
+                name: m.name,
+                type: machineTypeLabels[m.type],
+                identifier: m.identifier ?? "",
+                purchaseDate: m.purchaseDate ?? null,
+                price: m.price ?? 0,
+                totalPaid: m.totalPaid ?? 0,
+                remainingDue: m.remainingDue ?? 0,
+              }));
+              const labels = Object.fromEntries(FLEET_EXCEL_COLUMNS.map((c) => [c.key, t(c.labelKey)]));
+              const blob = buildReportWorkbookBlob(FLEET_EXCEL_COLUMNS, rows, undefined, labels, t("nav.fleet"));
+              downloadExcelFile(blob, "fleet.xlsx");
+            }}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+          >
+            {t("reports.action.downloadExcel")}
+          </button>
+        )}
         <Button size="sm" onClick={() => setShowForm((s) => !s)}>
           <Plus className="h-4 w-4" /> {t("fleet.addMachineVehicle")}
         </Button>

@@ -10,7 +10,16 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
 import { AddCustomerForm } from "@/components/customer/AddCustomerForm";
 import { CustomerDetailPage } from "@/components/customer/CustomerDetailPage";
+import { buildReportWorkbookBlob, downloadExcelFile } from "@/lib/exportExcel";
 import type { Customer } from "@/types";
+import type { ReportColumn } from "@/types/reports";
+
+const CUSTOMER_EXCEL_COLUMNS: ReportColumn[] = [
+  { key: "name", labelKey: "customer.customerNamePlaceholder", format: "text" },
+  { key: "phones", labelKey: "customer.phonesSection", format: "text" },
+  { key: "addresses", labelKey: "customer.addressesSection", format: "text" },
+  { key: "vehicles", labelKey: "customer.vehiclesSection", format: "text" },
+];
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -71,6 +80,25 @@ export function Customers() {
         <Card>
           <CardHeader>
             <CardTitle>{t("nav.customers")}</CardTitle>
+            {customers.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const rows = filtered.map((c) => ({
+                    name: c.name,
+                    phones: c.phones.join(", "),
+                    addresses: c.addresses.join(", "),
+                    vehicles: c.vehicles.map((v) => v.vehicleNumber).join(", "),
+                  }));
+                  const labels = Object.fromEntries(CUSTOMER_EXCEL_COLUMNS.map((c) => [c.key, t(c.labelKey)]));
+                  const blob = buildReportWorkbookBlob(CUSTOMER_EXCEL_COLUMNS, rows, undefined, labels, t("nav.customers"));
+                  downloadExcelFile(blob, "customers.xlsx");
+                }}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+              >
+                {t("reports.action.downloadExcel")}
+              </button>
+            )}
           </CardHeader>
           <div className="relative mb-3">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />

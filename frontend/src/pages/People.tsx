@@ -27,6 +27,16 @@ import { Staff } from "@/pages/Staff";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
+import { buildReportWorkbookBlob, downloadExcelFile } from "@/lib/exportExcel";
+import type { ReportColumn } from "@/types/reports";
+
+const THEKEDAR_EXCEL_COLUMNS: ReportColumn[] = [
+  { key: "name", labelKey: "common.name", format: "text" },
+  { key: "phone", labelKey: "common.phone", format: "text" },
+  { key: "workType", labelKey: "people.workTypeFieldLabel", format: "text" },
+  { key: "labourCount", labelKey: "people.labourCountStatLabel", format: "number" },
+  { key: "balance", labelKey: "common.balance", format: "currency" },
+];
 
 // One shared bulk fetch backing every tab's second stat tile ("Due" /
 // "Advance") — one request for every person's ledger balance in the kiln
@@ -343,9 +353,31 @@ function ThekedarTab({ onOpenThekedar }: { onOpenThekedar: (id: string) => void 
           <h3 className="font-display text-base font-bold text-ink-primary">{t("people.thekedarContractor")}</h3>
           <Badge variant="neutral">{filteredContractors.length}</Badge>
         </div>
-        <Button size="sm" onClick={() => setShowAdd(true)}>
-          <Plus className="h-4 w-4" /> {t("people.addThekedar")}
-        </Button>
+        <div className="flex items-center gap-2">
+          {filteredContractors.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const rows = filteredContractors.map((c) => ({
+                  name: c.name,
+                  phone: c.phone ?? "",
+                  workType: c.workType ? workTypeLabels[c.workType] : "",
+                  labourCount: labourCounts.get(c._id) ?? 0,
+                  balance: balances.get(c._id) ?? 0,
+                }));
+                const labels = Object.fromEntries(THEKEDAR_EXCEL_COLUMNS.map((c) => [c.key, t(c.labelKey)]));
+                const blob = buildReportWorkbookBlob(THEKEDAR_EXCEL_COLUMNS, rows, undefined, labels, t("people.thekedarContractor"));
+                downloadExcelFile(blob, "thekedar-contractors.xlsx");
+              }}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+            >
+              {t("reports.action.downloadExcel")}
+            </button>
+          )}
+          <Button size="sm" onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4" /> {t("people.addThekedar")}
+          </Button>
+        </div>
       </div>
 
       <FilterChips

@@ -10,7 +10,17 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { DieselSection } from "@/components/stock/DieselSection";
+import { buildReportWorkbookBlob, downloadExcelFile } from "@/lib/exportExcel";
 import type { BrickCategory, BrickProductionEntry, StockLoadingEntry } from "@/types";
+import type { ReportColumn } from "@/types/reports";
+
+const STOCK_EXCEL_COLUMNS: ReportColumn[] = [
+  { key: "category", labelKey: "reports.col.category", format: "text" },
+  { key: "grade", labelKey: "stock.grade", format: "text" },
+  { key: "quantity", labelKey: "reports.col.quantity", format: "number" },
+  { key: "pricePerBrick", labelKey: "stock.pricePerBrick", format: "currency" },
+  { key: "stockValue", labelKey: "stock.stockValue", format: "currency" },
+];
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -182,9 +192,31 @@ function BrickStockSection() {
           <h3 className="text-sm font-semibold text-ink-primary">{t("stock.brickCategoriesHeading")}</h3>
           <p className="text-sm text-ink-muted">{t("stock.categoriesSubtitle")}</p>
         </div>
-        <Button size="sm" onClick={() => setShowAddCategory((s) => !s)}>
-          <Plus className="h-4 w-4" /> {t("stock.addCategory")}
-        </Button>
+        <div className="flex items-center gap-2">
+          {categories.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const rows = categories.map((c) => ({
+                  category: c.category,
+                  grade: c.grade ?? "",
+                  quantity: c.quantity,
+                  pricePerBrick: c.pricePerBrick ?? 0,
+                  stockValue: Math.round(c.quantity * (c.pricePerBrick ?? 0) * 100) / 100,
+                }));
+                const labels = Object.fromEntries(STOCK_EXCEL_COLUMNS.map((c) => [c.key, t(c.labelKey)]));
+                const blob = buildReportWorkbookBlob(STOCK_EXCEL_COLUMNS, rows, undefined, labels, t("nav.stock"));
+                downloadExcelFile(blob, "stock.xlsx");
+              }}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink-secondary hover:bg-ink-primary/5"
+            >
+              {t("reports.action.downloadExcel")}
+            </button>
+          )}
+          <Button size="sm" onClick={() => setShowAddCategory((s) => !s)}>
+            <Plus className="h-4 w-4" /> {t("stock.addCategory")}
+          </Button>
+        </div>
       </div>
 
       {showAddCategory && (
