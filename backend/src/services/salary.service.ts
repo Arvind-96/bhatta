@@ -19,28 +19,22 @@ function monthDateRange(year: number, month: number) {
   return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59, 999) };
 }
 
-// The Salary module's population: exactly who the Staff page (Staff.tsx)
-// itself lists — MUNIM/CHOWKIDAR, office-flagged HELPER, every DRIVER, and
-// the types folded in from the removed People > Other tab (SUPPLIER/
-// PARTNER/FITTER/CUSTOMER) — NOT "anyone with monthlySalary set" (which
-// used to also sweep in salaried Labour Contractors/Thekedars/piece-rate
-// Workers, who belong to the People page's own Labour/Thekedar tabs and
-// are paid via the ledger/WorkEntry system, not "Salary"). Kept in sync
-// with Staff.tsx's own fetch list deliberately — every type shown there
-// must stay eligible here too, or a salaried person visible on the Staff
-// page silently stops receiving automatic monthly payroll (this
-// previously happened when this rule was scoped to the older, narrower
-// attendance-roster definition instead of Staff.tsx's actual population).
+// The Salary module's population: MUNIM/CHOWKIDAR, office-flagged HELPER,
+// every DRIVER, and FITTER (kiln machinery staff paid monthly, with real
+// salary-slip history even though they aren't on the Staff page's own
+// roster) — NOT "anyone with monthlySalary set" (which used to also sweep
+// in salaried Labour Contractors/Thekedars/piece-rate Workers, who belong
+// to the People page's own Labour/Thekedar tabs and are paid via the
+// ledger/WorkEntry system, not "Salary"), and not Suppliers, Partners, or
+// Customers either (paid via their own supplier-invoice/ledger,
+// partnership, and billing flows, not monthly payroll).
 function isStaffPerson(person: { type: string; isOfficeStaff?: boolean | null }) {
   return (
     person.type === "MUNIM" ||
     person.type === "CHOWKIDAR" ||
     (person.type === "HELPER" && !!person.isOfficeStaff) ||
     person.type === "DRIVER" ||
-    person.type === "SUPPLIER" ||
-    person.type === "PARTNER" ||
-    person.type === "FITTER" ||
-    person.type === "CUSTOMER"
+    person.type === "FITTER"
   );
 }
 
@@ -308,13 +302,11 @@ export function currentMonthString(reference = new Date()) {
   return `${reference.getFullYear()}-${String(reference.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// Salary page: every Staff-page person in the kiln (see isStaffPerson —
-// exclusively MUNIM/CHOWKIDAR/office HELPER/DRIVER, not "anyone with
-// monthlySalary set"), with their slip for the given month if one's been
+// Salary page: every payroll-eligible person in the kiln (see
+// isStaffPerson), with their slip for the given month if one's been
 // generated yet (so the UI can show "generated"/"pending" per person
 // without a second round trip). A staff member with no monthlySalary set
-// yet still shows (as permanently "pending" until one's set), matching
-// exactly who's visible on the Staff page itself.
+// yet still shows (as permanently "pending" until one's set).
 export async function listSalaryStatus(kilnId: string, month: string) {
   const rows = await db
     .select()

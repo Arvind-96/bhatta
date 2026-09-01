@@ -97,12 +97,10 @@ function StaffSection({
 
 export function Staff() {
   const { t } = useTranslation();
-  const personTypeMeta = usePersonTypeMeta();
   const [munims, setMunims] = useState<StaffMember[]>([]);
   const [chowkidars, setChowkidars] = useState<StaffMember[]>([]);
   const [officeHelpers, setOfficeHelpers] = useState<StaffMember[]>([]);
   const [drivers, setDrivers] = useState<StaffMember[]>([]);
-  const [suppliers, setSuppliers] = useState<StaffMember[]>([]);
   const [openStaffId, setOpenStaffId] = useState<string | null>(null);
   const [addType, setAddType] = useState<PersonType | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
@@ -113,14 +111,13 @@ export function Staff() {
   }
 
   async function refresh() {
-    const [munimList, chowkidarList, helperList, driverList, supplierList] = await Promise.all([
+    const [munimList, chowkidarList, helperList, driverList] = await Promise.all([
       api.people.list("MUNIM"),
       api.people.list("CHOWKIDAR"),
       api.people.list("HELPER"),
       api.people.list("DRIVER"),
-      api.people.list("SUPPLIER"),
     ]);
-    const [munimMembers, chowkidarMembers, helperMembers, driverMembers, supplierMembers] = await Promise.all([
+    const [munimMembers, chowkidarMembers, helperMembers, driverMembers] = await Promise.all([
       withBalance(munimList),
       withBalance(chowkidarList),
       withBalance(helperList.filter((h) => h.isOfficeStaff)),
@@ -128,13 +125,11 @@ export function Staff() {
       // now-removed People > Other tab's Driver filter used to show, so
       // every driver profile stays reachable from somewhere.
       withBalance(driverList),
-      withBalance(supplierList),
     ]);
     setMunims(munimMembers);
     setChowkidars(chowkidarMembers);
     setOfficeHelpers(helperMembers);
     setDrivers(driverMembers);
-    setSuppliers(supplierMembers);
   }
 
   useEffect(() => {
@@ -149,7 +144,7 @@ export function Staff() {
     return <StaffDetailPage staffId={openStaffId} onBack={() => setOpenStaffId(null)} />;
   }
 
-  const totalOnRoster = munims.length + chowkidars.length + officeHelpers.length + drivers.length + suppliers.length;
+  const totalOnRoster = munims.length + chowkidars.length + officeHelpers.length + drivers.length;
 
   return (
     <div className="space-y-6">
@@ -166,7 +161,6 @@ export function Staff() {
       <StaffSection title={t("staff.helperOffice")} members={officeHelpers} onOpen={setOpenStaffId} onAdd={() => setAddType("HELPER")} />
       <StaffSection title={t("staff.chowkidar")} members={chowkidars} onOpen={setOpenStaffId} onAdd={() => setAddType("CHOWKIDAR")} />
       <StaffSection title={t("staff.driverStaff")} members={drivers} onOpen={setOpenStaffId} onAdd={() => setAddType("DRIVER")} />
-      <StaffSection title={personTypeMeta.SUPPLIER.label} members={suppliers} onOpen={setOpenStaffId} onAdd={() => setAddType("SUPPLIER")} />
 
       {addType && (
         <AddPersonModal
