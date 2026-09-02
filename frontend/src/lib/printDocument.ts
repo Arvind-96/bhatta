@@ -1416,14 +1416,28 @@ export function printReportTable(
     rows
       .map((row) => `<tr>${columns.map((c) => `<td${c.format === "currency" || c.format === "number" ? ' class="num"' : ""}>${formatReportCell(row[c.key], c.format)}</td>`).join("")}</tr>`)
       .join("") || `<tr><td colspan="${columns.length}">No records for this filter.</td></tr>`;
+  // Average = each total divided by the number of rows in this report run
+  // (per transaction in detail view, per period when grouped) — same
+  // client-computed figure ReportTable.tsx shows on screen, kept
+  // consistent on the printed copy.
   const totalsRow = totals
-    ? `<tfoot><tr>${columns
-        .map((c, i) => {
-          if (i === 0) return `<td>Total</td>`;
-          const v = totals[c.key];
-          return `<td class="num">${v != null ? formatReportCell(v, c.format === "text" ? "number" : c.format) : ""}</td>`;
-        })
-        .join("")}</tr></tfoot>`
+    ? `<tfoot>
+        <tr>${columns
+          .map((c, i) => {
+            if (i === 0) return `<td>Total</td>`;
+            const v = totals[c.key];
+            return `<td class="num">${v != null ? formatReportCell(v, c.format === "text" ? "number" : c.format) : ""}</td>`;
+          })
+          .join("")}</tr>
+        <tr>${columns
+          .map((c, i) => {
+            if (i === 0) return `<td>Average</td>`;
+            const v = totals[c.key];
+            if (v == null || rows.length === 0 || (c.format !== "number" && c.format !== "currency")) return `<td class="num"></td>`;
+            return `<td class="num">${formatReportCell(Math.round((v / rows.length) * 100) / 100, c.format)}</td>`;
+          })
+          .join("")}</tr>
+      </tfoot>`
     : "";
 
   const body = `

@@ -1,10 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db/client";
-import { kilns } from "../../db/schema";
+import { kilns, brickLoadingEntries } from "../../db/schema";
 import { listCustomers } from "../customer.service";
 import { listInvoices, listGatePasses, listChallans, formatInvoiceNumber } from "../dispatchDocuments.service";
 import { listExpenses } from "../expense.service";
 import { listExpenseTypes } from "../expenseType.service";
+import { listBrickCategories } from "../brickCategory.service";
+import { itemsOrLegacyFallback } from "../brickLineItems.util";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
 import { ReportDefinition, round2 } from "./types";
 
@@ -71,48 +73,79 @@ const invoices: ReportDefinition = {
   key: "invoices",
   titleKey: "reports.title.invoices",
   async run(kilnId, filters) {
-    const [rows, kiln] = await Promise.all([
+    const [rows, kiln, categories] = await Promise.all([
       listInvoices(kilnId, null, { customerId: filters.customerId, agentId: filters.agentId, from: filters.from, to: filters.to }),
       db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)).then((r) => r[0]),
+      listBrickCategories(kilnId),
     ]);
     const kilnName = kiln?.name ?? "Bhatta Cloud";
-    const detail = rows.map((r) => {
-      // netAmount/paidNow stay as the invoice's own raw figures (a 0-brick
-      // row's netAmount is literally the advance/general-payment amount,
-      // same transparency the Customer profile's Invoices table keeps) —
-      // only `due` is charge-gated like getCustomerDetail, so a 0-brick
-      // row nets out as the credit it actually is instead of always
-      // reading 0 and silently dropping out of the report's Due total.
+    const categoryNameById = new Map(categories.map((c) => [c._id, c.category]));
+
+    // Loading/unloading charges are the palledar's wage for physically
+    // loading/unloading the truck — tracked on the brickLoadingEntries row
+    // a dispatch may have been generated from (brickLoading.service.ts),
+    // never folded into the invoice's own billed amount. Looked up here,
+    // one query for every relevant trip, so the report can show the full
+    // picture of a sale next to what it cost to move — exactly the
+    // "billing breakdown" gap the client asked to have closed.
+    const dispatchIds = [...new Set(rows.map((r) => r.dispatchId).filter((id): id is string => !!id))];
+    const loadingRows = dispatchIds.length
+      ? await db.select({ dispatchId: brickLoadingEntries.dispatchId, loadingCharge: brickLoadingEntries.loadingCharge, unloadingCharge: brickLoadingEntries.unloadingCharge }).from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), inArray(brickLoadingEntries.dispatchId, dispatchIds)))
+      : [];
+    const loadingByDispatch = new Map(loadingRows.map((r) => [r.dispatchId, r]));
+
+    const filtered = filters.categoryId
+      ? rows.filter((r) => itemsOrLegacyFallback(r).some((it) => it.categoryId === filters.categoryId))
+      : rows;
+
+    const detail = filtered.map((r) => {
+      // totalBillAmount/paidNow stay as the invoice's own raw figures (a
+      // 0-brick row's netAmount is literally the advance/general-payment
+      // amount, same transparency the Customer profile's Invoices table
+      // keeps) — only `due` is charge-gated like getCustomerDetail, so a
+      // 0-brick row nets out as the credit it actually is instead of
+      // always reading 0 and silently dropping out of the report's Due
+      // total.
       const charge = r.bricksCount > 0 ? r.netAmount : 0;
       const paidNow = r.amountPaidNow ?? r.netAmount;
+      const items = itemsOrLegacyFallback(r);
+      const category = [...new Set(items.map((it) => (it.categoryId ? categoryNameById.get(it.categoryId) ?? it.categoryId : null)).filter((v): v is string => !!v))].join(", ");
+      const loading = r.dispatchId ? loadingByDispatch.get(r.dispatchId) : undefined;
       return {
         date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
         serial: formatInvoiceNumber(r, kilnName),
         customer: r.customerName,
+        category: category || "—",
         bricksCount: r.bricksCount,
-        netAmount: r.netAmount,
+        totalBillAmount: r.netAmount,
         paidNow,
         due: round2(charge - paidNow),
+        loadingCharge: loading?.loadingCharge ?? 0,
+        unloadingCharge: loading?.unloadingCharge ?? 0,
       };
     });
 
     if (filters.groupBy && filters.groupBy !== "none") {
-      const grouped = groupRowsByPeriod(detail, "date", ["netAmount", "paidNow", "due"], filters.groupBy);
+      const grouped = groupRowsByPeriod(detail, "date", ["totalBillAmount", "paidNow", "due", "loadingCharge", "unloadingCharge"], filters.groupBy);
       return {
         reportKey: "invoices",
         titleKey: "reports.title.invoices",
         columns: [
           { key: "period", labelKey: "reports.col.period", format: "text" },
           { key: "count", labelKey: "reports.col.entries", format: "number" },
-          { key: "netAmount", labelKey: "reports.col.netAmount", format: "currency" },
+          { key: "totalBillAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
           { key: "paidNow", labelKey: "reports.col.paidThisPeriod", format: "currency" },
           { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+          { key: "loadingCharge", labelKey: "reports.col.loadingCharge", format: "currency" },
+          { key: "unloadingCharge", labelKey: "reports.col.unloadingCharge", format: "currency" },
         ],
         rows: grouped,
         totals: {
-          netAmount: round2(grouped.reduce((s, r) => s + (r.netAmount as number), 0)),
+          totalBillAmount: round2(grouped.reduce((s, r) => s + (r.totalBillAmount as number), 0)),
           paidNow: round2(grouped.reduce((s, r) => s + (r.paidNow as number), 0)),
           due: round2(grouped.reduce((s, r) => s + (r.due as number), 0)),
+          loadingCharge: round2(grouped.reduce((s, r) => s + (r.loadingCharge as number), 0)),
+          unloadingCharge: round2(grouped.reduce((s, r) => s + (r.unloadingCharge as number), 0)),
         },
       };
     }
@@ -124,15 +157,112 @@ const invoices: ReportDefinition = {
         { key: "date", labelKey: "reports.col.date", format: "date" },
         { key: "serial", labelKey: "reports.col.serial", format: "text" },
         { key: "customer", labelKey: "reports.col.customer", format: "text" },
+        { key: "category", labelKey: "reports.col.category", format: "text" },
         { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
-        { key: "netAmount", labelKey: "reports.col.netAmount", format: "currency" },
+        { key: "totalBillAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
         { key: "paidNow", labelKey: "reports.col.paidThisPeriod", format: "currency" },
+        { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+        { key: "loadingCharge", labelKey: "reports.col.loadingCharge", format: "currency" },
+        { key: "unloadingCharge", labelKey: "reports.col.unloadingCharge", format: "currency" },
+      ],
+      rows: detail,
+      totals: {
+        totalBillAmount: round2(detail.reduce((s, r) => s + r.totalBillAmount, 0)),
+        paidNow: round2(detail.reduce((s, r) => s + r.paidNow, 0)),
+        due: round2(detail.reduce((s, r) => s + r.due, 0)),
+        loadingCharge: round2(detail.reduce((s, r) => s + r.loadingCharge, 0)),
+        unloadingCharge: round2(detail.reduce((s, r) => s + r.unloadingCharge, 0)),
+      },
+    };
+  },
+};
+
+// One row per (customer, brick category) — the exact "which customer
+// bought how many bricks from which category" breakdown the client
+// asked for, which no report showed anywhere before this: the Customers
+// report rolls every category together per customer, and
+// itemWiseAvgSaleRate rolls every customer together per category.
+// Sourced from every invoice kiln-wide (not per-customer, so a sale
+// that never got linked to a real Customer record — see
+// listInvoicesForCustomer's own fallback — still shows up, grouped by
+// its raw customerName text, the same "name key" convention
+// salesAgent.service.ts's customersFromInvoices already uses), expanded
+// per line item for multi-category invoices. paid/due are allocated
+// across an invoice's line items proportionally to each item's own
+// share of the invoice's billed amount — invoices don't track payment
+// per line item, so this is the closest defensible per-category split
+// of a real, single invoice-level payment.
+const salesByCustomerCategory: ReportDefinition = {
+  key: "salesByCustomerCategory",
+  titleKey: "reports.title.salesByCustomerCategory",
+  async run(kilnId, filters) {
+    const [rows, categories] = await Promise.all([
+      listInvoices(kilnId, null, { customerId: filters.customerId, from: filters.from, to: filters.to }),
+      listBrickCategories(kilnId),
+    ]);
+    const categoryNameById = new Map(categories.map((c) => [c._id, c.category]));
+
+    interface Bucket {
+      customerName: string;
+      categoryId: string;
+      bricksCount: number;
+      amount: number;
+      paid: number;
+      due: number;
+    }
+    const byKey = new Map<string, Bucket>();
+
+    for (const inv of rows) {
+      if (inv.bricksCount <= 0) continue; // 0-brick advance/general-payment rows aren't a brick sale
+      const items = itemsOrLegacyFallback(inv).filter((it) => it.categoryId && (!filters.categoryId || it.categoryId === filters.categoryId));
+      if (items.length === 0) continue;
+
+      const itemAmounts = items.map((it) => it.amount ?? (it.pricePerBrick != null ? round2(it.bricksCount * it.pricePerBrick) : 0));
+      const totalItemsAmount = itemAmounts.reduce((s, a) => s + a, 0) || inv.netAmount;
+      const paidNow = inv.amountPaidNow ?? inv.netAmount;
+      const customerKey = inv.customerId ?? `name:${inv.customerName.trim().toLowerCase()}`;
+
+      items.forEach((it, i) => {
+        const itemAmount = itemAmounts[i];
+        const share = totalItemsAmount > 0 ? itemAmount / totalItemsAmount : 0;
+        const paidShare = round2(paidNow * share);
+        const key = `${customerKey}::${it.categoryId}`;
+        const bucket = byKey.get(key) ?? { customerName: inv.customerName, categoryId: it.categoryId!, bricksCount: 0, amount: 0, paid: 0, due: 0 };
+        bucket.bricksCount += it.bricksCount;
+        bucket.amount = round2(bucket.amount + itemAmount);
+        bucket.paid = round2(bucket.paid + paidShare);
+        bucket.due = round2(bucket.due + (itemAmount - paidShare));
+        byKey.set(key, bucket);
+      });
+    }
+
+    const detail = [...byKey.values()]
+      .map((b) => ({
+        customer: b.customerName,
+        category: categoryNameById.get(b.categoryId) ?? b.categoryId,
+        bricksCount: b.bricksCount,
+        amount: b.amount,
+        paid: b.paid,
+        due: round2(b.due),
+      }))
+      .sort((a, b) => a.customer.localeCompare(b.customer) || a.category.localeCompare(b.category));
+
+    return {
+      reportKey: "salesByCustomerCategory",
+      titleKey: "reports.title.salesByCustomerCategory",
+      columns: [
+        { key: "customer", labelKey: "reports.col.customer", format: "text" },
+        { key: "category", labelKey: "reports.col.category", format: "text" },
+        { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
+        { key: "amount", labelKey: "reports.col.totalBillAmount", format: "currency" },
+        { key: "paid", labelKey: "reports.col.paidThisPeriod", format: "currency" },
         { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
       ],
       rows: detail,
       totals: {
-        netAmount: round2(detail.reduce((s, r) => s + r.netAmount, 0)),
-        paidNow: round2(detail.reduce((s, r) => s + r.paidNow, 0)),
+        bricksCount: detail.reduce((s, r) => s + r.bricksCount, 0),
+        amount: round2(detail.reduce((s, r) => s + r.amount, 0)),
+        paid: round2(detail.reduce((s, r) => s + r.paid, 0)),
         due: round2(detail.reduce((s, r) => s + r.due, 0)),
       },
     };
@@ -271,4 +401,4 @@ const expenses: ReportDefinition = {
   },
 };
 
-export const tradeReports: ReportDefinition[] = [customers, invoices, gatePasses, challans, expenses];
+export const tradeReports: ReportDefinition[] = [customers, invoices, salesByCustomerCategory, gatePasses, challans, expenses];

@@ -39,6 +39,7 @@ function filtersFromQuery(query: AuthedRequest["query"]): ReportFilters {
     driverId: str(query.driverId),
     category: str(query.category),
     contractorId: str(query.contractorId),
+    categoryId: str(query.categoryId),
     damageFault: str(query.damageFault),
     damageThreshold: query.damageThreshold ? Number(query.damageThreshold) : undefined,
     workType: str(query.workType),

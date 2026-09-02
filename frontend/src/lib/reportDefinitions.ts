@@ -18,7 +18,8 @@ export const REPORT_DEFINITIONS: ReportDefinitionMeta[] = [
 
   // Trade & Billing
   { key: "customers", group: "trade", labelKey: "reports.title.customers", filters: ["customer"] },
-  { key: "invoices", group: "trade", labelKey: "reports.title.invoices", filters: ["customer", "agent"] },
+  { key: "invoices", group: "trade", labelKey: "reports.title.invoices", filters: ["customer", "agent", "brickCategory"] },
+  { key: "salesByCustomerCategory", group: "trade", labelKey: "reports.title.salesByCustomerCategory", filters: ["customer", "brickCategory"] },
   { key: "gatePasses", group: "trade", labelKey: "reports.title.gatePasses", filters: [] },
   { key: "challans", group: "trade", labelKey: "reports.title.challans", filters: [] },
   { key: "expenses", group: "trade", labelKey: "reports.title.expenses", filters: ["expenseCategory"] },

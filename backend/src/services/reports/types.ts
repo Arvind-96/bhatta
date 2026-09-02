@@ -56,6 +56,7 @@ export interface ReportFilters {
   driverId?: string;
   category?: string;
   contractorId?: string;
+  categoryId?: string;
   damageFault?: string;
   damageThreshold?: number;
   workType?: string;

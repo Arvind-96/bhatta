@@ -19,6 +19,15 @@ export function buildReportWorkbookBlob(
   if (totals) {
     const totalsRow = columns.map((c, i) => (i === 0 ? "Total" : c.key in totals ? round2(totals[c.key]) : ""));
     aoa.push(totalsRow);
+    // Average = each total divided by the row count — same figure the
+    // on-screen report and the printed copy show, for consistency across
+    // every place a report can be viewed.
+    const averageRow = columns.map((c, i) => {
+      if (i === 0) return "Average";
+      if (!(c.key in totals) || rows.length === 0 || (c.format !== "number" && c.format !== "currency")) return "";
+      return round2(totals[c.key] / rows.length);
+    });
+    aoa.push(averageRow);
   }
 
   const worksheet = XLSX.utils.aoa_to_sheet(aoa);

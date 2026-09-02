@@ -15,7 +15,7 @@ import { ContractorGroupedTable } from "@/components/reports/ContractorGroupedTa
 import { REPORT_DEFINITIONS } from "@/lib/reportDefinitions";
 import { printReportTable } from "@/lib/printDocument";
 import { buildReportWorkbookBlob, downloadExcelFile, shareExcelFile } from "@/lib/exportExcel";
-import type { Person, PersonFullReport, Customer, KilnVehicle, ExpenseType, Supplier, SalesAgentSummary } from "@/types";
+import type { Person, PersonFullReport, Customer, KilnVehicle, ExpenseType, Supplier, SalesAgentSummary, BrickCategory } from "@/types";
 import type { ReportResult, ReportRunParams, DashboardSummary } from "@/types/reports";
 
 const inputClass =
@@ -420,6 +420,7 @@ function ReportsWorkspace() {
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [salesAgents, setSalesAgents] = useState<SalesAgentSummary[]>([]);
+  const [brickCategories, setBrickCategories] = useState<BrickCategory[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -436,6 +437,7 @@ function ReportsWorkspace() {
     api.expenseTypes.list().then(setExpenseTypes).catch(console.error);
     api.suppliers.list().then(setSuppliers).catch(console.error);
     api.salesAgents.list().then(setSalesAgents).catch(console.error);
+    api.brickCategories.list().then(setBrickCategories).catch(console.error);
     api.reports.dashboardSummary().then(setDashboard).catch(console.error);
   }, [activeKilnId]);
 
@@ -571,6 +573,7 @@ function ReportsWorkspace() {
               expenseTypes={expenseTypes}
               suppliers={suppliers}
               salesAgents={salesAgents}
+              brickCategories={brickCategories}
             />
 
             {error && (

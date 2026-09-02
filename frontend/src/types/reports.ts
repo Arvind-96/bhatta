@@ -53,6 +53,7 @@ export interface ReportRunParams {
   driverId?: string;
   category?: string;
   contractorId?: string;
+  categoryId?: string;
   damageFault?: string;
   damageThreshold?: number;
   workType?: string;
@@ -73,6 +74,7 @@ export type ReportFilterKind =
   | "expenseCategory"
   | "ledgerCategory"
   | "contractor"
+  | "brickCategory"
   | "workType"
   | "status"
   | "damageFault"

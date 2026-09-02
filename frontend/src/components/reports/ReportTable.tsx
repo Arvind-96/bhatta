@@ -68,6 +68,24 @@ export function ReportTable({ result, rowHighlight }: { result: ReportResult; ro
                 </td>
               ))}
             </tr>
+            {/* Average = each total divided by the number of rows currently
+                on screen — in detail view that's "per transaction", in a
+                grouped view (day/week/month/...) that's "per period". Pure
+                client-side arithmetic off the same totals row above, so it
+                applies to every report's every numeric/currency column with
+                no backend changes and can never disagree with the Total
+                row it's derived from. */}
+            <tr className="text-ink-secondary">
+              {result.columns.map((c, i) => (
+                <td key={c.key} className={`py-2 pr-3 text-xs ${i > 0 && c.format !== "text" ? "text-right tabular-nums" : ""}`}>
+                  {i === 0
+                    ? t("reports.workspace.average")
+                    : c.key in result.totals! && (c.format === "number" || c.format === "currency") && result.rows.length > 0
+                      ? formatCell(Math.round((result.totals![c.key] / result.rows.length) * 100) / 100, c.format)
+                      : ""}
+                </td>
+              ))}
+            </tr>
           </tfoot>
         )}
       </table>
