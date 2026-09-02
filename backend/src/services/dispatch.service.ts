@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { dispatches, people, brickCategories, brickLoadingEntries, kilns, challans, gatePasses, invoices, expenses, saleOrders, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import { dispatches, people, customers, brickCategories, brickLoadingEntries, kilns, challans, gatePasses, invoices, expenses, saleOrders, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem, SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { updateLinkedExpensePaymentInfo } from "./expense.service";
 
@@ -22,6 +22,21 @@ const GRADE_STOCK_ITEM: Record<BrickGrade, string> = {
   JHAMA: "Bricks (Jhama)",
   PELA: "Bricks (Pela/Seem)",
 };
+
+// dispatches.customerId references the dedicated `customers` table, not a
+// `people` row — this used to (wrongly) call assertPersonOfType(...,
+// ["CUSTOMER"]) instead, which checks `people`. Every real customer in
+// this app lives in `customers` (created via customer.service.ts), and
+// no kiln has ever had a `people` row of type CUSTOMER, so that check
+// could never pass: selecting an existing customer from the Log Dispatch
+// form's dropdown made the entire createDispatch call fail outright
+// ("Referenced person not found in this kiln") — silently forcing every
+// dispatch through the walk-in/typed-name path instead, with no dispatch,
+// invoice, or sale actually saved.
+async function assertCustomerInKiln(kilnId: string, customerId: string) {
+  const customer = (await db.select({ _id: customers._id }).from(customers).where(and(eq(customers._id, customerId), eq(customers.kilnId, kilnId))))[0];
+  if (!customer) throw new Error("Referenced customer not found in this kiln");
+}
 
 // Same server-local-midnight convention used everywhere else in this app
 // (see attendance.service.ts's startOfDay) — keeps the slip number's "day"
@@ -179,7 +194,7 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
     await assertPersonOfType(rawInput.kilnId, rawInput.driverId, ["DRIVER"]);
   }
   if (rawInput.customerId) {
-    await assertPersonOfType(rawInput.kilnId, rawInput.customerId, ["CUSTOMER"]);
+    await assertCustomerInKiln(rawInput.kilnId, rawInput.customerId);
   }
 
   // The Log Dispatch form's "Linked Loading Trip" picker — bricksCount/
@@ -469,7 +484,7 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
     await assertPersonOfType(kilnId, input.driverId, ["DRIVER"]);
   }
   if (input.customerId) {
-    await assertPersonOfType(kilnId, input.customerId, ["CUSTOMER"]);
+    await assertCustomerInKiln(kilnId, input.customerId);
   }
 
   const patch: Record<string, unknown> = {};

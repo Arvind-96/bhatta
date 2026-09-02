@@ -326,7 +326,16 @@ export function Dispatch() {
                 required
                 placeholder={t("dispatch.customerNamePlaceholder")}
                 value={form.customerName}
-                onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value, customerId: "" }))}
+                // Editing this name does NOT clear customerId — the dropdown
+                // above is the only thing that links/unlinks a real Customer
+                // (its own "walk-in customer" option is how to go back to
+                // none). This used to reset customerId on every keystroke,
+                // so fixing a typo or adding a business-name suffix right
+                // after picking a real customer would silently detach the
+                // sale from them — the exact bug behind two real invoices
+                // (₹63,900 and ₹48,800) that never showed up in the
+                // customer's own due/paid totals or the Customers report.
+                onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))}
                 className={inputClass}
               />
               <input
