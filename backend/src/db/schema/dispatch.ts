@@ -407,6 +407,12 @@ export const expenses = mysqlTable("expenses", {
   // updateSupplierInvoice/deleteSupplierInvoice find and keep this row in
   // sync with the invoice it came from.
   supplierInvoiceId: varchar("supplierInvoiceId", { length: 64 }),
+  // Set only for the row auto-logged from a Machine Installment Payment —
+  // same purpose as doctorVisitId/supplierInvoiceId above, lets
+  // deleteInstallmentPayment/updateInstallmentPayment find and keep this
+  // row (and the machine's own totalPaid/remainingDue) in sync with the
+  // payment it came from.
+  machineInstallmentPaymentId: varchar("machineInstallmentPaymentId", { length: 64 }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDateIdx: index("expense_kiln_date_idx").on(t.kilnId, t.date),

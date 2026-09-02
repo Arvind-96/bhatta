@@ -1,0 +1,1 @@
+ALTER TABLE `expenses` ADD `machineInstallmentPaymentId` varchar(64);

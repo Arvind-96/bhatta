@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gt, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/client";
-import { machines, machineFuelLogs, machineMaintenanceLogs, machineInstallmentPayments, MACHINE_TYPES } from "../db/schema";
+import { machines, machineFuelLogs, machineMaintenanceLogs, machineInstallmentPayments, expenses, MACHINE_TYPES } from "../db/schema";
 import { createExpense } from "./expense.service";
 import { findOrCreateExpenseType } from "./expenseType.service";
 import { emitToKiln } from "../config/socket";
@@ -147,6 +147,7 @@ export async function createInstallmentPayment(input: CreateInstallmentPaymentIn
     amount: input.amount,
     notes: `Installment: ${machine.name}`,
     date: input.date,
+    machineInstallmentPaymentId: _id,
   });
 
   const payment = (await db.select().from(machineInstallmentPayments).where(eq(machineInstallmentPayments._id, _id)))[0]!;
@@ -162,6 +163,36 @@ export async function listInstallmentPayments(kilnId: string, seasonId: string, 
     .from(machineInstallmentPayments)
     .where(and(eq(machineInstallmentPayments.kilnId, kilnId), eq(machineInstallmentPayments.seasonId, seasonId), eq(machineInstallmentPayments.machineId, machineId)))
     .orderBy(desc(machineInstallmentPayments.date));
+}
+
+// A mistyped amount or a duplicate entry had no way to be corrected —
+// every other auto-logged cost in this app (Brick Loading charges, Doctor
+// Visits, Supplier Invoices) can be edited or deleted with the machine's
+// own running total and the linked Expense kept in sync; installment
+// payments were the one exception. Reverses this payment's contribution
+// to totalPaid/remainingDue and removes its linked Expense (matched via
+// expenses.machineInstallmentPaymentId).
+export async function deleteInstallmentPayment(kilnId: string, paymentId: string) {
+  const existing = (await db.select().from(machineInstallmentPayments).where(and(eq(machineInstallmentPayments._id, paymentId), eq(machineInstallmentPayments.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Installment payment not found in this kiln");
+  const machine = await assertMachineInKiln(kilnId, existing.machineId);
+
+  await db.delete(machineInstallmentPayments).where(eq(machineInstallmentPayments._id, paymentId));
+
+  const newTotalPaid = Math.max(0, (machine.totalPaid ?? 0) - existing.amount);
+  const newRemainingDue = Math.max(0, (machine.price ?? 0) - newTotalPaid);
+  await db.update(machines).set({ totalPaid: newTotalPaid, remainingDue: newRemainingDue }).where(eq(machines._id, existing.machineId));
+
+  const linkedExpense = (await db.select({ _id: expenses._id }).from(expenses).where(eq(expenses.machineInstallmentPaymentId, paymentId)))[0];
+  if (linkedExpense) {
+    await db.delete(expenses).where(eq(expenses._id, linkedExpense._id));
+    emitToKiln(kilnId, "expense:update", { _id: linkedExpense._id, deleted: true });
+  }
+
+  const updatedMachine = (await db.select().from(machines).where(eq(machines._id, existing.machineId)))[0]!;
+  emitToKiln(kilnId, "machineInstallment:update", { _id: paymentId, deleted: true });
+  emitToKiln(kilnId, "machine:update", updatedMachine);
+  return { machine: updatedMachine };
 }
 
 export interface CreateFuelLogInput {

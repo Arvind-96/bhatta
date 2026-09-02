@@ -10,6 +10,7 @@ import {
   listInstallments,
   listMaintenance,
   remove,
+  removeInstallment,
   update,
 } from "../controllers/machine.controller";
 import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
@@ -29,3 +30,4 @@ machineRouter.patch("/:id", asyncHandler(update));
 machineRouter.delete("/:id", asyncHandler(remove));
 machineRouter.post("/:id/installments", asyncHandler(createInstallment));
 machineRouter.get("/:id/installments", asyncHandler(listInstallments));
+machineRouter.delete("/:id/installments/:paymentId", asyncHandler(removeInstallment));

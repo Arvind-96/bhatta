@@ -6,6 +6,7 @@ import {
   createMachine,
   createMachineFuelLog,
   createMaintenanceLog,
+  deleteInstallmentPayment,
   getMachine,
   listInstallmentPayments,
   listMachineFuelLogs,
@@ -103,6 +104,11 @@ export async function createInstallment(req: AuthedRequest, res: Response) {
 export async function listInstallments(req: AuthedRequest, res: Response) {
   const payments = await listInstallmentPayments(req.kiln!.id, req.season!.id, req.params.id);
   res.json(payments);
+}
+
+export async function removeInstallment(req: AuthedRequest, res: Response) {
+  const result = await deleteInstallmentPayment(req.kiln!.id, req.params.paymentId);
+  res.json(result);
 }
 
 const fuelLogSchema = z.object({

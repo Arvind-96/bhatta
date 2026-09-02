@@ -1594,6 +1594,7 @@ export const api = {
       list: (machineId: string) => get<MachineInstallmentPayment[]>(`/machines/${machineId}/installments`, true),
       create: (machineId: string, input: { amount: number; date?: string; notes?: string }) =>
         post<{ payment: MachineInstallmentPayment; machine: Machine }>(`/machines/${machineId}/installments`, input, true),
+      remove: (machineId: string, paymentId: string) => del(`/machines/${machineId}/installments/${paymentId}`, true),
     },
     fuelLogs: {
       list: (days = 30) => get<MachineFuelLog[]>(`/machines/fuel-logs?days=${days}`, true),

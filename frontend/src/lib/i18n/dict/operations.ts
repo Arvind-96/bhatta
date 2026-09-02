@@ -284,4 +284,5 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "fleet.installmentAmountPlaceholder": { en: "Installment amount (₹)", hi: "किस्त राशि (₹)" },
   "fleet.saveInstallment": { en: "Save installment payment", hi: "किस्त भुगतान सहेजें" },
   "fleet.confirmDeleteMachine": { en: "Delete {name}? This can't be undone.", hi: "{name} हटाएं? यह पूर्ववत नहीं किया जा सकता।" },
+  "fleet.confirmDeleteInstallment": { en: "Delete this installment payment? The machine's paid/due totals and the linked expense will be updated.", hi: "यह किश्त भुगतान हटाएं? मशीन की भुगतान/बकाया राशि और जुड़ा खर्च अपडेट हो जाएगा।" },
 };

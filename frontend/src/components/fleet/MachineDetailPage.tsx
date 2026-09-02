@@ -144,6 +144,12 @@ export function MachineDetailPage({ machineId, onBack }: MachineDetailPageProps)
     }
   }
 
+  async function deleteInstallment(paymentId: string) {
+    if (!confirm(t("fleet.confirmDeleteInstallment"))) return;
+    await api.machines.installments.remove(machineId, paymentId);
+    await refresh();
+  }
+
   const backButton = (
     <button onClick={onBack} className="mb-3 flex items-center gap-1.5 text-sm text-ink-secondary hover:text-ink-primary">
       <ArrowLeft className="h-4 w-4" /> {t("fleet.backToMachines")}
@@ -336,7 +342,12 @@ export function MachineDetailPage({ machineId, onBack }: MachineDetailPageProps)
                     <p className="text-ink-primary">{new Date(i.date).toLocaleDateString("en-IN")}</p>
                     {i.notes && <p className="text-sm text-ink-muted">{i.notes}</p>}
                   </div>
-                  <span className="tabular-nums font-medium text-ink-primary">₹{formatINR(i.amount)}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="tabular-nums font-medium text-ink-primary">₹{formatINR(i.amount)}</span>
+                    <button onClick={() => deleteInstallment(i._id)} className="text-ink-muted hover:text-status-critical" aria-label={t("common.delete")}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
