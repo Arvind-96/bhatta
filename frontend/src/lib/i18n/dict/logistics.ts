@@ -102,6 +102,7 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "dispatch.vehicleNumberPlaceholder": { en: "Vehicle number (optional)", hi: "वाहन नंबर (वैकल्पिक)" },
   "dispatch.vehicleTypePlaceholder": { en: "Vehicle type (optional)", hi: "वाहन प्रकार (वैकल्पिक)" },
   "dispatch.driverTipPlaceholder": { en: "Driver tip / inaam (₹, optional)", hi: "ड्राइवर टिप / इनाम (₹, वैकल्पिक)" },
+  "dispatch.driverTipLockedPlaceholder": { en: "Already logged with the loading trip", hi: "लदाई ट्रिप के साथ पहले ही दर्ज है" },
   "dispatch.discountPlaceholder": { en: "Discount (₹, optional)", hi: "छूट (₹, वैकल्पिक)" },
   "dispatch.netAmountPreview": { en: "Net amount after discount", hi: "छूट के बाद शुद्ध राशि" },
   "dispatch.discountExceedsAmount": { en: "Discount cannot be more than the amount", hi: "छूट राशि से अधिक नहीं हो सकती" },
@@ -115,8 +116,8 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
   "dispatch.notesPlaceholder": { en: "Note (optional)", hi: "टिप्पणी (वैकल्पिक)" },
   "dispatch.totalAmountLabel": { en: "Total amount", hi: "कुल राशि" },
   "dispatch.tripLockedHint": {
-    en: "Vehicle, category, bricks, discount, and amount are locked to the selected loading trip. Clear it to enter these manually.",
-    hi: "वाहन, श्रेणी, ईंटें, छूट और राशि चुनी गई लदाई ट्रिप से लॉक हैं। इन्हें खुद भरने के लिए इसे हटाएं।",
+    en: "Vehicle, category, bricks, discount, and amount are locked to the selected loading trip, and the driver tip is already logged from it. Clear the trip to enter these manually.",
+    hi: "वाहन, श्रेणी, ईंटें, छूट और राशि चुनी गई लदाई ट्रिप से लॉक हैं, और ड्राइवर टिप पहले ही उससे दर्ज है। इन्हें खुद भरने के लिए ट्रिप हटाएं।",
   },
   "dispatch.editDispatch": { en: "Edit dispatch", hi: "डिस्पैच संपादित करें" },
   "dispatch.confirmDeleteDispatch": {

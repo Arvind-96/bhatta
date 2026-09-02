@@ -194,10 +194,12 @@ export function Dispatch() {
       customerAddress: trip.customerAddress || f.customerAddress,
       driverName: trip.driverName || f.driverName,
       driverPhone: trip.driverPhone || f.driverPhone,
-      driverTipAmount: trip.tipAmount != null ? String(trip.tipAmount) : f.driverTipAmount,
-      driverTipPaymentMode: trip.tipPaymentMode ?? f.driverTipPaymentMode,
-      driverTipCashAmount: trip.tipCashAmount != null ? String(trip.tipCashAmount) : f.driverTipCashAmount,
-      driverTipOnlineAmount: trip.tipOnlineAmount != null ? String(trip.tipOnlineAmount) : f.driverTipOnlineAmount,
+      // Deliberately NOT pre-filled from trip.tipAmount — the trip already
+      // auto-logged its own "Driver Reward / Inam" Expense when it was
+      // created, and the backend now clears these for a trip-linked
+      // dispatch (see createDispatch's loadingEntryId branch), so a
+      // pre-filled value here would just be silently dropped instead of
+      // double-logging it — worse than not showing it at all.
       placeOfSupply: trip.placeOfSupply || f.placeOfSupply,
       notes: trip.notes || f.notes,
       dispatchedOn: trip.date ? trip.date.slice(0, 10) : f.dispatchedOn,
@@ -378,12 +380,13 @@ export function Dispatch() {
 
             <input
               type="number"
-              placeholder={t("dispatch.driverTipPlaceholder")}
+              placeholder={tripLocked ? t("dispatch.driverTipLockedPlaceholder") : t("dispatch.driverTipPlaceholder")}
               value={form.driverTipAmount}
               onChange={(e) => setForm((f) => ({ ...f, driverTipAmount: e.target.value }))}
-              className={inputClass}
+              disabled={tripLocked}
+              className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
             />
-            {Number(form.driverTipAmount) > 0 && (
+            {!tripLocked && Number(form.driverTipAmount) > 0 && (
               <AmountPaymentModeFields
                 amount={Number(form.driverTipAmount)}
                 paymentMode={form.driverTipPaymentMode}

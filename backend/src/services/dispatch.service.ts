@@ -132,12 +132,9 @@ export interface CreateDispatchInput {
   vehicleType?: string;
   driverTipAmount?: number;
   // How the Driver Reward above was paid — see SIMPLE_PAYMENT_MODES's own
-  // doc comment. Like driverTipAmount itself, the Log Dispatch form
-  // pre-fills these from the linked trip's own tipPaymentMode/
-  // tipCashAmount/tipOnlineAmount when a trip is selected (client-side,
-  // see Dispatch.tsx's handleTripSelect) but they stay admin-editable from
-  // there — never server-overridden the way bricksCount/categoryId/etc.
-  // are for a trip-linked dispatch.
+  // doc comment. Cleared (like driverTipAmount itself) for a trip-linked
+  // dispatch, same as bricksCount/categoryId/etc. below — see the
+  // loadingEntryId branch's own comment for why.
   driverTipPaymentMode?: SimplePaymentMode;
   driverTipCashAmount?: number;
   driverTipOnlineAmount?: number;
@@ -212,6 +209,21 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
       // lets the netting below reproduce exactly that figure, the same
       // pattern brickLoading.service.ts's own auto-dispatch call uses.
       amount: (loadingEntry.amount ?? 0) + (loadingEntry.discountAmount ?? 0),
+      // The Log Dispatch form's trip picker pre-fills these from the
+      // trip's own tipAmount/tipPaymentMode/etc. as a convenience starting
+      // point — but createBrickLoadingEntry already auto-logged that exact
+      // tip as its own Expense (brickLoadingEntryId-linked) the moment the
+      // trip was created. Submitting them again here would auto-log a
+      // second "Driver Reward / Inam" Expense for the same real payment,
+      // dispatchId-linked this time — the same double-count the client
+      // asked to have eliminated everywhere. Cleared the same way
+      // bricksCount/categoryId/items/etc. above are never trusted from the
+      // client for a trip-linked dispatch; a genuinely separate tip can
+      // still be added by editing the dispatch afterward.
+      driverTipAmount: undefined,
+      driverTipPaymentMode: undefined,
+      driverTipCashAmount: undefined,
+      driverTipOnlineAmount: undefined,
     };
     // Inherits the trip's own seasonId rather than the request's current
     // one — a dispatch created from a trip logged in an earlier season
@@ -332,11 +344,11 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
   emitToKiln(input.kilnId, "dispatch:update", dispatch);
 
   // Same auto-log as brickLoading.service.ts's createBrickLoadingEntry —
-  // driverTipAmount here never had any other effect (see this interface's
-  // own comment above) and would double-count if this dispatch came from a
-  // loading trip (that trip already logs its own tip separately), but
-  // BrickLoadingTripDetailPage's "Add to Dispatch" never sends
-  // driverTipAmount, so that path is safe by construction.
+  // safe from double-counting a trip's own tip both for
+  // BrickLoadingTripDetailPage's "Add to Dispatch" (never sends
+  // driverTipAmount) and the Log Dispatch form's trip picker (sends it as
+  // a pre-filled convenience value, cleared above for a trip-linked
+  // dispatch before this point).
   await autoLogExpense(input.kilnId, dispatch.seasonId!, "Driver Reward / Inam", dispatch.driverTipAmount, dispatchedOn, `Dispatch ${dispatch.slipNumber}`, {
     dispatchId: dispatch._id,
     paymentMode: dispatch.driverTipPaymentMode ?? undefined,
