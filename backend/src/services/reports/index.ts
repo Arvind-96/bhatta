@@ -5,6 +5,7 @@ import { productionReports } from "./production.reports";
 import { ordersReports } from "./orders.reports";
 import { purchaseReports } from "./purchase.reports";
 import { accountingReports } from "./accounting.reports";
+import { averagesReports } from "./averages.reports";
 import { ReportDefinition } from "./types";
 
 export * from "./types";
@@ -17,6 +18,7 @@ const ALL_REPORTS: ReportDefinition[] = [
   ...ordersReports,
   ...purchaseReports,
   ...accountingReports,
+  ...averagesReports,
 ];
 
 export const reportRegistry = new Map(ALL_REPORTS.map((r) => [r.key, r]));

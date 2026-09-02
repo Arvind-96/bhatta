@@ -40,6 +40,7 @@ export const REPORT_DEFINITIONS: ReportDefinitionMeta[] = [
   { key: "vehicleWork", group: "resources", labelKey: "reports.title.vehicleWork", filters: [] },
 
   // Admin
+  { key: "keyAverages", group: "admin", labelKey: "reports.title.keyAverages", filters: [] },
   { key: "labourLedger", group: "admin", labelKey: "reports.title.labourLedger", filters: ["personType", "workType", "status", "person", "contractor", "ledgerCategory"] },
   { key: "labourByContractor", group: "admin", labelKey: "reports.title.labourByContractor", filters: ["workType", "status", "contractor"] },
   { key: "salary", group: "admin", labelKey: "reports.title.salary", filters: ["person"] },
