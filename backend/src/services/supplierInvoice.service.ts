@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { supplierInvoices, suppliers, expenses, type SupplierInvoiceItem } from "../db/schema";
+import { supplierInvoices, suppliers, expenses, purchaseOrders, type SupplierInvoiceItem } from "../db/schema";
 import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { emitToKiln } from "../config/socket";
 import { autoLogExpense } from "./expense.service";
@@ -149,6 +149,23 @@ export async function deleteSupplierInvoice(kilnId: string, invoiceId: string) {
   if (linkedExpense) {
     await db.delete(expenses).where(eq(expenses._id, linkedExpense._id));
     emitToKiln(kilnId, "expense:update", { _id: linkedExpense._id, deleted: true });
+  }
+
+  // Otherwise a Purchase Order's status stays stuck at FULFILLED/
+  // PARTIALLY_FULFILLED forever once the invoice that earned it is gone —
+  // same reasoning as dispatch.service.ts's identical fix for Sale
+  // Orders. A purchase order can be fulfilled across more than one
+  // invoice (see fulfillPurchaseOrder's own comment), so this only reverts
+  // to PENDING if no other invoice is still linked to it.
+  if (existing.purchaseOrderId) {
+    const order = (await db.select().from(purchaseOrders).where(eq(purchaseOrders._id, existing.purchaseOrderId)))[0];
+    if (order && order.status !== "CANCELLED") {
+      const remaining = await db.select({ _id: supplierInvoices._id }).from(supplierInvoices).where(eq(supplierInvoices.purchaseOrderId, existing.purchaseOrderId));
+      if (remaining.length === 0) {
+        await db.update(purchaseOrders).set({ status: "PENDING" }).where(eq(purchaseOrders._id, existing.purchaseOrderId));
+        emitToKiln(kilnId, "purchaseOrder:update", (await db.select().from(purchaseOrders).where(eq(purchaseOrders._id, existing.purchaseOrderId)))[0]);
+      }
+    }
   }
 
   emitToKiln(kilnId, "supplierInvoice:update", { _id: invoiceId, deleted: true });

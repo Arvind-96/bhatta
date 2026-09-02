@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { dispatches, people, brickCategories, brickLoadingEntries, kilns, challans, gatePasses, invoices, expenses, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
+import { dispatches, people, brickCategories, brickLoadingEntries, kilns, challans, gatePasses, invoices, expenses, saleOrders, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem, SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { updateLinkedExpensePaymentInfo } from "./expense.service";
 
@@ -593,6 +593,19 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
     }
   }
 
+  // Correcting bricksCount on a Sale-Order-linked dispatch moves the same
+  // delta onto the order's bricksFulfilled — see deleteDispatch's own note
+  // on why this is tracked at all.
+  if (existing.saleOrderId && bricksCountChanged) {
+    const order = (await db.select().from(saleOrders).where(eq(saleOrders._id, existing.saleOrderId)))[0];
+    if (order) {
+      const bricksFulfilled = Math.max(0, order.bricksFulfilled + (newBricksCount - existing.bricksCount));
+      const status = order.status === "CANCELLED" ? order.status : bricksFulfilled <= 0 ? "PENDING" : bricksFulfilled >= order.bricksCount ? "FULFILLED" : "PARTIALLY_FULFILLED";
+      await db.update(saleOrders).set({ bricksFulfilled, status }).where(eq(saleOrders._id, existing.saleOrderId));
+      emitToKiln(kilnId, "saleOrder:update", (await db.select().from(saleOrders).where(eq(saleOrders._id, existing.saleOrderId)))[0]);
+    }
+  }
+
   // Brick-Loading-linked dispatches keep a second, independent stock
   // system (brickCategories.quantity) — correct that too, the same
   // per-category delta-diff convention updateBrickLoadingEntry uses for
@@ -694,6 +707,25 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
     }
     await db.update(brickLoadingEntries).set({ dispatchId: null }).where(eq(brickLoadingEntries._id, linkedEntry._id));
     emitToKiln(kilnId, "brickLoading:update", (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, linkedEntry._id)))[0]);
+  }
+
+  // This dispatch's own bricksCount is released back onto the linked Sale
+  // Order — otherwise bricksFulfilled/status stay stuck at whatever
+  // fulfillSaleOrder last set them to, permanently overstating how much of
+  // the order is actually fulfilled once the dispatch that fulfilled it is
+  // gone. Not netted against returnedCount (recordDeliveryAdjustment's own
+  // concern, not fulfillment tracking) — this releases the order's own
+  // "committed" quantity back to pending, same as the stock/ledger
+  // reversals above use the dispatch's original figures, not the
+  // already-adjusted-for-returns ones.
+  if (existing.saleOrderId) {
+    const order = (await db.select().from(saleOrders).where(eq(saleOrders._id, existing.saleOrderId)))[0];
+    if (order) {
+      const bricksFulfilled = Math.max(0, order.bricksFulfilled - existing.bricksCount);
+      const status = order.status === "CANCELLED" ? order.status : bricksFulfilled <= 0 ? "PENDING" : bricksFulfilled >= order.bricksCount ? "FULFILLED" : "PARTIALLY_FULFILLED";
+      await db.update(saleOrders).set({ bricksFulfilled, status }).where(eq(saleOrders._id, existing.saleOrderId));
+      emitToKiln(kilnId, "saleOrder:update", (await db.select().from(saleOrders).where(eq(saleOrders._id, existing.saleOrderId)))[0]);
+    }
   }
 
   // Every Challan/Gate Pass/Invoice/Expense generated FROM this dispatch is
