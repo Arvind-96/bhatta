@@ -73,14 +73,15 @@ export function SalarySlipHistory({ personId, ledgerEntries }: SalarySlipHistory
   // numbers the slip itself shows once generated.
   const daysPresent = days.filter((d) => d.status === "PRESENT" || d.status === "LATE").length;
   const daysAbsent = days.filter((d) => d.status === "ABSENT").length;
-  // Advance/Kharchi/Medical combined — matches generateSalarySlip's own
-  // deduction query exactly (see salary.service.ts), so this live preview
-  // never disagrees with what the slip itself will show once generated.
+  // Advance/Kharchi/Medical/Festival combined — matches generateSalarySlip's
+  // own deduction query exactly (see salary.service.ts), so this live
+  // preview never disagrees with what the slip itself will show once
+  // generated.
   const advanceThisMonth = ledgerEntries
     .filter(
       (e) =>
         e.direction === "PAID" &&
-        (e.category === "ADVANCE" || e.category === "KHARCHI" || e.category === "MEDICAL") &&
+        (e.category === "ADVANCE" || e.category === "KHARCHI" || e.category === "MEDICAL" || e.category === "FESTIVAL") &&
         e.date.slice(0, 7) === cursorMonth
     )
     .reduce((sum, e) => sum + e.amount, 0);

@@ -169,7 +169,7 @@ function renderPdf(data: SlipData, filePath: string, lang: "en" | "hi"): Promise
         [t("Gross Salary", "सकल वेतन"), `Rs. ${data.grossSalary.toLocaleString("en-IN")}`],
         [t("Deductions (Absence)", "कटौती (अनुपस्थिति)"), `Rs. ${data.deductions.toLocaleString("en-IN")}`],
         ...(data.advanceDeducted > 0
-          ? [[t("Advance/Kharchi/Medical Deducted", "एडवांस/खर्ची/मेडिकल काटा गया"), `Rs. ${data.advanceDeducted.toLocaleString("en-IN")}`] as [string, string]]
+          ? [[t("Advance/Kharchi/Medical/Festival Deducted", "एडवांस/खर्ची/मेडिकल/त्योहार काटा गया"), `Rs. ${data.advanceDeducted.toLocaleString("en-IN")}`] as [string, string]]
           : []),
         ...(data.carriedForward !== 0
           ? [
@@ -205,14 +205,18 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
 
   const summary = await attendanceSummaryForMonth(kilnId, personId, year, monthNum);
 
-  // Advance/Kharchi/Medical-category ledger entries dated within this
-  // slip's month — money already handed to this person this month,
+  // Advance/Kharchi/Medical/Festival-category ledger entries dated within
+  // this slip's month — money already handed to this person this month,
   // recovered against pay the same way a real payroll advance is settled
   // at salary time. Previously ADVANCE-only, which silently ignored
   // Kharchi (daily allowance) and Medical payments made the same month,
-  // understating how much had already been drawn — same 3-category
-  // "money already given" bucket molding.service.ts's
-  // advanceDeductedForWorkers already uses for gang workers.
+  // understating how much had already been drawn; Festival was missed in
+  // that same fix and stayed excluded here even after being added to every
+  // other "money already given" bucket in the codebase (molding.service.ts's
+  // advanceDeductedForWorkers, person.service.ts's
+  // CONTRACTOR_DRAWDOWN_CATEGORIES, labourSession.service.ts's
+  // DEDUCTION_CATEGORIES, reports/dashboard.ts) — this was the one place
+  // still not following that convention.
   const { start, end } = monthDateRange(year, monthNum);
   const advanceRows = await db
     .select()
@@ -222,7 +226,7 @@ export async function generateSalarySlip(kilnId: string, personId: string, month
         eq(ledgerEntries.kilnId, kilnId),
         eq(ledgerEntries.personId, personId),
         eq(ledgerEntries.direction, "PAID"),
-        inArray(ledgerEntries.category, ["ADVANCE", "KHARCHI", "MEDICAL"]),
+        inArray(ledgerEntries.category, ["ADVANCE", "KHARCHI", "MEDICAL", "FESTIVAL"]),
         gte(ledgerEntries.date, start),
         lte(ledgerEntries.date, end)
       )
