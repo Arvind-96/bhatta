@@ -7,7 +7,6 @@ import { updateLinkedExpensePaymentInfo } from "./expense.service";
 
 type SimplePaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 import { assertPersonOfType } from "./person.service";
-import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
 import { createCustomer, findCustomerByName } from "./customer.service";
 import { autoLogExpense } from "./expense.service";
@@ -332,16 +331,14 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
     }
   }
 
-  if (input.customerId) {
-    await addLedgerEntry({
-      kilnId: input.kilnId,
-      personId: input.customerId,
-      direction: "DUE",
-      amount: netAmount,
-      reason: `Sale: ${input.bricksCount.toLocaleString()} bricks (${dispatch.slipNumber})`,
-      date: dispatchedOn,
-    });
-  }
+  // A customer's due/paid balance is computed live from the `invoices`
+  // table (getCustomerDetail, customer.service.ts) — never from
+  // ledgerEntries. A DUE ledgerEntries posting here would be dead
+  // (nothing reads it — see customerCreditAging's own doc comment in
+  // person.service.ts for the identical fix on the read side) and would
+  // throw anyway, since ledger.service.ts's addLedgerEntry validates
+  // personId against `people`, and a customerId belongs to the separate
+  // `customers` table.
 
   // Bricks leaving on this truck have to come back out of finished-goods
   // stock the same way a return puts them back in (see
@@ -399,18 +396,8 @@ export async function recordDeliveryAdjustment(kilnId: string, dispatchId: strin
   const updated = (await db.select().from(dispatches).where(eq(dispatches._id, dispatchId)))[0]!;
 
   if (input.returnedCount && input.returnedCount > 0) {
-    const unitPrice = dispatch.bricksCount > 0 ? dispatch.amount / dispatch.bricksCount : 0;
-    const refundAmount = Math.round(unitPrice * input.returnedCount);
-
-    if (dispatch.customerId && refundAmount > 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: dispatch.customerId,
-        direction: "PAID",
-        amount: refundAmount,
-        reason: `Return adjustment: ${input.returnedCount} bricks (${dispatch.slipNumber})`,
-      });
-    }
+    // Dead/broken ledgerEntries posting removed here — see createDispatch's
+    // own note on why a customerId never belongs in addLedgerEntry.
 
     await recordStockEntry({
       kilnId,
@@ -539,48 +526,11 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
   }
   const updated = (await db.select().from(dispatches).where(eq(dispatches._id, dispatchId)))[0]!;
 
-  // Ledger: a customer reassignment reverses the full original DUE off the
-  // old customer and posts a fresh DUE on the new one; otherwise, only the
-  // net-amount delta (if any) gets corrected on the existing customer.
-  if (customerChanged) {
-    if (existing.customerId && existing.amount !== 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.customerId,
-        direction: "PAID",
-        amount: existing.amount,
-        reason: `Dispatch ${existing.slipNumber} reassigned to a different customer — reversing ₹${existing.amount.toLocaleString("en-IN")}`,
-      });
-    }
-    if (input.customerId && newNetAmount !== 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: input.customerId,
-        direction: "DUE",
-        amount: newNetAmount,
-        reason: `Sale: ${(input.bricksCount ?? existing.bricksCount).toLocaleString()} bricks (${existing.slipNumber}) — reassigned from another customer`,
-      });
-    }
-  } else if (existing.customerId && amountChanged) {
-    const delta = Math.round((newNetAmount - existing.amount) * 100) / 100;
-    if (delta > 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.customerId,
-        direction: "DUE",
-        amount: delta,
-        reason: `Dispatch ${existing.slipNumber} correction: revised up to ₹${newNetAmount.toLocaleString("en-IN")}`,
-      });
-    } else if (delta < 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.customerId,
-        direction: "PAID",
-        amount: -delta,
-        reason: `Dispatch ${existing.slipNumber} correction: revised down to ₹${newNetAmount.toLocaleString("en-IN")}`,
-      });
-    }
-  }
+  // Dead/broken ledgerEntries postings for customer reassignment/amount
+  // correction removed here — see createDispatch's own note on why a
+  // customerId never belongs in addLedgerEntry. The customer's due/paid
+  // is computed live from the dispatch's own linked invoice (if any) via
+  // getCustomerDetail, not from a separately-posted ledger correction.
 
   // Stock: correct the grade-bucket deduction by the exact delta rather
   // than re-deducting the new total, which would double-count. A grade
@@ -683,22 +633,12 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
 
   // recordDeliveryAdjustment already posted its own partial reversal for
   // any bricks returned — reverse only what's still outstanding from this
-  // dispatch, not the original gross figures again.
+  // dispatch, not the original gross figures again. (The dead/broken
+  // ledgerEntries posting that used to sit here is gone — see
+  // createDispatch's own note on why a customerId never belongs in
+  // addLedgerEntry.)
   const returnedCount = existing.returnedCount ?? 0;
-  const unitPrice = existing.bricksCount > 0 ? existing.amount / existing.bricksCount : 0;
-  const alreadyRefunded = Math.round(unitPrice * returnedCount);
-  const remainingNetAmount = Math.round((existing.amount - alreadyRefunded) * 100) / 100;
   const remainingBricksOut = existing.bricksCount - returnedCount;
-
-  if (existing.customerId && remainingNetAmount !== 0) {
-    await addLedgerEntry({
-      kilnId,
-      personId: existing.customerId,
-      direction: "PAID",
-      amount: remainingNetAmount,
-      reason: `Dispatch ${existing.slipNumber} deleted — reversing ₹${remainingNetAmount.toLocaleString("en-IN")}`,
-    });
-  }
 
   if (remainingBricksOut !== 0) {
     const grade = (existing.grade ?? "A1") as BrickGrade;
