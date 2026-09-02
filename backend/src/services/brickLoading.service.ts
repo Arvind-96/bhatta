@@ -530,7 +530,12 @@ export async function brickLoadingDriverSummary(kilnId: string, seasonId: string
     const driverEntries = entriesByDriver.get(driver._id) ?? [];
     if (driverEntries.length === 0) continue;
 
-    const driverLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), eq(ledgerEntries.personId, driver._id)));
+    // Ledger balance stays all-time regardless of seasonId (see
+    // listLedgerForPerson's doc comment in ledger.service.ts) — seasonId on
+    // a ledger entry is optional and several real entries predate it, so
+    // hard-filtering here would silently understate a driver's balance
+    // relative to every other balance display in the app.
+    const driverLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, driver._id)));
     const { due, paid, balance } = sumByDirection(driverLedgerEntries);
 
     results.push({

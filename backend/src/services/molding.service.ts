@@ -331,10 +331,16 @@ export async function moldingContractorSummary(kilnId: string, seasonId: string 
       // same filter.
       const workerIdSet = new Set(workerIds);
       const gangEntries = allEntries.filter((e) => workerIdSet.has(e.workerId));
-      const seasonCond = seasonId ? [eq(ledgerEntries.seasonId, seasonId)] : [];
+      // Ledger balance stays all-time regardless of seasonId (see
+      // listLedgerForPerson's doc comment in ledger.service.ts) — seasonId
+      // on a ledger entry is optional and several real entries predate it,
+      // so filtering here would silently understate a contractor's/
+      // worker's balance relative to every other balance display in the
+      // app (this used to be conditional on seasonId, but every real
+      // caller always passes one, so the condition never actually helped).
       const gangLedgerEntries = workerIds.length
-        ? await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), ...seasonCond, inArray(ledgerEntries.personId, [contractor._id, ...workerIds])))
-        : await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), ...seasonCond, eq(ledgerEntries.personId, contractor._id)));
+        ? await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, [contractor._id, ...workerIds])))
+        : await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, contractor._id)));
 
       const bricksByWorker = new Map<string, number>();
       const damagedByWorker = new Map<string, number>();

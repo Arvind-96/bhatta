@@ -192,7 +192,12 @@ export async function pakayiOperatorSummary(kilnId: string, seasonId: string) {
     const opEntries = entriesByPerson.get(operator._id) ?? [];
     if (opEntries.length === 0) continue;
 
-    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), eq(ledgerEntries.personId, operator._id)));
+    // Ledger balance stays all-time regardless of seasonId (see
+    // listLedgerForPerson's doc comment in ledger.service.ts) — seasonId on
+    // a ledger entry is optional and several real entries predate it, so
+    // hard-filtering here would silently understate an operator's balance
+    // relative to every other balance display in the app.
+    const opLedgerEntries = await db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, operator._id)));
     const { due, paid, balance } = sumByDirection(opLedgerEntries);
 
     results.push({
@@ -243,9 +248,11 @@ export async function pakayiContractorSummary(kilnId: string, seasonId: string) 
       const workerIds = gangWorkers.map((w) => w._id);
       const personIds = [contractor._id, ...workerIds];
 
+      // Ledger balance stays all-time regardless of seasonId — see the
+      // identical note on the operator-summary query above.
       const [gangEntries, gangLedgerEntries] = await Promise.all([
         db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.seasonId, seasonId), eq(workEntries.workType, "PAKAYI"), inArray(workEntries.personId, personIds))),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), inArray(ledgerEntries.personId, personIds))),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), inArray(ledgerEntries.personId, personIds))),
       ]);
 
       const quantityByWorker = new Map<string, number>();

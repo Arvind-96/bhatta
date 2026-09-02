@@ -139,9 +139,14 @@ export async function fitterRosterSummary(kilnId: string, seasonId: string, forD
 
   const results = await Promise.all(
     fitters.map(async (fitter) => {
+      // Ledger balance stays all-time regardless of seasonId (see
+      // listLedgerForPerson's doc comment in ledger.service.ts) — seasonId
+      // on a ledger entry is optional and several real entries predate it,
+      // so hard-filtering here would silently understate a fitter's
+      // balance relative to every other balance display in the app.
       const [shifts, fitterLedgerEntries] = await Promise.all([
         db.select().from(firingShifts).where(and(eq(firingShifts.kilnId, kilnId), eq(firingShifts.seasonId, seasonId), eq(firingShifts.fitterId, fitter._id))).orderBy(desc(firingShifts.date)),
-        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.seasonId, seasonId), eq(ledgerEntries.personId, fitter._id))),
+        db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, fitter._id))),
       ]);
       const { due, paid, balance } = sumByDirection(fitterLedgerEntries);
 
