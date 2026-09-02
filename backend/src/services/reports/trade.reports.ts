@@ -217,21 +217,29 @@ const salesByCustomerCategory: ReportDefinition = {
       const items = itemsOrLegacyFallback(inv).filter((it) => it.categoryId && (!filters.categoryId || it.categoryId === filters.categoryId));
       if (items.length === 0) continue;
 
+      // Each item's raw amount (bricksCount x its own price) never reflects
+      // an invoice-level discountAmount — only inv.netAmount does. Share is
+      // computed off the raw amounts (their ratio to each other is the
+      // same either way), but every rupee figure actually recorded per
+      // category is that share applied to netAmount, so category amounts
+      // always sum to exactly what the invoice was really billed for —
+      // otherwise a discounted, fully-paid invoice would misreport its
+      // pre-discount slice as still due.
       const itemAmounts = items.map((it) => it.amount ?? (it.pricePerBrick != null ? round2(it.bricksCount * it.pricePerBrick) : 0));
       const totalItemsAmount = itemAmounts.reduce((s, a) => s + a, 0) || inv.netAmount;
       const paidNow = inv.amountPaidNow ?? inv.netAmount;
       const customerKey = inv.customerId ?? `name:${inv.customerName.trim().toLowerCase()}`;
 
       items.forEach((it, i) => {
-        const itemAmount = itemAmounts[i];
-        const share = totalItemsAmount > 0 ? itemAmount / totalItemsAmount : 0;
+        const share = totalItemsAmount > 0 ? itemAmounts[i] / totalItemsAmount : 0;
+        const billedShare = round2(inv.netAmount * share);
         const paidShare = round2(paidNow * share);
         const key = `${customerKey}::${it.categoryId}`;
         const bucket = byKey.get(key) ?? { customerName: inv.customerName, categoryId: it.categoryId!, bricksCount: 0, amount: 0, paid: 0, due: 0 };
         bucket.bricksCount += it.bricksCount;
-        bucket.amount = round2(bucket.amount + itemAmount);
+        bucket.amount = round2(bucket.amount + billedShare);
         bucket.paid = round2(bucket.paid + paidShare);
-        bucket.due = round2(bucket.due + (itemAmount - paidShare));
+        bucket.due = round2(bucket.due + (billedShare - paidShare));
         byKey.set(key, bucket);
       });
     }
