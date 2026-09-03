@@ -95,6 +95,13 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
 
   const { supplier, invoices, totalPaid, totalDue } = detail;
   const pendingDeleteInvoice = invoices.find((i) => i._id === pendingDeleteInvoiceId) ?? null;
+  // totalDue sums every invoice's raw (unclamped) bill-minus-paid, so a
+  // supplier the kiln has overpaid overall reads negative — formatINR
+  // renders that with a literal minus sign, showing e.g. "₹-4,000" in
+  // this card's red "due" styling. Same clamp-and-relabel fix as the
+  // Customer profile page's balance card.
+  const dueDisplay = Math.max(0, totalDue);
+  const creditDisplay = Math.max(0, -totalDue);
 
   return (
     <div>
@@ -182,8 +189,10 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
                   <p className="text-xl font-semibold tabular-nums text-status-good">₹{formatINR(totalPaid)}</p>
                   <p className="text-sm text-ink-muted">{t("supplier.totalPaidLabel")}</p>
                 </div>
-                <div className="rounded-xl border border-status-critical/30 bg-status-critical/5 p-3">
-                  <p className="text-xl font-semibold tabular-nums text-status-critical">₹{formatINR(totalDue)}</p>
+                <div className={`rounded-xl border p-3 ${creditDisplay > 0 ? "border-status-good/30 bg-status-good/5" : "border-status-critical/30 bg-status-critical/5"}`}>
+                  <p className={`text-xl font-semibold tabular-nums ${creditDisplay > 0 ? "text-status-good" : "text-status-critical"}`}>
+                    {creditDisplay > 0 ? `${t("supplier.creditPrefix")} ₹${formatINR(creditDisplay)}` : `₹${formatINR(dueDisplay)}`}
+                  </p>
                   <p className="text-sm text-ink-muted">{t("supplier.totalDueLabel")}</p>
                 </div>
               </div>

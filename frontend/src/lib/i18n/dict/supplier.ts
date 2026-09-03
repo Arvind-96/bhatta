@@ -41,6 +41,7 @@ export const supplierDict: Record<string, Record<Locale, string>> = {
   "supplier.invoiceListSection": { en: "Invoice List", hi: "इनवॉइस सूची" },
   "supplier.totalPaidLabel": { en: "Total paid to date", hi: "अब तक भुगतान की गई कुल राशि" },
   "supplier.totalDueLabel": { en: "Total pending", hi: "कुल बकाया" },
+  "supplier.creditPrefix": { en: "Credit", hi: "क्रेडिट" },
   "supplier.noInvoicesYet": { en: "No invoices recorded yet.", hi: "अभी तक कोई इनवॉइस दर्ज नहीं।" },
   "supplier.backToSuppliers": { en: "Back to Suppliers", hi: "आपूर्तिकर्ताओं पर वापस" },
   "supplier.confirmDeleteInvoice": { en: "Delete this invoice? This cannot be undone.", hi: "यह इनवॉइस हटाएं? इसे वापस नहीं लाया जा सकता।" },

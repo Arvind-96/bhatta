@@ -91,6 +91,15 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
   }
 
   const { customer, invoices, totalPaid, totalDue } = detail;
+  // totalDue sums every invoice's raw (unclamped) charge-minus-paid, so a
+  // customer who's paid more overall than they've been billed (a large
+  // advance with no matching sale yet) reads negative — same "credit, not
+  // a negative due" situation as a single invoice row below, just at the
+  // whole-customer level. formatINR renders a negative number with a
+  // literal minus sign, which showed as e.g. "₹-4,000" in this card's red
+  // "due" styling. Same clamp-and-relabel fix as the Invoices table.
+  const dueDisplay = Math.max(0, totalDue);
+  const creditDisplay = Math.max(0, -totalDue);
 
   return (
     <div>
@@ -181,8 +190,10 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
                   <p className="text-xl font-semibold tabular-nums text-status-good">₹{formatINR(totalPaid)}</p>
                   <p className="text-sm text-ink-muted">{t("customer.totalPaidLabel")}</p>
                 </div>
-                <div className="rounded-xl border border-status-critical/30 bg-status-critical/5 p-3">
-                  <p className="text-xl font-semibold tabular-nums text-status-critical">₹{formatINR(totalDue)}</p>
+                <div className={`rounded-xl border p-3 ${creditDisplay > 0 ? "border-status-good/30 bg-status-good/5" : "border-status-critical/30 bg-status-critical/5"}`}>
+                  <p className={`text-xl font-semibold tabular-nums ${creditDisplay > 0 ? "text-status-good" : "text-status-critical"}`}>
+                    {creditDisplay > 0 ? `${t("customer.invoiceCreditPrefix")} ₹${formatINR(creditDisplay)}` : `₹${formatINR(dueDisplay)}`}
+                  </p>
                   <p className="text-sm text-ink-muted">{t("customer.totalDueLabel")}</p>
                 </div>
               </div>
