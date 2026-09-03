@@ -287,7 +287,7 @@ const invoices: ReportDefinition = {
       return {
         date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
         serial: "_synthetic" in r ? "Not Invoiced" : formatInvoiceNumber(r, kilnName),
-        customer: r.customerName,
+        customer: r.customerName.trim(),
         category: category || "—",
         bricksCount: r.bricksCount,
         totalBillAmount: charge,
@@ -447,7 +447,7 @@ const salesByCustomerCategory: ReportDefinition = {
         const billedShare = round2(inv.netAmount * share);
         const paidShare = round2(paidNow * share);
         const key = `${customerKey}::${it.categoryId}`;
-        const bucket = byKey.get(key) ?? { customerName: inv.customerName, categoryId: it.categoryId!, bricksCount: 0, amount: 0, paid: 0, due: 0 };
+        const bucket = byKey.get(key) ?? { customerName: inv.customerName.trim(), categoryId: it.categoryId!, bricksCount: 0, amount: 0, paid: 0, due: 0 };
         bucket.bricksCount += it.bricksCount;
         bucket.amount = round2(bucket.amount + billedShare);
         bucket.paid = round2(bucket.paid + paidShare);
