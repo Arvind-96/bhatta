@@ -8,7 +8,7 @@ import { listExpenseTypes } from "../expenseType.service";
 import { listBrickCategories } from "../brickCategory.service";
 import { itemsOrLegacyFallback } from "../brickLineItems.util";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
-import { ReportDefinition, cashOnlineSplit, round2 } from "./types";
+import { ReportDefinition, cashOnlineSplit, round2, fifoResolveCustomerDues } from "./types";
 
 type InvoiceRow = Awaited<ReturnType<typeof listInvoices>>[number];
 // A synthetic, Invoice-shaped stand-in for a Dispatch nobody has generated
@@ -236,6 +236,27 @@ const invoices: ReportDefinition = {
     const kilnName = kiln?.name ?? "Bhatta Cloud";
     const categoryNameById = new Map(categories.map((c) => [c._id, c.category]));
 
+    // Kiln-wide, NOT date-ranged — same reasoning as unbilledDispatchRows
+    // above and brickLoading's own identical fetch: a later top-up payment
+    // outside this report's own date window still has to be able to
+    // settle an earlier due sitting inside it. Real invoices only (not
+    // unbilledAll) — an unbilled dispatch is always its own amount=paidNow
+    // by construction, so it never contributes a shortfall to resolve or
+    // a credit to apply.
+    const allInvoicesForFifo = await listInvoices(kilnId, null, {});
+    const invoicesByCustomer = new Map<string, typeof allInvoicesForFifo>();
+    for (const inv of allInvoicesForFifo) {
+      const key = inv.customerId ?? `name:${inv.customerName.trim().toLowerCase()}`;
+      const list = invoicesByCustomer.get(key) ?? [];
+      list.push(inv);
+      invoicesByCustomer.set(key, list);
+    }
+    const remainingDueByDispatch = new Map<string, number>();
+    for (const custInvoices of invoicesByCustomer.values()) {
+      const { remainingDue } = fifoResolveCustomerDues(custInvoices);
+      for (const [dispatchId, due] of remainingDue) remainingDueByDispatch.set(dispatchId, due);
+    }
+
     // Loading/unloading charges are the palledar's wage for physically
     // loading/unloading the truck — tracked on the brickLoadingEntries row
     // a dispatch may have been generated from (brickLoading.service.ts),
@@ -284,6 +305,16 @@ const invoices: ReportDefinition = {
       const items = itemsOrLegacyFallback(r);
       const category = [...new Set(items.map((it) => (it.categoryId ? categoryNameById.get(it.categoryId) ?? it.categoryId : null)).filter((v): v is string => !!v))].join(", ");
       const loading = r.dispatchId ? loadingByDispatch.get(r.dispatchId) : undefined;
+      // A later, separate top-up payment against this exact invoice may
+      // have already settled some or all of rawDue (see
+      // fifoResolveCustomerDues in types.ts) — resolved due reads lower
+      // (often 0) than the raw shortfall in that case. Only real,
+      // dispatch-linked invoices are in remainingDueByDispatch (it's built
+      // from allInvoicesForFifo, real invoices only); a 0-brick advance
+      // row's own credit is untouched by this — it's a genuine payment
+      // fact on its own date, not double-counted just because the money
+      // went on to settle an earlier invoice's due.
+      const due = r.dispatchId ? (remainingDueByDispatch.get(r.dispatchId) ?? Math.max(0, rawDue)) : Math.max(0, rawDue);
       return {
         date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
         serial: "_synthetic" in r ? "Not Invoiced" : formatInvoiceNumber(r, kilnName),
@@ -292,7 +323,7 @@ const invoices: ReportDefinition = {
         bricksCount: r.bricksCount,
         totalBillAmount: charge,
         paidNow,
-        due: Math.max(0, rawDue),
+        due: round2(due),
         credit: Math.max(0, -rawDue),
         loadingCharge: loading?.loadingCharge ?? 0,
         unloadingCharge: loading?.unloadingCharge ?? 0,

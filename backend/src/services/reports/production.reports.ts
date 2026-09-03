@@ -11,7 +11,7 @@ import { listBrickLoadingEntries } from "../brickLoading.service";
 import { listInvoices } from "../dispatchDocuments.service";
 import { listGherCycleCrossChecks } from "../gherCycle.service";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
-import { ReportDefinition, cashOnlineSplit, refName, round2 } from "./types";
+import { ReportDefinition, cashOnlineSplit, refName, round2, fifoResolveCustomerDues, type FifoInvoiceRow } from "./types";
 
 function groupedOrDetail<T extends Record<string, unknown>>(
   groupBy: string | undefined,
@@ -306,94 +306,6 @@ const nikasi: ReportDefinition = {
 function effectiveSplit(paymentMode: string | null | undefined, cashAmount: number | null | undefined, onlineAmount: number | null | undefined, amount: number) {
   if (!paymentMode) return { cash: null as number | null, online: null as number | null };
   return cashOnlineSplit(paymentMode, cashAmount, onlineAmount, amount);
-}
-
-interface FifoInvoiceRow {
-  dispatchId: string | null;
-  bricksCount: number;
-  netAmount: number;
-  amountPaidNow: number | null;
-  paymentMode: string | null;
-  cashAmount: number | null;
-  onlineAmount: number | null;
-  invoiceDate: Date | null;
-  createdAt: Date | null;
-}
-
-// A later top-up payment against an earlier due is logged as its own
-// separate, un-dispatched Invoice (see AddCustomerPaymentModal) — it never
-// touches the original sale's own amountPaidNow, so left alone that
-// original dispatch's own "due" keeps showing the original shortfall
-// forever, even once the customer has genuinely paid it off. This walks
-// one customer's full invoice history in date order and applies every
-// payment — whether it's a later 0-brick top-up or an overpayment on a
-// real sale — to the MOST RECENTLY opened still-open charge first (LIFO).
-// Confirmed against real client data, not assumed: for one customer with
-// two simultaneously-open dues (an older ₹26,000 shortfall from Aug 8, a
-// newer ₹4,000 shortfall from Aug 12), a ₹4,000 top-up on Aug 13 was
-// independently confirmed by the client to have paid off the Aug 12 due
-// while the Aug 8 due stayed outstanding — i.e. customers settle their
-// most recent purchase first and carry older balances forward, the
-// opposite of textbook oldest-first AR application. Returns, per
-// dispatchId: the true remaining due after all of that customer's
-// payments are accounted for, and any EXTRA cash/online that a later
-// payment contributed toward it (so a report row's own cash+online+due
-// still sums to its own billed amount instead of quietly losing track of
-// the ₹X a later, separate payment actually settled).
-function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
-  const sorted = [...customerInvoices].sort((a, b) => (a.invoiceDate ?? a.createdAt ?? new Date(0)).getTime() - (b.invoiceDate ?? b.createdAt ?? new Date(0)).getTime());
-  const openStack: { dispatchId: string; remaining: number }[] = [];
-  const extraCash = new Map<string, number>();
-  const extraOnline = new Map<string, number>();
-  // Every dispatchId that ever had a shortfall pushed gets an entry here,
-  // kept in sync on every push and every partial/full credit application —
-  // including 0 once fully cleared. Deriving this only from what's left in
-  // openStack at the very end would silently drop any dispatch a later
-  // payment fully settled (it's popped off the stack once cleared), and
-  // the caller's own fallback for a "not found" dispatch is the ORIGINAL
-  // pre-payment shortfall, not 0 — so a settled due would wrongly reread
-  // as still fully outstanding.
-  const remainingDue = new Map<string, number>();
-
-  function applyCredit(amount: number, paymentMode: string | null, cashAmount: number | null, onlineAmount: number | null) {
-    if (amount <= 0) return;
-    const split = cashOnlineSplit(paymentMode, cashAmount, onlineAmount, amount);
-    let cashLeft = split.cash;
-    let onlineLeft = split.online;
-    while ((cashLeft > 0.005 || onlineLeft > 0.005) && openStack.length > 0) {
-      const top = openStack[openStack.length - 1];
-      const totalLeft = round2(cashLeft + onlineLeft);
-      const applied = Math.min(top.remaining, totalLeft);
-      if (applied <= 0) break;
-      const fromCash = totalLeft > 0 ? round2((cashLeft / totalLeft) * applied) : 0;
-      const fromOnline = round2(applied - fromCash);
-      extraCash.set(top.dispatchId, round2((extraCash.get(top.dispatchId) ?? 0) + fromCash));
-      extraOnline.set(top.dispatchId, round2((extraOnline.get(top.dispatchId) ?? 0) + fromOnline));
-      cashLeft = round2(cashLeft - fromCash);
-      onlineLeft = round2(onlineLeft - fromOnline);
-      top.remaining = round2(top.remaining - applied);
-      remainingDue.set(top.dispatchId, top.remaining);
-      if (top.remaining <= 0.005) openStack.pop();
-    }
-  }
-
-  for (const inv of sorted) {
-    const charge = inv.bricksCount > 0 ? inv.netAmount : 0;
-    const paidNow = inv.amountPaidNow ?? inv.netAmount;
-    if (charge > 0) {
-      const shortfall = round2(charge - paidNow);
-      if (shortfall > 0.005 && inv.dispatchId) {
-        openStack.push({ dispatchId: inv.dispatchId, remaining: shortfall });
-        remainingDue.set(inv.dispatchId, shortfall);
-      } else if (shortfall < -0.005) {
-        applyCredit(-shortfall, inv.paymentMode, inv.cashAmount, inv.onlineAmount);
-      }
-    } else {
-      applyCredit(paidNow, inv.paymentMode, inv.cashAmount, inv.onlineAmount);
-    }
-  }
-
-  return { remainingDue, extraCash, extraOnline };
 }
 
 const brickLoading: ReportDefinition = {
