@@ -36,13 +36,24 @@ type SyntheticRow = InvoiceRow & { _synthetic: true };
 // (which reads dispatches directly) but completely absent from every
 // invoice-based report, explaining part of why the client's own manual
 // total never matched the software's.
-async function unbilledDispatchRows(kilnId: string, filters: { customerId?: string; from?: Date; to?: Date }): Promise<SyntheticRow[]> {
+// No customerId param — deliberately kiln-wide. A dispatch nobody's ever
+// invoiced often has no customerId of its own either (just a free-text
+// customerName snapshot from whoever typed it at dispatch time, unlinked
+// from the tracked Customer record — confirmed against real data: one
+// such dispatch's customerName was "Harcharan " with a trailing-space
+// typo, customerId null, while the tracked Customer is named "Harcharan"
+// cleanly). Filtering this query by customerId at the SQL level would
+// silently drop exactly the unlinked rows this function exists to
+// surface. Callers that need one customer's slice filter afterward with
+// belongsToCustomer below, the same customerId-OR-matching-name fallback
+// listInvoicesForCustomer already established for real invoices.
+async function unbilledDispatchRows(kilnId: string, filters: { from?: Date; to?: Date }): Promise<SyntheticRow[]> {
   const dateRange = [];
   if (filters.from) dateRange.push(gte(dispatches.dispatchedOn, filters.from));
   if (filters.to) dateRange.push(lte(dispatches.dispatchedOn, filters.to));
 
   const [dispatchRows, invoicedDispatchIdRows] = await Promise.all([
-    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), filters.customerId ? eq(dispatches.customerId, filters.customerId) : undefined, ...dateRange)),
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), ...dateRange)),
     // Kiln-wide, NOT date-ranged — same reasoning as flowForRange's own
     // identical query: this only answers "does this dispatch have an
     // invoice at all, ever", regardless of when that invoice was dated.
@@ -94,6 +105,15 @@ async function unbilledDispatchRows(kilnId: string, filters: { customerId?: stri
     );
 }
 
+// Same customerId-OR-matching-name convention listInvoicesForCustomer uses
+// for real invoices — a row belongs to this customer if it's explicitly
+// linked by id, or if it's unlinked (customerId null) but its own
+// customerName matches case/whitespace-insensitively.
+function belongsToCustomer(row: { customerId?: string | null; customerName: string }, customerId: string, customerName: string): boolean {
+  if (row.customerId) return row.customerId === customerId;
+  return row.customerName.trim().toLowerCase() === customerName.trim().toLowerCase();
+}
+
 // One row per customer, totals scoped to the requested period only (not
 // lifetime balance — the Customer page already shows that) — satisfies
 // "per individual or bulk (all customers)" via the optional customerId
@@ -105,6 +125,9 @@ const customers: ReportDefinition = {
   async run(kilnId, filters) {
     const allCustomers = await listCustomers(kilnId);
     const scoped = filters.customerId ? allCustomers.filter((c) => c._id === filters.customerId) : allCustomers;
+    // Fetched once, kiln-wide — see unbilledDispatchRows' own comment on
+    // why it can't be scoped by customerId at the query level.
+    const allUnbilled = await unbilledDispatchRows(kilnId, { from: filters.from, to: filters.to });
 
     const rows = await Promise.all(
       scoped.map(async (c) => {
@@ -117,10 +140,8 @@ const customers: ReportDefinition = {
         // customer whose only 0-brick row was a ₹4,000 advance showed
         // ₹4,000 too much due, since that ₹4,000 was being added as a
         // charge AND already subtracted back out as a payment).
-        const [realInvoices, unbilled] = await Promise.all([
-          listInvoices(kilnId, null, { customerId: c._id, from: filters.from, to: filters.to }),
-          unbilledDispatchRows(kilnId, { customerId: c._id, from: filters.from, to: filters.to }),
-        ]);
+        const realInvoices = await listInvoices(kilnId, null, { customerId: c._id, from: filters.from, to: filters.to });
+        const unbilled = allUnbilled.filter((d) => belongsToCustomer(d, c._id, c.name));
         const invoices = [...realInvoices, ...unbilled];
         const invoicedThisPeriod = round2(invoices.reduce((s, i) => s + (i.bricksCount > 0 ? i.netAmount : 0), 0));
         const paidThisPeriod = round2(invoices.reduce((s, i) => s + (i.amountPaidNow ?? i.netAmount), 0));
@@ -201,12 +222,16 @@ const invoices: ReportDefinition = {
     // on the Invoice row) — an agentId filter is inherently about
     // attributed invoices, so unbilled dispatches are left out rather than
     // guessed at when that filter is active.
-    const [realRows, unbilled, kiln, categories] = await Promise.all([
+    const [realRows, unbilledAll, kiln, categories, targetCustomer] = await Promise.all([
       listInvoices(kilnId, null, { customerId: filters.customerId, agentId: filters.agentId, from: filters.from, to: filters.to }),
-      filters.agentId ? Promise.resolve([]) : unbilledDispatchRows(kilnId, { customerId: filters.customerId, from: filters.from, to: filters.to }),
+      filters.agentId ? Promise.resolve([]) : unbilledDispatchRows(kilnId, { from: filters.from, to: filters.to }),
       db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)).then((r) => r[0]),
       listBrickCategories(kilnId),
+      // Only resolved when actually needed, to filter the kiln-wide
+      // unbilled set down to this one customer — see belongsToCustomer.
+      filters.customerId ? listCustomers(kilnId).then((cs) => cs.find((c) => c._id === filters.customerId)) : Promise.resolve(undefined),
     ]);
+    const unbilled = filters.customerId ? unbilledAll.filter((d) => targetCustomer && belongsToCustomer(d, targetCustomer._id, targetCustomer.name)) : unbilledAll;
     const rows = [...realRows, ...unbilled];
     const kilnName = kiln?.name ?? "Bhatta Cloud";
     const categoryNameById = new Map(categories.map((c) => [c._id, c.category]));
@@ -349,13 +374,25 @@ const salesByCustomerCategory: ReportDefinition = {
   key: "salesByCustomerCategory",
   titleKey: "reports.title.salesByCustomerCategory",
   async run(kilnId, filters) {
-    const [realRows, unbilled, categories] = await Promise.all([
+    const [realRows, unbilledAll, categories, targetCustomer] = await Promise.all([
       listInvoices(kilnId, null, { customerId: filters.customerId, from: filters.from, to: filters.to }),
-      unbilledDispatchRows(kilnId, { customerId: filters.customerId, from: filters.from, to: filters.to }),
+      unbilledDispatchRows(kilnId, { from: filters.from, to: filters.to }),
       listBrickCategories(kilnId),
+      filters.customerId ? listCustomers(kilnId).then((cs) => cs.find((c) => c._id === filters.customerId)) : Promise.resolve(undefined),
     ]);
+    const unbilled = filters.customerId ? unbilledAll.filter((d) => targetCustomer && belongsToCustomer(d, targetCustomer._id, targetCustomer.name)) : unbilledAll;
     const rows = [...realRows, ...unbilled];
     const categoryNameById = new Map(categories.map((c) => [c._id, c.category]));
+    // An unbilled dispatch's own customerId is usually null (see
+    // unbilledDispatchRows) even when its customerName matches a real
+    // tracked Customer who ALSO has real, customerId-linked invoices —
+    // without resolving that name back to the tracked customer's id here,
+    // the two would fragment into separate "customer" rows below for the
+    // same actual person (one keyed by the real id, one by a raw name:
+    // key), splitting their bricks/amount across two buckets instead of
+    // one. Built once, all customers, not just filters.customerId — a
+    // kiln-wide report has to resolve every customer's name, not just one.
+    const customerIdByName = new Map((await listCustomers(kilnId)).map((c) => [c.name.trim().toLowerCase(), c._id]));
 
     interface Bucket {
       customerName: string;
@@ -403,7 +440,7 @@ const salesByCustomerCategory: ReportDefinition = {
       const itemAmounts = items.map((it) => it.amount ?? (it.pricePerBrick != null ? round2(it.bricksCount * it.pricePerBrick) : 0));
       const totalItemsAmount = itemAmounts.reduce((s, a) => s + a, 0) || inv.netAmount;
       const paidNow = inv.amountPaidNow ?? inv.netAmount;
-      const customerKey = inv.customerId ?? `name:${inv.customerName.trim().toLowerCase()}`;
+      const customerKey = inv.customerId ?? customerIdByName.get(inv.customerName.trim().toLowerCase()) ?? `name:${inv.customerName.trim().toLowerCase()}`;
 
       items.forEach((it, i) => {
         const share = totalItemsAmount > 0 ? itemAmounts[i] / totalItemsAmount : 0;
