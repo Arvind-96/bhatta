@@ -286,19 +286,34 @@ const nikasi: ReportDefinition = {
   },
 };
 
+// paymentMode/cashAmount/onlineAmount on a Dispatch follow the same
+// convention financialOverview.service.ts's splitByPaymentMode reads:
+// cashAmount/onlineAmount are ONLY populated when paymentMode is
+// CASH_AND_ONLINE — a plain CASH dispatch has them both null even though
+// 100% of it was cash. Reading the raw fields directly (as this report
+// used to) would misreport every single-mode dispatch as "no payment
+// recorded" instead of fully cash or fully online.
+function effectiveSplit(paymentMode: string | null | undefined, cashAmount: number | null | undefined, onlineAmount: number | null | undefined, amount: number) {
+  if (!paymentMode) return { cash: null as number | null, online: null as number | null };
+  if (paymentMode === "CASH") return { cash: amount, online: 0 };
+  if (paymentMode === "CASH_AND_ONLINE") return { cash: cashAmount ?? 0, online: onlineAmount ?? 0 };
+  return { cash: 0, online: amount }; // BANK / UPI / GST_INVOICE
+}
+
 const brickLoading: ReportDefinition = {
   key: "brickLoading",
   titleKey: "reports.title.brickLoading",
   async run(kilnId, filters) {
     const rows = await listBrickLoadingEntries(kilnId, null, { driverId: filters.driverId, from: filters.from, to: filters.to });
-    // cashAmount/onlineAmount for the CUSTOMER's own brick payment are
-    // never stored on brickLoadingEntries itself — only on whichever
-    // Dispatch this trip is linked to (see listBrickLoadingEntries'
-    // dispatchId resolution). A trip with no linked dispatch yet has no
-    // payment recorded at all, so both read as null (shown as "—") rather
-    // than a misleading 0.
+    // The CUSTOMER's own brick payment (mode + split) is never stored on
+    // brickLoadingEntries itself — only on whichever Dispatch this trip is
+    // linked to (see listBrickLoadingEntries' dispatchId resolution). A
+    // trip with no linked dispatch yet has no payment recorded at all, so
+    // both read as null (shown as "—") rather than a misleading 0.
     const detail = rows.map((r) => {
       const dispatch = r.dispatchId && typeof r.dispatchId === "object" ? r.dispatchId : null;
+      const amount = r.amount ?? 0;
+      const split = dispatch ? effectiveSplit(dispatch.paymentMode, dispatch.cashAmount, dispatch.onlineAmount, amount) : { cash: null, online: null };
       return {
         date: r.date ? r.date.toISOString() : null,
         tripNumber: r.tripNumber ?? "",
@@ -306,9 +321,9 @@ const brickLoading: ReportDefinition = {
         driver: refName(r.driverId) ?? r.driverName ?? "",
         vehicleNumber: r.vehicleNumber,
         bricksCount: r.bricksCount,
-        amount: r.amount ?? 0,
-        cashAmount: dispatch?.cashAmount ?? null,
-        onlineAmount: dispatch?.onlineAmount ?? null,
+        amount,
+        cashAmount: split.cash,
+        onlineAmount: split.online,
         tipAmount: r.tipAmount ?? 0,
       };
     });
