@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { challans, gatePasses, invoices, dispatches, people, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem } from "../db/schema/_helpers";
@@ -200,11 +200,34 @@ export async function updateChallan(kilnId: string, id: string, rawInput: Partia
   return updated;
 }
 
+// Gate Pass/Challan numbering is a plain internal logistics counter, not a
+// tax document — unlike Invoice's own sessionSerialNumber, the admin
+// explicitly wants a deleted one's gap closed immediately rather than
+// left as a permanent hole (deliberately NOT applied to invoices: a
+// customer's already-printed GST invoice could show a number the system
+// no longer agrees with, which is the one place this kind of renumbering
+// would cause real problems). Shifts every later document in the same
+// kiln+season down by one, in ascending order so each UPDATE only ever
+// targets a number the previous step (or the delete itself) just freed —
+// never a number still held by another row.
+async function closeSequenceGap(table: typeof challans | typeof gatePasses, kilnId: string, seasonId: string, deletedNumber: number | null) {
+  if (deletedNumber == null) return;
+  const later = await db
+    .select({ _id: table._id, sequenceNumber: table.sequenceNumber })
+    .from(table)
+    .where(and(eq(table.kilnId, kilnId), eq(table.seasonId, seasonId), gt(table.sequenceNumber, deletedNumber)))
+    .orderBy(asc(table.sequenceNumber));
+  for (const row of later) {
+    await db.update(table).set({ sequenceNumber: row.sequenceNumber! - 1 }).where(eq(table._id, row._id));
+  }
+}
+
 export async function deleteChallan(kilnId: string, id: string) {
   const existing = (await db.select().from(challans).where(and(eq(challans._id, id), eq(challans.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Challan not found in this kiln");
   await db.delete(challans).where(eq(challans._id, id));
-  emitToKiln(kilnId, "challan:update", { _id: id, deleted: true });
+  await closeSequenceGap(challans, kilnId, existing.seasonId!, existing.sequenceNumber);
+  emitToKiln(kilnId, "challan:update", { _id: id, deleted: true, renumbered: existing.sequenceNumber != null });
 }
 
 // ---- Gate Pass (exit-authorization slip) ----
@@ -280,7 +303,8 @@ export async function deleteGatePass(kilnId: string, id: string) {
   const existing = (await db.select().from(gatePasses).where(and(eq(gatePasses._id, id), eq(gatePasses.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Gate pass not found in this kiln");
   await db.delete(gatePasses).where(eq(gatePasses._id, id));
-  emitToKiln(kilnId, "gatePass:update", { _id: id, deleted: true });
+  await closeSequenceGap(gatePasses, kilnId, existing.seasonId!, existing.sequenceNumber);
+  emitToKiln(kilnId, "gatePass:update", { _id: id, deleted: true, renumbered: existing.sequenceNumber != null });
 }
 
 // ---- Invoice (priced, GST commercial bill) ----
