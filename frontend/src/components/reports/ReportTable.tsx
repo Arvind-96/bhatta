@@ -30,9 +30,12 @@ export function ReportTable({ result, rowHighlight }: { result: ReportResult; ro
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] text-sm">
         <thead>
-          <tr className="border-b border-border text-left text-ink-muted">
+          <tr className="border-b-2 border-border text-left">
             {result.columns.map((c, i) => (
-              <th key={c.key} className={`pb-2 pr-3 font-medium ${i > 0 && c.format !== "text" ? "text-right" : ""}`}>
+              <th
+                key={c.key}
+                className={`pb-2 pr-3 font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted ${i > 0 && c.format !== "text" ? "text-right" : ""}`}
+              >
                 {t(c.labelKey)}
               </th>
             ))}
@@ -51,7 +54,10 @@ export function ReportTable({ result, rowHighlight }: { result: ReportResult; ro
                 )}
               >
                 {result.columns.map((c, i) => (
-                  <td key={c.key} className={`py-2 pr-3 text-ink-secondary ${i > 0 && c.format !== "text" ? "text-right tabular-nums" : ""}`}>
+                  <td
+                    key={c.key}
+                    className={`py-2 pr-3 text-ink-secondary ${i > 0 && c.format !== "text" ? "font-mono text-right tabular-nums" : ""}`}
+                  >
                     {formatCell(row[c.key], c.format)}
                   </td>
                 ))}
@@ -61,9 +67,13 @@ export function ReportTable({ result, rowHighlight }: { result: ReportResult; ro
         </tbody>
         {result.totals && (
           <tfoot>
-            <tr className="border-t-2 border-border font-semibold text-ink-primary">
+            {/* The ledger's own "closing line" convention — a heavier double
+                rule (border-t-2 + the row's own bottom border) sets the Total
+                row apart from the transactions that feed into it, same as a
+                real accounts book. */}
+            <tr className="border-t-2 border-b border-border font-bold text-ink-primary">
               {result.columns.map((c, i) => (
-                <td key={c.key} className={`py-2 pr-3 ${i > 0 && c.format !== "text" ? "text-right tabular-nums" : ""}`}>
+                <td key={c.key} className={`py-2.5 pr-3 ${i > 0 && c.format !== "text" ? "font-mono text-right tabular-nums" : ""}`}>
                   {i === 0 ? t("reports.workspace.total") : c.key in result.totals! ? formatCell(result.totals![c.key], c.format) : ""}
                 </td>
               ))}
@@ -77,7 +87,7 @@ export function ReportTable({ result, rowHighlight }: { result: ReportResult; ro
                 row it's derived from. */}
             <tr className="text-ink-secondary">
               {result.columns.map((c, i) => (
-                <td key={c.key} className={`py-2 pr-3 text-xs ${i > 0 && c.format !== "text" ? "text-right tabular-nums" : ""}`}>
+                <td key={c.key} className={`py-2 pr-3 text-xs ${i > 0 && c.format !== "text" ? "font-mono text-right tabular-nums" : ""}`}>
                   {i === 0
                     ? t("reports.workspace.average")
                     : c.key in result.totals! && (c.format === "number" || c.format === "currency") && result.rows.length > 0

@@ -6,7 +6,7 @@ import type { ContractorRollupGroup } from "@/types/reports";
 
 function Money({ value, tone }: { value: number; tone?: "critical" | "good" }) {
   const cls = tone === "critical" ? "text-status-critical" : tone === "good" ? "text-status-good" : "text-ink-primary";
-  return <span className={cn("tabular-nums font-medium", cls)}>₹{formatINR(value)}</span>;
+  return <span className={cn("font-mono tabular-nums font-medium", cls)}>₹{formatINR(value)}</span>;
 }
 
 // The "master view of a thekedar and all their laborers underneath,
@@ -53,13 +53,13 @@ export function ContractorGroupedTable({ groups }: { groups: ContractorRollupGro
               <div className="border-t border-border">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-ink-muted">
-                      <th className="px-4 py-2 font-medium">{t("reports.col.person")}</th>
-                      <th className="px-4 py-2 text-right font-medium">{t("reports.col.dueAmount")}</th>
-                      <th className="px-4 py-2 text-right font-medium">{t("reports.col.paidAmount")}</th>
-                      <th className="px-4 py-2 text-right font-medium">{t("reports.col.netAmount")}</th>
-                      <th className="px-4 py-2 text-right font-medium">{t("reports.col.bricksCount")}</th>
-                      <th className="px-4 py-2 text-right font-medium">{t("reports.col.damagedCount")}</th>
+                    <tr className="border-b-2 border-border text-left">
+                      <th className="px-4 py-2 font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("reports.col.person")}</th>
+                      <th className="px-4 py-2 text-right font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("reports.col.dueAmount")}</th>
+                      <th className="px-4 py-2 text-right font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("reports.col.paidAmount")}</th>
+                      <th className="px-4 py-2 text-right font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("reports.col.netAmount")}</th>
+                      <th className="px-4 py-2 text-right font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("reports.col.bricksCount")}</th>
+                      <th className="px-4 py-2 text-right font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("reports.col.damagedCount")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -73,13 +73,13 @@ export function ContractorGroupedTable({ groups }: { groups: ContractorRollupGro
                       g.laborers.map((l) => (
                         <tr key={l.personId} className="border-t border-border/60">
                           <td className="px-4 py-2 text-ink-secondary">{l.name}</td>
-                          <td className="px-4 py-2 text-right tabular-nums text-ink-secondary">₹{formatINR(l.totalDue)}</td>
-                          <td className="px-4 py-2 text-right tabular-nums text-ink-secondary">₹{formatINR(l.totalPaid)}</td>
+                          <td className="px-4 py-2 text-right font-mono tabular-nums text-ink-secondary">₹{formatINR(l.totalDue)}</td>
+                          <td className="px-4 py-2 text-right font-mono tabular-nums text-ink-secondary">₹{formatINR(l.totalPaid)}</td>
                           <td className="px-4 py-2 text-right">
                             <Money value={l.netAmount} tone={l.netAmount > 0 ? "critical" : l.netAmount < 0 ? "good" : undefined} />
                           </td>
-                          <td className="px-4 py-2 text-right tabular-nums text-ink-secondary">{l.bricksCount.toLocaleString("en-IN")}</td>
-                          <td className="px-4 py-2 text-right tabular-nums text-ink-secondary">{l.damagedCount || "—"}</td>
+                          <td className="px-4 py-2 text-right font-mono tabular-nums text-ink-secondary">{l.bricksCount.toLocaleString("en-IN")}</td>
+                          <td className="px-4 py-2 text-right font-mono tabular-nums text-ink-secondary">{l.damagedCount || "—"}</td>
                         </tr>
                       ))
                     )}

@@ -29,7 +29,7 @@ export function Gauge({
   subtitle?: string;
   delta?: string;
   deltaDirection?: "up" | "down" | "flat";
-  tone?: "critical" | "good";
+  tone?: "critical" | "warning" | "good";
 }) {
   return (
     <div className="flex flex-col gap-1.5 px-4 py-3 first:pl-0">
@@ -38,7 +38,7 @@ export function Gauge({
         <span
           className={cn(
             "font-mono text-2xl font-semibold tabular-nums",
-            tone === "critical" ? "text-status-critical" : tone === "good" ? "text-status-good" : "text-ink-primary"
+            tone === "critical" ? "text-status-critical" : tone === "warning" ? "text-status-warning" : tone === "good" ? "text-status-good" : "text-ink-primary"
           )}
         >
           {value}

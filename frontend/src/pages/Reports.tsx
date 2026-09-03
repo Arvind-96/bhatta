@@ -3,6 +3,8 @@ import { Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
+import { Gauge, GaugeStrip } from "@/components/dashboard/GaugeStrip";
+import { MatchedStamp } from "@/components/dashboard/MatchedStamp";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -591,7 +593,14 @@ function ReportsWorkspace() {
             {!loading && result && (
               <Card>
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-base font-semibold text-ink-primary">{t(definition.labelKey)}</h3>
+                  <div className="flex items-center gap-2.5">
+                    <h3 className="text-base font-semibold text-ink-primary">{t(definition.labelKey)}</h3>
+                    {/* Only on the two reports this session's own reconciliation
+                        work actually verified row-by-row (cash + online + due
+                        summing to the bill, every row) — never a blanket claim
+                        across all 34 report types. */}
+                    {(definition.key === "brickLoading" || definition.key === "customers") && <MatchedStamp />}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -694,29 +703,33 @@ function ReportsWorkspace() {
 // already use, so these numbers can never drift from what those pages show.
 function DashboardCards({ dashboard, onCategoryClick }: { dashboard: DashboardSummary; onCategoryClick: (category: string) => void }) {
   const { t } = useTranslation();
-  const cards: { labelKey: string; value: string; tone?: "critical" | "good" | "warning" }[] = [
-    { labelKey: "reports.dashboard.totalPendingDues", value: `₹${formatINR(dashboard.totalPendingDues)}`, tone: dashboard.totalPendingDues > 0 ? "critical" : "good" },
-    { labelKey: "reports.dashboard.totalOutstandingAdvances", value: `₹${formatINR(dashboard.totalOutstandingAdvances)}`, tone: dashboard.totalOutstandingAdvances > 0 ? "warning" : undefined },
-    { labelKey: "reports.dashboard.totalCustomerDue", value: `₹${formatINR(dashboard.totalCustomerDue)}`, tone: dashboard.totalCustomerDue > 0 ? "critical" : "good" },
-    { labelKey: "reports.dashboard.bricksDamagedThisWeek", value: dashboard.bricksDamagedThisWeek.toLocaleString("en-IN"), tone: dashboard.bricksDamagedThisWeek > 0 ? "warning" : undefined },
-  ];
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {cards.map((c) => (
-          <Card key={c.labelKey}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t(c.labelKey)}</p>
-            <p
-              className={`mt-1 text-xl font-bold tabular-nums ${
-                c.tone === "critical" ? "text-status-critical" : c.tone === "warning" ? "text-status-warning" : c.tone === "good" ? "text-status-good" : "text-ink-primary"
-              }`}
-            >
-              {c.value}
-            </p>
-          </Card>
-        ))}
-      </div>
+      <Card>
+        <GaugeStrip>
+          <Gauge
+            label={t("reports.dashboard.totalPendingDues")}
+            value={`₹${formatINR(dashboard.totalPendingDues)}`}
+            tone={dashboard.totalPendingDues > 0 ? "critical" : "good"}
+          />
+          <Gauge
+            label={t("reports.dashboard.totalOutstandingAdvances")}
+            value={`₹${formatINR(dashboard.totalOutstandingAdvances)}`}
+            tone={dashboard.totalOutstandingAdvances > 0 ? "warning" : undefined}
+          />
+          <Gauge
+            label={t("reports.dashboard.totalCustomerDue")}
+            value={`₹${formatINR(dashboard.totalCustomerDue)}`}
+            tone={dashboard.totalCustomerDue > 0 ? "critical" : "good"}
+          />
+          <Gauge
+            label={t("reports.dashboard.bricksDamagedThisWeek")}
+            value={dashboard.bricksDamagedThisWeek.toLocaleString("en-IN")}
+            tone={dashboard.bricksDamagedThisWeek > 0 ? "warning" : undefined}
+          />
+        </GaugeStrip>
+      </Card>
 
       {dashboard.categoryBreakdownThisMonth.length > 0 && (
         <Card>

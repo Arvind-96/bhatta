@@ -38,6 +38,10 @@ export function GherMap({ ghers, selectedId, onSelect }: GherMapProps) {
     );
   }
 
+  // A fixed white label (below) reads reliably against every one of the 5
+  // status colors in both light and dark theme — the near-black this used
+  // to be had poor contrast against the new palette's darker, more
+  // saturated light-mode status colors (e.g. status-good's #2f6b45).
   return (
     <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(3rem,1fr))] gap-2">
       {ghers.map((gher) => (
@@ -50,7 +54,7 @@ export function GherMap({ ghers, selectedId, onSelect }: GherMapProps) {
             "flex aspect-square items-center justify-center rounded-lg text-xs font-semibold transition-all hover:-translate-y-0.5",
             selectedId === gher._id ? "ring-2 ring-series-1 ring-offset-2 ring-offset-surface" : ""
           )}
-          style={{ background: STATUS_COLOR[gher.status], color: "#0b0b0b" }}
+          style={{ background: STATUS_COLOR[gher.status], color: "#fff" }}
         >
           {gher.number}
         </button>
