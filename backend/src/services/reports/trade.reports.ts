@@ -1,6 +1,6 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import { db } from "../../db/client";
-import { kilns, brickLoadingEntries } from "../../db/schema";
+import { kilns, brickLoadingEntries, dispatches, invoices as invoicesTable } from "../../db/schema";
 import { listCustomers } from "../customer.service";
 import { listInvoices, listGatePasses, listChallans, formatInvoiceNumber } from "../dispatchDocuments.service";
 import { listExpenses } from "../expense.service";
@@ -9,6 +9,90 @@ import { listBrickCategories } from "../brickCategory.service";
 import { itemsOrLegacyFallback } from "../brickLineItems.util";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
 import { ReportDefinition, cashOnlineSplit, round2 } from "./types";
+
+type InvoiceRow = Awaited<ReturnType<typeof listInvoices>>[number];
+// A synthetic, Invoice-shaped stand-in for a Dispatch nobody has generated
+// a formal Invoice for yet — same real sale, same money, just no GST
+// document printed against it. Shaped to slot directly into every one of
+// this file's invoice-consuming reports (customers/invoices/
+// salesByCustomerCategory) unchanged: `dispatchId` is the dispatch's own
+// id (so the Invoices report's loading/unloading-charge lookup still
+// resolves it), amountPaidNow mirrors the dispatch's own "assumed fully
+// paid, no partial-payment concept" convention (brickLoading.service.ts
+// uses the same fallback), and session/sessionSerialNumber/sequenceNumber
+// stay null since no invoice number was ever actually issued —
+// formatInvoiceNumber already renders that as "INV-—", and the Invoices
+// report below overrides it to a clearer label.
+type SyntheticRow = InvoiceRow & { _synthetic: true };
+
+// Same reasoning financialOverview.service.ts's flowForRange already
+// established for Overview/Financial Overview's own totals: a Dispatch
+// nobody has generated a formal Invoice for yet is still a real, complete
+// sale, and every report here that reads listInvoices alone silently
+// dropped it — undercounting Invoices/Customers/Sales-by-Category by
+// however much real, physically-dispatched brick never got billed.
+// Confirmed against real production data: two customers' real sales
+// (₹73,500 combined) were fully present in the Sale/Production report
+// (which reads dispatches directly) but completely absent from every
+// invoice-based report, explaining part of why the client's own manual
+// total never matched the software's.
+async function unbilledDispatchRows(kilnId: string, filters: { customerId?: string; from?: Date; to?: Date }): Promise<SyntheticRow[]> {
+  const dateRange = [];
+  if (filters.from) dateRange.push(gte(dispatches.dispatchedOn, filters.from));
+  if (filters.to) dateRange.push(lte(dispatches.dispatchedOn, filters.to));
+
+  const [dispatchRows, invoicedDispatchIdRows] = await Promise.all([
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), filters.customerId ? eq(dispatches.customerId, filters.customerId) : undefined, ...dateRange)),
+    // Kiln-wide, NOT date-ranged — same reasoning as flowForRange's own
+    // identical query: this only answers "does this dispatch have an
+    // invoice at all, ever", regardless of when that invoice was dated.
+    db.select({ dispatchId: invoicesTable.dispatchId }).from(invoicesTable).where(and(eq(invoicesTable.kilnId, kilnId), isNotNull(invoicesTable.dispatchId))),
+  ]);
+
+  const invoicedDispatchIds = new Set(invoicedDispatchIdRows.map((r) => r.dispatchId));
+  return dispatchRows
+    .filter((d) => !invoicedDispatchIds.has(d._id))
+    .map(
+      (d) =>
+        ({
+          _id: `dispatch:${d._id}`,
+          kilnId: d.kilnId,
+          seasonId: d.seasonId,
+          dispatchId: d._id,
+          customerId: d.customerId,
+          partnerId: null,
+          agentId: null,
+          sequenceNumber: null,
+          customerName: d.customerName,
+          customerAddress: d.customerAddress,
+          customerPhone: d.customerPhone,
+          customerGstNumber: null,
+          customerStateCode: null,
+          vehicleNumber: d.vehicleNumber,
+          gstRatePercent: null,
+          gstType: null,
+          session: null,
+          sessionSerialNumber: null,
+          termsAndConditions: null,
+          categoryId: d.categoryId,
+          bricksCount: d.bricksCount,
+          items: d.items,
+          ratePerBrick: null,
+          grossAmount: null,
+          discountAmount: d.discountAmount,
+          netAmount: d.amount,
+          amountPaidNow: d.amount,
+          paymentMode: d.paymentMode,
+          cashAmount: d.cashAmount,
+          onlineAmount: d.onlineAmount,
+          placeOfSupply: d.placeOfSupply,
+          invoiceDate: d.dispatchedOn,
+          notes: d.notes,
+          createdAt: d.createdAt,
+          _synthetic: true,
+        }) as unknown as SyntheticRow
+    );
+}
 
 // One row per customer, totals scoped to the requested period only (not
 // lifetime balance — the Customer page already shows that) — satisfies
@@ -33,7 +117,11 @@ const customers: ReportDefinition = {
         // customer whose only 0-brick row was a ₹4,000 advance showed
         // ₹4,000 too much due, since that ₹4,000 was being added as a
         // charge AND already subtracted back out as a payment).
-        const invoices = await listInvoices(kilnId, null, { customerId: c._id, from: filters.from, to: filters.to });
+        const [realInvoices, unbilled] = await Promise.all([
+          listInvoices(kilnId, null, { customerId: c._id, from: filters.from, to: filters.to }),
+          unbilledDispatchRows(kilnId, { customerId: c._id, from: filters.from, to: filters.to }),
+        ]);
+        const invoices = [...realInvoices, ...unbilled];
         const invoicedThisPeriod = round2(invoices.reduce((s, i) => s + (i.bricksCount > 0 ? i.netAmount : 0), 0));
         const paidThisPeriod = round2(invoices.reduce((s, i) => s + (i.amountPaidNow ?? i.netAmount), 0));
         // A customer whose only activity this period was a 0-brick advance
@@ -108,11 +196,18 @@ const invoices: ReportDefinition = {
   key: "invoices",
   titleKey: "reports.title.invoices",
   async run(kilnId, filters) {
-    const [rows, kiln, categories] = await Promise.all([
+    // A dispatch attributed to a specific sales agent can't be told apart
+    // from any other until it's actually invoiced (agentId only ever lives
+    // on the Invoice row) — an agentId filter is inherently about
+    // attributed invoices, so unbilled dispatches are left out rather than
+    // guessed at when that filter is active.
+    const [realRows, unbilled, kiln, categories] = await Promise.all([
       listInvoices(kilnId, null, { customerId: filters.customerId, agentId: filters.agentId, from: filters.from, to: filters.to }),
+      filters.agentId ? Promise.resolve([]) : unbilledDispatchRows(kilnId, { customerId: filters.customerId, from: filters.from, to: filters.to }),
       db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)).then((r) => r[0]),
       listBrickCategories(kilnId),
     ]);
+    const rows = [...realRows, ...unbilled];
     const kilnName = kiln?.name ?? "Bhatta Cloud";
     const categoryNameById = new Map(categories.map((c) => [c._id, c.category]));
 
@@ -145,6 +240,19 @@ const invoices: ReportDefinition = {
       // its own `credit` column instead. Showing a raw negative due right
       // next to a matching totalBillAmount/paidNow looked like a math
       // error (e.g. "4,000 bill, 4,000 paid, -4,000 due").
+      //
+      // totalBillAmount is charge-gated the same way, NOT the invoice's
+      // raw netAmount — a 0-brick advance row has nothing billed on it (see
+      // `charge` above), so showing its netAmount here double-counted the
+      // same rupees as both a "bill" and (correctly) a `credit`, and
+      // inflated this report's own Bill-amount total above every other
+      // report's for the identical underlying data (confirmed against real
+      // production data: this column's total ran ₹66,700 over the
+      // Customers report's own "Invoiced" total — exactly the sum of every
+      // 0-brick advance invoice's netAmount). The Customer profile page's
+      // own Invoices table already gates this the same way (see
+      // CustomerDetailPage.tsx's `charge`) — this brings the Reports-page
+      // version back in line with it.
       const charge = r.bricksCount > 0 ? r.netAmount : 0;
       const paidNow = r.amountPaidNow ?? r.netAmount;
       const rawDue = round2(charge - paidNow);
@@ -153,11 +261,11 @@ const invoices: ReportDefinition = {
       const loading = r.dispatchId ? loadingByDispatch.get(r.dispatchId) : undefined;
       return {
         date: r.invoiceDate ? r.invoiceDate.toISOString() : null,
-        serial: formatInvoiceNumber(r, kilnName),
+        serial: "_synthetic" in r ? "Not Invoiced" : formatInvoiceNumber(r, kilnName),
         customer: r.customerName,
         category: category || "—",
         bricksCount: r.bricksCount,
-        totalBillAmount: r.netAmount,
+        totalBillAmount: charge,
         paidNow,
         due: Math.max(0, rawDue),
         credit: Math.max(0, -rawDue),
@@ -241,10 +349,12 @@ const salesByCustomerCategory: ReportDefinition = {
   key: "salesByCustomerCategory",
   titleKey: "reports.title.salesByCustomerCategory",
   async run(kilnId, filters) {
-    const [rows, categories] = await Promise.all([
+    const [realRows, unbilled, categories] = await Promise.all([
       listInvoices(kilnId, null, { customerId: filters.customerId, from: filters.from, to: filters.to }),
+      unbilledDispatchRows(kilnId, { customerId: filters.customerId, from: filters.from, to: filters.to }),
       listBrickCategories(kilnId),
     ]);
+    const rows = [...realRows, ...unbilled];
     const categoryNameById = new Map(categories.map((c) => [c._id, c.category]));
 
     interface Bucket {
@@ -259,7 +369,27 @@ const salesByCustomerCategory: ReportDefinition = {
 
     for (const inv of rows) {
       if (inv.bricksCount <= 0) continue; // 0-brick advance/general-payment rows aren't a brick sale
-      const items = itemsOrLegacyFallback(inv).filter((it) => it.categoryId && (!filters.categoryId || it.categoryId === filters.categoryId));
+      // itemsOrLegacyFallback's per-field names (pricePerBrick/amount) are
+      // its OWN generic convention, not an Invoice row's actual column
+      // names (ratePerBrick, and no top-level `amount` at all — only
+      // netAmount) — calling it directly on `inv` silently read undefined
+      // for both on any invoice with no `items` array (single-category,
+      // pre-multi-category-support legacy rows), so its synthesized
+      // fallback item always priced out at ₹0. That zeroed itemAmounts[i]
+      // for every item on the invoice, so `share` below divided 0 by
+      // (itemAmounts.reduce(...) || netAmount) and still came out 0 —
+      // the netAmount fallback fixed the DENOMINATOR but not the
+      // NUMERATOR, so the invoice's real billed amount silently
+      // vanished from this report while its own bricksCount (added
+      // unconditionally below) still counted normally. Confirmed against
+      // real production data: one legacy single-category invoice's full
+      // ₹81,200 was missing from its customer/category bucket while its
+      // 14,000 bricks were present, undercounting this report's own total
+      // against every other report's by exactly that amount. Mapping the
+      // real column names in explicitly fixes it.
+      const items = itemsOrLegacyFallback({ items: inv.items, categoryId: inv.categoryId, bricksCount: inv.bricksCount, pricePerBrick: inv.ratePerBrick, amount: inv.netAmount }).filter(
+        (it) => it.categoryId && (!filters.categoryId || it.categoryId === filters.categoryId)
+      );
       if (items.length === 0) continue;
 
       // Each item's raw amount (bricksCount x its own price) never reflects
