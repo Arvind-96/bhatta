@@ -36,13 +36,24 @@ const customers: ReportDefinition = {
         const invoices = await listInvoices(kilnId, null, { customerId: c._id, from: filters.from, to: filters.to });
         const invoicedThisPeriod = round2(invoices.reduce((s, i) => s + (i.bricksCount > 0 ? i.netAmount : 0), 0));
         const paidThisPeriod = round2(invoices.reduce((s, i) => s + (i.amountPaidNow ?? i.netAmount), 0));
+        // A customer whose only activity this period was a 0-brick advance
+        // (invoicedThisPeriod 0, paidThisPeriod > 0) nets to a NEGATIVE raw
+        // due — mathematically a credit, not a due, and confusing to show
+        // as a negative number sitting next to two positive figures that
+        // otherwise look like they should just subtract cleanly to 0. "Due"
+        // is clamped at 0 (a due can't sensibly be negative) and whatever
+        // it would have gone negative by is surfaced as its own
+        // creditThisPeriod instead, so the money is still visible, just not
+        // disguised as a below-zero "due".
+        const rawDue = round2(invoicedThisPeriod - paidThisPeriod);
         return {
           customer: c.name,
           phone: (c.phones ?? [])[0] ?? "",
           invoiceCount: invoices.length,
           invoicedThisPeriod,
           paidThisPeriod,
-          dueThisPeriod: round2(invoicedThisPeriod - paidThisPeriod),
+          dueThisPeriod: Math.max(0, rawDue),
+          creditThisPeriod: Math.max(0, -rawDue),
         };
       })
     );
@@ -51,6 +62,7 @@ const customers: ReportDefinition = {
       invoicedThisPeriod: round2(nonZero.reduce((s, r) => s + r.invoicedThisPeriod, 0)),
       paidThisPeriod: round2(nonZero.reduce((s, r) => s + r.paidThisPeriod, 0)),
       dueThisPeriod: round2(nonZero.reduce((s, r) => s + r.dueThisPeriod, 0)),
+      creditThisPeriod: round2(nonZero.reduce((s, r) => s + r.creditThisPeriod, 0)),
     };
     return {
       reportKey: "customers",
@@ -62,6 +74,7 @@ const customers: ReportDefinition = {
         { key: "invoicedThisPeriod", labelKey: "reports.col.invoicedThisPeriod", format: "currency" },
         { key: "paidThisPeriod", labelKey: "reports.col.paidThisPeriod", format: "currency" },
         { key: "dueThisPeriod", labelKey: "reports.col.dueThisPeriod", format: "currency" },
+        { key: "creditThisPeriod", labelKey: "reports.col.credit", format: "currency" },
       ],
       rows: nonZero,
       totals,
@@ -102,12 +115,17 @@ const invoices: ReportDefinition = {
       // totalBillAmount/paidNow stay as the invoice's own raw figures (a
       // 0-brick row's netAmount is literally the advance/general-payment
       // amount, same transparency the Customer profile's Invoices table
-      // keeps) — only `due` is charge-gated like getCustomerDetail, so a
-      // 0-brick row nets out as the credit it actually is instead of
-      // always reading 0 and silently dropping out of the report's Due
-      // total.
+      // keeps). `due` is charge-gated like getCustomerDetail (a 0-brick
+      // row has nothing billed on it, so nothing can be "due" on it) and
+      // then clamped at 0 — a due can't sensibly be negative, that's a
+      // credit — with whatever it would have gone negative by (an advance,
+      // or a real invoice paid for more than it was billed) surfaced as
+      // its own `credit` column instead. Showing a raw negative due right
+      // next to a matching totalBillAmount/paidNow looked like a math
+      // error (e.g. "4,000 bill, 4,000 paid, -4,000 due").
       const charge = r.bricksCount > 0 ? r.netAmount : 0;
       const paidNow = r.amountPaidNow ?? r.netAmount;
+      const rawDue = round2(charge - paidNow);
       const items = itemsOrLegacyFallback(r);
       const category = [...new Set(items.map((it) => (it.categoryId ? categoryNameById.get(it.categoryId) ?? it.categoryId : null)).filter((v): v is string => !!v))].join(", ");
       const loading = r.dispatchId ? loadingByDispatch.get(r.dispatchId) : undefined;
@@ -119,14 +137,15 @@ const invoices: ReportDefinition = {
         bricksCount: r.bricksCount,
         totalBillAmount: r.netAmount,
         paidNow,
-        due: round2(charge - paidNow),
+        due: Math.max(0, rawDue),
+        credit: Math.max(0, -rawDue),
         loadingCharge: loading?.loadingCharge ?? 0,
         unloadingCharge: loading?.unloadingCharge ?? 0,
       };
     });
 
     if (filters.groupBy && filters.groupBy !== "none") {
-      const grouped = groupRowsByPeriod(detail, "date", ["totalBillAmount", "paidNow", "due", "loadingCharge", "unloadingCharge"], filters.groupBy);
+      const grouped = groupRowsByPeriod(detail, "date", ["totalBillAmount", "paidNow", "due", "credit", "loadingCharge", "unloadingCharge"], filters.groupBy);
       return {
         reportKey: "invoices",
         titleKey: "reports.title.invoices",
@@ -136,6 +155,7 @@ const invoices: ReportDefinition = {
           { key: "totalBillAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
           { key: "paidNow", labelKey: "reports.col.paidThisPeriod", format: "currency" },
           { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+          { key: "credit", labelKey: "reports.col.credit", format: "currency" },
           { key: "loadingCharge", labelKey: "reports.col.loadingCharge", format: "currency" },
           { key: "unloadingCharge", labelKey: "reports.col.unloadingCharge", format: "currency" },
         ],
@@ -144,6 +164,7 @@ const invoices: ReportDefinition = {
           totalBillAmount: round2(grouped.reduce((s, r) => s + (r.totalBillAmount as number), 0)),
           paidNow: round2(grouped.reduce((s, r) => s + (r.paidNow as number), 0)),
           due: round2(grouped.reduce((s, r) => s + (r.due as number), 0)),
+          credit: round2(grouped.reduce((s, r) => s + (r.credit as number), 0)),
           loadingCharge: round2(grouped.reduce((s, r) => s + (r.loadingCharge as number), 0)),
           unloadingCharge: round2(grouped.reduce((s, r) => s + (r.unloadingCharge as number), 0)),
         },
@@ -162,6 +183,7 @@ const invoices: ReportDefinition = {
         { key: "totalBillAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
         { key: "paidNow", labelKey: "reports.col.paidThisPeriod", format: "currency" },
         { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+        { key: "credit", labelKey: "reports.col.credit", format: "currency" },
         { key: "loadingCharge", labelKey: "reports.col.loadingCharge", format: "currency" },
         { key: "unloadingCharge", labelKey: "reports.col.unloadingCharge", format: "currency" },
       ],
@@ -170,6 +192,7 @@ const invoices: ReportDefinition = {
         totalBillAmount: round2(detail.reduce((s, r) => s + r.totalBillAmount, 0)),
         paidNow: round2(detail.reduce((s, r) => s + r.paidNow, 0)),
         due: round2(detail.reduce((s, r) => s + r.due, 0)),
+        credit: round2(detail.reduce((s, r) => s + r.credit, 0)),
         loadingCharge: round2(detail.reduce((s, r) => s + r.loadingCharge, 0)),
         unloadingCharge: round2(detail.reduce((s, r) => s + r.unloadingCharge, 0)),
       },
@@ -208,7 +231,7 @@ const salesByCustomerCategory: ReportDefinition = {
       bricksCount: number;
       amount: number;
       paid: number;
-      due: number;
+      due: number; // signed running total; clamped to due/credit only when read out below
     }
     const byKey = new Map<string, Bucket>();
 
@@ -244,6 +267,10 @@ const salesByCustomerCategory: ReportDefinition = {
       });
     }
 
+    // due is clamped at 0 here (a due can't sensibly be negative — that's
+    // a credit, e.g. a category over-paid relative to its own allocated
+    // share) with the excess broken out as its own `credit` column,
+    // same reasoning as the invoices/customers reports above.
     const detail = [...byKey.values()]
       .map((b) => ({
         customer: b.customerName,
@@ -251,7 +278,8 @@ const salesByCustomerCategory: ReportDefinition = {
         bricksCount: b.bricksCount,
         amount: b.amount,
         paid: b.paid,
-        due: round2(b.due),
+        due: Math.max(0, round2(b.due)),
+        credit: Math.max(0, round2(-b.due)),
       }))
       .sort((a, b) => a.customer.localeCompare(b.customer) || a.category.localeCompare(b.category));
 
@@ -265,6 +293,7 @@ const salesByCustomerCategory: ReportDefinition = {
         { key: "amount", labelKey: "reports.col.totalBillAmount", format: "currency" },
         { key: "paid", labelKey: "reports.col.paidThisPeriod", format: "currency" },
         { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+        { key: "credit", labelKey: "reports.col.credit", format: "currency" },
       ],
       rows: detail,
       totals: {
@@ -272,6 +301,7 @@ const salesByCustomerCategory: ReportDefinition = {
         amount: round2(detail.reduce((s, r) => s + r.amount, 0)),
         paid: round2(detail.reduce((s, r) => s + r.paid, 0)),
         due: round2(detail.reduce((s, r) => s + r.due, 0)),
+        credit: round2(detail.reduce((s, r) => s + r.credit, 0)),
       },
     };
   },

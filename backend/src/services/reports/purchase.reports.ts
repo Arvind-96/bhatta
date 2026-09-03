@@ -22,17 +22,26 @@ const purchaseRegister: ReportDefinition = {
       listSuppliers(kilnId),
     ]);
     const supplierById = new Map(allSuppliers.map((s) => [s._id, s.name]));
-    const detail = rows.map((r) => ({
-      date: r.date ? r.date.toISOString() : null,
-      serial: r.sequenceNumber != null ? `PI-${r.sequenceNumber}` : "",
-      supplier: supplierById.get(r.supplierId) ?? r.supplierId,
-      totalBillAmount: r.totalBillAmount,
-      amountPaid: r.amountPaid,
-      due: round2(r.totalBillAmount - r.amountPaid),
-    }));
+    // due is clamped at 0 — a due can't sensibly be negative — with any
+    // overpayment on a supplier invoice surfaced as its own `credit`
+    // column instead, same reasoning as the customer-side invoices report
+    // (see trade.reports.ts's own note on why a raw negative due next to
+    // a matching bill/paid pair reads as a math error).
+    const detail = rows.map((r) => {
+      const rawDue = round2(r.totalBillAmount - r.amountPaid);
+      return {
+        date: r.date ? r.date.toISOString() : null,
+        serial: r.sequenceNumber != null ? `PI-${r.sequenceNumber}` : "",
+        supplier: supplierById.get(r.supplierId) ?? r.supplierId,
+        totalBillAmount: r.totalBillAmount,
+        amountPaid: r.amountPaid,
+        due: Math.max(0, rawDue),
+        credit: Math.max(0, -rawDue),
+      };
+    });
 
     if (filters.groupBy && filters.groupBy !== "none") {
-      const grouped = groupRowsByPeriod(detail, "date", ["totalBillAmount", "amountPaid", "due"], filters.groupBy);
+      const grouped = groupRowsByPeriod(detail, "date", ["totalBillAmount", "amountPaid", "due", "credit"], filters.groupBy);
       return {
         reportKey: "purchaseRegister",
         titleKey: "reports.title.purchaseRegister",
@@ -42,12 +51,14 @@ const purchaseRegister: ReportDefinition = {
           { key: "totalBillAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
           { key: "amountPaid", labelKey: "reports.col.amountPaid", format: "currency" },
           { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+          { key: "credit", labelKey: "reports.col.credit", format: "currency" },
         ],
         rows: grouped,
         totals: {
           totalBillAmount: round2(grouped.reduce((s, r) => s + (r.totalBillAmount as number), 0)),
           amountPaid: round2(grouped.reduce((s, r) => s + (r.amountPaid as number), 0)),
           due: round2(grouped.reduce((s, r) => s + (r.due as number), 0)),
+          credit: round2(grouped.reduce((s, r) => s + (r.credit as number), 0)),
         },
       };
     }
@@ -62,12 +73,14 @@ const purchaseRegister: ReportDefinition = {
         { key: "totalBillAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
         { key: "amountPaid", labelKey: "reports.col.amountPaid", format: "currency" },
         { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+        { key: "credit", labelKey: "reports.col.credit", format: "currency" },
       ],
       rows: detail,
       totals: {
         totalBillAmount: round2(detail.reduce((s, r) => s + r.totalBillAmount, 0)),
         amountPaid: round2(detail.reduce((s, r) => s + r.amountPaid, 0)),
         due: round2(detail.reduce((s, r) => s + r.due, 0)),
+        credit: round2(detail.reduce((s, r) => s + r.credit, 0)),
       },
     };
   },
@@ -87,7 +100,10 @@ const purchaseBySupplier: ReportDefinition = {
       existing.amountPaid += r.amountPaid;
       byId.set(r.supplierId, existing);
     }
-    const detail = [...byId.values()].map((v) => ({ ...v, due: round2(v.totalBillAmount - v.amountPaid) }));
+    const detail = [...byId.values()].map((v) => {
+      const rawDue = round2(v.totalBillAmount - v.amountPaid);
+      return { ...v, due: Math.max(0, rawDue), credit: Math.max(0, -rawDue) };
+    });
     return {
       reportKey: "purchaseBySupplier",
       titleKey: "reports.title.purchaseBySupplier",
@@ -97,9 +113,14 @@ const purchaseBySupplier: ReportDefinition = {
         { key: "totalBillAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
         { key: "amountPaid", labelKey: "reports.col.amountPaid", format: "currency" },
         { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+        { key: "credit", labelKey: "reports.col.credit", format: "currency" },
       ],
       rows: detail,
-      totals: { totalBillAmount: round2(detail.reduce((s, r) => s + r.totalBillAmount, 0)), due: round2(detail.reduce((s, r) => s + r.due, 0)) },
+      totals: {
+        totalBillAmount: round2(detail.reduce((s, r) => s + r.totalBillAmount, 0)),
+        due: round2(detail.reduce((s, r) => s + r.due, 0)),
+        credit: round2(detail.reduce((s, r) => s + r.credit, 0)),
+      },
     };
   },
 };
