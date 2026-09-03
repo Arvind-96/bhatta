@@ -1,6 +1,6 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { invoices, expenses, ledgerEntries, people, ghers, fuelLogs, stackingEntries, fuelPurchases, vehicleDieselEntries, chamberGradings } from "../db/schema";
+import { invoices, expenses, ledgerEntries, people, ghers, fuelLogs, stackingEntries, fuelPurchases, vehicleDieselEntries, chamberGradings, dispatches } from "../db/schema";
 import type { BrickLineItem } from "../db/schema/_helpers";
 import { totalGradedOutput } from "./chamberGrading.service";
 
@@ -18,13 +18,19 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
   // Revenue sourced from invoices (amountPaidNow, falling back to
   // netAmount), the same formula and same COALESCE(invoiceDate, createdAt)
   // date basis financialOverview.service.ts's flowForRange uses for
-  // "moneyReceived" — this used to sum dispatches.amount instead, which is
-  // the accrual sale value the instant a dispatch is logged (no GST,
-  // regardless of whether the customer has actually paid), so it could
-  // silently disagree with Financial Overview for the same period. Using
-  // the same source here keeps every "revenue"/"money received" figure in
-  // the app in agreement.
-  const [invoiceRows, expenseRows, dueEntries, customers, totalBricksProduced, fuelPurchaseRows, dieselRows] = await Promise.all([
+  // "moneyReceived" — PLUS every Dispatch in range that has no formal
+  // Invoice generated for it yet (see unInvoicedDispatches below). This
+  // used to sum invoices alone, on the theory that using the same source
+  // as Financial Overview would keep every "revenue" figure in the app in
+  // agreement — but Financial Overview had the identical gap at the time
+  // (a Dispatch is a complete real sale the moment it's logged; "Invoice"
+  // is a separate, easy-to-forget follow-up step), so both silently
+  // undercounted together instead of disagreeing. Both are now fixed the
+  // same way, so a currently-un-invoiced sale shows up here exactly like
+  // it does in Financial Overview and the Reports page's own dispatch-based
+  // totals, rather than being invisible in two places and visible in the
+  // third.
+  const [invoiceRows, expenseRows, dueEntries, customers, totalBricksProduced, fuelPurchaseRows, dieselRows, dispatchRows, invoicedDispatchIdRows] = await Promise.all([
     db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.seasonId, seasonId), sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`)),
     db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.seasonId, seasonId), gte(expenses.date, since))),
     // ledgerEntries.seasonId is optional (not reliably populated — see
@@ -35,10 +41,19 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
     totalGradedOutput(kilnId, seasonId, since),
     db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), eq(fuelPurchases.seasonId, seasonId), gte(fuelPurchases.date, since))),
     db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.seasonId, seasonId), gte(vehicleDieselEntries.date, since))),
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), gte(dispatches.dispatchedOn, since))),
+    // Kiln-wide, not date-ranged — see flowForRange's identical query for
+    // why this has to stay unbounded (only answers "was this dispatch ever
+    // invoiced", not "was it invoiced in this window").
+    db.select({ dispatchId: invoices.dispatchId }).from(invoices).where(and(eq(invoices.kilnId, kilnId), isNotNull(invoices.dispatchId))),
   ]);
 
   const customerIds = new Set(customers.map((c) => c._id));
-  const revenue = invoiceRows.reduce((sum, inv) => sum + (inv.amountPaidNow ?? inv.netAmount), 0);
+  const invoicedDispatchIds = new Set(invoicedDispatchIdRows.map((r) => r.dispatchId));
+  const unInvoicedDispatches = dispatchRows.filter((d) => !invoicedDispatchIds.has(d._id));
+  const revenue =
+    invoiceRows.reduce((sum, inv) => sum + (inv.amountPaidNow ?? inv.netAmount), 0) +
+    unInvoicedDispatches.reduce((sum, d) => sum + d.amount, 0);
   const expenseCosts = expenseRows.reduce((sum, e) => sum + e.amount, 0);
   const fuelCosts = fuelPurchaseRows.reduce((sum, p) => sum + p.amount, 0);
   const dieselCosts = dieselRows.reduce((sum, d) => sum + (d.costAmount ?? 0), 0);

@@ -1,7 +1,11 @@
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { dispatches, expenses, fuelPurchases, vehicleDieselEntries, ledgerEntries, invoices } from "../db/schema";
 import { listPaymentsDue, customerCreditAging } from "./person.service";
+
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
 
 // Splits a set of money-flow rows into cash vs. online, for the Financial
 // Overview's payment-method breakdown. CASH_AND_ONLINE rows split
@@ -53,12 +57,23 @@ function splitByPaymentMode<T extends { paymentMode?: string | null; cashAmount?
 // rupee-accountable place. "Money received" is real money collected from
 // customers — sourced from `invoices.amountPaidNow` (falling back to
 // `netAmount`, same "unset = fully paid" convention getCustomerDetail
-// uses), NOT ledger entries against a `people.type = "CUSTOMER"` row. That
-// legacy person type predates the dedicated Customer/Dispatch/Invoice
-// model this app actually bills through and is essentially never
-// populated by real sales — summing it here silently reported ~0 "money
-// received" regardless of actual sales. "Money spent" sums every distinct
-// spend source exactly once:
+// uses) PLUS every Dispatch that was never turned into a formal Invoice
+// (see unInvoicedDispatches below) — NOT ledger entries against a
+// `people.type = "CUSTOMER"` row. That legacy person type predates the
+// dedicated Customer/Dispatch/Invoice model this app actually bills
+// through and is essentially never populated by real sales — summing it
+// here silently reported ~0 "money received" regardless of actual sales.
+// Counting invoices ALONE (the original version of this function) has the
+// same silent-undercount problem in a subtler way: a Dispatch is a
+// complete, real sale the moment it's logged (it now carries its own
+// paymentMode/cashAmount/onlineAmount — see dispatch.service.ts), but
+// "Invoice" is a separate, optional follow-up step (the printed GST
+// document) an admin can forget or simply not get around to for days —
+// during which that entire sale was invisible here while showing up fine
+// on the Reports page's dispatch-based totals, exactly the kind of
+// cross-page mismatch a client would notice immediately.
+//
+// "Money spent" sums every distinct spend source exactly once:
 //   - Expense entries (JCB rental, royalty, petty cash, ...) — never touch
 //     the ledger, so no overlap risk.
 //   - FuelPurchase.amount (coal/wood/etc. bought) — the purchase's own
@@ -89,7 +104,7 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
     ? sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) BETWEEN ${since} AND ${until}`
     : sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`;
 
-  const [dispatchRows, expenseRows, fuelPurchaseRows, dieselRows, paidEntries, invoiceRows] = await Promise.all([
+  const [dispatchRows, expenseRows, fuelPurchaseRows, dieselRows, paidEntries, invoiceRows, invoicedDispatchIdRows] = await Promise.all([
     db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), seasonId ? eq(dispatches.seasonId, seasonId) : undefined, dateRange(dispatches.dispatchedOn))),
     db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), seasonId ? eq(expenses.seasonId, seasonId) : undefined, dateRange(expenses.date))),
     db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), seasonId ? eq(fuelPurchases.seasonId, seasonId) : undefined, dateRange(fuelPurchases.date))),
@@ -100,9 +115,24 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
     // to the requested window.
     db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), dateRange(ledgerEntries.date), eq(ledgerEntries.direction, "PAID"))),
     db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), seasonId ? eq(invoices.seasonId, seasonId) : undefined, invoiceDateRange)),
+    // Kiln-wide, NOT date-ranged — this only answers "does this dispatch
+    // have an invoice at all, ever", so a dispatch logged inside the period
+    // whose invoice happened to be created just outside it (or vice versa)
+    // is still correctly recognized as invoiced, instead of getting
+    // double-counted (once via invoiceRows, once via unInvoicedDispatches).
+    db.select({ dispatchId: invoices.dispatchId }).from(invoices).where(and(eq(invoices.kilnId, kilnId), isNotNull(invoices.dispatchId))),
   ]);
 
-  const moneyReceived = invoiceRows.reduce((sum, inv) => sum + (inv.amountPaidNow ?? inv.netAmount), 0);
+  const invoicedDispatchIds = new Set(invoicedDispatchIdRows.map((r) => r.dispatchId));
+  // A Dispatch nobody has generated a formal Invoice for yet is still a
+  // real, complete sale — see this function's own doc comment above for
+  // why counting invoices alone silently dropped it from "money received".
+  const unInvoicedDispatches = dispatchRows.filter((d) => !invoicedDispatchIds.has(d._id));
+
+  const moneyReceived = round2(
+    invoiceRows.reduce((sum, inv) => sum + (inv.amountPaidNow ?? inv.netAmount), 0) +
+      unInvoicedDispatches.reduce((sum, d) => sum + d.amount, 0)
+  );
 
   const expenseCosts = expenseRows.reduce((sum, e) => sum + e.amount, 0);
   const fuelCosts = fuelPurchaseRows.reduce((sum, p) => sum + p.amount, 0);
@@ -113,7 +143,15 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
 
   const bricksSold = dispatchRows.reduce((sum, d) => sum + d.bricksCount, 0);
 
-  const moneyInSplit = splitByPaymentMode(invoiceRows, (inv) => inv.amountPaidNow ?? inv.netAmount);
+  const moneyInSplits = [
+    splitByPaymentMode(invoiceRows, (inv) => inv.amountPaidNow ?? inv.netAmount),
+    splitByPaymentMode(unInvoicedDispatches, (d) => d.amount),
+  ];
+  const moneyInSplit = {
+    cash: round2(moneyInSplits.reduce((sum, s) => sum + s.cash, 0)),
+    online: round2(moneyInSplits.reduce((sum, s) => sum + s.online, 0)),
+    unspecified: round2(moneyInSplits.reduce((sum, s) => sum + s.unspecified, 0)),
+  };
   const outSplits = [
     splitByPaymentMode(expenseRows, (e) => e.amount),
     splitByPaymentMode(fuelPurchaseRows, (p) => p.amount),
