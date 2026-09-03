@@ -200,16 +200,13 @@ export async function updateChallan(kilnId: string, id: string, rawInput: Partia
   return updated;
 }
 
-// Gate Pass/Challan numbering is a plain internal logistics counter, not a
-// tax document — unlike Invoice's own sessionSerialNumber, the admin
-// explicitly wants a deleted one's gap closed immediately rather than
-// left as a permanent hole (deliberately NOT applied to invoices: a
-// customer's already-printed GST invoice could show a number the system
-// no longer agrees with, which is the one place this kind of renumbering
-// would cause real problems). Shifts every later document in the same
-// kiln+season down by one, in ascending order so each UPDATE only ever
-// targets a number the previous step (or the delete itself) just freed —
-// never a number still held by another row.
+// Closes the gap a deleted Gate Pass/Challan leaves behind — every later
+// document in the same kiln+season shifts down by one, in ascending order
+// so each UPDATE only ever targets a number the previous step (or the
+// delete itself) just freed, never a number still held by another row.
+// Invoice has its own equivalent, closeInvoiceSessionGap below, since it's
+// numbered via session+sessionSerialNumber rather than this plain
+// per-kiln-per-season sequenceNumber.
 async function closeSequenceGap(table: typeof challans | typeof gatePasses, kilnId: string, seasonId: string, deletedNumber: number | null) {
   if (deletedNumber == null) return;
   const later = await db
@@ -572,5 +569,26 @@ export async function deleteInvoice(kilnId: string, id: string) {
   }
 
   await db.delete(invoices).where(eq(invoices._id, id));
-  emitToKiln(kilnId, "invoice:update", { _id: id, deleted: true });
+  await closeInvoiceSessionGap(kilnId, existing.session, existing.sessionSerialNumber);
+  emitToKiln(kilnId, "invoice:update", { _id: id, deleted: true, renumbered: existing.sessionSerialNumber != null });
+}
+
+// Invoice's own equivalent of closeSequenceGap above, scoped by
+// (kilnId, session) instead of (kilnId, seasonId) since sessionSerialNumber
+// — not the older sequenceNumber field — is the one actually printed as
+// JVS/{session}/{N} and shown everywhere in the UI. Per explicit
+// instruction, invoices now renumber on delete the same as Gate Pass/
+// Challan, overriding the GST-continuity caution this originally shipped
+// with — the client weighed that tradeoff and wants consistency across
+// all three document types instead.
+async function closeInvoiceSessionGap(kilnId: string, session: string | null, deletedNumber: number | null) {
+  if (session == null || deletedNumber == null) return;
+  const later = await db
+    .select({ _id: invoices._id, sessionSerialNumber: invoices.sessionSerialNumber })
+    .from(invoices)
+    .where(and(eq(invoices.kilnId, kilnId), eq(invoices.session, session), gt(invoices.sessionSerialNumber, deletedNumber)))
+    .orderBy(asc(invoices.sessionSerialNumber));
+  for (const row of later) {
+    await db.update(invoices).set({ sessionSerialNumber: row.sessionSerialNumber! - 1 }).where(eq(invoices._id, row._id));
+  }
 }
