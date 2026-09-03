@@ -431,7 +431,22 @@ export async function listInvoices(kilnId: string, seasonId: string | null, filt
   if (f.agentId) conditions.push(eq(invoices.agentId, f.agentId));
   if (f.from) conditions.push(gte(invoices.invoiceDate, f.from));
   if (f.to) conditions.push(lte(invoices.invoiceDate, f.to));
-  return db.select().from(invoices).where(and(...conditions)).orderBy(desc(invoices.createdAt));
+  // Newest-first by the invoice's own printed serial (session, then
+  // sessionSerialNumber within it) — not createdAt. createdAt is when the
+  // DB row was inserted, which drifts from serial order the moment any
+  // invoice is backdated, edited, or re-entered after the fact (this
+  // session alone created two invoices today dated back in August) —
+  // sorting by it made the Invoices page's list bounce around in an order
+  // that had nothing to do with the printed JVS/{session}/{N} numbers
+  // sitting right next to it. invoiceDate/createdAt stay as the final
+  // tiebreaker for older rows with no session (pre-dates the session
+  // feature) — NULLs sort last in a DESC order, so those legitimately
+  // older rows still land at the bottom of a newest-first list.
+  return db
+    .select()
+    .from(invoices)
+    .where(and(...conditions))
+    .orderBy(desc(invoices.session), desc(invoices.sessionSerialNumber), desc(invoices.invoiceDate), desc(invoices.createdAt));
 }
 
 // Every invoice "generated under this customer's name" — matched by
