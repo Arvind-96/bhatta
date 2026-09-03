@@ -311,9 +311,39 @@ export async function updateLandLeaseContract(kilnId: string, contractId: string
   return updated;
 }
 
+// The ADVANCE and lump-sum-value ledger entries this contract posted at
+// creation would otherwise sit on the landowner's ledger forever,
+// permanently showing money paid/owed against a contract that (from the
+// admin's view) no longer exists — reversed here the same way
+// updateLandLeaseContract's own delta correction does it, just for the
+// full original amount instead of a partial delta.
 export async function deleteLandLeaseContract(kilnId: string, contractId: string) {
   const existing = (await db.select().from(landLeaseContracts).where(and(eq(landLeaseContracts._id, contractId), eq(landLeaseContracts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Land lease contract not found in this kiln");
+
+  if (existing.advanceAmount && existing.advanceAmount > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.landLeaseId,
+      direction: "DUE",
+      amount: existing.advanceAmount,
+      reason: `Land lease contract ${existing.contractNumber} deleted — reversing advance`,
+      category: "ADVANCE",
+      contractId,
+    });
+  }
+  if (existing.rateType !== "PER_TROLLEY" && existing.totalContractValue > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.landLeaseId,
+      direction: "PAID",
+      amount: existing.totalContractValue,
+      reason: `Land lease contract ${existing.contractNumber} deleted — reversing contract value`,
+      category: "SOIL",
+      contractId,
+    });
+  }
+
   await db.delete(landLeaseContracts).where(eq(landLeaseContracts._id, contractId));
   emitToKiln(kilnId, "landLeaseContract:update", { _id: contractId, deleted: true });
   return existing;

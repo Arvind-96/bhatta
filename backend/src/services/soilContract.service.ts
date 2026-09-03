@@ -508,14 +508,44 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
   return updated;
 }
 
-// Deletion never touches ledger entries or SoilTrip/SoilArrival records
-// already posted against this contract — they simply keep their contractId
-// pointing at a now-deleted document, same "historical records survive
-// deletion of the parent" convention used for admin-managed brick/fuel
-// types elsewhere in this app.
+// SoilTrip/SoilArrival records already posted against this contract keep
+// their contractId pointing at a now-deleted document, same "historical
+// records survive deletion of the parent" convention used for
+// admin-managed brick/fuel types elsewhere in this app — those aren't
+// reversed. The ADVANCE and lump-sum-value ledger entries THIS contract
+// itself posted at creation are a different matter, though: left alone,
+// they'd sit on the landowner's ledger forever, permanently showing money
+// paid/owed against a contract that (from the admin's view) no longer
+// exists. Reversed here the same way updateSoilContract's own delta
+// correction does it, just for the full original amount instead of a
+// partial delta.
 export async function deleteSoilContract(kilnId: string, contractId: string) {
   const existing = (await db.select().from(soilContracts).where(and(eq(soilContracts._id, contractId), eq(soilContracts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Soil contract not found in this kiln");
+
+  if (existing.advanceAmount && existing.advanceAmount > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.landownerId,
+      direction: "DUE",
+      amount: existing.advanceAmount,
+      reason: `Soil contract ${existing.contractNumber} deleted — reversing advance`,
+      category: "ADVANCE",
+      contractId,
+    });
+  }
+  if (existing.rateType !== "PER_TROLLEY" && existing.totalContractValue > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.landownerId,
+      direction: "PAID",
+      amount: existing.totalContractValue,
+      reason: `Soil contract ${existing.contractNumber} deleted — reversing contract value`,
+      category: "SOIL",
+      contractId,
+    });
+  }
+
   await db.delete(soilContracts).where(eq(soilContracts._id, contractId));
   emitToKiln(kilnId, "soilContract:update", { _id: contractId, deleted: true });
   return existing;

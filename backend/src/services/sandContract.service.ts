@@ -203,9 +203,38 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
 // posted against this contract — they simply keep their contractId
 // pointing at a now-deleted document, same "historical records survive
 // deletion of the parent" convention deleteSoilContract uses.
+// The ADVANCE and lump-sum-value ledger entries this contract posted at
+// creation would otherwise sit on the contractor's ledger forever,
+// permanently showing money paid/owed against a contract that (from the
+// admin's view) no longer exists — reversed here in full, same reasoning
+// as soilContract.service.ts/landLeaseContract.service.ts's identical fix.
 export async function deleteSandContract(kilnId: string, contractId: string) {
   const existing = (await db.select().from(sandContracts).where(and(eq(sandContracts._id, contractId), eq(sandContracts.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Sand contract not found in this kiln");
+
+  if (existing.advanceAmount && existing.advanceAmount > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.sandContractorId,
+      direction: "DUE",
+      amount: existing.advanceAmount,
+      reason: `Sand contract ${existing.contractNumber} deleted — reversing advance`,
+      category: "ADVANCE",
+      contractId,
+    });
+  }
+  if (existing.rateType !== "PER_TROLLEY" && existing.totalContractValue > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.sandContractorId,
+      direction: "PAID",
+      amount: existing.totalContractValue,
+      reason: `Sand contract ${existing.contractNumber} deleted — reversing contract value`,
+      category: "SAND",
+      contractId,
+    });
+  }
+
   await db.delete(sandContracts).where(eq(sandContracts._id, contractId));
   emitToKiln(kilnId, "sandContract:update", { _id: contractId, deleted: true });
   return existing;
