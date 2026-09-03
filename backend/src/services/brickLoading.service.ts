@@ -90,11 +90,12 @@ async function generateTripNumber(kilnId: string, seasonId: string) {
 // The vehicle-loading operation record — which truck/tractor, how many
 // bricks, which category — kept separate from Dispatch (the sale) and
 // LoadingEntry (the palledar's wage for the physical loading labor). Every
-// trip gets a unique sequential trip number and an auto-computed final
-// amount: (category price × bricksCount − discount) + loadingCharge +
-// unloadingCharge. Does NOT create a Dispatch — that link is established
-// the other way round, from the Dispatch page's "Linked Loading Trip"
-// picker (see createDispatch's loadingEntryId handling in
+// trip gets a unique sequential trip number and an auto-computed `amount`
+// (the brick sale value alone — see the comment on finalAmount below;
+// loadingCharge/unloadingCharge are tracked as entirely separate figures,
+// never folded into it). Does NOT create a Dispatch — that link is
+// established the other way round, from the Dispatch page's "Linked
+// Loading Trip" picker (see createDispatch's loadingEntryId handling in
 // dispatch.service.ts), which is also what sets this row's dispatchId.
 export async function createBrickLoadingEntry(input: CreateBrickLoadingInput) {
   if (!input.items || input.items.length === 0) throw new Error("At least one brick category line item is required");
@@ -488,7 +489,17 @@ export async function listBrickLoadingEntries(kilnId: string, seasonId: string |
   ];
   const [driverRows, dispatchRows, categoryRows] = await Promise.all([
     driverIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, driverIds)) : [],
-    dispatchIds.length ? db.select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName }).from(dispatches).where(inArray(dispatches._id, dispatchIds)) : [],
+    // paymentMode/cashAmount/onlineAmount included so read paths (the
+    // Production > Brick Loading report especially) can show how the
+    // customer's own payment for the bricks broke down cash-vs-online —
+    // that split is never stored on brickLoadingEntries itself, only on
+    // whichever Dispatch it's linked to.
+    dispatchIds.length
+      ? db
+          .select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName, paymentMode: dispatches.paymentMode, cashAmount: dispatches.cashAmount, onlineAmount: dispatches.onlineAmount })
+          .from(dispatches)
+          .where(inArray(dispatches._id, dispatchIds))
+      : [],
     categoryIds.length ? db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)) : [],
   ]);
   const driverById = new Map(driverRows.map((d) => [d._id, d]));

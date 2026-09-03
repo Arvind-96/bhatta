@@ -291,25 +291,38 @@ const brickLoading: ReportDefinition = {
   titleKey: "reports.title.brickLoading",
   async run(kilnId, filters) {
     const rows = await listBrickLoadingEntries(kilnId, null, { driverId: filters.driverId, from: filters.from, to: filters.to });
-    const detail = rows.map((r) => ({
-      date: r.date ? r.date.toISOString() : null,
-      tripNumber: r.tripNumber ?? "",
-      customer: r.customerName ?? "",
-      driver: refName(r.driverId) ?? r.driverName ?? "",
-      vehicleNumber: r.vehicleNumber,
-      bricksCount: r.bricksCount,
-      amount: r.amount ?? 0,
-      tipAmount: r.tipAmount ?? 0,
-    }));
+    // cashAmount/onlineAmount for the CUSTOMER's own brick payment are
+    // never stored on brickLoadingEntries itself — only on whichever
+    // Dispatch this trip is linked to (see listBrickLoadingEntries'
+    // dispatchId resolution). A trip with no linked dispatch yet has no
+    // payment recorded at all, so both read as null (shown as "—") rather
+    // than a misleading 0.
+    const detail = rows.map((r) => {
+      const dispatch = r.dispatchId && typeof r.dispatchId === "object" ? r.dispatchId : null;
+      return {
+        date: r.date ? r.date.toISOString() : null,
+        tripNumber: r.tripNumber ?? "",
+        customer: r.customerName ?? "",
+        driver: refName(r.driverId) ?? r.driverName ?? "",
+        vehicleNumber: r.vehicleNumber,
+        bricksCount: r.bricksCount,
+        amount: r.amount ?? 0,
+        cashAmount: dispatch?.cashAmount ?? null,
+        onlineAmount: dispatch?.onlineAmount ?? null,
+        tipAmount: r.tipAmount ?? 0,
+      };
+    });
     const { rows: outRows, columns } = groupedOrDetail(
       filters.groupBy,
       detail,
-      ["bricksCount", "amount", "tipAmount"],
+      ["bricksCount", "amount", "cashAmount", "onlineAmount", "tipAmount"],
       [
         { key: "period", labelKey: "reports.col.period", format: "text" },
         { key: "count", labelKey: "reports.col.entries", format: "number" },
         { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
         { key: "amount", labelKey: "reports.col.amount", format: "currency" },
+        { key: "cashAmount", labelKey: "reports.col.cashAmount", format: "currency" },
+        { key: "onlineAmount", labelKey: "reports.col.onlineAmount", format: "currency" },
         { key: "tipAmount", labelKey: "reports.col.tipAmount", format: "currency" },
       ],
       [
@@ -320,6 +333,8 @@ const brickLoading: ReportDefinition = {
         { key: "vehicleNumber", labelKey: "reports.col.vehicleNumber", format: "text" },
         { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
         { key: "amount", labelKey: "reports.col.amount", format: "currency" },
+        { key: "cashAmount", labelKey: "reports.col.cashAmount", format: "currency" },
+        { key: "onlineAmount", labelKey: "reports.col.onlineAmount", format: "currency" },
         { key: "tipAmount", labelKey: "reports.col.tipAmount", format: "currency" },
       ]
     );
@@ -331,6 +346,8 @@ const brickLoading: ReportDefinition = {
       totals: {
         bricksCount: detail.reduce((s, r) => s + r.bricksCount, 0),
         amount: round2(detail.reduce((s, r) => s + r.amount, 0)),
+        cashAmount: round2(detail.reduce((s, r) => s + (r.cashAmount ?? 0), 0)),
+        onlineAmount: round2(detail.reduce((s, r) => s + (r.onlineAmount ?? 0), 0)),
         tipAmount: round2(detail.reduce((s, r) => s + r.tipAmount, 0)),
       },
     };
