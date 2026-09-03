@@ -105,7 +105,7 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
     : sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`;
 
   const [dispatchRows, expenseRows, fuelPurchaseRows, dieselRows, paidEntries, invoiceRows, invoicedDispatchIdRows] = await Promise.all([
-    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), seasonId ? eq(dispatches.seasonId, seasonId) : undefined, dateRange(dispatches.dispatchedOn))),
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.cancelled, false), seasonId ? eq(dispatches.seasonId, seasonId) : undefined, dateRange(dispatches.dispatchedOn))),
     db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), seasonId ? eq(expenses.seasonId, seasonId) : undefined, dateRange(expenses.date))),
     db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), seasonId ? eq(fuelPurchases.seasonId, seasonId) : undefined, dateRange(fuelPurchases.date))),
     db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), seasonId ? eq(vehicleDieselEntries.seasonId, seasonId) : undefined, dateRange(vehicleDieselEntries.date))),
@@ -114,13 +114,15 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
     // here regardless of seasonId; the date-range bound already scopes this
     // to the requested window.
     db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), dateRange(ledgerEntries.date), eq(ledgerEntries.direction, "PAID"))),
-    db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), seasonId ? eq(invoices.seasonId, seasonId) : undefined, invoiceDateRange)),
+    db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.cancelled, false), seasonId ? eq(invoices.seasonId, seasonId) : undefined, invoiceDateRange)),
     // Kiln-wide, NOT date-ranged — this only answers "does this dispatch
     // have an invoice at all, ever", so a dispatch logged inside the period
     // whose invoice happened to be created just outside it (or vice versa)
     // is still correctly recognized as invoiced, instead of getting
     // double-counted (once via invoiceRows, once via unInvoicedDispatches).
-    db.select({ dispatchId: invoices.dispatchId }).from(invoices).where(and(eq(invoices.kilnId, kilnId), isNotNull(invoices.dispatchId))),
+    // Cancelled invoices excluded — a dispatch whose only invoice was
+    // cancelled goes back to being "un-invoiced", same as a deleted one.
+    db.select({ dispatchId: invoices.dispatchId }).from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.cancelled, false), isNotNull(invoices.dispatchId))),
   ]);
 
   const invoicedDispatchIds = new Set(invoicedDispatchIdRows.map((r) => r.dispatchId));

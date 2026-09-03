@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Pencil, Trash2, Truck } from "lucide-react";
+import { ArrowLeft, Ban, Pencil, Truck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -15,6 +15,13 @@ function Field({ label, value }: { label: string; value?: string | number | null
       <p className="text-sm text-ink-primary">{value}</p>
     </div>
   );
+}
+
+// Same muted "stays visible, marked Cancelled" tone SaleOrders.tsx's own
+// STATUS_TONE.CANCELLED uses — not the shared Badge component, which has
+// no cancelled variant.
+function CancelledBadge({ label }: { label: string }) {
+  return <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-xs font-semibold text-ink-muted">{label}</span>;
 }
 
 interface BrickLoadingTripDetailPageProps {
@@ -76,8 +83,9 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
       <Card className="mb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-ink-primary">
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-primary">
               {trip.tripNumber ? `#${trip.tripNumber}` : t("brickLoading.tripNumberHeader")} · {trip.vehicleNumber}
+              {trip.cancelled && <CancelledBadge label={t("common.cancelledBadge")} />}
             </h3>
             <p className="text-sm text-ink-muted">
               {new Date(trip.date).toLocaleDateString("en-IN")} · {formatDateTime(trip.createdAt)}
@@ -92,26 +100,32 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
                 <Truck className="h-3.5 w-3.5" /> {t("dispatchDocs.viewInDispatch")}
               </button>
             ) : (
-              <button
-                onClick={handleAddToDispatch}
-                disabled={addingToDispatch}
-                className="flex items-center gap-1 rounded-lg border border-series-1/30 bg-series-1/5 px-3 py-1.5 text-xs font-medium text-series-1 hover:bg-series-1/10 disabled:opacity-50"
-              >
-                <Truck className="h-3.5 w-3.5" /> {t("dispatchDocs.addToDispatchButton")}
-              </button>
+              !trip.cancelled && (
+                <button
+                  onClick={handleAddToDispatch}
+                  disabled={addingToDispatch}
+                  className="flex items-center gap-1 rounded-lg border border-series-1/30 bg-series-1/5 px-3 py-1.5 text-xs font-medium text-series-1 hover:bg-series-1/10 disabled:opacity-50"
+                >
+                  <Truck className="h-3.5 w-3.5" /> {t("dispatchDocs.addToDispatchButton")}
+                </button>
+              )
             )}
-            <button
-              onClick={onEdit}
-              className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
-            >
-              <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-            </button>
-            <button
-              onClick={onDelete}
-              className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-            </button>
+            {!trip.cancelled && (
+              <>
+                <button
+                  onClick={onEdit}
+                  className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                </button>
+                <button
+                  onClick={onDelete}
+                  className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+                >
+                  <Ban className="h-3.5 w-3.5" /> {t("common.cancel")}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </Card>

@@ -116,7 +116,7 @@ export async function listUnmatchedBookEntries(kilnId: string, from: Date, to: D
     .select({ row: invoices, customerName: customers.name })
     .from(invoices)
     .leftJoin(customers, eq(customers._id, invoices.customerId))
-    .where(and(eq(invoices.kilnId, kilnId), gte(invoices.invoiceDate, from), lte(invoices.invoiceDate, to)));
+    .where(and(eq(invoices.kilnId, kilnId), eq(invoices.cancelled, false), gte(invoices.invoiceDate, from), lte(invoices.invoiceDate, to)));
   for (const { row, customerName } of invoiceRows) {
     if (matchedInvoiceIds.has(row._id)) continue;
     const paidNow = row.amountPaidNow ?? row.netAmount;

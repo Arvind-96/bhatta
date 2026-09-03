@@ -384,6 +384,15 @@ export const brickLoadingEntries = mysqlTable("brick_loading_entries", {
   date: dateColumn(),
   unloadingDate: datetime("unloadingDate", { mode: "date" }),
   notes: text("notes"),
+  // Never hard-deleted — "Delete" cancels the trip instead: reverses the
+  // driver-tip ledger entry and either stock directly or (when linked)
+  // cascades into cancelling the Dispatch itself, same as delete's cascade
+  // does today, just without erasing either row. Trip numbering is left
+  // untouched by a cancel (no shift-down renumbering) — tripNumber is
+  // already MAX-based/gap-tolerant, and the client's renumber-on-cancel
+  // request was scoped to Invoice/Gate Pass/Challan only.
+  cancelled: boolean("cancelled").notNull().default(false),
+  cancelledAt: datetime("cancelledAt", { mode: "date" }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDateIdx: index("brickloading_kiln_date_idx").on(t.kilnId, t.date),

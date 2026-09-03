@@ -57,7 +57,7 @@ export async function dayBook(kilnId: string, date: Date): Promise<DayBookEntry[
     .select({ row: invoices, customerName: customers.name })
     .from(invoices)
     .leftJoin(customers, eq(customers._id, invoices.customerId))
-    .where(and(eq(invoices.kilnId, kilnId), gte(invoices.invoiceDate, dayStart), lte(invoices.invoiceDate, dayEnd)));
+    .where(and(eq(invoices.kilnId, kilnId), eq(invoices.cancelled, false), gte(invoices.invoiceDate, dayStart), lte(invoices.invoiceDate, dayEnd)));
   for (const { row, customerName } of invoiceRows) {
     const paidNow = row.amountPaidNow ?? row.netAmount;
     const { cash, online } = cashOnline(row.paymentMode, paidNow, row.cashAmount, row.onlineAmount);

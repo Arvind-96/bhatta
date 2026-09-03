@@ -1,4 +1,4 @@
-import { double, int, json, mysqlTable, varchar, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
+import { boolean, double, int, json, mysqlTable, varchar, text, datetime, uniqueIndex, index } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn, itemsColumn, SIMPLE_PAYMENT_MODES } from "./_helpers";
 
 export const BRICK_GRADES = ["A1", "JHAMA", "PELA"] as const;
@@ -78,6 +78,14 @@ export const dispatches = mysqlTable("dispatches", {
   // Sale Order — see saleOrder.service.ts's fulfillSaleOrder. Null for
   // every dispatch made the normal, order-less way.
   saleOrderId: varchar("saleOrderId", { length: 64 }),
+  // No sale/dispatch is ever hard-deleted — "Delete" in the UI cancels it
+  // instead (reverses every stock/ledger effect exactly as a delete would,
+  // cascades to cancel its linked Challan/Gate Pass/Invoice) and leaves
+  // the row in place for audit history. Every read path that sums money
+  // or bricks (listDispatches and every raw query alike) filters this
+  // out, same as a deleted row would be absent — see dispatch.service.ts.
+  cancelled: boolean("cancelled").notNull().default(false),
+  cancelledAt: datetime("cancelledAt", { mode: "date" }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   // Scoped to (kilnId, seasonId, slipNumber), not slipNumber alone — the
@@ -135,6 +143,14 @@ export const challans = mysqlTable("challans", {
   placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   challanDate: dateColumn("challanDate"),
   notes: text("notes"),
+  // Never hard-deleted — "Delete" cancels it instead (see dispatches'
+  // own cancelled comment above). A cancelled challan's own
+  // sequenceNumber is nulled out and every later challan's number shifts
+  // down to close the gap (closeSequenceGap, dispatchDocuments.service.ts)
+  // — same renumbering that already happens on cancel, just no longer
+  // paired with the row actually disappearing.
+  cancelled: boolean("cancelled").notNull().default(false),
+  cancelledAt: datetime("cancelledAt", { mode: "date" }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDispatchIdx: index("challan_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
@@ -160,6 +176,10 @@ export const gatePasses = mysqlTable("gate_passes", {
   placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   gatePassDate: dateColumn("gatePassDate"),
   notes: text("notes"),
+  // Never hard-deleted — same cancel-not-delete convention as challans
+  // above (nulled sequenceNumber, later gate passes renumbered down).
+  cancelled: boolean("cancelled").notNull().default(false),
+  cancelledAt: datetime("cancelledAt", { mode: "date" }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDispatchIdx: index("gatepass_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),
@@ -245,6 +265,16 @@ export const invoices = mysqlTable("invoices", {
   placeOfSupply: varchar("placeOfSupply", { length: 255 }),
   invoiceDate: dateColumn("invoiceDate"),
   notes: text("notes"),
+  // Never hard-deleted — same cancel-not-delete convention as challans/
+  // gate passes above (nulled sessionSerialNumber, later invoices in the
+  // same session renumbered down via closeInvoiceSessionGap). Partner/
+  // agent commission ledger entries still reverse exactly as they do on
+  // delete today; the customer's own balance is always live-recomputed
+  // from currently-non-cancelled invoices (getCustomerDetail), so
+  // excluding a cancelled row from that query is the entire reversal
+  // needed there — no separate ledger bookkeeping.
+  cancelled: boolean("cancelled").notNull().default(false),
+  cancelledAt: datetime("cancelledAt", { mode: "date" }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDispatchIdx: index("invoice_kiln_dispatch_idx").on(t.kilnId, t.dispatchId),

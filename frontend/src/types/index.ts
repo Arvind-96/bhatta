@@ -75,6 +75,8 @@ export interface Dispatch {
   notes?: string;
   dispatchedOn: string;
   createdAt: string;
+  cancelled?: boolean;
+  cancelledAt?: string;
 }
 
 export interface Challan {
@@ -95,6 +97,8 @@ export interface Challan {
   challanDate?: string;
   notes?: string;
   createdAt: string;
+  cancelled?: boolean;
+  cancelledAt?: string;
 }
 
 export interface GatePassRecord {
@@ -113,6 +117,8 @@ export interface GatePassRecord {
   gatePassDate?: string;
   notes?: string;
   createdAt: string;
+  cancelled?: boolean;
+  cancelledAt?: string;
 }
 
 export interface Invoice {
@@ -148,6 +154,8 @@ export interface Invoice {
   invoiceDate?: string;
   notes?: string;
   createdAt: string;
+  cancelled?: boolean;
+  cancelledAt?: string;
 }
 
 export interface CustomerDriver {
@@ -1387,6 +1395,8 @@ export interface BrickLoadingEntry {
   unloadingDate?: string;
   createdAt: string;
   notes?: string;
+  cancelled?: boolean;
+  cancelledAt?: string;
 }
 
 export interface BrickLoadingDriverEntry {

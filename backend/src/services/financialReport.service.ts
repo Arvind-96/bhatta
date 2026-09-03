@@ -31,7 +31,7 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
   // totals, rather than being invisible in two places and visible in the
   // third.
   const [invoiceRows, expenseRows, dueEntries, customers, totalBricksProduced, fuelPurchaseRows, dieselRows, dispatchRows, invoicedDispatchIdRows] = await Promise.all([
-    db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.seasonId, seasonId), sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`)),
+    db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.seasonId, seasonId), eq(invoices.cancelled, false), sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`)),
     db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.seasonId, seasonId), gte(expenses.date, since))),
     // ledgerEntries.seasonId is optional (not reliably populated — see
     // ledger.service.ts's AddLedgerEntryInput comment) and left unfiltered
@@ -41,11 +41,14 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
     totalGradedOutput(kilnId, seasonId, since),
     db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), eq(fuelPurchases.seasonId, seasonId), gte(fuelPurchases.date, since))),
     db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.seasonId, seasonId), gte(vehicleDieselEntries.date, since))),
-    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), gte(dispatches.dispatchedOn, since))),
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), eq(dispatches.cancelled, false), gte(dispatches.dispatchedOn, since))),
     // Kiln-wide, not date-ranged — see flowForRange's identical query for
     // why this has to stay unbounded (only answers "was this dispatch ever
-    // invoiced", not "was it invoiced in this window").
-    db.select({ dispatchId: invoices.dispatchId }).from(invoices).where(and(eq(invoices.kilnId, kilnId), isNotNull(invoices.dispatchId))),
+    // invoiced", not "was it invoiced in this window"). Cancelled-invoice
+    // exclusion means a dispatch whose only invoice got cancelled is
+    // correctly treated as un-invoiced again, same as it would be if that
+    // invoice had been deleted outright.
+    db.select({ dispatchId: invoices.dispatchId }).from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.cancelled, false), isNotNull(invoices.dispatchId))),
   ]);
 
   const customerIds = new Set(customers.map((c) => c._id));

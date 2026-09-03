@@ -140,6 +140,17 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.saving": { en: "Saving…", hi: "सहेजा जा रहा है…" },
   "common.saveChanges": { en: "Save changes", hi: "बदलाव सहेजें" },
   "common.cancel": { en: "Cancel", hi: "रद्द करें" },
+  // Badge label for a cancelled Dispatch/Brick Loading trip/Invoice/
+  // Challan/Gate Pass row — same "stays visible with a muted badge"
+  // pattern SaleOrders/PurchaseOrders already use for their own
+  // status.CANCELLED, generalized here since none of these five have a
+  // status enum of their own (just a plain cancelled boolean).
+  "common.cancelledBadge": { en: "Cancelled", hi: "रद्द" },
+  // The confirm button inside ConfirmDialog when the action being
+  // confirmed is itself a cancel — distinct from common.cancel (that
+  // dialog's own dismiss button), which would otherwise read "Cancel" /
+  // "Cancel" side by side for the two very different buttons.
+  "common.confirmCancelAction": { en: "Yes, cancel it", hi: "हाँ, रद्द करें" },
   "common.continue": { en: "Continue", hi: "जारी रखें" },
   "common.somethingWentWrong": { en: "Something went wrong — please try again", hi: "कुछ गड़बड़ हो गई — कृपया फिर से कोशिश करें" },
   "common.loading": { en: "Loading…", hi: "लोड हो रहा है…" },

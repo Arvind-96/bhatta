@@ -27,7 +27,7 @@ export async function personProductionTotals(kilnId: string, seasonId: string | 
     db.select().from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), seasonId ? eq(moldingEntries.seasonId, seasonId) : undefined, inArray(moldingEntries.workerId, personIds), ...dateConditions(moldingEntries.date))),
     db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), seasonId ? eq(stackingEntries.seasonId, seasonId) : undefined, inArray(stackingEntries.gangId, personIds), ...dateConditions(stackingEntries.date))),
     db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), seasonId ? eq(nikasiEntries.seasonId, seasonId) : undefined, inArray(nikasiEntries.gangId, personIds), ...dateConditions(nikasiEntries.date))),
-    db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), seasonId ? eq(brickLoadingEntries.seasonId, seasonId) : undefined, inArray(brickLoadingEntries.driverId, personIds), ...dateConditions(brickLoadingEntries.date))),
+    db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), eq(brickLoadingEntries.cancelled, false), seasonId ? eq(brickLoadingEntries.seasonId, seasonId) : undefined, inArray(brickLoadingEntries.driverId, personIds), ...dateConditions(brickLoadingEntries.date))),
   ]);
 
   const byModule = [

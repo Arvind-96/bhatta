@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, Pencil, Printer, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Pencil, Printer } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -20,6 +20,13 @@ function Field({ label, value }: { label: string; value?: string | number | null
       <p className="text-sm text-ink-primary">{value}</p>
     </div>
   );
+}
+
+// Same muted "stays visible, marked Cancelled" tone SaleOrders.tsx's own
+// STATUS_TONE.CANCELLED uses — not the shared Badge component, which has
+// no cancelled variant.
+function CancelledBadge({ label }: { label: string }) {
+  return <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-xs font-semibold text-ink-muted">{label}</span>;
 }
 
 interface ChallanDetailPageProps {
@@ -66,7 +73,10 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
       <Card className="mb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-ink-primary">CH-{challan.sequenceNumber ?? "—"} · {challan.customerName}</h3>
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-primary">
+              CH-{challan.sequenceNumber ?? "—"} · {challan.customerName}
+              {challan.cancelled && <CancelledBadge label={t("common.cancelledBadge")} />}
+            </h3>
             <p className="text-sm text-ink-muted">
               {challan.challanDate ? new Date(challan.challanDate).toLocaleDateString("en-IN") : "—"}
             </p>
@@ -81,18 +91,22 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
             >
               <Printer className="h-3.5 w-3.5" /> {t("common.print")}
             </button>
-            <button
-              onClick={() => setEditing((e) => !e)}
-              className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
-            >
-              <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-            </button>
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-            </button>
+            {!challan.cancelled && (
+              <>
+                <button
+                  onClick={() => setEditing((e) => !e)}
+                  className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+                >
+                  <Ban className="h-3.5 w-3.5" /> {t("common.cancel")}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </Card>

@@ -7,7 +7,7 @@ import { updateLinkedExpensePaymentInfo } from "./expense.service";
 
 type SimplePaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 import { addLedgerEntry } from "./ledger.service";
-import { deleteDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
+import { cancelDispatch, isDuplicateEntryError, MAX_NUMBER_GENERATION_ATTEMPTS } from "./dispatch.service";
 import { autoLogExpense } from "./expense.service";
 import { summarizeItems, itemsOrLegacyFallback, bricksByCategory } from "./brickLineItems.util";
 import { emitToKiln } from "../config/socket";
@@ -390,25 +390,32 @@ export async function updateBrickLoadingEntry(kilnId: string, entryId: string, i
   return updated;
 }
 
-// Reverses everything createBrickLoadingEntry could have caused: the
+// No trip is ever hard-deleted — reverses everything
+// createBrickLoadingEntry could have caused, exactly as before: the
 // driver-tip ledger DUE (reversed via a PAID correction, current
 // `tipAmount` value — same "reverse what's outstanding now" convention as
-// deleteDispatch), and the brickCategories.quantity deduction. That
+// cancelDispatch), and the brickCategories.quantity deduction. That
 // deduction is restored in one of two ways depending on whether this trip
 // auto-linked a Dispatch:
-//   - linked (dispatchId set): deleteDispatch already restores
+//   - linked (dispatchId set): cancelDispatch already restores
 //     brickCategories using the DISPATCH's own current
 //     categoryId/bricksCount (the authoritative "what's actually deducted"
 //     state, even if either side was independently edited since creation)
-//     and un-links + deletes the dispatch itself — this function must NOT
-//     also restore the category here, or the quantity would be double-credited.
+//     and cancels the dispatch itself (keeping the link intact, not
+//     clearing it, for audit history) — this function must NOT also
+//     restore the category here, or the quantity would be double-credited.
 //   - unlinked (no dispatchId, e.g. the category had no price set): nothing
 //     else will restore it, so this function does it directly.
-// Also deletes this trip's own auto-logged Expense rows (see below) and,
-// via deleteDispatch when linked, everything that dispatch generated too.
-export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
+// This trip's own auto-logged Expense rows (Driver Reward/Loading/
+// Unloading Charge — not part of the client's cancel-not-delete list)
+// still hard-delete exactly as before; the row itself is marked
+// `cancelled` rather than removed. tripNumber is left untouched — already
+// MAX-based/gap-tolerant, and not in scope for the shift-down renumbering
+// (that's Invoice/Gate Pass/Challan only).
+export async function cancelBrickLoadingEntry(kilnId: string, entryId: string) {
   const existing = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries._id, entryId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick loading entry not found in this kiln");
+  if (existing.cancelled) throw new Error("Loading trip is already cancelled");
 
   if (existing.tipAmount && existing.tipAmount > 0 && existing.driverId) {
     await addLedgerEntry({
@@ -416,15 +423,18 @@ export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
       personId: existing.driverId,
       direction: "PAID",
       amount: existing.tipAmount,
-      reason: `Loading trip deleted — reversing driver tip for ${existing.vehicleNumber}`,
+      reason: `Loading trip cancelled — reversing driver tip for ${existing.vehicleNumber}`,
       category: "TIP",
     });
   }
 
   if (existing.dispatchId) {
-    // Cascades Challan/Gate Pass/Invoice/dispatch-level Expense too — see
-    // deleteDispatch's own doc comment in dispatch.service.ts.
-    await deleteDispatch(kilnId, existing.dispatchId);
+    // Cascades Challan/Gate Pass/Invoice cancellation too — see
+    // cancelDispatch's own doc comment in dispatch.service.ts. Guarded
+    // since the linked dispatch may have already been cancelled
+    // independently (e.g. from the Dispatch page itself).
+    const dispatch = (await db.select({ cancelled: dispatches.cancelled }).from(dispatches).where(eq(dispatches._id, existing.dispatchId)))[0];
+    if (dispatch && !dispatch.cancelled) await cancelDispatch(kilnId, existing.dispatchId);
   } else {
     for (const item of itemsOrLegacyFallback(existing)) {
       if (!item.categoryId) continue;
@@ -445,8 +455,9 @@ export async function deleteBrickLoadingEntry(kilnId: string, entryId: string) {
     emitToKiln(kilnId, "expense:update", { _id: row._id, deleted: true });
   }
 
-  await db.delete(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId));
-  emitToKiln(kilnId, "brickLoading:update", { _id: entryId, deleted: true });
+  await db.update(brickLoadingEntries).set({ cancelled: true, cancelledAt: new Date() }).where(eq(brickLoadingEntries._id, entryId));
+  const updated = (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, entryId)))[0]!;
+  emitToKiln(kilnId, "brickLoading:update", updated);
 }
 
 export interface ListBrickLoadingFilter {
@@ -454,6 +465,12 @@ export interface ListBrickLoadingFilter {
   days?: number;
   from?: Date;
   to?: Date;
+  // Excluded by default — this function backs the Sale/Production report
+  // (reports/production.reports.ts) and the extraCharges/person-lookup
+  // reports too, all of which sum real money/bricks from these rows. Only
+  // the Brick Loading list PAGE itself opts in with true, to show a
+  // cancelled trip with a muted badge instead of hiding it.
+  includeCancelled?: boolean;
 }
 
 // seasonId is nullable — pass null for an all-time, every-season view (see
@@ -469,6 +486,7 @@ export async function listBrickLoadingEntries(kilnId: string, seasonId: string |
   }
   if (filter.from) conditions.push(gte(brickLoadingEntries.date, filter.from));
   if (filter.to) conditions.push(lte(brickLoadingEntries.date, filter.to));
+  if (!filter.includeCancelled) conditions.push(eq(brickLoadingEntries.cancelled, false));
 
   // Most recent first: `date` is the primary business ordering, but two
   // trips logged the same day sort by actual entry order (createdAt) as a
@@ -519,7 +537,7 @@ export async function listBrickLoadingEntries(kilnId: string, seasonId: string |
       ? db
           .select({ dispatchId: invoices.dispatchId, netAmount: invoices.netAmount, amountPaidNow: invoices.amountPaidNow, paymentMode: invoices.paymentMode, cashAmount: invoices.cashAmount, onlineAmount: invoices.onlineAmount })
           .from(invoices)
-          .where(and(eq(invoices.kilnId, kilnId), inArray(invoices.dispatchId, dispatchIds)))
+          .where(and(eq(invoices.kilnId, kilnId), eq(invoices.cancelled, false), inArray(invoices.dispatchId, dispatchIds)))
       : [],
   ]);
   const driverById = new Map(driverRows.map((d) => [d._id, d]));
@@ -562,7 +580,7 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 export async function brickLoadingDriverSummary(kilnId: string, seasonId: string) {
   const drivers = await db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "DRIVER"), eq(people.active, true))).orderBy(asc(people.name));
 
-  const allEntries = await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), eq(brickLoadingEntries.seasonId, seasonId)));
+  const allEntries = await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), eq(brickLoadingEntries.seasonId, seasonId), eq(brickLoadingEntries.cancelled, false)));
   const entriesByDriver = new Map<string, typeof allEntries>();
   for (const e of allEntries) {
     if (!e.driverId) continue;

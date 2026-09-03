@@ -46,9 +46,18 @@ export const dispatchDocumentsDict: Record<string, Record<Locale, string>> = {
   "dispatchDocs.challansListTitle": { en: "Challans created", hi: "बनाए गए चालान" },
   "dispatchDocs.gatePassesListTitle": { en: "Gate passes created", hi: "बनाए गए गेट पास" },
   "dispatchDocs.invoicesListTitle": { en: "Invoices created", hi: "बनाए गए इनवॉइस" },
-  "dispatchDocs.confirmDeleteChallan": { en: "Delete challan CH-{number}? This cannot be undone.", hi: "चालान CH-{number} हटाएं? इसे वापस नहीं लाया जा सकता।" },
-  "dispatchDocs.confirmDeleteGatePass": { en: "Delete gate pass GP-{number}? This cannot be undone.", hi: "गेट पास GP-{number} हटाएं? इसे वापस नहीं लाया जा सकता।" },
-  "dispatchDocs.confirmDeleteInvoice": { en: "Delete invoice INV-{number}? This cannot be undone.", hi: "इनवॉइस INV-{number} हटाएं? इसे वापस नहीं लाया जा सकता।" },
+  "dispatchDocs.confirmDeleteChallan": {
+    en: "Cancel challan CH-{number}? Its number will be freed up and later challans renumbered. The challan stays on record, marked Cancelled.",
+    hi: "चालान CH-{number} रद्द करें? इसका नंबर खाली हो जाएगा और बाद के चालानों की क्रम संख्या बदल जाएगी। चालान रिकॉर्ड में रहेगा, रद्द के रूप में चिह्नित।",
+  },
+  "dispatchDocs.confirmDeleteGatePass": {
+    en: "Cancel gate pass GP-{number}? Its number will be freed up and later gate passes renumbered. The gate pass stays on record, marked Cancelled.",
+    hi: "गेट पास GP-{number} रद्द करें? इसका नंबर खाली हो जाएगा और बाद के गेट पास की क्रम संख्या बदल जाएगी। गेट पास रिकॉर्ड में रहेगा, रद्द के रूप में चिह्नित।",
+  },
+  "dispatchDocs.confirmDeleteInvoice": {
+    en: "Cancel invoice {number}? Its number will be freed up and later invoices renumbered, and any pending due it carried will be reversed. The invoice stays on record, marked Cancelled.",
+    hi: "इनवॉइस {number} रद्द करें? इसका नंबर खाली हो जाएगा और बाद के इनवॉइस की क्रम संख्या बदल जाएगी, और इस पर बकाया राशि वापस हो जाएगी। इनवॉइस रिकॉर्ड में रहेगा, रद्द के रूप में चिह्नित।",
+  },
   "dispatchDocs.addToDispatchButton": { en: "Add to Dispatch", hi: "डिस्पैच में जोड़ें" },
   "dispatchDocs.confirmAddToDispatch": {
     en: "Create a Dispatch entry from this trip? The trip's customer, driver, vehicle, category, and amount will carry over.",

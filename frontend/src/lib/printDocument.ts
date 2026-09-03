@@ -154,6 +154,15 @@ const DOCUMENT_STYLES = `
   .doc-stamp-paid { border-color: #1f8a4c; color: #1f8a4c; }
   .doc-stamp-partial { border-color: #b8860b; color: #b8860b; }
   .doc-stamp-due { border-color: #c0392b; color: #c0392b; }
+  /* A large diagonal overlay for a printed Invoice/Challan/Gate Pass
+     whose row is now cancelled — printDocument.ts's openPrintWindow only
+     renders this when a caller passes watermarkText, so a re-print of a
+     voided document is unambiguous on paper even though the serial
+     number printed on it has since been reassigned to a later document.
+     position: fixed (not absolute) so it still shows if the content ever
+     spans more than one printed page. */
+  .doc-watermark { position: fixed; top: 46%; left: 50%; transform: translate(-50%, -50%) rotate(-28deg); font-size: 84px; font-weight: 900; letter-spacing: 0.1em; color: rgba(200, 30, 30, 0.16); text-transform: uppercase; pointer-events: none; z-index: 999; white-space: nowrap; }
+  @media print { .doc-watermark { color: rgba(200, 30, 30, 0.22); -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   table.doc-table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 12px; border: 1px solid #e5e0d8; border-radius: 10px; overflow: hidden; break-inside: avoid; }
   table.doc-table td { padding: 6px 12px; font-size: 13px; border-bottom: 1px solid #efece5; }
   table.doc-table tr:last-child td { border-bottom: none; }
@@ -223,7 +232,8 @@ const DIESEL_ACCENT = `:root { --doc-accent: #b8860b; --doc-accent-soft: #d4a836
 const SUPPLIER_INVOICE_ACCENT = `:root { --doc-accent: #0f766e; --doc-accent-soft: #4fa89f; --doc-accent-tint: #eef8f7; }`;
 const DOCTOR_VISIT_ACCENT = `:root { --doc-accent: #0e7490; --doc-accent-soft: #4ba3ba; --doc-accent-tint: #eaf6f8; }`;
 
-function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
+function openPrintWindow(title: string, bodyHtml: string, extraStyles = "", watermarkText?: string) {
+  const watermarkHtml = watermarkText ? `<div class="doc-watermark">${escapeHtml(watermarkText)}</div>` : "";
   const html = `<!doctype html>
 <html>
 <head>
@@ -238,6 +248,7 @@ function openPrintWindow(title: string, bodyHtml: string, extraStyles = "") {
 </style>
 </head>
 <body>
+${watermarkHtml}
 ${bodyHtml}
 <script>window.onload = function() { window.print(); };</script>
 </body>
@@ -319,7 +330,7 @@ export function printChallanRecord(challan: Challan, kiln: KilnPrintInfo, catego
       <div class="doc-sign-box">Received by</div>
     </div>
   `;
-  openPrintWindow(`Challan ${number}`, body, CHALLAN_ACCENT);
+  openPrintWindow(`Challan ${number}`, body, CHALLAN_ACCENT, challan.cancelled ? "Cancelled" : undefined);
 }
 
 // Exit-authorization slip — its own editable/deletable record, distinct
@@ -389,7 +400,7 @@ export function printGatePassRecord(gatePass: GatePassRecord, kiln: KilnPrintInf
       <div class="doc-sign-box">Munim / Owner<br />(Stamp &amp; Signature)</div>
     </div>
   `;
-  openPrintWindow(`Gate Pass ${number}`, body, GATE_PASS_ACCENT);
+  openPrintWindow(`Gate Pass ${number}`, body, GATE_PASS_ACCENT, gatePass.cancelled ? "Cancelled" : undefined);
 }
 
 // e.g. "JVS Bricks" -> "JVS" — mirrors dispatch.service.ts's own
@@ -531,7 +542,7 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
         ${invoice.customerStateCode ? `<p class="doc-box-detail">State Code: ${escapeHtml(invoice.customerStateCode)}</p>` : ""}
       </div>
       <div class="doc-totalbox">
-        ${stampHtml(resolvedStamp)}
+        ${invoice.cancelled ? "" : stampHtml(resolvedStamp)}
         <p class="doc-total-label">Total amount</p>
         <p class="doc-total-amount">₹${formatINR(headerTotal)}</p>
         <p class="doc-amount-words">${escapeHtml(amountInWords(headerTotal))}</p>
@@ -631,7 +642,7 @@ export function printInvoiceRecord(invoice: Invoice, kiln: KilnPrintInfo, catego
     <p class="doc-digital-note">~ THIS IS A DIGITALLY CREATED INVOICE ~</p>
     <div class="doc-bottombar"></div>
   `;
-  openPrintWindow(`Invoice ${number}`, body, INVOICE_RECORD_ACCENT);
+  openPrintWindow(`Invoice ${number}`, body, INVOICE_RECORD_ACCENT, invoice.cancelled ? "Cancelled" : undefined);
 }
 
 // A payment receipt can be issued to anyone in the People directory, not

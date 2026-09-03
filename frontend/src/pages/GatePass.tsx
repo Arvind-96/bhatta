@@ -94,7 +94,16 @@ export function GatePass() {
                 const itemRows = resolveItemRows(e.items, categories, { categoryId: e.categoryId, bricksCount: e.bricksCount });
                 return (
                 <tr key={e._id} onClick={() => setOpenId(e._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                  <td className="py-3 text-ink-primary hover:underline">GP-{e.sequenceNumber ?? "—"}</td>
+                  <td className="py-3 text-ink-primary hover:underline">
+                    <span className="flex items-center gap-2">
+                      GP-{e.sequenceNumber ?? "—"}
+                      {e.cancelled && (
+                        <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-xs font-semibold text-ink-muted">
+                          {t("common.cancelledBadge")}
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td className="py-3 text-ink-secondary">{e.gatePassDate ? new Date(e.gatePassDate).toLocaleDateString("en-IN") : "—"}</td>
                   <td className="py-3 text-ink-primary">{e.customerName}</td>
                   <td className="py-3 text-ink-secondary">{e.vehicleNumber ?? "—"}</td>

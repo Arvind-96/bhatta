@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { dispatches, people, customers, brickCategories, brickLoadingEntries, kilns, challans, gatePasses, invoices, expenses, saleOrders, BRICK_GRADES, DISPATCH_PAYMENT_MODES } from "../db/schema";
 import type { BrickLineItem, SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
@@ -79,28 +79,53 @@ export function kilnPrefix(kilnName: string) {
 // better-sqlite3 driver) — createDispatch below closes that gap with a
 // retry loop against the (kilnId, slipNumber) unique constraint, not by
 // trying to make this function itself atomic.
+// MAX-based, not COUNT-based — same reasoning as generateTripNumber in
+// brickLoading.service.ts: a COUNT-based counter reissues an
+// already-taken number the moment any dispatch that day is cancelled
+// (COUNT drops, but the highest sequence actually printed that day
+// doesn't), and a cancelled dispatch stays in the table (this is exactly
+// what would trigger the collision, since a delete used to be the only
+// way a row left the table and cancel now does the same thing). The
+// slipNumber column isn't a plain integer (it's
+// "{prefix}-{DD-MM-YYYY}-{seq}"), so unlike generateTripNumber/
+// generateInvoiceNumber below this can't MAX-cast the column directly —
+// existing slip numbers for the day are fetched and their trailing
+// sequence parsed instead. Deliberately counts every dispatch for the
+// day including cancelled ones — a cancelled dispatch's own slip number
+// is NOT reissued (see cancelDispatch's doc comment: unlike Invoice/Gate
+// Pass/Challan, Dispatch numbers are never renumbered on cancel), so the
+// next number must still skip past it.
 async function generateSlipNumber(kilnId: string, seasonId: string, dispatchedOn: Date) {
   const kiln = (await db.select({ name: kilns.name }).from(kilns).where(eq(kilns._id, kilnId)))[0];
   const prefix = kilnPrefix(kiln?.name ?? "KILN");
   const dayStart = startOfDay(dispatchedOn);
   const dayEnd = endOfDay(dispatchedOn);
-  const countRow = (await db
-    .select({ count: sql<number>`count(*)` })
+  const rows = await db
+    .select({ slipNumber: dispatches.slipNumber })
     .from(dispatches)
-    .where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), gte(dispatches.dispatchedOn, dayStart), lte(dispatches.dispatchedOn, dayEnd))))[0];
-  const seq = (countRow?.count ?? 0) + 1;
-  return `${prefix}-${formatDDMMYYYY(dayStart)}-${String(seq).padStart(2, "0")}`;
+    .where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), gte(dispatches.dispatchedOn, dayStart), lte(dispatches.dispatchedOn, dayEnd)));
+  const maxSeq = rows.reduce((max, r) => {
+    const match = /-(\d+)$/.exec(r.slipNumber);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `${prefix}-${formatDDMMYYYY(dayStart)}-${String(maxSeq + 1).padStart(2, "0")}`;
 }
 
 // A plain, sequential per-kiln invoice counter ("1", "2", ... "61") — this
 // is what actually prints on the Challan, matching the kiln's real paper
 // invoice book. Never resets; unlike the slip number's daily reset, an
-// invoice book's numbering runs continuously. Same race caveat as
-// generateSlipNumber above — closed by createDispatch's retry loop, not
-// here.
+// invoice book's numbering runs continuously. MAX-based, not COUNT-based
+// — same reasoning as generateSlipNumber above and generateTripNumber in
+// brickLoading.service.ts. Counts cancelled dispatches toward MAX too —
+// Dispatch numbers are never renumbered/reissued on cancel.
 async function generateInvoiceNumber(kilnId: string, seasonId: string) {
-  const countRow = (await db.select({ count: sql<number>`count(*)` }).from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId))))[0];
-  return String((countRow?.count ?? 0) + 1);
+  const maxRow = (
+    await db
+      .select({ max: sql<number | null>`max(cast(${dispatches.invoiceNumber} as unsigned))` })
+      .from(dispatches)
+      .where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId)))
+  )[0];
+  return String((maxRow?.max ?? 0) + 1);
 }
 
 // MySQL's duplicate-entry error, thrown when an insert collides with an
@@ -435,7 +460,7 @@ export async function recordDeliveryAdjustment(kilnId: string, dispatchId: strin
 // same reasoning as listDispatchesForCustomer: a return can be recorded on
 // a dispatch from an earlier season and should stay visible regardless.
 export async function listReturnedDispatches(kilnId: string, filter: { from?: Date; to?: Date } = {}) {
-  const conditions = [eq(dispatches.kilnId, kilnId), gt(sql<number>`${dispatches.breakageCount} + ${dispatches.returnedCount}`, 0)];
+  const conditions = [eq(dispatches.kilnId, kilnId), eq(dispatches.cancelled, false), gt(sql<number>`${dispatches.breakageCount} + ${dispatches.returnedCount}`, 0)];
   if (filter.from) conditions.push(gte(dispatches.dispatchedOn, filter.from));
   if (filter.to) conditions.push(lte(dispatches.dispatchedOn, filter.to));
   return db.select().from(dispatches).where(and(...conditions)).orderBy(desc(dispatches.dispatchedOn));
@@ -646,9 +671,18 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
 // loading trip is a real, separate record. Also deletes every Challan/
 // Gate Pass/Invoice/Expense generated FROM this dispatch (see below) —
 // nothing about this dispatch is left behind anywhere in the system.
-export async function deleteDispatch(kilnId: string, dispatchId: string) {
+// No sale/dispatch is ever hard-deleted — "Delete" cancels it instead:
+// every stock/ledger/sale-order/document reversal below is unchanged from
+// what a delete used to do, so "amounts refresh exactly as they would
+// when deleted" holds; the only difference is the final step marks the
+// row `cancelled` rather than removing it, so its history survives for
+// audit. The linked Brick Loading trip's own dispatchId link is now left
+// intact (previously cleared) — a cancelled dispatch is still a real,
+// traceable past event, not an orphaned reference to erase.
+export async function cancelDispatch(kilnId: string, dispatchId: string) {
   const existing = (await db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Dispatch not found in this kiln");
+  if (existing.cancelled) throw new Error("Dispatch is already cancelled");
 
   // recordDeliveryAdjustment already posted its own partial reversal for
   // any bricks returned — reverse only what's still outstanding from this
@@ -680,12 +714,6 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
     emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, item.categoryId)))[0]);
   }
 
-  const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
-  if (linkedEntry) {
-    await db.update(brickLoadingEntries).set({ dispatchId: null }).where(eq(brickLoadingEntries._id, linkedEntry._id));
-    emitToKiln(kilnId, "brickLoading:update", (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, linkedEntry._id)))[0]);
-  }
-
   // This dispatch's own bricksCount is released back onto the linked Sale
   // Order — otherwise bricksFulfilled/status stay stuck at whatever
   // fulfillSaleOrder last set them to, permanently overstating how much of
@@ -705,35 +733,40 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
     }
   }
 
-  // Every Challan/Gate Pass/Invoice/Expense generated FROM this dispatch is
-  // meaningless once it's gone — delete them too rather than leaving them
-  // orphaned (pointing at a dispatchId that no longer exists). Challan/Gate
-  // Pass are plain documents with no side effects of their own, so a plain
-  // delete + the same "{_id, deleted:true}" socket event their own
-  // dedicated delete functions already emit is enough. A partner- or
-  // agent-attributed invoice is NOT side-effect-free, though — it posts a
+  // Every Challan/Gate Pass/Invoice/Expense generated FROM this dispatch
+  // gets cancelled (Expense excepted — see below) right along with it, not
+  // left dangling on a now-cancelled sale. Challan/Gate Pass are plain
+  // documents with no side effects of their own beyond the numbering gap
+  // they leave — closed and their own number cleared here, same as
+  // cancelChallan/cancelGatePass do standalone. A partner- or agent-
+  // attributed invoice is NOT side-effect-free, though — it posts a
   // PARTNER_DUE/COMMISSION ledger entry (see dispatchDocuments.service.ts's
-  // createInvoice/deleteInvoice) that a plain row delete would leave stale
-  // forever. Reversed inline below (not calling deleteChallan/deleteGatePass/
-  // deleteInvoice directly) since dispatchDocuments.service.ts already
+  // createInvoice/cancelInvoice) that leaving it alone would leave stale
+  // forever. Reversed inline below (not calling cancelChallan/cancelGatePass/
+  // cancelInvoice directly) since dispatchDocuments.service.ts already
   // imports from this file, and importing back would create a circular
-  // dependency.
+  // dependency — same reasoning the pre-existing duplication here already
+  // followed. Expense rows (Driver Reward/Loading/Unloading Charge) are
+  // NOT part of the client's cancel-not-delete list, so they still hard-
+  // delete exactly as before.
   const [linkedChallans, linkedGatePasses, linkedInvoices, linkedExpenses] = await Promise.all([
-    db.select({ _id: challans._id }).from(challans).where(and(eq(challans.dispatchId, dispatchId), eq(challans.kilnId, kilnId))),
-    db.select({ _id: gatePasses._id }).from(gatePasses).where(and(eq(gatePasses.dispatchId, dispatchId), eq(gatePasses.kilnId, kilnId))),
-    db.select().from(invoices).where(and(eq(invoices.dispatchId, dispatchId), eq(invoices.kilnId, kilnId))),
+    db.select().from(challans).where(and(eq(challans.dispatchId, dispatchId), eq(challans.kilnId, kilnId), eq(challans.cancelled, false))),
+    db.select().from(gatePasses).where(and(eq(gatePasses.dispatchId, dispatchId), eq(gatePasses.kilnId, kilnId), eq(gatePasses.cancelled, false))),
+    db.select().from(invoices).where(and(eq(invoices.dispatchId, dispatchId), eq(invoices.kilnId, kilnId), eq(invoices.cancelled, false))),
     db.select({ _id: expenses._id }).from(expenses).where(and(eq(expenses.dispatchId, dispatchId), eq(expenses.kilnId, kilnId))),
   ]);
   for (const row of linkedChallans) {
-    await db.delete(challans).where(eq(challans._id, row._id));
-    emitToKiln(kilnId, "challan:update", { _id: row._id, deleted: true });
+    await closeDocumentSequenceGap(challans, kilnId, row.seasonId!, row.sequenceNumber);
+    await db.update(challans).set({ cancelled: true, cancelledAt: new Date(), sequenceNumber: null }).where(eq(challans._id, row._id));
+    emitToKiln(kilnId, "challan:update", (await db.select().from(challans).where(eq(challans._id, row._id)))[0]);
   }
   for (const row of linkedGatePasses) {
-    await db.delete(gatePasses).where(eq(gatePasses._id, row._id));
-    emitToKiln(kilnId, "gatePass:update", { _id: row._id, deleted: true });
+    await closeDocumentSequenceGap(gatePasses, kilnId, row.seasonId!, row.sequenceNumber);
+    await db.update(gatePasses).set({ cancelled: true, cancelledAt: new Date(), sequenceNumber: null }).where(eq(gatePasses._id, row._id));
+    emitToKiln(kilnId, "gatePass:update", (await db.select().from(gatePasses).where(eq(gatePasses._id, row._id)))[0]);
   }
   for (const row of linkedInvoices) {
-    // Same reversal deleteInvoice itself performs — duplicated here rather
+    // Same reversal cancelInvoice itself performs — duplicated here rather
     // than imported, per the circular-dependency note above.
     if (row.partnerId) {
       const paid = row.amountPaidNow ?? row.netAmount;
@@ -744,7 +777,7 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
           personId: row.partnerId,
           direction: "PAID",
           amount: pending,
-          reason: `Invoice deleted — reversing pending due on sale to ${row.customerName}`,
+          reason: `Invoice cancelled — reversing pending due on sale to ${row.customerName}`,
           category: "PARTNER_DUE",
         });
       }
@@ -763,21 +796,58 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
           personId: row.agentId,
           direction: "PAID",
           amount: commission,
-          reason: `Invoice deleted — reversing commission on sale to ${row.customerName}`,
+          reason: `Invoice cancelled — reversing commission on sale to ${row.customerName}`,
           category: "COMMISSION",
         });
       }
     }
-    await db.delete(invoices).where(eq(invoices._id, row._id));
-    emitToKiln(kilnId, "invoice:update", { _id: row._id, deleted: true });
+    await closeInvoiceSessionGapInline(kilnId, row.session, row.sessionSerialNumber);
+    await db.update(invoices).set({ cancelled: true, cancelledAt: new Date(), sessionSerialNumber: null }).where(eq(invoices._id, row._id));
+    emitToKiln(kilnId, "invoice:update", (await db.select().from(invoices).where(eq(invoices._id, row._id)))[0]);
   }
   for (const row of linkedExpenses) {
     await db.delete(expenses).where(eq(expenses._id, row._id));
     emitToKiln(kilnId, "expense:update", { _id: row._id, deleted: true });
   }
 
-  await db.delete(dispatches).where(eq(dispatches._id, dispatchId));
-  emitToKiln(kilnId, "dispatch:update", { _id: dispatchId, deleted: true });
+  // Dispatch's own slipNumber/invoiceNumber are left untouched — no shift-
+  // down renumbering for these two (the client's renumber-on-cancel ask
+  // was scoped to Invoice/Gate Pass/Challan only); generateSlipNumber/
+  // generateInvoiceNumber below already count cancelled dispatches toward
+  // their MAX so a future dispatch can never collide with this one's
+  // still-occupied number.
+  await db.update(dispatches).set({ cancelled: true, cancelledAt: new Date() }).where(eq(dispatches._id, dispatchId));
+  const updated = (await db.select().from(dispatches).where(eq(dispatches._id, dispatchId)))[0]!;
+  emitToKiln(kilnId, "dispatch:update", updated);
+}
+
+// Local equivalents of dispatchDocuments.service.ts's closeSequenceGap/
+// closeInvoiceSessionGap — duplicated rather than imported, per this
+// file's own established circular-dependency workaround (see
+// cancelDispatch's doc comment above). Kept byte-for-byte in step with
+// those two; if one changes, the other must too.
+async function closeDocumentSequenceGap(table: typeof challans | typeof gatePasses, kilnId: string, seasonId: string, cancelledNumber: number | null) {
+  if (cancelledNumber == null) return;
+  const later = await db
+    .select({ _id: table._id, sequenceNumber: table.sequenceNumber })
+    .from(table)
+    .where(and(eq(table.kilnId, kilnId), eq(table.seasonId, seasonId), gt(table.sequenceNumber, cancelledNumber)))
+    .orderBy(asc(table.sequenceNumber));
+  for (const row of later) {
+    await db.update(table).set({ sequenceNumber: row.sequenceNumber! - 1 }).where(eq(table._id, row._id));
+  }
+}
+
+async function closeInvoiceSessionGapInline(kilnId: string, session: string | null, cancelledNumber: number | null) {
+  if (session == null || cancelledNumber == null) return;
+  const later = await db
+    .select({ _id: invoices._id, sessionSerialNumber: invoices.sessionSerialNumber })
+    .from(invoices)
+    .where(and(eq(invoices.kilnId, kilnId), eq(invoices.session, session), gt(invoices.sessionSerialNumber, cancelledNumber)))
+    .orderBy(asc(invoices.sessionSerialNumber));
+  for (const row of later) {
+    await db.update(invoices).set({ sessionSerialNumber: row.sessionSerialNumber! - 1 }).where(eq(invoices._id, row._id));
+  }
 }
 
 // `days` is optional and unbounded (all-time) when omitted — mirrors
@@ -786,6 +856,14 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
 // dispatch (including a Brick-Loading-linked one) older than a month from
 // the Dispatch/Billing/Gate-Pass pages, even though it was fully visible
 // and correctly linked on the Brick Loading page the whole time.
+// Deliberately includes cancelled dispatches — its only caller is the
+// Dispatch list page (confirmed: no other function routes through this),
+// which shows a cancelled dispatch with a muted badge rather than hiding
+// it, per the client's explicit "stays visible" answer. Every function
+// that computes a REVENUE/bricks total from dispatches (dispatchTotals,
+// bricksSoldByCategory, etc. below) queries the table directly with its
+// own `eq(dispatches.cancelled, false)` filter instead of going through
+// this function, so a cancelled row never reaches a financial total.
 export async function listDispatches(kilnId: string, seasonId: string, days?: number) {
   const conditions = [eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId)];
   if (days) {
@@ -829,7 +907,7 @@ export async function listDispatches(kilnId: string, seasonId: string, days?: nu
 // it out, so a future change to one doesn't risk silently changing the
 // other's behavior too.
 export async function listDispatchesForCustomer(kilnId: string, customerId: string) {
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.customerId, customerId))).orderBy(desc(dispatches.dispatchedOn));
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.customerId, customerId), eq(dispatches.cancelled, false))).orderBy(desc(dispatches.dispatchedOn));
 
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
   const driverRows = driverIds.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone }).from(people).where(inArray(people._id, driverIds)) : [];
@@ -854,14 +932,14 @@ export async function listDispatchesForCustomer(kilnId: string, customerId: stri
 // this sums across the whole cumulative history rather than one season's
 // slice, matching brickCategories.quantity's own always-cumulative meaning.
 export async function totalDispatchedSince(kilnId: string, seasonIds: string[], since: Date) {
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), inArray(dispatches.seasonId, seasonIds), gte(dispatches.dispatchedOn, since)));
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), inArray(dispatches.seasonId, seasonIds), eq(dispatches.cancelled, false), gte(dispatches.dispatchedOn, since)));
   return rows.reduce((sum, d) => sum + d.bricksCount, 0);
 }
 
 export async function dispatchTotals(kilnId: string, seasonId: string, days = 7) {
   const since = new Date();
   since.setDate(since.getDate() - days);
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), gte(dispatches.dispatchedOn, since)));
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.seasonId, seasonId), eq(dispatches.cancelled, false), gte(dispatches.dispatchedOn, since)));
 
   return {
     days,
@@ -883,7 +961,7 @@ export async function bricksSoldByCategory(kilnId: string, seasonIds: string[]) 
   const rows = await db
     .select({ categoryId: dispatches.categoryId, bricksCount: dispatches.bricksCount, items: dispatches.items })
     .from(dispatches)
-    .where(and(eq(dispatches.kilnId, kilnId), inArray(dispatches.seasonId, seasonIds)));
+    .where(and(eq(dispatches.kilnId, kilnId), inArray(dispatches.seasonId, seasonIds), eq(dispatches.cancelled, false)));
 
   const totals = new Map<string, number>();
   for (const r of rows) {
@@ -914,7 +992,7 @@ export async function bricksSoldByCategory(kilnId: string, seasonIds: string[]) 
 // now, which isn't what a season-year comparison needs (an absolute,
 // possibly-past window). Same shape otherwise.
 export async function dispatchTotalsForRange(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), gte(dispatches.dispatchedOn, from), lte(dispatches.dispatchedOn, to)));
+  const rows = await db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.cancelled, false), gte(dispatches.dispatchedOn, from), lte(dispatches.dispatchedOn, to)));
   return {
     bricksCount: rows.reduce((sum, d) => sum + d.bricksCount, 0),
     amount: rows.reduce((sum, d) => sum + d.amount, 0),

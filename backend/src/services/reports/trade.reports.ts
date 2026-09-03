@@ -53,11 +53,13 @@ async function unbilledDispatchRows(kilnId: string, filters: { from?: Date; to?:
   if (filters.to) dateRange.push(lte(dispatches.dispatchedOn, filters.to));
 
   const [dispatchRows, invoicedDispatchIdRows] = await Promise.all([
-    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), ...dateRange)),
+    db.select().from(dispatches).where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.cancelled, false), ...dateRange)),
     // Kiln-wide, NOT date-ranged — same reasoning as flowForRange's own
     // identical query: this only answers "does this dispatch have an
     // invoice at all, ever", regardless of when that invoice was dated.
-    db.select({ dispatchId: invoicesTable.dispatchId }).from(invoicesTable).where(and(eq(invoicesTable.kilnId, kilnId), isNotNull(invoicesTable.dispatchId))),
+    // Cancelled invoices excluded — a dispatch whose only invoice was
+    // cancelled goes back to being "unbilled", same as a deleted one.
+    db.select({ dispatchId: invoicesTable.dispatchId }).from(invoicesTable).where(and(eq(invoicesTable.kilnId, kilnId), eq(invoicesTable.cancelled, false), isNotNull(invoicesTable.dispatchId))),
   ]);
 
   const invoicedDispatchIds = new Set(invoicedDispatchIdRows.map((r) => r.dispatchId));

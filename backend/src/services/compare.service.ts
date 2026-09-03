@@ -84,7 +84,7 @@ async function compareFiring(kilnId: string, from: Date, to: Date) {
 }
 
 async function compareBrickLoading(kilnId: string, from: Date, to: Date) {
-  const rows = await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), gte(brickLoadingEntries.date, from), lte(brickLoadingEntries.date, to)));
+  const rows = await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), eq(brickLoadingEntries.cancelled, false), gte(brickLoadingEntries.date, from), lte(brickLoadingEntries.date, to)));
   return {
     bricksLoaded: rows.reduce((sum, e) => sum + e.bricksCount, 0),
     totalTips: rows.reduce((sum, e) => sum + (e.tipAmount ?? 0), 0),

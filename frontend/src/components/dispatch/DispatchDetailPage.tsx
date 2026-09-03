@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowLeft, FileText, Pencil, Printer, Receipt, Trash2, Truck } from "lucide-react";
+import { ArrowLeft, Ban, FileText, Pencil, Printer, Receipt, Truck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -23,6 +23,13 @@ function Field({ label, value }: { label: string; value?: string | number | null
       <p className="text-sm text-ink-primary">{value}</p>
     </div>
   );
+}
+
+// Same muted "stays visible, marked Cancelled" tone SaleOrders.tsx's own
+// STATUS_TONE.CANCELLED uses — not the shared Badge component, which has
+// no cancelled variant.
+function CancelledBadge({ label }: { label: string }) {
+  return <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-xs font-semibold text-ink-muted">{label}</span>;
 }
 
 interface DispatchDetailPageProps {
@@ -129,17 +136,17 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
     }
   }
 
-  async function deleteChallan(c: Challan) {
+  async function cancelChallan(c: Challan) {
     if (!confirm(t("dispatchDocs.confirmDeleteChallan", { number: c.sequenceNumber ?? "—" }))) return;
     await api.challans.remove(c._id);
     await refreshDocs();
   }
-  async function deleteGatePass(g: GatePassRecord) {
+  async function cancelGatePass(g: GatePassRecord) {
     if (!confirm(t("dispatchDocs.confirmDeleteGatePass", { number: g.sequenceNumber ?? "—" }))) return;
     await api.gatePasses.remove(g._id);
     await refreshDocs();
   }
-  async function deleteInvoice(i: Invoice) {
+  async function cancelInvoice(i: Invoice) {
     if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: formatInvoiceNumber(i, kilnInfo.name) }))) return;
     await api.invoices.remove(i._id);
     await refreshDocs();
@@ -174,21 +181,24 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
       <Card className="mb-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-ink-primary">
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-ink-primary">
               {dispatch.slipNumber} · {dispatch.customerName}
+              {dispatch.cancelled && <CancelledBadge label={t("common.cancelledBadge")} />}
             </h3>
             <p className="text-sm text-ink-muted">
               {new Date(dispatch.dispatchedOn).toLocaleDateString("en-IN")} · {formatDateTime(dispatch.createdAt)}
             </p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={onEdit} className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10">
-              <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-            </button>
-            <button onClick={onDelete} className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10">
-              <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-            </button>
-          </div>
+          {!dispatch.cancelled && (
+            <div className="flex gap-2">
+              <button onClick={onEdit} className="flex items-center gap-1 rounded-lg border border-border bg-ink-primary/5 px-3 py-1.5 text-xs font-medium text-ink-secondary hover:bg-ink-primary/10">
+                <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+              </button>
+              <button onClick={onDelete} className="flex items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10">
+                <Ban className="h-3.5 w-3.5" /> {t("common.cancel")}
+              </button>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -232,13 +242,21 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
         <Card className="lg:col-span-2">
           <div className="mb-3 flex items-center justify-between">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatch.adjustmentsHeader")}</h4>
-            <button onClick={() => setShowAdjustment((s) => !s)} className="text-xs font-medium text-series-1 hover:underline">
-              {dispatch.breakageCount > 0 || dispatch.returnedCount > 0
-                ? t("dispatch.brokenReturnedSummary", { broken: dispatch.breakageCount, returned: dispatch.returnedCount })
-                : t("dispatch.addBreakageReturn")}
-            </button>
+            {dispatch.cancelled ? (
+              (dispatch.breakageCount > 0 || dispatch.returnedCount > 0) && (
+                <span className="text-xs font-medium text-ink-muted">
+                  {t("dispatch.brokenReturnedSummary", { broken: dispatch.breakageCount, returned: dispatch.returnedCount })}
+                </span>
+              )
+            ) : (
+              <button onClick={() => setShowAdjustment((s) => !s)} className="text-xs font-medium text-series-1 hover:underline">
+                {dispatch.breakageCount > 0 || dispatch.returnedCount > 0
+                  ? t("dispatch.brokenReturnedSummary", { broken: dispatch.breakageCount, returned: dispatch.returnedCount })
+                  : t("dispatch.addBreakageReturn")}
+              </button>
+            )}
           </div>
-          {showAdjustment && (
+          {showAdjustment && !dispatch.cancelled && (
             <form onSubmit={submitAdjustment} className="flex flex-wrap items-end gap-2">
               <input
                 type="number"
@@ -267,6 +285,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
           )}
         </Card>
 
+        {!dispatch.cancelled && (
         <Card className="lg:col-span-2">
           <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("dispatchDocs.generateDocumentsSection")}</h4>
           <div className="flex flex-wrap gap-2">
@@ -281,6 +300,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
             </Button>
           </div>
         </Card>
+        )}
 
         {(activeForm === "challan" || editingChallan) && (
           <div className="lg:col-span-2">
@@ -334,19 +354,26 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               {challansList.map((c) => (
                 <div key={c._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                   <div>
-                    <p className="text-ink-primary">CH-{c.sequenceNumber ?? "—"}</p>
+                    <p className="flex items-center gap-2 text-ink-primary">
+                      CH-{c.sequenceNumber ?? "—"}
+                      {c.cancelled && <CancelledBadge label={t("common.cancelledBadge")} />}
+                    </p>
                     <p className="text-sm text-ink-muted">{c.bricksCount.toLocaleString("en-IN")} {t("brickLoading.bricksUnit")} · {c.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button onClick={() => printChallan(c)} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
                       <Printer className="h-3.5 w-3.5" /> {t("common.print")}
                     </button>
-                    <button onClick={() => { closeForms(); setEditingChallan(c); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">
-                      <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                    </button>
-                    <button onClick={() => deleteChallan(c)} className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline">
-                      <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-                    </button>
+                    {!c.cancelled && (
+                      <>
+                        <button onClick={() => { closeForms(); setEditingChallan(c); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">
+                          <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                        </button>
+                        <button onClick={() => cancelChallan(c)} className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline">
+                          <Ban className="h-3.5 w-3.5" /> {t("common.cancel")}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -361,19 +388,26 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               {gatePassesList.map((g) => (
                 <div key={g._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                   <div>
-                    <p className="text-ink-primary">GP-{g.sequenceNumber ?? "—"}</p>
+                    <p className="flex items-center gap-2 text-ink-primary">
+                      GP-{g.sequenceNumber ?? "—"}
+                      {g.cancelled && <CancelledBadge label={t("common.cancelledBadge")} />}
+                    </p>
                     <p className="text-sm text-ink-muted">{g.bricksCount.toLocaleString("en-IN")} {t("brickLoading.bricksUnit")} · {g.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button onClick={() => printGatePass(g)} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
                       <Printer className="h-3.5 w-3.5" /> {t("common.print")}
                     </button>
-                    <button onClick={() => { closeForms(); setEditingGatePass(g); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">
-                      <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                    </button>
-                    <button onClick={() => deleteGatePass(g)} className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline">
-                      <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-                    </button>
+                    {!g.cancelled && (
+                      <>
+                        <button onClick={() => { closeForms(); setEditingGatePass(g); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">
+                          <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                        </button>
+                        <button onClick={() => cancelGatePass(g)} className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline">
+                          <Ban className="h-3.5 w-3.5" /> {t("common.cancel")}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -388,19 +422,26 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
               {invoicesList.map((i) => (
                 <div key={i._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
                   <div>
-                    <p className="text-ink-primary">{formatInvoiceNumber(i, kilnInfo.name)}</p>
+                    <p className="flex items-center gap-2 text-ink-primary">
+                      {formatInvoiceNumber(i, kilnInfo.name)}
+                      {i.cancelled && <CancelledBadge label={t("common.cancelledBadge")} />}
+                    </p>
                     <p className="text-sm text-ink-muted">₹{formatINR(i.netAmount)} · {i.customerName}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <button onClick={() => printInvoice(i)} className="flex items-center gap-1 text-xs font-medium text-series-1 hover:underline">
                       <Printer className="h-3.5 w-3.5" /> {t("common.print")}
                     </button>
-                    <button onClick={() => { closeForms(); setEditingInvoice(i); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">
-                      <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-                    </button>
-                    <button onClick={() => deleteInvoice(i)} className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline">
-                      <Trash2 className="h-3.5 w-3.5" /> {t("common.delete")}
-                    </button>
+                    {!i.cancelled && (
+                      <>
+                        <button onClick={() => { closeForms(); setEditingInvoice(i); }} className="flex items-center gap-1 text-xs font-medium text-ink-secondary hover:text-ink-primary">
+                          <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                        </button>
+                        <button onClick={() => cancelInvoice(i)} className="flex items-center gap-1 text-xs font-medium text-status-critical hover:underline">
+                          <Ban className="h-3.5 w-3.5" /> {t("common.cancel")}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

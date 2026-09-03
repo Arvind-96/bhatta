@@ -6,17 +6,17 @@ import {
   createChallan,
   listChallans,
   updateChallan,
-  deleteChallan,
+  cancelChallan,
   nextChallanSequenceNumber,
   createGatePass,
   listGatePasses,
   updateGatePass,
-  deleteGatePass,
+  cancelGatePass,
   nextGatePassSequenceNumber,
   createInvoice,
   listInvoices,
   updateInvoice,
-  deleteInvoice,
+  cancelInvoice,
   nextInvoiceSequenceNumber,
 } from "../services/dispatchDocuments.service";
 
@@ -56,8 +56,12 @@ export async function createChallanHandler(req: AuthedRequest, res: Response) {
   const row = await createChallan(req.kiln!.id, req.season!.id, { ...input, challanDate: input.challanDate ? new Date(input.challanDate) : undefined });
   res.status(201).json(row);
 }
+// includeCancelled: true — the Challan list page (and DispatchDetailPage's
+// own per-dispatch document list, same endpoint) shows a cancelled
+// challan too, marked with a badge, per the client's explicit "stays
+// visible" answer — never silently hidden the way a deleted one used to be.
 export async function listChallansHandler(req: AuthedRequest, res: Response) {
-  res.json(await listChallans(req.kiln!.id, req.season!.id, req.query.dispatchId as string | undefined));
+  res.json(await listChallans(req.kiln!.id, req.season!.id, { dispatchId: req.query.dispatchId as string | undefined, includeCancelled: true }));
 }
 export async function nextChallanSequenceNumberHandler(req: AuthedRequest, res: Response) {
   res.json({ nextSequenceNumber: await nextChallanSequenceNumber(req.kiln!.id, req.season!.id) });
@@ -67,8 +71,10 @@ export async function updateChallanHandler(req: AuthedRequest, res: Response) {
   const row = await updateChallan(req.kiln!.id, req.params.id, { ...input, challanDate: input.challanDate ? new Date(input.challanDate) : undefined });
   res.json(row);
 }
+// Route stays DELETE /challans/:id — same API surface, now cancels
+// instead of hard-deleting (see cancelChallan's own doc comment).
 export async function deleteChallanHandler(req: AuthedRequest, res: Response) {
-  await deleteChallan(req.kiln!.id, req.params.id);
+  await cancelChallan(req.kiln!.id, req.params.id);
   res.status(204).end();
 }
 
@@ -94,8 +100,9 @@ export async function createGatePassHandler(req: AuthedRequest, res: Response) {
   const row = await createGatePass(req.kiln!.id, req.season!.id, { ...input, gatePassDate: input.gatePassDate ? new Date(input.gatePassDate) : undefined });
   res.status(201).json(row);
 }
+// includeCancelled: true — same reasoning as listChallansHandler above.
 export async function listGatePassesHandler(req: AuthedRequest, res: Response) {
-  res.json(await listGatePasses(req.kiln!.id, req.season!.id, req.query.dispatchId as string | undefined));
+  res.json(await listGatePasses(req.kiln!.id, req.season!.id, { dispatchId: req.query.dispatchId as string | undefined, includeCancelled: true }));
 }
 export async function nextGatePassSequenceNumberHandler(req: AuthedRequest, res: Response) {
   res.json({ nextSequenceNumber: await nextGatePassSequenceNumber(req.kiln!.id, req.season!.id) });
@@ -105,8 +112,9 @@ export async function updateGatePassHandler(req: AuthedRequest, res: Response) {
   const row = await updateGatePass(req.kiln!.id, req.params.id, { ...input, gatePassDate: input.gatePassDate ? new Date(input.gatePassDate) : undefined });
   res.json(row);
 }
+// Route stays DELETE /gate-passes/:id — now cancels, not hard-deletes.
 export async function deleteGatePassHandler(req: AuthedRequest, res: Response) {
-  await deleteGatePass(req.kiln!.id, req.params.id);
+  await cancelGatePass(req.kiln!.id, req.params.id);
   res.status(204).end();
 }
 
@@ -153,8 +161,9 @@ export async function createInvoiceHandler(req: AuthedRequest, res: Response) {
   const row = await createInvoice(req.kiln!.id, req.season!.id, { ...input, invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : undefined });
   res.status(201).json(row);
 }
+// includeCancelled: true — same reasoning as listChallansHandler above.
 export async function listInvoicesHandler(req: AuthedRequest, res: Response) {
-  res.json(await listInvoices(req.kiln!.id, req.season!.id, req.query.dispatchId as string | undefined));
+  res.json(await listInvoices(req.kiln!.id, req.season!.id, { dispatchId: req.query.dispatchId as string | undefined, includeCancelled: true }));
 }
 export async function nextInvoiceSequenceNumberHandler(req: AuthedRequest, res: Response) {
   res.json({ nextSequenceNumber: await nextInvoiceSequenceNumber(req.kiln!.id, req.season!.id) });
@@ -164,7 +173,8 @@ export async function updateInvoiceHandler(req: AuthedRequest, res: Response) {
   const row = await updateInvoice(req.kiln!.id, req.params.id, { ...input, invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : undefined });
   res.json(row);
 }
+// Route stays DELETE /invoices/:id — now cancels, not hard-deletes.
 export async function deleteInvoiceHandler(req: AuthedRequest, res: Response) {
-  await deleteInvoice(req.kiln!.id, req.params.id);
+  await cancelInvoice(req.kiln!.id, req.params.id);
   res.status(204).end();
 }

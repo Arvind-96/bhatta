@@ -269,7 +269,7 @@ export function BrickLoading() {
     }
   }
 
-  async function deleteEntry(entry: BrickLoadingEntry) {
+  async function cancelEntry(entry: BrickLoadingEntry) {
     setDeleting(true);
     try {
       await api.brickLoading.remove(entry._id);
@@ -590,7 +590,16 @@ export function BrickLoading() {
                     onClick={() => setOpenTripId(entry._id)}
                     className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5"
                   >
-                    <td className="py-3 text-ink-primary hover:underline">{entry.tripNumber ? `#${entry.tripNumber}` : "—"}</td>
+                    <td className="py-3 text-ink-primary hover:underline">
+                      <span className="flex items-center gap-2">
+                        {entry.tripNumber ? `#${entry.tripNumber}` : "—"}
+                        {entry.cancelled && (
+                          <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-xs font-semibold text-ink-muted">
+                            {t("common.cancelledBadge")}
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="py-3 text-ink-secondary">
                       {new Date(entry.date).toLocaleDateString("en-IN")}
                       <p className="text-xs text-ink-muted/70">{formatDateTime(entry.createdAt)}</p>
@@ -652,11 +661,11 @@ export function BrickLoading() {
             <ConfirmDialog
               title={t("brickLoading.confirmDeleteTripTitle")}
               detail={t("brickLoading.confirmDeleteTrip", { vehicleNumber: target.vehicleNumber })}
-              confirmLabel={t("common.delete")}
+              confirmLabel={t("common.confirmCancelAction")}
               loading={deleting}
               onCancel={() => setPendingDeleteId(null)}
               onConfirm={async () => {
-                if (await deleteEntry(target)) {
+                if (await cancelEntry(target)) {
                   setPendingDeleteId(null);
                   if (openTripId === target._id) setOpenTripId(null);
                 }

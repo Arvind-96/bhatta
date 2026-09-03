@@ -4,7 +4,7 @@ import { AuthedRequest } from "../middleware/auth.middleware";
 import {
   brickLoadingDriverSummary,
   createBrickLoadingEntry,
-  deleteBrickLoadingEntry,
+  cancelBrickLoadingEntry,
   listBrickLoadingEntries,
   updateBrickLoadingEntry,
 } from "../services/brickLoading.service";
@@ -76,10 +76,13 @@ export async function create(req: AuthedRequest, res: Response) {
   res.status(201).json(entry);
 }
 
+// includeCancelled: true — the Brick Loading list page shows a cancelled
+// trip too, marked with a badge, per the client's "stays visible" answer.
 export async function list(req: AuthedRequest, res: Response) {
   const entries = await listBrickLoadingEntries(req.kiln!.id, req.season!.id, {
     driverId: req.query.driverId as string | undefined,
     days: req.query.days ? Number(req.query.days) : undefined,
+    includeCancelled: true,
   });
   res.json(entries);
 }
@@ -126,8 +129,9 @@ export async function update(req: AuthedRequest, res: Response) {
   res.json(entry);
 }
 
+// Route stays DELETE /brick-loading/:id — now cancels, not hard-deletes.
 export async function remove(req: AuthedRequest, res: Response) {
-  await deleteBrickLoadingEntry(req.kiln!.id, req.params.id);
+  await cancelBrickLoadingEntry(req.kiln!.id, req.params.id);
   res.status(204).end();
 }
 

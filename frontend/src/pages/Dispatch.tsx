@@ -273,7 +273,7 @@ export function Dispatch() {
     }
   }
 
-  async function deleteDispatch(d: DispatchEntry) {
+  async function cancelDispatch(d: DispatchEntry) {
     if (!confirm(t("dispatch.confirmDeleteDispatch", { slipNumber: d.slipNumber }))) return false;
     await api.dispatch.remove(d._id);
     await refresh();
@@ -550,7 +550,16 @@ export function Dispatch() {
                     onClick={() => setOpenDispatchId(d._id)}
                     className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5"
                   >
-                    <td className="py-3 text-sm text-ink-muted hover:underline">{d.slipNumber}</td>
+                    <td className="py-3 text-sm text-ink-muted hover:underline">
+                      <span className="flex items-center gap-2">
+                        {d.slipNumber}
+                        {d.cancelled && (
+                          <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-xs font-semibold text-ink-muted">
+                            {t("common.cancelledBadge")}
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="py-3 text-ink-secondary">
                       {new Date(d.dispatchedOn).toLocaleDateString("en-IN")}
                       <p className="text-xs text-ink-muted/70">{formatDateTime(d.createdAt)}</p>
@@ -589,7 +598,7 @@ export function Dispatch() {
           onEdit={() => setEditingDispatch(openDispatch)}
           onAdjusted={refresh}
           onDelete={async () => {
-            if (await deleteDispatch(openDispatch)) setOpenDispatchId(null);
+            if (await cancelDispatch(openDispatch)) setOpenDispatchId(null);
           }}
         />
       ) : (

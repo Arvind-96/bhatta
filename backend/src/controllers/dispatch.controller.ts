@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { bricksSoldByCategory, createDispatch, deleteDispatch, dispatchTotals, listDispatches, recordDeliveryAdjustment, updateDispatch } from "../services/dispatch.service";
+import { bricksSoldByCategory, createDispatch, cancelDispatch, dispatchTotals, listDispatches, recordDeliveryAdjustment, updateDispatch } from "../services/dispatch.service";
 import { seasonIdsThrough } from "../services/season.util";
 import { BRICK_GRADES, DISPATCH_PAYMENT_MODES as PAYMENT_MODES } from "../db/schema";
 import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
@@ -206,7 +206,8 @@ export async function update(req: AuthedRequest, res: Response) {
   res.json(dispatch);
 }
 
+// Route stays DELETE /dispatches/:id — now cancels, not hard-deletes.
 export async function remove(req: AuthedRequest, res: Response) {
-  await deleteDispatch(req.kiln!.id, req.params.id);
+  await cancelDispatch(req.kiln!.id, req.params.id);
   res.status(204).end();
 }

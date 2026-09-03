@@ -91,7 +91,12 @@ export function Invoices() {
   const receiptsPg = usePagination(receipts, 10);
   const openEntry = entries.find((e) => e._id === openId) ?? null;
   const totalOutstanding = creditAging.reduce((sum, c) => sum + c.outstandingCredit, 0);
-  const totalInvoiced = entries.reduce((sum, e) => sum + e.netAmount, 0);
+  // entries includes cancelled invoices (the list endpoint passes
+  // includeCancelled so this page can show them with a badge, per the
+  // client's "stays visible" answer) — excluded here so a cancelled
+  // invoice's reversed amount doesn't still count toward this total.
+  const activeEntries = entries.filter((e) => !e.cancelled);
+  const totalInvoiced = activeEntries.reduce((sum, e) => sum + e.netAmount, 0);
 
   if (openEntry) {
     return <InvoiceDetailPage invoice={openEntry} categories={categories} onBack={() => setOpenId(null)} onDeleted={() => setOpenId(null)} />;
@@ -111,7 +116,7 @@ export function Invoices() {
           <p className="text-sm text-ink-muted">{t("dispatchDocs.totalInvoicedLabel")}</p>
         </Card>
         <Card className="p-3 text-center">
-          <p className="text-xl font-semibold tabular-nums text-ink-primary">{entries.length}</p>
+          <p className="text-xl font-semibold tabular-nums text-ink-primary">{activeEntries.length}</p>
           <p className="text-sm text-ink-muted">{t("dispatchDocs.totalInvoicesLabel")}</p>
         </Card>
         <Card className="p-3 text-center">
@@ -126,7 +131,7 @@ export function Invoices() {
           <button
             type="button"
             onClick={() => {
-              const rows = filteredEntries.map((e) => ({
+              const rows = filteredEntries.filter((e) => !e.cancelled).map((e) => ({
                 date: e.invoiceDate ?? null,
                 serial: formatInvoiceNumber(e, kilnName),
                 customer: e.customerName,
@@ -175,7 +180,16 @@ export function Invoices() {
                   const itemRows = resolveItemRows(e.items, categories, { categoryId: e.categoryId, bricksCount: e.bricksCount });
                   return (
                   <tr key={e._id} onClick={() => setOpenId(e._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
-                    <td className="py-3 text-ink-primary hover:underline">{formatInvoiceNumber(e, kilnName)}</td>
+                    <td className="py-3 text-ink-primary hover:underline">
+                      <span className="flex items-center gap-2">
+                        {formatInvoiceNumber(e, kilnName)}
+                        {e.cancelled && (
+                          <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-xs font-semibold text-ink-muted">
+                            {t("common.cancelledBadge")}
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="py-3 text-ink-secondary">{e.invoiceDate ? new Date(e.invoiceDate).toLocaleDateString("en-IN") : "—"}</td>
                     <td className="py-3 text-ink-primary">{e.customerName}</td>
                     <td className="py-3 text-ink-secondary">

@@ -171,6 +171,14 @@ export interface ListChallansFilter {
   dispatchId?: string;
   from?: Date;
   to?: Date;
+  // Excluded by default — a cancelled challan carries no pricing so it
+  // never affected a total, but staying out of the default list keeps
+  // every existing caller (dispatch-linked lookups, exports) correct
+  // without having to know cancelled challans exist at all. The Challan
+  // list PAGE explicitly opts in with true, since the client wants a
+  // cancelled document to stay visible there with a muted badge, not
+  // disappear the way a deleted one used to.
+  includeCancelled?: boolean;
 }
 
 // seasonId is nullable — pass null for an all-time, every-season view
@@ -182,6 +190,7 @@ export async function listChallans(kilnId: string, seasonId: string | null, filt
   if (f.dispatchId) conditions.push(eq(challans.dispatchId, f.dispatchId));
   if (f.from) conditions.push(gte(challans.challanDate, f.from));
   if (f.to) conditions.push(lte(challans.challanDate, f.to));
+  if (!f.includeCancelled) conditions.push(eq(challans.cancelled, false));
   return db.select().from(challans).where(and(...conditions)).orderBy(desc(challans.createdAt));
 }
 
@@ -200,31 +209,42 @@ export async function updateChallan(kilnId: string, id: string, rawInput: Partia
   return updated;
 }
 
-// Closes the gap a deleted Gate Pass/Challan leaves behind — every later
+// Closes the gap a cancelled Gate Pass/Challan leaves behind — every later
 // document in the same kiln+season shifts down by one, in ascending order
 // so each UPDATE only ever targets a number the previous step (or the
-// delete itself) just freed, never a number still held by another row.
+// cancelled row's own number, about to be nulled by the caller) just
+// freed, never a number still held by another row. A row whose own
+// sequenceNumber is already NULL (an earlier cancel) is automatically
+// skipped by the `gt` comparison, so this is safe to call repeatedly.
 // Invoice has its own equivalent, closeInvoiceSessionGap below, since it's
 // numbered via session+sessionSerialNumber rather than this plain
 // per-kiln-per-season sequenceNumber.
-async function closeSequenceGap(table: typeof challans | typeof gatePasses, kilnId: string, seasonId: string, deletedNumber: number | null) {
-  if (deletedNumber == null) return;
+async function closeSequenceGap(table: typeof challans | typeof gatePasses, kilnId: string, seasonId: string, cancelledNumber: number | null) {
+  if (cancelledNumber == null) return;
   const later = await db
     .select({ _id: table._id, sequenceNumber: table.sequenceNumber })
     .from(table)
-    .where(and(eq(table.kilnId, kilnId), eq(table.seasonId, seasonId), gt(table.sequenceNumber, deletedNumber)))
+    .where(and(eq(table.kilnId, kilnId), eq(table.seasonId, seasonId), gt(table.sequenceNumber, cancelledNumber)))
     .orderBy(asc(table.sequenceNumber));
   for (const row of later) {
     await db.update(table).set({ sequenceNumber: row.sequenceNumber! - 1 }).where(eq(table._id, row._id));
   }
 }
 
-export async function deleteChallan(kilnId: string, id: string) {
+// No Challan is ever hard-deleted — this reverses nothing financial (a
+// Challan carries no pricing) beyond closing the numbering gap it leaves:
+// every later challan in the same kiln+season shifts down by one, and
+// this challan's own number is cleared so nothing ever shows two
+// documents with the same printed number, one cancelled or not. The row
+// itself stays, marked cancelled, for audit history.
+export async function cancelChallan(kilnId: string, id: string) {
   const existing = (await db.select().from(challans).where(and(eq(challans._id, id), eq(challans.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Challan not found in this kiln");
-  await db.delete(challans).where(eq(challans._id, id));
+  if (existing.cancelled) throw new Error("Challan is already cancelled");
   await closeSequenceGap(challans, kilnId, existing.seasonId!, existing.sequenceNumber);
-  emitToKiln(kilnId, "challan:update", { _id: id, deleted: true, renumbered: existing.sequenceNumber != null });
+  await db.update(challans).set({ cancelled: true, cancelledAt: new Date(), sequenceNumber: null }).where(eq(challans._id, id));
+  const updated = (await db.select().from(challans).where(eq(challans._id, id)))[0]!;
+  emitToKiln(kilnId, "challan:update", updated);
 }
 
 // ---- Gate Pass (exit-authorization slip) ----
@@ -267,6 +287,9 @@ export interface ListGatePassesFilter {
   dispatchId?: string;
   from?: Date;
   to?: Date;
+  // Excluded by default — see ListChallansFilter's own note on why (same
+  // reasoning, Gate Pass carries no pricing either).
+  includeCancelled?: boolean;
 }
 
 // seasonId is nullable — pass null for an all-time, every-season view
@@ -278,6 +301,7 @@ export async function listGatePasses(kilnId: string, seasonId: string | null, fi
   if (f.dispatchId) conditions.push(eq(gatePasses.dispatchId, f.dispatchId));
   if (f.from) conditions.push(gte(gatePasses.gatePassDate, f.from));
   if (f.to) conditions.push(lte(gatePasses.gatePassDate, f.to));
+  if (!f.includeCancelled) conditions.push(eq(gatePasses.cancelled, false));
   return db.select().from(gatePasses).where(and(...conditions)).orderBy(desc(gatePasses.createdAt));
 }
 
@@ -296,12 +320,17 @@ export async function updateGatePass(kilnId: string, id: string, rawInput: Parti
   return updated;
 }
 
-export async function deleteGatePass(kilnId: string, id: string) {
+// No Gate Pass is ever hard-deleted — same reasoning as cancelChallan
+// above (no pricing to reverse, just close the numbering gap and mark it
+// cancelled in place).
+export async function cancelGatePass(kilnId: string, id: string) {
   const existing = (await db.select().from(gatePasses).where(and(eq(gatePasses._id, id), eq(gatePasses.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Gate pass not found in this kiln");
-  await db.delete(gatePasses).where(eq(gatePasses._id, id));
+  if (existing.cancelled) throw new Error("Gate pass is already cancelled");
   await closeSequenceGap(gatePasses, kilnId, existing.seasonId!, existing.sequenceNumber);
-  emitToKiln(kilnId, "gatePass:update", { _id: id, deleted: true, renumbered: existing.sequenceNumber != null });
+  await db.update(gatePasses).set({ cancelled: true, cancelledAt: new Date(), sequenceNumber: null }).where(eq(gatePasses._id, id));
+  const updated = (await db.select().from(gatePasses).where(eq(gatePasses._id, id)))[0]!;
+  emitToKiln(kilnId, "gatePass:update", updated);
 }
 
 // ---- Invoice (priced, GST commercial bill) ----
@@ -438,6 +467,14 @@ export interface ListInvoicesFilter {
   agentId?: string;
   from?: Date;
   to?: Date;
+  // Excluded by default — a cancelled invoice must not count toward any
+  // revenue/due/balance total (that's the entire point of cancel-not-
+  // delete: "amounts refresh exactly as they would when deleted"), and
+  // this function is the one almost every report/balance calculation
+  // routes through. The Invoices list PAGE explicitly opts in with true,
+  // since the client wants a cancelled invoice to stay visible there with
+  // a muted badge, not vanish the way a deleted one used to.
+  includeCancelled?: boolean;
 }
 
 // seasonId is nullable — pass null for an all-time, every-season view
@@ -452,6 +489,7 @@ export async function listInvoices(kilnId: string, seasonId: string | null, filt
   if (f.agentId) conditions.push(eq(invoices.agentId, f.agentId));
   if (f.from) conditions.push(gte(invoices.invoiceDate, f.from));
   if (f.to) conditions.push(lte(invoices.invoiceDate, f.to));
+  if (!f.includeCancelled) conditions.push(eq(invoices.cancelled, false));
   // Newest-first by the invoice's own printed serial (session, then
   // sessionSerialNumber within it) — not createdAt. createdAt is when the
   // DB row was inserted, which drifts from serial order the moment any
@@ -480,11 +518,21 @@ export async function listInvoices(kilnId: string, seasonId: string | null, filt
 // seasonIdsThrough) — a customer's balance always includes every season up
 // to and including the one being viewed, never just one season in
 // isolation (same "carries forward" principle as openingPaid/openingDue).
+// Always excludes cancelled invoices, no opt-in — this is the query
+// getCustomerDetail's live balance sums over, so leaving a cancelled one
+// in would re-inflate the exact balance cancel is supposed to correct.
 export async function listInvoicesForCustomer(kilnId: string, customerId: string, customerName: string, seasonIds: string[]) {
   const rows = await db
     .select()
     .from(invoices)
-    .where(and(eq(invoices.kilnId, kilnId), inArray(invoices.seasonId, seasonIds), or(eq(invoices.customerId, customerId), and(isNull(invoices.customerId), eq(sql`lower(${invoices.customerName})`, customerName.toLowerCase())))))
+    .where(
+      and(
+        eq(invoices.kilnId, kilnId),
+        inArray(invoices.seasonId, seasonIds),
+        eq(invoices.cancelled, false),
+        or(eq(invoices.customerId, customerId), and(isNull(invoices.customerId), eq(sql`lower(${invoices.customerName})`, customerName.toLowerCase())))
+      )
+    )
     .orderBy(desc(invoices.createdAt));
   return rows;
 }
@@ -537,9 +585,19 @@ export async function updateInvoice(kilnId: string, id: string, rawInput: Partia
   return updated;
 }
 
-export async function deleteInvoice(kilnId: string, id: string) {
+// No Invoice is ever hard-deleted — "Delete" cancels it: reverses the
+// partner/agent ledger entries exactly as before, closes the numbering
+// gap and clears this invoice's own printed number (same renumber-on-
+// cancel behavior the client asked to extend from Gate Pass/Challan to
+// Invoice too), but leaves the row itself in place, marked cancelled.
+// The customer's own balance never needed a separate reversal here — it's
+// always live-recomputed from currently-non-cancelled invoices
+// (getCustomerDetail/listInvoicesForCustomer), so excluding this row from
+// that query IS the balance reversal.
+export async function cancelInvoice(kilnId: string, id: string) {
   const existing = (await db.select().from(invoices).where(and(eq(invoices._id, id), eq(invoices.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Invoice not found in this kiln");
+  if (existing.cancelled) throw new Error("Invoice is already cancelled");
 
   if (existing.partnerId) {
     const pending = partnerPendingAmount(existing.netAmount, existing.amountPaidNow);
@@ -549,7 +607,7 @@ export async function deleteInvoice(kilnId: string, id: string) {
         personId: existing.partnerId,
         direction: "PAID",
         amount: pending,
-        reason: `Invoice deleted — reversing pending due on sale to ${existing.customerName}`,
+        reason: `Invoice cancelled — reversing pending due on sale to ${existing.customerName}`,
         category: "PARTNER_DUE",
       });
     }
@@ -562,31 +620,31 @@ export async function deleteInvoice(kilnId: string, id: string) {
         personId: existing.agentId,
         direction: "PAID",
         amount: commission,
-        reason: `Invoice deleted — reversing commission on sale to ${existing.customerName}`,
+        reason: `Invoice cancelled — reversing commission on sale to ${existing.customerName}`,
         category: "COMMISSION",
       });
     }
   }
 
-  await db.delete(invoices).where(eq(invoices._id, id));
   await closeInvoiceSessionGap(kilnId, existing.session, existing.sessionSerialNumber);
-  emitToKiln(kilnId, "invoice:update", { _id: id, deleted: true, renumbered: existing.sessionSerialNumber != null });
+  await db.update(invoices).set({ cancelled: true, cancelledAt: new Date(), sessionSerialNumber: null }).where(eq(invoices._id, id));
+  const updated = (await db.select().from(invoices).where(eq(invoices._id, id)))[0]!;
+  emitToKiln(kilnId, "invoice:update", updated);
 }
 
 // Invoice's own equivalent of closeSequenceGap above, scoped by
 // (kilnId, session) instead of (kilnId, seasonId) since sessionSerialNumber
 // — not the older sequenceNumber field — is the one actually printed as
-// JVS/{session}/{N} and shown everywhere in the UI. Per explicit
-// instruction, invoices now renumber on delete the same as Gate Pass/
-// Challan, overriding the GST-continuity caution this originally shipped
-// with — the client weighed that tradeoff and wants consistency across
-// all three document types instead.
-async function closeInvoiceSessionGap(kilnId: string, session: string | null, deletedNumber: number | null) {
-  if (session == null || deletedNumber == null) return;
+// JVS/{session}/{N} and shown everywhere in the UI. A row whose own
+// sessionSerialNumber is already NULL (an earlier cancel) is
+// automatically skipped by the `gt` comparison below, so this is safe to
+// call repeatedly.
+export async function closeInvoiceSessionGap(kilnId: string, session: string | null, cancelledNumber: number | null) {
+  if (session == null || cancelledNumber == null) return;
   const later = await db
     .select({ _id: invoices._id, sessionSerialNumber: invoices.sessionSerialNumber })
     .from(invoices)
-    .where(and(eq(invoices.kilnId, kilnId), eq(invoices.session, session), gt(invoices.sessionSerialNumber, deletedNumber)))
+    .where(and(eq(invoices.kilnId, kilnId), eq(invoices.session, session), gt(invoices.sessionSerialNumber, cancelledNumber)))
     .orderBy(asc(invoices.sessionSerialNumber));
   for (const row of later) {
     await db.update(invoices).set({ sessionSerialNumber: row.sessionSerialNumber! - 1 }).where(eq(invoices._id, row._id));
