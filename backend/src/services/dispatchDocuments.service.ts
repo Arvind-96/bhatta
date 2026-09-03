@@ -354,10 +354,19 @@ export async function createInvoice(kilnId: string, seasonId: string, rawInput: 
   const input = applyItemsAggregate(rawInput);
   const invoiceDate = input.invoiceDate ?? new Date();
   const session = financialYearSession(invoiceDate);
-  const sameSessionCount = (
-    await db.select({ count: sql<number>`count(*)` }).from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.session, session)))
-  )[0]?.count ?? 0;
-  const sessionSerialNumber = sameSessionCount + 1;
+  // MAX-based, not COUNT-based — same collision-after-delete bug
+  // generateSequenceNumber's own comment above warns about, and this had
+  // it: COUNT(*) shrinks the moment any invoice in this session is
+  // deleted, so the very next invoice created quietly reuses an already-
+  // printed number instead of continuing past it. Confirmed against real
+  // production data — one financial-year session had the same printed
+  // serial (e.g. "JVS/26-27/36") on three different invoices while two
+  // other numbers in the same range were never issued to anyone, the
+  // exact gap-and-collision signature a COUNT-based counter produces.
+  const sessionMaxRow = (
+    await db.select({ max: sql<number | null>`max(${invoices.sessionSerialNumber})` }).from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.session, session)))
+  )[0];
+  const sessionSerialNumber = (sessionMaxRow?.max ?? 0) + 1;
 
   const _id = randomUUID();
   try {
