@@ -327,16 +327,22 @@ interface FifoInvoiceRow {
 // forever, even once the customer has genuinely paid it off. This walks
 // one customer's full invoice history in date order and applies every
 // payment — whether it's a later 0-brick top-up or an overpayment on a
-// real sale — to the OLDEST still-open charge first (FIFO), exactly the
-// way a real accounts-receivable ledger works. Returns, per dispatchId:
-// the true remaining due after all of that customer's payments are
-// accounted for, and any EXTRA cash/online that a later payment
-// contributed toward it (so a report row's own cash+online+due still
-// sums to its own billed amount instead of quietly losing track of the
-// ₹X a later, separate payment actually settled).
+// real sale — to the MOST RECENTLY opened still-open charge first (LIFO).
+// Confirmed against real client data, not assumed: for one customer with
+// two simultaneously-open dues (an older ₹26,000 shortfall from Aug 8, a
+// newer ₹4,000 shortfall from Aug 12), a ₹4,000 top-up on Aug 13 was
+// independently confirmed by the client to have paid off the Aug 12 due
+// while the Aug 8 due stayed outstanding — i.e. customers settle their
+// most recent purchase first and carry older balances forward, the
+// opposite of textbook oldest-first AR application. Returns, per
+// dispatchId: the true remaining due after all of that customer's
+// payments are accounted for, and any EXTRA cash/online that a later
+// payment contributed toward it (so a report row's own cash+online+due
+// still sums to its own billed amount instead of quietly losing track of
+// the ₹X a later, separate payment actually settled).
 function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
   const sorted = [...customerInvoices].sort((a, b) => (a.invoiceDate ?? a.createdAt ?? new Date(0)).getTime() - (b.invoiceDate ?? b.createdAt ?? new Date(0)).getTime());
-  const openQueue: { dispatchId: string; remaining: number }[] = [];
+  const openStack: { dispatchId: string; remaining: number }[] = [];
   const extraCash = new Map<string, number>();
   const extraOnline = new Map<string, number>();
 
@@ -345,19 +351,19 @@ function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
     const split = cashOnlineSplit(paymentMode, cashAmount, onlineAmount, amount);
     let cashLeft = split.cash;
     let onlineLeft = split.online;
-    while ((cashLeft > 0.005 || onlineLeft > 0.005) && openQueue.length > 0) {
-      const front = openQueue[0];
+    while ((cashLeft > 0.005 || onlineLeft > 0.005) && openStack.length > 0) {
+      const top = openStack[openStack.length - 1];
       const totalLeft = round2(cashLeft + onlineLeft);
-      const applied = Math.min(front.remaining, totalLeft);
+      const applied = Math.min(top.remaining, totalLeft);
       if (applied <= 0) break;
       const fromCash = totalLeft > 0 ? round2((cashLeft / totalLeft) * applied) : 0;
       const fromOnline = round2(applied - fromCash);
-      extraCash.set(front.dispatchId, round2((extraCash.get(front.dispatchId) ?? 0) + fromCash));
-      extraOnline.set(front.dispatchId, round2((extraOnline.get(front.dispatchId) ?? 0) + fromOnline));
+      extraCash.set(top.dispatchId, round2((extraCash.get(top.dispatchId) ?? 0) + fromCash));
+      extraOnline.set(top.dispatchId, round2((extraOnline.get(top.dispatchId) ?? 0) + fromOnline));
       cashLeft = round2(cashLeft - fromCash);
       onlineLeft = round2(onlineLeft - fromOnline);
-      front.remaining = round2(front.remaining - applied);
-      if (front.remaining <= 0.005) openQueue.shift();
+      top.remaining = round2(top.remaining - applied);
+      if (top.remaining <= 0.005) openStack.pop();
     }
   }
 
@@ -367,7 +373,7 @@ function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
     if (charge > 0) {
       const shortfall = round2(charge - paidNow);
       if (shortfall > 0.005 && inv.dispatchId) {
-        openQueue.push({ dispatchId: inv.dispatchId, remaining: shortfall });
+        openStack.push({ dispatchId: inv.dispatchId, remaining: shortfall });
       } else if (shortfall < -0.005) {
         applyCredit(-shortfall, inv.paymentMode, inv.cashAmount, inv.onlineAmount);
       }
@@ -377,7 +383,7 @@ function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
   }
 
   const remainingDue = new Map<string, number>();
-  for (const item of openQueue) {
+  for (const item of openStack) {
     remainingDue.set(item.dispatchId, round2((remainingDue.get(item.dispatchId) ?? 0) + item.remaining));
   }
   return { remainingDue, extraCash, extraOnline };
