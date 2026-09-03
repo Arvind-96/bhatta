@@ -1,11 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DateInput } from "@/components/ui/date-input";
 import { Pagination, usePagination } from "@/components/ui/pagination";
-import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { cn, formatINR } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -14,7 +13,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { MachineDetailPage } from "@/components/fleet/MachineDetailPage";
 import { useMachineTypeLabels } from "@/components/fleet/machineTypes";
 import { buildReportWorkbookBlob, downloadExcelFile } from "@/lib/exportExcel";
-import type { Machine, MachineFuelLog, MachineFuelType, MachineMaintenanceLog, MachineType } from "@/types";
+import type { Machine, MachineType } from "@/types";
 import type { ReportColumn } from "@/types/reports";
 
 const FLEET_EXCEL_COLUMNS: ReportColumn[] = [
@@ -46,309 +45,16 @@ function emptyForm() {
   };
 }
 
-function fuelUnitLabel(t: (key: string) => string, fuelType: MachineFuelType) {
-  return fuelType === "ELECTRICITY" ? t("fleet.unitsKwh") : t("fleet.quantityLitres");
-}
-
-function fuelTypeLabel(t: (key: string) => string, fuelType: MachineFuelType) {
-  if (fuelType === "DIESEL") return t("fleet.fuelDiesel");
-  if (fuelType === "PETROL") return t("fleet.fuelPetrol");
-  return t("fleet.fuelElectricity");
-}
-
-function machineLabel(machineId: MachineFuelLog["machineId"]) {
-  return typeof machineId === "string" ? machineId : machineId.name;
-}
-
-// Log fuel / electricity use per machine, plus the anomaly alert
-// (createMachineFuelLog's own 30-day-baseline check) surfaced right after
-// a log that trips it.
-function FuelElectricityTab({ machines }: { machines: Machine[] }) {
-  const { t } = useTranslation();
-  const [logs, setLogs] = useState<MachineFuelLog[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [machineId, setMachineId] = useState("");
-  const [fuelType, setFuelType] = useState<MachineFuelType>("DIESEL");
-  const [quantity, setQuantity] = useState("");
-  const [hoursRun, setHoursRun] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
-
-  async function refresh() {
-    setLogs(await api.machines.fuelLogs.list());
-  }
-
-  useEffect(() => {
-    refresh().catch(console.error);
-  }, []);
-
-  useKilnEvent("machineFuel:update", () => refresh());
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!machineId || !quantity) return;
-    setSaving(true);
-    try {
-      const result = await api.machines.fuelLogs.create({
-        machineId,
-        fuelType,
-        quantity: Number(quantity),
-        hoursRun: hoursRun ? Number(hoursRun) : undefined,
-        notes: notes || undefined,
-      });
-      setAlertMessage(
-        result.consumptionAlert && result.ratePerHour != null && result.baselineRatePerHour != null
-          ? t("fleet.consumptionAlertMessage", { rate: result.ratePerHour.toFixed(2), baseline: result.baselineRatePerHour.toFixed(2) })
-          : null
-      );
-      setQuantity("");
-      setHoursRun("");
-      setNotes("");
-      setShowForm(false);
-      await refresh();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteLog(id: string) {
-    if (!confirm(t("fleet.confirmDeleteFuelLog"))) return;
-    await api.machines.fuelLogs.remove(id);
-    await refresh();
-  }
-
-  return (
-    <div className="space-y-3">
-      {alertMessage && (
-        <div className="rounded-lg border border-status-warning/30 bg-status-warning/5 px-3 py-2 text-sm text-status-warning">
-          {alertMessage}
-        </div>
-      )}
-
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setShowForm((s) => !s)}>
-          <Plus className="h-4 w-4" /> {t("fleet.logFuelElectricityUse")}
-        </Button>
-      </div>
-
-      {showForm && (
-        <Card>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-            <select required value={machineId} onChange={(e) => setMachineId(e.target.value)} className={cn(inputClass, "col-span-2")}>
-              <option value="" disabled>
-                {t("fleet.machinePlaceholder")}
-              </option>
-              {machines.map((m) => (
-                <option key={m._id} value={m._id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            <select value={fuelType} onChange={(e) => setFuelType(e.target.value as MachineFuelType)} className={inputClass}>
-              <option value="DIESEL">{t("fleet.fuelDiesel")}</option>
-              <option value="PETROL">{t("fleet.fuelPetrol")}</option>
-              <option value="ELECTRICITY">{t("fleet.fuelElectricity")}</option>
-            </select>
-            <input
-              required
-              type="number"
-              placeholder={fuelUnitLabel(t, fuelType)}
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className={inputClass}
-            />
-            <input
-              type="number"
-              placeholder={t("fleet.hoursRunOptional")}
-              value={hoursRun}
-              onChange={(e) => setHoursRun(e.target.value)}
-              className={inputClass}
-            />
-            <input
-              placeholder={t("fleet.notesOptional")}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className={inputClass}
-            />
-            <Button type="submit" disabled={saving} className="col-span-2">
-              {t("fleet.saveLog")}
-            </Button>
-          </form>
-        </Card>
-      )}
-
-      <Card>
-        {logs.length === 0 ? (
-          <p className="py-8 text-center text-sm text-ink-muted">{t("fleet.noFuelLogsYet")}</p>
-        ) : (
-          <div className="space-y-1">
-            {logs.map((log) => {
-              const rateHr = log.hoursRun ? log.quantity / log.hoursRun : null;
-              return (
-                <div key={log._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
-                  <div>
-                    <p className="text-ink-primary">
-                      {new Date(log.date).toLocaleDateString("en-IN")} · {machineLabel(log.machineId)}{" "}
-                      <Badge variant="neutral">{fuelTypeLabel(t, log.fuelType)}</Badge>
-                    </p>
-                    {log.notes && <p className="text-sm text-ink-muted">{log.notes}</p>}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="tabular-nums font-medium text-ink-primary">
-                      {log.quantity} {log.fuelType === "ELECTRICITY" ? "kWh" : "L"}
-                    </span>
-                    {rateHr != null && <span className="tabular-nums text-sm text-ink-muted">{rateHr.toFixed(2)}/{t("fleet.rateHr")}</span>}
-                    <button onClick={() => deleteLog(log._id)} className="text-ink-muted hover:text-status-critical" aria-label={t("common.delete")}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-// Log repairs/breakdowns per machine — a nonzero cost auto-logs as a
-// MACHINERY_REPAIR Expense (machine.service.ts's createMaintenanceLog),
-// reversed on delete via expenses.machineMaintenanceLogId.
-function MaintenanceBreakdownTab({ machines }: { machines: Machine[] }) {
-  const { t } = useTranslation();
-  const [logs, setLogs] = useState<MachineMaintenanceLog[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [machineId, setMachineId] = useState("");
-  const [description, setDescription] = useState("");
-  const [cost, setCost] = useState("");
-  const [downtimeHours, setDowntimeHours] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  async function refresh() {
-    setLogs(await api.machines.maintenance.list());
-  }
-
-  useEffect(() => {
-    refresh().catch(console.error);
-  }, []);
-
-  useKilnEvent("machineMaintenance:update", () => refresh());
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!machineId || !description) return;
-    setSaving(true);
-    try {
-      await api.machines.maintenance.create({
-        machineId,
-        description,
-        cost: cost ? Number(cost) : undefined,
-        downtimeHours: downtimeHours ? Number(downtimeHours) : undefined,
-        notes: notes || undefined,
-      });
-      setDescription("");
-      setCost("");
-      setDowntimeHours("");
-      setNotes("");
-      setShowForm(false);
-      await refresh();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteLog(id: string) {
-    if (!confirm(t("fleet.confirmDeleteMaintenance"))) return;
-    await api.machines.maintenance.remove(id);
-    await refresh();
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setShowForm((s) => !s)}>
-          <Plus className="h-4 w-4" /> {t("fleet.logRepairBreakdown")}
-        </Button>
-      </div>
-
-      {showForm && (
-        <Card>
-          <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-            <select required value={machineId} onChange={(e) => setMachineId(e.target.value)} className={cn(inputClass, "col-span-2")}>
-              <option value="" disabled>
-                {t("fleet.machinePlaceholder")}
-              </option>
-              {machines.map((m) => (
-                <option key={m._id} value={m._id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            <input
-              required
-              placeholder={t("fleet.whatBrokeRepairDone")}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className={cn(inputClass, "col-span-2")}
-            />
-            <input type="number" placeholder={t("fleet.repairCost")} value={cost} onChange={(e) => setCost(e.target.value)} className={inputClass} />
-            <input
-              type="number"
-              placeholder={t("fleet.downtimeHours")}
-              value={downtimeHours}
-              onChange={(e) => setDowntimeHours(e.target.value)}
-              className={inputClass}
-            />
-            <input
-              placeholder={t("fleet.notesOptional")}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className={cn(inputClass, "col-span-2")}
-            />
-            <Button type="submit" disabled={saving} className="col-span-2">
-              {t("fleet.saveLog")}
-            </Button>
-          </form>
-        </Card>
-      )}
-
-      <Card>
-        {logs.length === 0 ? (
-          <p className="py-8 text-center text-sm text-ink-muted">{t("fleet.noMaintenanceYet")}</p>
-        ) : (
-          <div className="space-y-1">
-            {logs.map((log) => (
-              <div key={log._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
-                <div>
-                  <p className="text-ink-primary">
-                    {new Date(log.date).toLocaleDateString("en-IN")} · {machineLabel(log.machineId)}
-                  </p>
-                  <p className="text-sm text-ink-muted">{log.description}</p>
-                  {log.notes && <p className="text-sm text-ink-muted">{log.notes}</p>}
-                </div>
-                <div className="flex items-center gap-3">
-                  {log.downtimeHours > 0 && <Badge variant="neutral">{t("fleet.downtimeSuffix", { hours: log.downtimeHours })}</Badge>}
-                  {log.cost > 0 && <span className="tabular-nums font-medium text-ink-primary">₹{formatINR(log.cost)}</span>}
-                  <button onClick={() => deleteLog(log._id)} className="text-ink-muted hover:text-status-critical" aria-label={t("common.delete")}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-// The Machine & Vehicle directory, plus its two auxiliary logs (Fuel &
-// Electricity, Maintenance & Breakdown) as sibling tabs — the backend for
-// both has always supported create+list (and now delete), this just wires
-// it into the page.
+// The Machine & Vehicle directory. Fuel/Electricity and Maintenance/
+// Breakdown logging used to live here as sibling tabs, but were removed
+// per explicit request — those costs are tracked directly on the
+// Expenses page now instead of a second, easy-to-forget entry point. Any
+// money still entered here (the purchase-time "amount paid now" below,
+// and Installment Payments on a machine's own detail page) auto-logs to
+// Expenses exactly once — see machine.service.ts's createMachine/
+// createInstallmentPayment, both of which route through the same
+// createInstallmentPayment-backed path so there's exactly one place that
+// ever writes the linked Expense row for a given payment.
 export function Fleet() {
   const { t } = useTranslation();
   const machineTypeLabels = useMachineTypeLabels();
@@ -357,7 +63,6 @@ export function Fleet() {
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [openMachineId, setOpenMachineId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"machines" | "fuel" | "maintenance">("machines");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
@@ -405,20 +110,6 @@ export function Fleet() {
 
   return (
     <div className="space-y-3">
-      <SegmentedTabs
-        options={[
-          { value: "machines" as const, label: t("fleet.machinesVehiclesTab") },
-          { value: "fuel" as const, label: t("fleet.fuelElectricityTab") },
-          { value: "maintenance" as const, label: t("fleet.maintenanceBreakdownTab") },
-        ]}
-        value={tab}
-        onChange={setTab}
-      />
-
-      {tab === "fuel" && <FuelElectricityTab machines={machines} />}
-      {tab === "maintenance" && <MaintenanceBreakdownTab machines={machines} />}
-      {tab === "machines" && (
-      <div className="space-y-3">
       <div className="flex justify-end gap-2">
         {machines.length > 0 && (
           <button
@@ -566,8 +257,6 @@ export function Fleet() {
           </>
         )}
       </Card>
-      </div>
-      )}
     </div>
   );
 }

@@ -36,27 +36,67 @@ export interface CreateMachineInput {
   notes?: string;
 }
 
+// Records one payment against a machine — rolls it into that machine's own
+// running totalPaid/remainingDue and auto-logs the exact same amount as a
+// properly-linked Expense (expenses.machineInstallmentPaymentId), so it can
+// be found, shown in the Installment Payment History list, and reversed
+// the same way regardless of whether it's the purchase-time payment or a
+// later EMI. Shared by createMachine (below) and createInstallmentPayment
+// so there is exactly ONE code path that ever writes this kind of row —
+// the only way to guarantee a payment can never end up logged as two
+// separate, unlinked Expenses for the same money.
+async function recordMachinePayment(
+  machine: { _id: string; kilnId: string; name: string; price: number | null; totalPaid: number | null },
+  input: { seasonId: string; amount: number; date?: Date; notes?: string; label: string }
+) {
+  const _id = randomUUID();
+  await db.insert(machineInstallmentPayments).values({
+    _id,
+    kilnId: machine.kilnId,
+    seasonId: input.seasonId,
+    machineId: machine._id,
+    amount: input.amount,
+    date: input.date,
+    notes: input.notes,
+  });
+
+  const newTotalPaid = (machine.totalPaid ?? 0) + input.amount;
+  const newRemainingDue = Math.max(0, (machine.price ?? 0) - newTotalPaid);
+  await db.update(machines).set({ totalPaid: newTotalPaid, remainingDue: newRemainingDue }).where(eq(machines._id, machine._id));
+
+  const expenseType = await findOrCreateExpenseType(machine.kilnId, INSTALLMENT_EXPENSE_TYPE_NAME);
+  await createExpense({
+    kilnId: machine.kilnId,
+    seasonId: input.seasonId,
+    expenseTypeId: expenseType._id,
+    amount: input.amount,
+    notes: `${input.label}: ${machine.name}`,
+    date: input.date,
+    machineInstallmentPaymentId: _id,
+  });
+
+  return _id;
+}
+
 export async function createMachine(input: CreateMachineInput) {
   const { seasonId, ...machineInput } = input;
   const _id = randomUUID();
-  const totalPaid = input.totalPaid ?? 0;
-  const remainingDue = Math.max(0, (input.price ?? 0) - totalPaid);
-  await db.insert(machines).values({ ...machineInput, _id, totalPaid, remainingDue });
+  // Inserted at 0/full-due first, then recordMachinePayment (below) folds
+  // in the purchase-time payment — same call every later installment
+  // payment makes, so the very first payment is never a special case that
+  // could drift out of sync with (or double-log alongside) the rest.
+  await db.insert(machines).values({ ...machineInput, _id, totalPaid: 0, remainingDue: Math.max(0, input.price ?? 0) });
 
-  if (totalPaid > 0) {
-    const expenseType = await findOrCreateExpenseType(input.kilnId, INSTALLMENT_EXPENSE_TYPE_NAME);
-    await createExpense({
-      kilnId: input.kilnId,
-      seasonId,
-      expenseTypeId: expenseType._id,
-      amount: totalPaid,
-      notes: `Purchase: ${input.name}`,
-      date: input.purchaseDate,
-    });
+  if (input.totalPaid && input.totalPaid > 0) {
+    await recordMachinePayment(
+      { _id, kilnId: input.kilnId, name: input.name, price: input.price ?? null, totalPaid: 0 },
+      { seasonId, amount: input.totalPaid, date: input.purchaseDate, label: "Purchase" }
+    );
   }
 
   const machine = (await db.select().from(machines).where(eq(machines._id, _id)))[0]!;
   emitToKiln(input.kilnId, "machine:update", machine);
+  if (input.totalPaid && input.totalPaid > 0) emitToKiln(input.kilnId, "machineInstallment:update", { machineId: _id });
   return machine;
 }
 
@@ -118,37 +158,13 @@ export interface CreateInstallmentPaymentInput {
   notes?: string;
 }
 
-// Logs one EMI/installment payment against a machine, rolls it into that
-// machine's own running totalPaid/remainingDue, and auto-logs the same
-// amount as an Expense under the shared "Installment" expense type (item
-// 6) — same pattern as the purchase-time payment in createMachine above.
+// Logs one EMI/installment payment against a machine via the same
+// recordMachinePayment path createMachine's purchase-time payment uses —
+// rolls it into totalPaid/remainingDue and auto-logs the same amount as a
+// linked Expense under the shared "Installment" expense type.
 export async function createInstallmentPayment(input: CreateInstallmentPaymentInput) {
   const machine = await assertMachineInKiln(input.kilnId, input.machineId);
-  const _id = randomUUID();
-  await db.insert(machineInstallmentPayments).values({
-    _id,
-    kilnId: input.kilnId,
-    seasonId: input.seasonId,
-    machineId: input.machineId,
-    amount: input.amount,
-    date: input.date,
-    notes: input.notes,
-  });
-
-  const newTotalPaid = (machine.totalPaid ?? 0) + input.amount;
-  const newRemainingDue = Math.max(0, (machine.price ?? 0) - newTotalPaid);
-  await db.update(machines).set({ totalPaid: newTotalPaid, remainingDue: newRemainingDue }).where(eq(machines._id, input.machineId));
-
-  const expenseType = await findOrCreateExpenseType(input.kilnId, INSTALLMENT_EXPENSE_TYPE_NAME);
-  await createExpense({
-    kilnId: input.kilnId,
-    seasonId: input.seasonId,
-    expenseTypeId: expenseType._id,
-    amount: input.amount,
-    notes: `Installment: ${machine.name}`,
-    date: input.date,
-    machineInstallmentPaymentId: _id,
-  });
+  const _id = await recordMachinePayment(machine, { seasonId: input.seasonId, amount: input.amount, date: input.date, notes: input.notes, label: "Installment" });
 
   const payment = (await db.select().from(machineInstallmentPayments).where(eq(machineInstallmentPayments._id, _id)))[0]!;
   const updatedMachine = (await db.select().from(machines).where(eq(machines._id, input.machineId)))[0]!;

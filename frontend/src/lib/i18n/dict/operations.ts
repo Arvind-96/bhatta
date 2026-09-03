@@ -225,43 +225,12 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "fleet.typeBlower": { en: "Blower", hi: "ब्लोअर" },
   "fleet.typeOther": { en: "Other", hi: "अन्य" },
 
-  "fleet.fuelDiesel": { en: "Diesel", hi: "डीज़ल" },
-  "fleet.fuelPetrol": { en: "Petrol", hi: "पेट्रोल" },
-  "fleet.fuelElectricity": { en: "Electricity", hi: "बिजली" },
-
   "fleet.addMachineVehicle": { en: "Add machine / vehicle", hi: "मशीन / वाहन जोड़ें" },
   "fleet.machineNamePlaceholder": { en: "Name (e.g. Tractor 1, JCB)", hi: "नाम (जैसे ट्रैक्टर 1, जेसीबी)" },
   "fleet.registrationIdentifierOptional": { en: "Registration / identifier (optional)", hi: "पंजीकरण / पहचान (वैकल्पिक)" },
   "fleet.saveMachine": { en: "Save machine", hi: "मशीन सहेजें" },
   "fleet.noMachinesYet": { en: "No machines registered yet.", hi: "अभी तक कोई मशीन दर्ज नहीं हुई।" },
-
-  "fleet.consumptionAlertMessage": {
-    en: "Consumption {rate} /hr is over 30% above this machine's 30-day baseline ({baseline} /hr) — worth checking for a leak or diversion.",
-    hi: "खपत {rate}/घंटा इस मशीन के 30-दिन के औसत ({baseline}/घंटा) से 30% ज़्यादा है — रिसाव या चोरी की जांच करें।",
-  },
-  "fleet.logFuelElectricityUse": { en: "Log fuel / electricity use", hi: "ईंधन / बिजली उपयोग दर्ज करें" },
-  "fleet.machinePlaceholder": { en: "Machine…", hi: "मशीन…" },
-  "fleet.unitsKwh": { en: "Units (kWh)", hi: "यूनिट (kWh)" },
-  "fleet.quantityLitres": { en: "Quantity (litres)", hi: "मात्रा (लीटर)" },
-  "fleet.hoursRunOptional": { en: "Hours run (optional)", hi: "घंटे चला (वैकल्पिक)" },
-  "fleet.saveLog": { en: "Save log", hi: "लॉग सहेजें" },
-  "fleet.noFuelLogsYet": { en: "No fuel logs yet.", hi: "अभी तक कोई ईंधन लॉग नहीं है।" },
-  "fleet.machine": { en: "Machine", hi: "मशीन" },
-  "fleet.rateHr": { en: "Rate/hr", hi: "दर/घंटा" },
-  "fleet.qty": { en: "Qty", hi: "मात्रा" },
-  "fleet.fuelColumn": { en: "Fuel", hi: "ईंधन" },
   "fleet.notesOptional": { en: "Notes (optional)", hi: "टिप्पणी (वैकल्पिक)" },
-
-  "fleet.logRepairBreakdown": { en: "Log repair / breakdown", hi: "मरम्मत / खराबी दर्ज करें" },
-  "fleet.whatBrokeRepairDone": { en: "What broke / repair done", hi: "क्या खराब हुआ / क्या मरम्मत हुई" },
-  "fleet.repairCost": { en: "Repair cost (₹)", hi: "मरम्मत लागत (₹)" },
-  "fleet.downtimeHours": { en: "Downtime (hours)", hi: "बंद रहने का समय (घंटे)" },
-  "fleet.noMaintenanceYet": { en: "No maintenance logged yet.", hi: "अभी तक कोई मरम्मत दर्ज नहीं हुई।" },
-  "fleet.downtimeSuffix": { en: "{hours}h downtime", hi: "{hours} घंटे बंद" },
-
-  "fleet.machinesVehiclesTab": { en: "Machines & Vehicles", hi: "मशीन व वाहन" },
-  "fleet.fuelElectricityTab": { en: "Fuel & Electricity", hi: "ईंधन व बिजली" },
-  "fleet.maintenanceBreakdownTab": { en: "Maintenance & Breakdown", hi: "मरम्मत व खराबी" },
 
   "fleet.identifierColumn": { en: "Registration / Identifier", hi: "पंजीकरण / पहचान" },
   "fleet.purchaseDate": { en: "Date of purchase", hi: "खरीद की तारीख" },
@@ -285,6 +254,4 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "fleet.saveInstallment": { en: "Save installment payment", hi: "किस्त भुगतान सहेजें" },
   "fleet.confirmDeleteMachine": { en: "Delete {name}? This can't be undone.", hi: "{name} हटाएं? यह पूर्ववत नहीं किया जा सकता।" },
   "fleet.confirmDeleteInstallment": { en: "Delete this installment payment? The machine's paid/due totals and the linked expense will be updated.", hi: "यह किश्त भुगतान हटाएं? मशीन की भुगतान/बकाया राशि और जुड़ा खर्च अपडेट हो जाएगा।" },
-  "fleet.confirmDeleteFuelLog": { en: "Delete this fuel log?", hi: "यह ईंधन लॉग हटाएं?" },
-  "fleet.confirmDeleteMaintenance": { en: "Delete this maintenance log? The linked expense (if any) will be removed too.", hi: "यह मरम्मत लॉग हटाएं? जुड़ा खर्च (यदि कोई हो) भी हटा दिया जाएगा।" },
 };
