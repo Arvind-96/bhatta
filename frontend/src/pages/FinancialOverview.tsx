@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, Boxes, Fuel, IndianRupee, PieChart, RefreshCw, Search, Wallet } from "lucide-react";
+import { PieChart, RefreshCw, Search, Wallet } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PeriodStatCard } from "@/components/dashboard/PeriodStatCard";
+import { Gauge, GaugeStrip } from "@/components/dashboard/GaugeStrip";
+import { MatchedStamp } from "@/components/dashboard/MatchedStamp";
 import { MoneyInOutChart } from "@/components/dashboard/MoneyInOutChart";
 import { PaymentMixDonut } from "@/components/dashboard/PaymentMixDonut";
 import { SpendingByCategoryBar } from "@/components/dashboard/SpendingByCategoryBar";
@@ -50,52 +51,30 @@ function formatCell(key: FlowNumberKey, value: number) {
 function FlowStatGrid({ flow }: { flow: FinancialFlow }) {
   const { t } = useTranslation();
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <PeriodStatCard
-        label={t("financialOverview.moneyReceived")}
-        value={flow.moneyReceived}
-        subtitle={t("financialOverview.moneyReceivedSubtitle")}
-        icon={ArrowDownCircle}
-        tone="text-series-3"
-      />
-      <PeriodStatCard
-        label={t("financialOverview.moneySpent")}
-        value={flow.moneySpent}
-        subtitle={t("financialOverview.moneySpentSubtitle")}
-        icon={ArrowUpCircle}
-        tone="text-series-2"
-        critical={flow.moneySpent > flow.moneyReceived}
-      />
-      <PeriodStatCard
-        label={t("financialOverview.netCashFlow")}
-        value={flow.netCashFlow}
-        subtitle={flow.netCashFlow >= 0 ? t("financialOverview.surplus") : t("financialOverview.deficit")}
-        icon={IndianRupee}
-        tone="text-series-1"
-        critical={flow.netCashFlow < 0}
-      />
-      <PeriodStatCard
-        label={t("financialOverview.bricksSold")}
-        value={flow.bricksSold}
-        subtitle={t("financialOverview.bricksSoldSubtitle")}
-        icon={Boxes}
-        tone="text-series-6"
-      />
-      <PeriodStatCard
-        label={t("financialOverview.fuelExpense")}
-        value={flow.fuelExpense}
-        subtitle={t("financialOverview.fuelExpenseSubtitle")}
-        icon={Fuel}
-        tone="text-series-4"
-      />
-      <PeriodStatCard
-        label={t("financialOverview.dieselExpense")}
-        value={flow.dieselExpense}
-        subtitle={t("financialOverview.dieselExpenseSubtitle")}
-        icon={Fuel}
-        tone="text-series-5"
-      />
-    </div>
+    <Card>
+      <GaugeStrip className="lg:grid-cols-3">
+        <Gauge
+          label={t("financialOverview.moneyReceived")}
+          value={`₹${formatINR(flow.moneyReceived)}`}
+          subtitle={t("financialOverview.moneyReceivedSubtitle")}
+        />
+        <Gauge
+          label={t("financialOverview.moneySpent")}
+          value={`₹${formatINR(flow.moneySpent)}`}
+          subtitle={t("financialOverview.moneySpentSubtitle")}
+          tone={flow.moneySpent > flow.moneyReceived ? "critical" : undefined}
+        />
+        <Gauge
+          label={t("financialOverview.netCashFlow")}
+          value={`₹${formatINR(flow.netCashFlow)}`}
+          subtitle={flow.netCashFlow >= 0 ? t("financialOverview.surplus") : t("financialOverview.deficit")}
+          tone={flow.netCashFlow < 0 ? "critical" : "good"}
+        />
+        <Gauge label={t("financialOverview.bricksSold")} value={flow.bricksSold.toLocaleString("en-IN")} subtitle={t("financialOverview.bricksSoldSubtitle")} />
+        <Gauge label={t("financialOverview.fuelExpense")} value={`₹${formatINR(flow.fuelExpense)}`} subtitle={t("financialOverview.fuelExpenseSubtitle")} />
+        <Gauge label={t("financialOverview.dieselExpense")} value={`₹${formatINR(flow.dieselExpense)}`} subtitle={t("financialOverview.dieselExpenseSubtitle")} />
+      </GaugeStrip>
+    </Card>
   );
 }
 
@@ -155,24 +134,34 @@ export function FinancialOverview() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <PeriodStatCard
-          label={t("financialOverview.currentDues")}
-          value={overview.totalDues}
-          subtitle={t("financialOverview.currentDuesSubtitle")}
-          icon={Wallet}
-          tone="text-series-2"
-          critical={overview.totalDues > 0}
-        />
-        <PeriodStatCard
-          label={t("financialOverview.outstandingFromClients")}
-          value={overview.totalOutstandingFromClients}
-          subtitle={t("financialOverview.outstandingFromClientsSubtitle")}
-          icon={Wallet}
-          tone="text-series-5"
-          critical={overview.totalOutstandingFromClients > 0}
-        />
-      </div>
+      <Card>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-series-1" />
+            <p className="text-sm font-medium text-ink-primary">{t("financialOverview.moneyInHeadline")}</p>
+          </div>
+          <MatchedStamp />
+        </div>
+        <div className="mb-4">
+          <span className="font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("financialOverview.thisYear")}</span>
+          <p className="font-mono text-4xl font-semibold tabular-nums text-series-1">₹{formatINR(overview.year.moneyReceived)}</p>
+          <p className="mt-1 text-xs text-ink-muted">{t("financialOverview.moneyInHeadlineHint")}</p>
+        </div>
+        <GaugeStrip className="border-t border-border sm:grid-cols-2 lg:grid-cols-2">
+          <Gauge
+            label={t("financialOverview.currentDues")}
+            value={`₹${formatINR(overview.totalDues)}`}
+            subtitle={t("financialOverview.currentDuesSubtitle")}
+            tone={overview.totalDues > 0 ? "critical" : undefined}
+          />
+          <Gauge
+            label={t("financialOverview.outstandingFromClients")}
+            value={`₹${formatINR(overview.totalOutstandingFromClients)}`}
+            subtitle={t("financialOverview.outstandingFromClientsSubtitle")}
+            tone={overview.totalOutstandingFromClients > 0 ? "critical" : undefined}
+          />
+        </GaugeStrip>
+      </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <MoneyInOutChart overview={overview} />
@@ -196,10 +185,10 @@ export function FinancialOverview() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-sm text-ink-muted">
-                <th className="pb-2 font-medium">{t("financialOverview.metric")}</th>
+              <tr className="border-b-2 border-border text-left">
+                <th className="pb-2 font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("financialOverview.metric")}</th>
                 {PERIOD_COLUMNS.map((c) => (
-                  <th key={c.key} className="pb-2 font-medium text-right">
+                  <th key={c.key} className="pb-2 text-right font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
                     {c.label}
                   </th>
                 ))}
@@ -216,7 +205,7 @@ export function FinancialOverview() {
                       <td
                         key={c.key}
                         className={cn(
-                          "py-2.5 text-right font-semibold tabular-nums",
+                          "py-2.5 text-right font-mono font-semibold tabular-nums",
                           row.tone ?? "text-ink-primary",
                           isNegative && "text-status-critical"
                         )}
@@ -244,10 +233,10 @@ export function FinancialOverview() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-sm text-ink-muted">
-                <th className="pb-2 font-medium">{t("financialOverview.metric")}</th>
+              <tr className="border-b-2 border-border text-left">
+                <th className="pb-2 font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("financialOverview.metric")}</th>
                 {PERIOD_COLUMNS.map((c) => (
-                  <th key={c.key} className="pb-2 font-medium text-right">
+                  <th key={c.key} className="pb-2 text-right font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
                     {c.label}
                   </th>
                 ))}
@@ -266,10 +255,19 @@ export function FinancialOverview() {
                   { flowKey: "moneyOut", splitKey: "total", label: t("financialOverview.moneyOutTotal"), tone: "text-status-critical" },
                 ] as const
               ).map((row) => (
-                <tr key={`${row.flowKey}-${row.splitKey}`} className="border-b border-border/60 last:border-0">
-                  <td className="py-2.5 text-ink-secondary">{row.label}</td>
+                <tr
+                  key={`${row.flowKey}-${row.splitKey}`}
+                  className={cn("border-b border-border/60 last:border-0", row.splitKey === "total" && "border-t-2 border-t-border")}
+                >
+                  <td className={cn("py-2.5", row.splitKey === "total" ? "font-semibold text-ink-primary" : "text-ink-secondary")}>{row.label}</td>
                   {PERIOD_COLUMNS.map((c) => (
-                    <td key={c.key} className={cn("py-2.5 text-right font-semibold tabular-nums", row.splitKey === "total" ? row.tone : "text-ink-primary")}>
+                    <td
+                      key={c.key}
+                      className={cn(
+                        "py-2.5 text-right font-mono tabular-nums",
+                        row.splitKey === "total" ? cn("font-bold", row.tone) : "font-semibold text-ink-primary"
+                      )}
+                    >
                       ₹{formatINR(overview[c.key][row.flowKey]?.[row.splitKey] ?? 0)}
                     </td>
                   ))}

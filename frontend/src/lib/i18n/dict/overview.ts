@@ -10,8 +10,8 @@ export const overviewDict: Record<string, Record<Locale, string>> = {
   // comment on why this exists.
   "overview.matchedStamp": { en: "Matched", hi: "मिलान" },
   "overview.matchedStampTooltip": {
-    en: "This figure is cross-checked to match Overview, Financial Overview, and Reports",
-    hi: "यह आंकड़ा ओवरव्यू, फाइनेंशियल ओवरव्यू और रिपोर्ट्स से मिलान करके जांचा गया है",
+    en: "Computed with the same verified formula as every other page — cash + online + due always add up to the bill",
+    hi: "यह अन्य सभी पेजों जैसे ही सत्यापित सूत्र से गणना की गई है — कैश + ऑनलाइन + बकाया हमेशा बिल के बराबर होता है",
   },
   "overview.logProduction": { en: "Log production", hi: "उत्पादन दर्ज करें" },
   "overview.logStock": { en: "Log stock", hi: "स्टॉक दर्ज करें" },
@@ -76,6 +76,11 @@ export const overviewDict: Record<string, Record<Locale, string>> = {
   "overview.newBhattaName": { en: "New bhatta name", hi: "नए भट्टे का नाम" },
   "overview.addBhatta": { en: "Add bhatta", hi: "भट्टा जोड़ें" },
 
+  "financialOverview.moneyInHeadline": { en: "Money In", hi: "आया हुआ पैसा" },
+  "financialOverview.moneyInHeadlineHint": {
+    en: "Same figure as the Year column in the table below",
+    hi: "नीचे तालिका के 'वर्ष' कॉलम जैसा ही आंकड़ा",
+  },
   "financialOverview.currentDues": { en: "Current dues (kiln owes)", hi: "मौजूदा देनदारी (भट्टे पर बकाया)" },
   "financialOverview.currentDuesSubtitle": {
     en: "Owed to workers, contractors & suppliers, as of today",

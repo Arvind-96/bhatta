@@ -2,12 +2,17 @@ import { Check } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
 // A deliberate trust device, not decoration: this app's whole engagement
-// history has been about the same rupee figure showing differently on
-// Overview, Financial Overview, and Reports. Placed next to a headline
-// total on all three pages as a quiet, consistent signal that this
-// specific number is the one already cross-checked to match everywhere
-// else it appears — never shown next to a figure that hasn't actually
-// been verified against the others (see each page's own call site).
+// history has been about revenue figures that didn't reconcile across
+// pages. Placed next to a headline total on Overview/Financial Overview/
+// Reports as a quiet signal that THIS figure was computed with the
+// verified formula (cash + online + due always sums to the bill) rather
+// than a separate, possibly-drifting calculation — not a claim that the
+// number is numerically identical to what another page shows, since
+// Overview's own summary window (90 days) and Financial Overview's
+// Today/Week/Month/Year columns are legitimately different periods by
+// design. Only ever placed next to a figure that's actually been traced
+// through this session's own reconciliation work — see each page's call
+// site.
 export function MatchedStamp() {
   const { t } = useTranslation();
   return (
