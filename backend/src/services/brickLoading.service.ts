@@ -489,14 +489,20 @@ export async function listBrickLoadingEntries(kilnId: string, seasonId: string |
   ];
   const [driverRows, dispatchRows, categoryRows] = await Promise.all([
     driverIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, driverIds)) : [],
-    // paymentMode/cashAmount/onlineAmount included so read paths (the
-    // Production > Brick Loading report especially) can show how the
+    // paymentMode/cashAmount/onlineAmount/amount included so read paths
+    // (the Production > Brick Loading report especially) can show how the
     // customer's own payment for the bricks broke down cash-vs-online —
     // that split is never stored on brickLoadingEntries itself, only on
-    // whichever Dispatch it's linked to.
+    // whichever Dispatch it's linked to. The dispatch's own `amount` is
+    // included too because it's the true NET billed figure (post any
+    // discount applied when the dispatch was created/edited) — this row's
+    // own `amount` is a frozen snapshot from trip-creation time and never
+    // gets updated for a discount applied later at the dispatch stage, so
+    // it can legitimately disagree with what cashAmount+onlineAmount sum
+    // to.
     dispatchIds.length
       ? db
-          .select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName, paymentMode: dispatches.paymentMode, cashAmount: dispatches.cashAmount, onlineAmount: dispatches.onlineAmount })
+          .select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName, amount: dispatches.amount, paymentMode: dispatches.paymentMode, cashAmount: dispatches.cashAmount, onlineAmount: dispatches.onlineAmount })
           .from(dispatches)
           .where(inArray(dispatches._id, dispatchIds))
       : [],

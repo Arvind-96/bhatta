@@ -309,10 +309,14 @@ const brickLoading: ReportDefinition = {
     // brickLoadingEntries itself — only on whichever Dispatch this trip is
     // linked to (see listBrickLoadingEntries' dispatchId resolution). A
     // trip with no linked dispatch yet has no payment recorded at all, so
-    // both read as null (shown as "—") rather than a misleading 0.
+    // both read as null (shown as "—") rather than a misleading 0. Once a
+    // dispatch IS linked, its own `amount` (net of any discount applied at
+    // the dispatch stage) is shown instead of this row's own `amount` — a
+    // frozen pre-discount snapshot from trip-creation time — so `amount`
+    // always agrees with what cashAmount+onlineAmount actually sum to.
     const detail = rows.map((r) => {
       const dispatch = r.dispatchId && typeof r.dispatchId === "object" ? r.dispatchId : null;
-      const amount = r.amount ?? 0;
+      const amount = dispatch?.amount ?? r.amount ?? 0;
       const split = dispatch ? effectiveSplit(dispatch.paymentMode, dispatch.cashAmount, dispatch.onlineAmount, amount) : { cash: null, online: null };
       return {
         date: r.date ? r.date.toISOString() : null,
