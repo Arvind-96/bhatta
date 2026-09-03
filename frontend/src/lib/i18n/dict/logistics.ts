@@ -120,6 +120,14 @@ export const logisticsDict: Record<string, Record<Locale, string>> = {
     hi: "वाहन, श्रेणी, ईंटें, छूट और राशि चुनी गई लदाई ट्रिप से लॉक हैं, और ड्राइवर टिप पहले ही उससे दर्ज है। इन्हें खुद भरने के लिए ट्रिप हटाएं।",
   },
   "dispatch.editDispatch": { en: "Edit dispatch", hi: "डिस्पैच संपादित करें" },
+  "dispatch.missingPaymentModeCount": {
+    en: "{count} dispatches are missing payment info (cash/online) — click to fill them in",
+    hi: "{count} डिस्पैच में भुगतान जानकारी (नकद/ऑनलाइन) दर्ज नहीं है — भरने के लिए क्लिक करें",
+  },
+  "dispatch.missingPaymentModeHint": {
+    en: "These were logged before payment mode was captured on this form. Pick how each was actually paid — only you know that, so nothing here is guessed.",
+    hi: "ये फ़ॉर्म पर भुगतान का तरीका दर्ज होने से पहले लॉग हुए थे। हर एक का वास्तविक भुगतान तरीका चुनें — यह केवल आप ही जानते हैं, यहाँ कुछ भी अनुमानित नहीं है।",
+  },
   "dispatch.confirmDeleteDispatch": {
     en: "Delete {slipNumber}? This reverses its ledger entry and stock effect and can't be undone.",
     hi: "{slipNumber} हटाएं? इससे इसकी लेजर एंट्री और स्टॉक प्रभाव वापस हो जाएगा और यह पूर्ववत नहीं हो सकता।",

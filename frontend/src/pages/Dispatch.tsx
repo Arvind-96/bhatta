@@ -14,6 +14,7 @@ import { useUiStore } from "@/store/ui.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import { DispatchDetailPage } from "@/components/dispatch/DispatchDetailPage";
+import { MissingPaymentModeSection } from "@/components/dispatch/MissingPaymentModeSection";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
 import { PaymentSplitFields, isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
@@ -522,6 +523,8 @@ export function Dispatch() {
           <Truck className="h-[18px] w-[18px]" />
         </span>
       </div>
+
+      <MissingPaymentModeSection dispatches={dispatches} onUpdated={refresh} />
 
       <Card>
         {dispatches.length === 0 ? (
