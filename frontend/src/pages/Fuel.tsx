@@ -12,7 +12,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
-import type { FuelEfficiency, FuelLog, FuelPurchase, FuelType, Gher, Person, SimplePaymentMode, SupplierFuelBalance } from "@/types";
+import type { FuelEfficiency, FuelLog, FuelPurchase, FuelType, Gher, SimplePaymentMode, Supplier, SupplierFuelBalance } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -355,7 +355,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
   const { t } = useTranslation();
   const [purchases, setPurchases] = useState<FuelPurchase[]>([]);
   const { page, setPage, pageCount, pageItems: pagedPurchases, total } = usePagination(purchases, 10);
-  const [suppliers, setSuppliers] = useState<Person[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     fuelType: "",
@@ -388,7 +388,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
   async function refresh() {
     const [purchaseData, supplierData] = await Promise.all([
       api.fuelPurchases.list(),
-      api.people.list("SUPPLIER"),
+      api.suppliers.list(),
     ]);
     setPurchases(purchaseData);
     setSuppliers(supplierData);
@@ -400,6 +400,7 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
   }, [activeKilnId]);
 
   useKilnEvent("fuelPurchase:update", () => refresh());
+  useKilnEvent("supplier:update", () => refresh());
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

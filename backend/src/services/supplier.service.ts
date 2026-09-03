@@ -41,6 +41,16 @@ export async function createSupplier(kilnId: string, input: SupplierInput) {
   return row;
 }
 
+// Every real supplier lives in this dedicated table, not the generic
+// `people` table's legacy SUPPLIER type — see fuelPurchase.service.ts's
+// createFuelPurchase for a caller that used to (wrongly) validate against
+// `people` instead, the same duplicate-table mistake dispatch.service.ts's
+// assertCustomerInKiln was added to fix for customers.
+export async function assertSupplierInKiln(kilnId: string, supplierId: string) {
+  const supplier = (await db.select({ _id: suppliers._id }).from(suppliers).where(and(eq(suppliers._id, supplierId), eq(suppliers.kilnId, kilnId))))[0];
+  if (!supplier) throw new Error("Referenced supplier not found in this kiln");
+}
+
 export async function listSuppliers(kilnId: string) {
   return db.select().from(suppliers).where(eq(suppliers.kilnId, kilnId)).orderBy(desc(suppliers.createdAt));
 }

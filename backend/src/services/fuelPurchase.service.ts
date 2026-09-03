@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { db } from "../db/client";
-import { fuelPurchases, fuelLogs, people, LEDGER_PAYMENT_MODES } from "../db/schema";
-import { assertPersonOfType } from "./person.service";
+import { fuelPurchases, fuelLogs, suppliers, LEDGER_PAYMENT_MODES } from "../db/schema";
+import { assertSupplierInKiln } from "./supplier.service";
 import { assertFuelTypeExists } from "./fuelType.service";
 import { addLedgerEntry, listLedgerForPerson } from "./ledger.service";
 import { seasonIdsThrough } from "./season.util";
@@ -33,7 +33,7 @@ export interface CreateFuelPurchaseInput {
 export async function createFuelPurchase(input: CreateFuelPurchaseInput) {
   await assertFuelTypeExists(input.kilnId, input.fuelType);
   if (input.supplierId) {
-    await assertPersonOfType(input.kilnId, input.supplierId, ["SUPPLIER"]);
+    await assertSupplierInKiln(input.kilnId, input.supplierId);
   }
 
   const _id = randomUUID();
@@ -193,7 +193,7 @@ export async function listFuelPurchases(kilnId: string, seasonId: string, days =
   const rows = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), eq(fuelPurchases.seasonId, seasonId), gte(fuelPurchases.date, since))).orderBy(desc(fuelPurchases.date));
 
   const supplierIds = [...new Set(rows.map((r) => r.supplierId).filter((v): v is string => !!v))];
-  const supplierRows = supplierIds.length ? await db.select({ _id: people._id, name: people.name }).from(people).where(inArray(people._id, supplierIds)) : [];
+  const supplierRows = supplierIds.length ? await db.select({ _id: suppliers._id, name: suppliers.name }).from(suppliers).where(inArray(suppliers._id, supplierIds)) : [];
   const supplierById = new Map(supplierRows.map((s) => [s._id, s]));
   return rows.map((r) => ({ ...r, supplierId: r.supplierId ? supplierById.get(r.supplierId) ?? r.supplierId : r.supplierId }));
 }
@@ -237,10 +237,10 @@ export async function supplierFuelBalances(kilnId: string, seasonId: string) {
   const supplierIds = Array.from(new Set(purchases.map((p) => p.supplierId!)));
   if (supplierIds.length === 0) return [];
 
-  const suppliers = await db.select().from(people).where(and(inArray(people._id, supplierIds), eq(people.kilnId, kilnId)));
+  const supplierRows = await db.select().from(suppliers).where(and(inArray(suppliers._id, supplierIds), eq(suppliers.kilnId, kilnId)));
 
   const results = await Promise.all(
-    suppliers.map(async (supplier) => {
+    supplierRows.map(async (supplier) => {
       const ledger = await listLedgerForPerson(kilnId, supplier._id);
       const fuelLedger = ledger.filter((e) => e.category === "FUEL");
       const { due, paid, balance } = sumByDirection(fuelLedger);
