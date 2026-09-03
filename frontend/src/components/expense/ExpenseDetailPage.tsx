@@ -43,8 +43,12 @@ export function ExpenseDetailPage({ expense, expenseType, expenseTypes, dueAfter
 
   async function handleDelete() {
     if (!confirm(t("expense.confirmDeleteExpense", { amount: formatINR(expense.amount) }))) return;
-    await api.expenses.remove(expense._id);
-    onDeleted();
+    try {
+      await api.expenses.remove(expense._id);
+      onDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   function handlePrint() {

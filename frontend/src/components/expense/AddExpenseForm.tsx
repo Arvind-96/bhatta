@@ -109,6 +109,8 @@ export function AddExpenseForm({ expenseTypes, existing, existingTypeName, onSav
         });
       }
       onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }

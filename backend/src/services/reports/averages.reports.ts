@@ -1,6 +1,6 @@
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "../../db/client";
-import { expenses, ledgerEntries, people, fuelPurchases, chamberGradings } from "../../db/schema";
+import { expenses, ledgerEntries, people, fuelPurchases, vehicleDieselEntries, chamberGradings } from "../../db/schema";
 import { listSoilTrips } from "../soilTrip.service";
 import { listSandDeliveries } from "../sandDelivery.service";
 import { listInvoices } from "../dispatchDocuments.service";
@@ -40,35 +40,41 @@ const keyAverages: ReportDefinition = {
       return c;
     };
 
-    const [expenseRows, dueEntries, customerIds, gradingRows, fuelRows, soilRows, sandRows, invoiceRows, categories] = await Promise.all([
+    const [expenseRows, dueEntries, customerIds, gradingRows, fuelRows, dieselRows, soilRows, sandRows, invoiceRows, categories] = await Promise.all([
       db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), ...dateCond(expenses.date))),
       db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.direction, "DUE"), ...dateCond(ledgerEntries.date))),
       db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))).then((rows) => new Set(rows.map((r) => r._id))),
       db.select().from(chamberGradings).where(and(eq(chamberGradings.kilnId, kilnId), ...dateCond(chamberGradings.date))),
       db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), ...dateCond(fuelPurchases.date))),
+      db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), ...dateCond(vehicleDieselEntries.date))),
       listSoilTrips(kilnId, null, { from, to }),
       listSandDeliveries(kilnId, null, { from, to }),
       listInvoices(kilnId, null, { from, to }),
       listBrickCategories(kilnId),
     ]);
 
-    // 1. Production cost per brick — every logged expense plus every
-    // non-customer ledger DUE (wages/payments owed) in the period, spread
-    // across every brick graded out of a chamber in that same window.
-    // Same formula seasonFinancialSummary uses for the Overview dashboard's
-    // "Cost / brick" stat, just with a real from/to range instead of a
-    // fixed "last N days" — a kiln-wide average, not attributable to any
-    // one batch (see chamberCostReport, financialReport.service.ts, for
-    // the directly-attributable one-chamber version of this same idea).
-    const expenseCosts = expenseRows.reduce((s, e) => s + e.amount, 0);
-    const laborCosts = dueEntries.filter((e) => !customerIds.has(e.personId)).reduce((s, e) => s + e.amount, 0);
-    const totalProductionCost = round2(expenseCosts + laborCosts);
-    const bricksProduced = gradingRows.reduce((s, g) => s + totalBricksOf({ a1Count: g.a1Count, jhamaCount: g.jhamaCount, pelaCount: g.pelaCount, rodaCount: g.rodaCount, items: g.items as any }), 0);
-
     // 2. Fuel cost per kg — every fuel purchase's amount over its actual
     // weighed-in kg, across every fuel type combined.
     const fuelAmount = round2(fuelRows.reduce((s, f) => s + f.amount, 0));
     const fuelWeight = round2(fuelRows.reduce((s, f) => s + f.actualWeightKg, 0));
+    const dieselAmount = round2(dieselRows.reduce((s, d) => s + (d.costAmount ?? 0), 0));
+
+    // 1. Production cost per brick — every logged expense, every
+    // non-customer ledger DUE (wages/payments owed), every fuel purchase,
+    // and every diesel fill-up in the period, spread across every brick
+    // graded out of a chamber in that same window. Same formula
+    // seasonFinancialSummary uses for the Overview dashboard's "Cost /
+    // brick" stat, just with a real from/to range instead of a fixed
+    // "last N days" — a kiln-wide average, not attributable to any one
+    // batch (see chamberCostReport, financialReport.service.ts, for the
+    // directly-attributable one-chamber version of this same idea). A fuel
+    // purchase with a linked supplier also posts its own "FUEL"-category
+    // DUE ledger entry, so that category is excluded from laborCosts here
+    // to avoid double-counting it against fuelAmount below.
+    const expenseCosts = expenseRows.reduce((s, e) => s + e.amount, 0);
+    const laborCosts = dueEntries.filter((e) => !customerIds.has(e.personId) && e.category !== "FUEL").reduce((s, e) => s + e.amount, 0);
+    const totalProductionCost = round2(expenseCosts + laborCosts + fuelAmount + dieselAmount);
+    const bricksProduced = gradingRows.reduce((s, g) => s + totalBricksOf({ a1Count: g.a1Count, jhamaCount: g.jhamaCount, pelaCount: g.pelaCount, rodaCount: g.rodaCount, items: g.items as any }), 0);
 
     // 3. Soil cost per trolley (trolleyCount x ratePerTrolley, same as the
     // Soil report's own per-trip amount).

@@ -1702,6 +1702,7 @@ export const api = {
       if (params.driverId) q.set("driverId", params.driverId);
       if (params.category) q.set("category", params.category);
       if (params.contractorId) q.set("contractorId", params.contractorId);
+      if (params.categoryId) q.set("categoryId", params.categoryId);
       if (params.damageFault) q.set("damageFault", params.damageFault);
       if (params.damageThreshold != null) q.set("damageThreshold", String(params.damageThreshold));
       if (params.workType) q.set("workType", params.workType);

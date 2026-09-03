@@ -1,6 +1,6 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { invoices, expenses, ledgerEntries, people, ghers, fuelLogs, stackingEntries, fuelPurchases, chamberGradings } from "../db/schema";
+import { invoices, expenses, ledgerEntries, people, ghers, fuelLogs, stackingEntries, fuelPurchases, vehicleDieselEntries, chamberGradings } from "../db/schema";
 import type { BrickLineItem } from "../db/schema/_helpers";
 import { totalGradedOutput } from "./chamberGrading.service";
 
@@ -24,7 +24,7 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
   // silently disagree with Financial Overview for the same period. Using
   // the same source here keeps every "revenue"/"money received" figure in
   // the app in agreement.
-  const [invoiceRows, expenseRows, dueEntries, customers, totalBricksProduced] = await Promise.all([
+  const [invoiceRows, expenseRows, dueEntries, customers, totalBricksProduced, fuelPurchaseRows, dieselRows] = await Promise.all([
     db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.seasonId, seasonId), sql`COALESCE(${invoices.invoiceDate}, ${invoices.createdAt}) >= ${since}`)),
     db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.seasonId, seasonId), gte(expenses.date, since))),
     // ledgerEntries.seasonId is optional (not reliably populated — see
@@ -33,21 +33,32 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
     db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), gte(ledgerEntries.date, since), eq(ledgerEntries.direction, "DUE"))),
     db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))),
     totalGradedOutput(kilnId, seasonId, since),
+    db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), eq(fuelPurchases.seasonId, seasonId), gte(fuelPurchases.date, since))),
+    db.select().from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.seasonId, seasonId), gte(vehicleDieselEntries.date, since))),
   ]);
 
   const customerIds = new Set(customers.map((c) => c._id));
   const revenue = invoiceRows.reduce((sum, inv) => sum + (inv.amountPaidNow ?? inv.netAmount), 0);
   const expenseCosts = expenseRows.reduce((sum, e) => sum + e.amount, 0);
+  const fuelCosts = fuelPurchaseRows.reduce((sum, p) => sum + p.amount, 0);
+  const dieselCosts = dieselRows.reduce((sum, d) => sum + (d.costAmount ?? 0), 0);
+  // A FuelPurchase with a linked supplier also posts its own "FUEL"-category
+  // DUE ledger entry (fuelPurchase.service.ts's createFuelPurchase) — same
+  // double-count risk financialOverview.service.ts's flowForRange already
+  // guards against, and the same fix: exclude category FUEL here since
+  // fuelPurchaseRows above already counts that cost directly.
   const laborCosts = dueEntries
-    .filter((e) => !customerIds.has(e.personId))
+    .filter((e) => !customerIds.has(e.personId) && e.category !== "FUEL")
     .reduce((sum, e) => sum + e.amount, 0);
-  const totalCosts = expenseCosts + laborCosts;
+  const totalCosts = expenseCosts + laborCosts + fuelCosts + dieselCosts;
 
   return {
     days,
     revenue,
     expenseCosts,
     laborCosts,
+    fuelCosts,
+    dieselCosts,
     totalCosts,
     netProfit: revenue - totalCosts,
     // Every expense/labor cost for the period, spread across every brick

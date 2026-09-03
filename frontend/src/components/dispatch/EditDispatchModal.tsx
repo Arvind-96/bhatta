@@ -160,10 +160,16 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
             required
             placeholder={t("dispatch.customerNamePlaceholder")}
             value={customerName}
-            onChange={(e) => {
-              setCustomerName(e.target.value);
-              setCustomerId("");
-            }}
+            // Editing this name does NOT clear customerId — the dropdown
+            // above is the only thing that links/unlinks a real Customer
+            // (its own "walk-in customer" option is how to go back to
+            // none). See Dispatch.tsx's own customerName field for the
+            // full history: this used to reset customerId on every
+            // keystroke here too, so fixing a typo on an already-linked
+            // dispatch would silently detach it from the real customer on
+            // save — the same bug already fixed on the create form, just
+            // never carried over to this edit modal.
+            onChange={(e) => setCustomerName(e.target.value)}
             className={inputClass}
           />
           <input

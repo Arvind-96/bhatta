@@ -127,9 +127,34 @@ export async function updateLinkedExpensePaymentInfo(
   emitToKiln(kilnId, "expense:update", updated);
 }
 
+// The name of whichever source record auto-logged this expense, and
+// nothing if it's a plain, directly-entered one — used by both
+// updateExpense (to block an amount edit) and deleteExpense (to block a
+// delete) below. Every one of these source entities keeps its own running
+// total (machines.totalPaid/remainingDue, supplierInvoices.amountPaid,
+// ...) in sync with its linked expense through its OWN dedicated
+// update/delete function (deleteInstallmentPayment, deleteMaintenanceLog,
+// updateSupplierInvoice, ...) — editing or deleting the expense row
+// directly here would silently desync that cached total from what the
+// Expense page itself then shows, the exact "amounts don't match"
+// complaint this guard exists to prevent.
+function linkedSourceLabel(e: typeof expenses.$inferSelect): string | null {
+  if (e.dispatchId) return "its Dispatch";
+  if (e.brickLoadingEntryId) return "its Brick Loading trip";
+  if (e.doctorVisitId) return "its Doctor Visit";
+  if (e.supplierInvoiceId) return "its Supplier Invoice";
+  if (e.machineInstallmentPaymentId) return "its Machine Installment Payment";
+  if (e.machineMaintenanceLogId) return "its Machine Maintenance log";
+  return null;
+}
+
 export async function updateExpense(kilnId: string, expenseId: string, input: UpdateExpenseInput) {
   const existing = (await db.select().from(expenses).where(and(eq(expenses._id, expenseId), eq(expenses.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Expense not found in this kiln");
+  if (input.amount !== undefined && input.amount !== existing.amount) {
+    const source = linkedSourceLabel(existing);
+    if (source) throw new Error(`This expense was auto-logged from ${source} — edit the amount there instead, so its own totals stay in sync.`);
+  }
 
   await db.update(expenses).set(input).where(eq(expenses._id, expenseId));
   const updated = (await db.select().from(expenses).where(eq(expenses._id, expenseId)))[0]!;
@@ -140,6 +165,8 @@ export async function updateExpense(kilnId: string, expenseId: string, input: Up
 export async function deleteExpense(kilnId: string, expenseId: string) {
   const existing = (await db.select().from(expenses).where(and(eq(expenses._id, expenseId), eq(expenses.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Expense not found in this kiln");
+  const source = linkedSourceLabel(existing);
+  if (source) throw new Error(`This expense was auto-logged from ${source} — delete it there instead, so its own totals stay in sync.`);
 
   await db.delete(expenses).where(eq(expenses._id, expenseId));
   emitToKiln(kilnId, "expense:update", { _id: expenseId, deleted: true });

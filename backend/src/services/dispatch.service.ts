@@ -7,6 +7,7 @@ import { updateLinkedExpensePaymentInfo } from "./expense.service";
 
 type SimplePaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
 import { assertPersonOfType } from "./person.service";
+import { addLedgerEntry } from "./ledger.service";
 import { recordStockEntry } from "./stock.service";
 import { createCustomer, findCustomerByName } from "./customer.service";
 import { autoLogExpense } from "./expense.service";
@@ -353,6 +354,23 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
     quantity: -input.bricksCount,
   });
 
+  // A Brick-Loading-linked dispatch already had this exact deduction
+  // applied per-category when the Loading Trip itself was created (see
+  // brickLoading.service.ts's createBrickLoadingEntry) — deducting again
+  // here would double-count. A manually-created dispatch (the ordinary
+  // "Log Dispatch" flow, no linked trip) never went through that path, so
+  // without this it silently never reduced brickCategories.quantity at
+  // all — stock kept climbing from production but never fell from a sale,
+  // permanently inflating every "current stock" figure that reads this
+  // field (Overview, the Stock report, Key Averages).
+  if (!loadingEntry) {
+    for (const item of itemsOrLegacyFallback({ items: input.items, categoryId: input.categoryId, bricksCount: input.bricksCount })) {
+      if (!item.categoryId) continue;
+      await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${item.bricksCount}` }).where(eq(brickCategories._id, item.categoryId));
+      emitToKiln(input.kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, item.categoryId)))[0]);
+    }
+  }
+
   emitToKiln(input.kilnId, "dispatch:update", dispatch);
 
   // Same auto-log as brickLoading.service.ts's createBrickLoadingEntry —
@@ -571,31 +589,32 @@ export async function updateDispatch(kilnId: string, dispatchId: string, input: 
     }
   }
 
-  // Brick-Loading-linked dispatches keep a second, independent stock
-  // system (brickCategories.quantity) — correct that too, the same
-  // per-category delta-diff convention updateBrickLoadingEntry uses for
-  // its own edits (never re-deducting a full new total, which would
+  // brickCategories.quantity was already reduced by this dispatch's
+  // original items — either directly at creation (a manual dispatch) or
+  // inherited from its Brick Loading trip's own deduction (a linked one),
+  // see createDispatch — correct that by the exact delta here, same
+  // per-category diff convention updateBrickLoadingEntry uses for its own
+  // edits (never re-deducting a full new total, which would
   // double-count). `items` (old, reconstructed from legacy scalar fields
   // when this row predates multi-category support) is diffed against
   // whichever of `items`/`categoryId`/`bricksCount` the admin actually
-  // changed.
+  // changed. Applies regardless of whether a Loading Trip is linked —
+  // both paths reduced this same field by the same amount, so both need
+  // the same delta correction on edit.
   const categoryChanged = input.categoryId !== undefined && input.categoryId !== existing.categoryId;
   if (bricksCountChanged || categoryChanged || newItemsSummary) {
-    const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
-    if (linkedEntry) {
-      const oldItems = itemsOrLegacyFallback(existing);
-      const newItems: BrickLineItem[] = newItemsSummary
-        ? newItemsSummary.items
-        : [{ categoryId: (input.categoryId !== undefined ? input.categoryId : existing.categoryId) ?? undefined, bricksCount: newBricksCount }];
-      const oldByCategory = bricksByCategory(oldItems);
-      const newByCategory = bricksByCategory(newItems);
-      const allCategoryIds = new Set([...oldByCategory.keys(), ...newByCategory.keys()]);
-      for (const catId of allCategoryIds) {
-        const delta = (newByCategory.get(catId) ?? 0) - (oldByCategory.get(catId) ?? 0);
-        if (delta !== 0) {
-          await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${delta}` }).where(eq(brickCategories._id, catId));
-          emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, catId)))[0]);
-        }
+    const oldItems = itemsOrLegacyFallback(existing);
+    const newItems: BrickLineItem[] = newItemsSummary
+      ? newItemsSummary.items
+      : [{ categoryId: (input.categoryId !== undefined ? input.categoryId : existing.categoryId) ?? undefined, bricksCount: newBricksCount }];
+    const oldByCategory = bricksByCategory(oldItems);
+    const newByCategory = bricksByCategory(newItems);
+    const allCategoryIds = new Set([...oldByCategory.keys(), ...newByCategory.keys()]);
+    for (const catId of allCategoryIds) {
+      const delta = (newByCategory.get(catId) ?? 0) - (oldByCategory.get(catId) ?? 0);
+      if (delta !== 0) {
+        await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} - ${delta}` }).where(eq(brickCategories._id, catId));
+        emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, catId)))[0]);
       }
     }
   }
@@ -645,21 +664,24 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
     await recordStockEntry({ kilnId, seasonId: existing.seasonId!, type: "FINISHED_GOODS", itemName: GRADE_STOCK_ITEM[grade], quantity: remainingBricksOut });
   }
 
+  // Restore by the DISPATCH's own current items/categoryId/bricksCount, not
+  // any linked loading entry's — updateDispatch above only ever corrects
+  // brickCategories.quantity against the dispatch's own fields (it never
+  // touches brickLoadingEntries), so those are what the stock was actually
+  // last deducted against if this dispatch was edited after creation.
+  // Applies whether or not a Loading Trip is linked — createDispatch
+  // deducts this same field either way (directly for a manual dispatch, or
+  // inherited from the trip's own deduction for a linked one), so it's
+  // restored either way too. One restore per category line item, not just
+  // the aggregate.
+  for (const item of itemsOrLegacyFallback(existing)) {
+    if (!item.categoryId) continue;
+    await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${item.bricksCount}` }).where(eq(brickCategories._id, item.categoryId));
+    emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, item.categoryId)))[0]);
+  }
+
   const linkedEntry = (await db.select().from(brickLoadingEntries).where(and(eq(brickLoadingEntries.dispatchId, dispatchId), eq(brickLoadingEntries.kilnId, kilnId))))[0];
   if (linkedEntry) {
-    // Restore by the DISPATCH's own current items/categoryId/bricksCount,
-    // not the loading entry's — updateDispatch above only ever corrects
-    // brickCategories.quantity against the dispatch's own fields (it never
-    // touches brickLoadingEntries), so those are what the stock was actually
-    // last deducted against if this dispatch was edited after creation.
-    // Using the loading entry's original (possibly stale) values here would
-    // restore the wrong category and/or the wrong quantity. One restore per
-    // category line item, not just the aggregate.
-    for (const item of itemsOrLegacyFallback(existing)) {
-      if (!item.categoryId) continue;
-      await db.update(brickCategories).set({ quantity: sql`${brickCategories.quantity} + ${item.bricksCount}` }).where(eq(brickCategories._id, item.categoryId));
-      emitToKiln(kilnId, "brickCategory:update", (await db.select().from(brickCategories).where(eq(brickCategories._id, item.categoryId)))[0]);
-    }
     await db.update(brickLoadingEntries).set({ dispatchId: null }).where(eq(brickLoadingEntries._id, linkedEntry._id));
     emitToKiln(kilnId, "brickLoading:update", (await db.select().from(brickLoadingEntries).where(eq(brickLoadingEntries._id, linkedEntry._id)))[0]);
   }
@@ -685,19 +707,21 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
 
   // Every Challan/Gate Pass/Invoice/Expense generated FROM this dispatch is
   // meaningless once it's gone — delete them too rather than leaving them
-  // orphaned (pointing at a dispatchId that no longer exists). Invoices
-  // don't post to the ledger or any stock table (customer balance is
-  // derived live from the invoices table itself, see customer.service.ts),
-  // and Challan/Gate Pass are plain documents with no side effects of their
-  // own, so a plain delete + the same "{_id, deleted:true}" socket event
-  // their own dedicated delete functions already emit is enough — inlined
-  // here (not calling deleteChallan/deleteGatePass/deleteInvoice directly)
-  // since dispatchDocuments.service.ts already imports from this file,
-  // and importing back would create a circular dependency.
+  // orphaned (pointing at a dispatchId that no longer exists). Challan/Gate
+  // Pass are plain documents with no side effects of their own, so a plain
+  // delete + the same "{_id, deleted:true}" socket event their own
+  // dedicated delete functions already emit is enough. A partner- or
+  // agent-attributed invoice is NOT side-effect-free, though — it posts a
+  // PARTNER_DUE/COMMISSION ledger entry (see dispatchDocuments.service.ts's
+  // createInvoice/deleteInvoice) that a plain row delete would leave stale
+  // forever. Reversed inline below (not calling deleteChallan/deleteGatePass/
+  // deleteInvoice directly) since dispatchDocuments.service.ts already
+  // imports from this file, and importing back would create a circular
+  // dependency.
   const [linkedChallans, linkedGatePasses, linkedInvoices, linkedExpenses] = await Promise.all([
     db.select({ _id: challans._id }).from(challans).where(and(eq(challans.dispatchId, dispatchId), eq(challans.kilnId, kilnId))),
     db.select({ _id: gatePasses._id }).from(gatePasses).where(and(eq(gatePasses.dispatchId, dispatchId), eq(gatePasses.kilnId, kilnId))),
-    db.select({ _id: invoices._id }).from(invoices).where(and(eq(invoices.dispatchId, dispatchId), eq(invoices.kilnId, kilnId))),
+    db.select().from(invoices).where(and(eq(invoices.dispatchId, dispatchId), eq(invoices.kilnId, kilnId))),
     db.select({ _id: expenses._id }).from(expenses).where(and(eq(expenses.dispatchId, dispatchId), eq(expenses.kilnId, kilnId))),
   ]);
   for (const row of linkedChallans) {
@@ -709,6 +733,41 @@ export async function deleteDispatch(kilnId: string, dispatchId: string) {
     emitToKiln(kilnId, "gatePass:update", { _id: row._id, deleted: true });
   }
   for (const row of linkedInvoices) {
+    // Same reversal deleteInvoice itself performs — duplicated here rather
+    // than imported, per the circular-dependency note above.
+    if (row.partnerId) {
+      const paid = row.amountPaidNow ?? row.netAmount;
+      const pending = Math.max(0, Math.round((row.netAmount - paid) * 100) / 100);
+      if (pending > 0) {
+        await addLedgerEntry({
+          kilnId,
+          personId: row.partnerId,
+          direction: "PAID",
+          amount: pending,
+          reason: `Invoice deleted — reversing pending due on sale to ${row.customerName}`,
+          category: "PARTNER_DUE",
+        });
+      }
+    }
+    if (row.agentId) {
+      const agent = (await db.select().from(people).where(and(eq(people._id, row.agentId), eq(people.kilnId, kilnId))))[0];
+      let commission = 0;
+      if (agent?.commissionType === "PERCENT_OF_SALE") {
+        commission = Math.round(row.netAmount * ((agent.commissionPercent ?? 0) / 100) * 100) / 100;
+      } else if (agent?.commissionType === "PER_THOUSAND_BRICKS") {
+        commission = Math.round((row.bricksCount / 1000) * (agent.commissionPerThousand ?? 0) * 100) / 100;
+      }
+      if (commission > 0) {
+        await addLedgerEntry({
+          kilnId,
+          personId: row.agentId,
+          direction: "PAID",
+          amount: commission,
+          reason: `Invoice deleted — reversing commission on sale to ${row.customerName}`,
+          category: "COMMISSION",
+        });
+      }
+    }
     await db.delete(invoices).where(eq(invoices._id, row._id));
     emitToKiln(kilnId, "invoice:update", { _id: row._id, deleted: true });
   }
