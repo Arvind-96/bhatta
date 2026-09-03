@@ -2,243 +2,176 @@
 @tailwind components;
 @tailwind utilities;
 
+/* "Bhatta Ledger" design system — replaced the earlier vivid blue/violet
+   glassmorphic palette per the client's approved redesign (see the
+   published "Two Ledgers" concept pitch). Six-hue series anchored on
+   kiln-ember (warm fire tones: ember/brick/gold) plus three cool
+   instrument-panel complements (slate/olive/teal-grey) for icon-chip
+   variety. Dark is the primary/default-feeling identity; light is a
+   "ledger paper" companion in the same hue family — both real, both
+   maintained, since the app's light/dark toggle (useTheme.ts) is a real,
+   used feature this redesign must not regress. */
 :root {
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --plane: #f5f5f6;
-  --ink-primary: #1c2130;
-  --ink-secondary: #000000;
-  --ink-muted: #000000;
-  --gridline: #e7e9f3;
-  --baseline: #d3d7e8;
-  --border-hairline: rgba(28, 33, 48, 0.09);
+  --surface: #fffdfa;
+  --surface-raised: #fffdfa;
+  --plane: #f2ece2;
+  --ink-primary: #241d17;
+  --ink-secondary: #5c5145;
+  --ink-muted: #948a7a;
+  --gridline: #e6ddcf;
+  --baseline: #d3c6b0;
+  --border-hairline: rgba(36, 29, 23, 0.12);
 
-  /* A real, vivid palette — six distinct hues, not shades of one accent.
-     series-1 (blue) is the primary/default accent (buttons, focus rings,
-     links); 2-6 give stat-card icon chips, avatar initials, and sidebar
-     nav items their own color instead of repeating blue everywhere. */
-  --series-1: #3b6cf6;
-  --series-2: #8b5cf6;
-  --series-3: #f5941f;
-  --series-4: #ef4a63;
-  --series-5: #16b871;
-  --series-6: #f4c22b;
+  /* Ember/brick/gold as the warm "kiln fire" trio (series 1-3, used most
+     prominently — buttons, focus rings, the primary accent); slate/olive/
+     teal-grey as a cooler "gauge cluster" trio (series 4-6) for icon-chip
+     and avatar variety elsewhere in the app, so nothing repeats a single
+     hue everywhere the way plain brand-blue used to. */
+  --series-1: #c2410c;
+  --series-2: #7c2d12;
+  --series-3: #a3720b;
+  --series-4: #3d5266;
+  --series-5: #6b5d1f;
+  --series-6: #2f544b;
 
-  --status-good: #16b871;
-  --status-warning: #e0a300;
-  --status-serious: #f5941f;
-  --status-critical: #ef4a63;
+  --status-good: #2f6b45;
+  --status-warning: #a3720b;
+  --status-serious: #c2410c;
+  --status-critical: #7c2d12;
 
-  --glass-bg: #ffffff;
-  --glass-border: rgba(28, 33, 48, 0.07);
-  --shadow-glass: 0 1px 2px rgba(20, 20, 60, 0.04), 0 10px 24px -14px rgba(20, 20, 60, 0.14);
+  --glass-bg: #fffdfa;
+  --glass-border: rgba(36, 29, 23, 0.1);
+  --shadow-glass: 0 1px 2px rgba(36, 24, 12, 0.05), 0 10px 22px -16px rgba(36, 24, 12, 0.22);
 
-  /* Tinted glow per series tone, used by shadow-glow-N in tailwind.config
-     — the active nav pill, primary buttons, and floating actions actually
-     glow in their own color instead of a neutral drop shadow. */
-  --glow-1: rgba(59, 108, 246, 0.35);
-  --glow-2: rgba(139, 92, 246, 0.35);
-  --glow-3: rgba(245, 148, 31, 0.35);
-  --glow-4: rgba(239, 74, 99, 0.35);
-  --glow-5: rgba(22, 184, 113, 0.35);
-  --glow-6: rgba(244, 194, 43, 0.35);
-  --glow-pulse: rgba(22, 184, 113, 0.45);
+  /* Tinted depth shadow per series tone (shadow-glow-N in tailwind.config)
+     — a quiet, low-opacity lift rather than a neon glow, matching the
+     instrument-panel's calmer register. */
+  --glow-1: rgba(194, 65, 12, 0.28);
+  --glow-2: rgba(124, 45, 18, 0.28);
+  --glow-3: rgba(163, 114, 11, 0.28);
+  --glow-4: rgba(61, 82, 102, 0.28);
+  --glow-5: rgba(107, 93, 31, 0.28);
+  --glow-6: rgba(47, 84, 75, 0.28);
+  --glow-pulse: rgba(47, 107, 69, 0.4);
 
-  --gradient-brand: linear-gradient(120deg, var(--series-1), var(--series-2));
+  --gradient-brand: linear-gradient(135deg, var(--series-1), var(--series-2));
 
-  /* Electric secondary accent — violet into cyan — reserved for hover
-     states, live/status indicators, and the single highest-stakes CTA per
-     screen. Never a resting color, so it stays a signal, not wallpaper. */
-  --neon: #00c9c2;
-  --neon-glow: rgba(0, 201, 194, 0.5);
-  --gradient-accent2: linear-gradient(120deg, var(--series-2), var(--neon));
+  /* Secondary accent — gold, reserved for the single highest-stakes CTA
+     per screen and "spotlight" figures (e.g. a headline total's accent
+     underline), same restrained-use convention as before, just recolored
+     off the old electric cyan onto the ledger's own gold-ink tone. */
+  --neon: #a3720b;
+  --neon-glow: rgba(163, 114, 11, 0.35);
+  --gradient-accent2: linear-gradient(135deg, var(--series-3), var(--series-1));
 
-  /* Glassmorphic surface: translucent + blurred rather than the flat
-     opaque card this token used to produce, so cards read as frosted
-     panes floating over the page's own soft background mesh below. */
-  --glass-blur: blur(20px) saturate(180%);
-  --mesh-a: rgba(139, 92, 246, 0.16);
-  --mesh-b: rgba(0, 201, 194, 0.13);
-  --mesh-c: rgba(59, 108, 246, 0.14);
+  /* Flat instrument panel, not frosted glass — .glass-panel below reads
+     this directly; kept as its own token set (rather than aliasing
+     --surface) so a future surface adjustment doesn't silently change
+     panel legibility too. */
+  --panel-bg: var(--surface-raised);
+  --panel-border: var(--border-hairline);
 
-  /* The one dark surface in the app — the nav rail only, never the main
-     canvas (the brief was explicit: white/light background). Distinct
-     from --ink-* so sidebar text stays legible against its own dark
-     ground regardless of what the light theme's ink tokens are doing. */
-  --sidebar: #171d33;
-  --sidebar-raised: #1f2642;
-  --sidebar-ink: #ffffff;
-  --sidebar-ink-soft: #aeb4cc;
-  --sidebar-ink-faint: #6b7291;
-  --sidebar-line: #2b3355;
+  /* The nav rail's own always-dark palette (see .sidebar-scroll and
+     Sidebar.tsx) — deliberately its own token family, distinct from the
+     ink/surface tokens above, so it reads as a fixed instrument rail
+     regardless of the light/dark toggle, same architecture the app
+     already had, recolored from navy to charcoal + ember. */
+  --sidebar: #14110e;
+  --sidebar-raised: #1c1815;
+  --sidebar-ink: #f4efe6;
+  --sidebar-ink-soft: #c9c0b2;
+  --sidebar-ink-faint: #8b8272;
+  --sidebar-line: #2a231d;
 }
 
 .dark {
-  --surface: #171a24;
-  --surface-raised: #1e2230;
-  --plane: #10121a;
-  --ink-primary: #f4f5fa;
-  --ink-secondary: #b7bcd4;
-  --ink-muted: #838aa8;
-  --gridline: #2a2e42;
-  --baseline: #3a3f5c;
-  --border-hairline: rgba(255, 255, 255, 0.1);
+  --surface: #1c1815;
+  --surface-raised: #241f1a;
+  --plane: #14110e;
+  --ink-primary: #f4efe6;
+  --ink-secondary: #c9c0b2;
+  --ink-muted: #8b8272;
+  --gridline: #2a231d;
+  --baseline: #3a3129;
+  --border-hairline: rgba(244, 239, 230, 0.12);
 
-  --series-1: #6d93ff;
-  --series-2: #ab8bff;
-  --series-3: #ffab52;
-  --series-4: #ff7d94;
-  --series-5: #4fd897;
-  --series-6: #ffd766;
+  --series-1: #e8622a;
+  --series-2: #a13a2c;
+  --series-3: #d9a441;
+  --series-4: #4a6478;
+  --series-5: #8a7a3a;
+  --series-6: #3f6e63;
 
-  --glass-bg: #171a24;
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --shadow-glass: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 24px -14px rgba(0, 0, 0, 0.5);
+  --status-good: #4f9d69;
+  --status-warning: #d9a441;
+  --status-serious: #c2410c;
+  --status-critical: #a13a2c;
 
-  --glow-1: rgba(109, 147, 255, 0.4);
-  --glow-2: rgba(171, 139, 255, 0.4);
-  --glow-3: rgba(255, 171, 82, 0.4);
-  --glow-4: rgba(255, 125, 148, 0.4);
-  --glow-5: rgba(79, 216, 151, 0.4);
-  --glow-6: rgba(255, 215, 102, 0.4);
-  --glow-pulse: rgba(79, 216, 151, 0.5);
+  --glass-bg: #1c1815;
+  --glass-border: rgba(244, 239, 230, 0.12);
+  --shadow-glass: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 22px -16px rgba(0, 0, 0, 0.55);
 
-  --neon: #2bffe0;
-  --neon-glow: rgba(43, 255, 224, 0.55);
-  --mesh-a: rgba(171, 139, 255, 0.22);
-  --mesh-b: rgba(43, 255, 224, 0.15);
-  --mesh-c: rgba(109, 147, 255, 0.18);
+  --glow-1: rgba(232, 98, 42, 0.32);
+  --glow-2: rgba(161, 58, 44, 0.32);
+  --glow-3: rgba(217, 164, 65, 0.32);
+  --glow-4: rgba(74, 100, 120, 0.32);
+  --glow-5: rgba(138, 122, 58, 0.32);
+  --glow-6: rgba(63, 110, 99, 0.32);
+  --glow-pulse: rgba(79, 157, 105, 0.45);
 
-  --sidebar: #0d0f18;
-  --sidebar-raised: #171a24;
-  --sidebar-ink: #ffffff;
-  --sidebar-ink-soft: #9aa0bd;
-  --sidebar-ink-faint: #5c6284;
-  --sidebar-line: #262b40;
+  --neon: #d9a441;
+  --neon-glow: rgba(217, 164, 65, 0.38);
+
+  --panel-bg: var(--surface-raised);
+  --panel-border: var(--border-hairline);
+
+  --sidebar: #0e0c0a;
+  --sidebar-raised: #171310;
+  --sidebar-ink: #f4efe6;
+  --sidebar-ink-soft: #b8ac98;
+  --sidebar-ink-faint: #746a5b;
+  --sidebar-line: #241e18;
 }
 
-/* A soft, fixed gradient mesh behind the flat --plane ground — purely
-   cosmetic (background-image layered under background-color, so nothing
-   breaks if color-mix/backdrop-filter is unsupported) — gives the new
-   glassmorphic cards below something with texture to actually blur. */
+/* Flat ledger-paper/charcoal ground — no mesh gradient (the old vivid
+   theme's glowing radial-mesh texture doesn't suit an instrument-panel
+   material language, which reads as flat and precise instead). */
 body {
   background-color: var(--plane);
-  background-image: radial-gradient(900px 500px at 10% -10%, var(--mesh-a), transparent 60%),
-    radial-gradient(700px 460px at 95% 5%, var(--mesh-b), transparent 55%),
-    radial-gradient(800px 600px at 50% 110%, var(--mesh-c), transparent 60%);
-  background-attachment: fixed;
   color: var(--ink-primary);
 }
 
-.dark body {
-  background-color: var(--plane);
-}
-
-/* Glassmorphic surface — translucent + blurred rather than the flat
-   opaque panel this used to be, plus a thin bright top-edge highlight
-   (the way real frosted glass catches light from above) and a diagonal
-   light-sweep that crosses the card once on hover. Every element that
-   already uses .glass-panel (Card and anything built on it) picks this
-   up automatically — no per-component changes needed.
+/* Flat instrument panel — solid background, hairline border, a quiet low
+   shadow for lift. Replaces the earlier frosted/blurred treatment (no
+   backdrop-filter at all now), matching Bhatta Ledger's "ledger book,"
+   not "glass," material language. Every element that already used
+   .glass-panel (Card and anything built on it) picks this up
+   automatically — no per-component changes needed anywhere in the app.
 
    Wrapped in @layer components (rather than left as plain CSS after the
    @tailwind directives) so Tailwind's own utilities always win a
-   specificity tie against it. Without this, `.glass-panel`'s own
-   `position: relative` — same 0,1,0 specificity as Tailwind's
-   `.absolute{position:absolute}`, but textually later in the compiled
-   stylesheet — silently overrode `absolute`/`fixed` on any element using
-   both classes together (every dropdown/menu built as
-   `className="glass-panel absolute ..."`: Topbar's profile and
-   notification menus, Reports' filter panel, KilnSwitcher). Each one
-   rendered in normal document flow instead of floating, inflating its
-   sticky header/container by the menu's own height and pushing the rest
-   of the page down every time it opened. */
+   specificity tie against it — same reasoning as before: without this,
+   `.glass-panel`'s own `position: relative` silently overrode
+   `absolute`/`fixed` on any element using both classes together (every
+   dropdown/menu built as `className="glass-panel absolute ..."`:
+   Topbar's profile and notification menus, Reports' filter panel,
+   KilnSwitcher). */
 @layer components {
   .glass-panel {
-    background: color-mix(in srgb, var(--surface) 70%, transparent);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
     position: relative;
-  }
-  /* Both pseudo-elements get their own border-radius so the highlight ring
-     and sweep respect the card's rounded corners WITHOUT the parent needing
-     overflow:hidden — deliberately avoided, since several cards across the
-     app host absolutely-positioned dropdowns/menus/tooltips that need to
-     overflow their card's bounds, and clipping the parent would break them. */
-  .glass-panel::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    padding: 1px;
-    border-radius: inherit;
-    z-index: 1;
-    pointer-events: none;
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 30%);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-  }
-  .glass-panel::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    z-index: 2;
-    pointer-events: none;
-    overflow: hidden;
-    background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.3) 48%, rgba(255, 255, 255, 0) 58%);
-    transform: translateX(-140%);
-    transition: transform 0.1s linear;
-  }
-  .glass-panel:hover::after {
-    transform: translateX(140%);
-    transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-  .dark .glass-panel {
-    /* Fully opaque, not translucent — a glass panel positioned over an SVG
-       illustration (the topbar's search-suggestions dropdown sits right on
-       top of the Overview hero art) renders as a solid white box in dark
-       mode: backdrop-filter's blur+saturate sampling an SVG backdrop is a
-       known Chromium compositing failure mode, and no amount of raising
-       the panel's own background opacity fixes it (confirmed — even 88%
-       still rendered pure white) since the corruption happens in the
-       filtered backdrop itself, underneath whatever color sits on top of
-       it. A solid, non-translucent background sidesteps the bug entirely:
-       there's no gap left for a broken backdrop sample to show through.
-       Light mode isn't affected, so keeps its translucent look. */
-    background: var(--surface);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .glass-panel:hover::after {
-      transition: none;
-      transform: translateX(-140%);
-    }
   }
 }
 
-/* The topbar's own glass treatment — same frosted-surface idea as
-   .glass-panel, but a lighter blur (14px/160% vs the card's 20px/180%),
-   no shine-sweep, and no rounded corners: a full-width bar that stays
-   subtly see-through over the page's mesh background as you scroll,
-   rather than the flat opaque bar it used to be. */
+/* The topbar's own flat treatment — same solid-panel idea as
+   .glass-panel, full-width, with a bottom hairline rule instead of
+   rounded-card borders. No blur (removes the old Chromium SVG-backdrop
+   compositing workaround this file used to carry for dark mode — with
+   backdrop-filter gone entirely, that bug class no longer applies). */
 .topbar-glass {
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border-bottom: 1px solid var(--glass-border);
-}
-.dark .topbar-glass {
-  /* Same Chromium SVG-backdrop compositing bug .dark .glass-panel documents
-     above: the Overview page's hero illustration sits right under this
-     sticky bar, and a translucent background + active backdrop-filter
-     renders as solid white over it in dark mode. Fully opaque, no blur —
-     identical fix, same trigger condition. */
   background: var(--surface);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border-bottom: 1px solid var(--glass-border);
 }
 
 /* Light-shimmer sweep for primary/accent buttons — applied via the
@@ -252,7 +185,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.55) 48%, transparent 66%);
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.35) 48%, transparent 66%);
   transform: translateX(-130%);
   pointer-events: none;
 }
@@ -276,7 +209,7 @@ body {
 }
 
 /* People-page card icon actions (call / ledger / view profile) — the
-   rightmost action per card gets the electric accent2 gradient on hover
+   rightmost action per card gets the gold accent2 gradient on hover
    (matching every other "highest-stakes action" treatment in the app),
    the others get the brand gradient. Plain CSS rather than Tailwind
    utilities since gradient-brand/gradient-accent2 aren't Tailwind-known
@@ -438,9 +371,9 @@ body {
 
 /* Reserved for headings/brand moments only (see tailwind.config.ts's
    `display` font entry) — applied via className, not globally, so dense
-   card titles stay in Inter. */
+   card titles stay in IBM Plex Sans. */
 .font-display {
-  font-family: "Poppins", "Inter", system-ui, sans-serif;
+  font-family: "Barlow Condensed", "IBM Plex Sans", system-ui, sans-serif;
 }
 
 /* Baseline interactivity affordances applied app-wide, so a raw <button>

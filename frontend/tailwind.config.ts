@@ -89,15 +89,20 @@ export default {
         glass: "16px",
       },
       fontFamily: {
-        // Inter for body copy, UI chrome, and all numeric/data display —
-        // smooth, highly legible at small sizes, reads clean in a dense
-        // dashboard.
-        sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
-        // Poppins reserved for headings/brand moments (page titles, the
-        // login wordmark) — a rounder, friendlier geometric face that
-        // matches the vivid, colorful direction better than a neutral
-        // grotesque; used sparingly via `font-display`, not globally.
-        display: ["Poppins", "Inter", "system-ui", "sans-serif"],
+        // IBM Plex Sans for body copy and UI chrome — a technical,
+        // enterprise-grade humanist face that reads as "instrument," not
+        // "app" (part of the "Bhatta Ledger" redesign — see index.css's
+        // top-of-file note on the palette this replaced).
+        sans: ["IBM Plex Sans", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        // Barlow Condensed reserved for headings/brand moments and
+        // uppercase tracked labels (page titles, gauge-cluster captions)
+        // — a condensed industrial face matching the instrument-panel
+        // direction; used sparingly via `font-display`, not globally.
+        display: ["Barlow Condensed", "IBM Plex Sans", "system-ui", "sans-serif"],
+        // Every rupee figure in a table/stat column — true tabular
+        // ledger-column alignment, applied via `font-mono`/`.mono`
+        // alongside the existing `tabular-nums` convention.
+        mono: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       keyframes: {
         "pulse-ring": {
