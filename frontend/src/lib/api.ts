@@ -1604,11 +1604,13 @@ export const api = {
           input,
           true
         ),
+      remove: (id: string) => del(`/machines/fuel-logs/${id}`, true),
     },
     maintenance: {
       list: (days = 90) => get<MachineMaintenanceLog[]>(`/machines/maintenance?days=${days}`, true),
       create: (input: { machineId: string; description: string; cost?: number; downtimeHours?: number; notes?: string }) =>
         post<MachineMaintenanceLog>("/machines/maintenance", input, true),
+      remove: (id: string) => del(`/machines/maintenance/${id}`, true),
     },
   },
 

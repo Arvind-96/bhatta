@@ -295,6 +295,13 @@
       "when": 1788356487734,
       "tag": "0041_equal_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "5",
+      "when": 1788408400748,
+      "tag": "0042_sturdy_shockwave",
+      "breakpoints": true
     }
   ]
 }

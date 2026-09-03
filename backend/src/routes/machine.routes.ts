@@ -10,7 +10,9 @@ import {
   listInstallments,
   listMaintenance,
   remove,
+  removeFuelLog,
   removeInstallment,
+  removeMaintenance,
   update,
 } from "../controllers/machine.controller";
 import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
@@ -23,8 +25,10 @@ machineRouter.post("/", asyncHandler(create));
 machineRouter.get("/", asyncHandler(list));
 machineRouter.post("/fuel-logs", asyncHandler(createFuelLog));
 machineRouter.get("/fuel-logs", asyncHandler(listFuelLogs));
+machineRouter.delete("/fuel-logs/:id", asyncHandler(removeFuelLog));
 machineRouter.post("/maintenance", asyncHandler(createMaintenance));
 machineRouter.get("/maintenance", asyncHandler(listMaintenance));
+machineRouter.delete("/maintenance/:id", asyncHandler(removeMaintenance));
 machineRouter.get("/:id", asyncHandler(get));
 machineRouter.patch("/:id", asyncHandler(update));
 machineRouter.delete("/:id", asyncHandler(remove));

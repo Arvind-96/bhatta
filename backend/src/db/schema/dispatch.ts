@@ -413,6 +413,10 @@ export const expenses = mysqlTable("expenses", {
   // row (and the machine's own totalPaid/remainingDue) in sync with the
   // payment it came from.
   machineInstallmentPaymentId: varchar("machineInstallmentPaymentId", { length: 64 }),
+  // Set only for the row auto-logged from a Machine Maintenance Log's cost
+  // — same purpose as machineInstallmentPaymentId above, lets
+  // deleteMaintenanceLog find and remove this row again.
+  machineMaintenanceLogId: varchar("machineMaintenanceLogId", { length: 64 }),
   createdAt: createdAtColumn(),
 }, (t) => ({
   kilnDateIdx: index("expense_kiln_date_idx").on(t.kilnId, t.date),

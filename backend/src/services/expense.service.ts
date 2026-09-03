@@ -31,6 +31,7 @@ export interface CreateExpenseInput {
   doctorVisitId?: string;
   supplierInvoiceId?: string;
   machineInstallmentPaymentId?: string;
+  machineMaintenanceLogId?: string;
 }
 
 export async function createExpense(input: CreateExpenseInput) {

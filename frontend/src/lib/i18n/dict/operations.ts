@@ -285,4 +285,6 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   "fleet.saveInstallment": { en: "Save installment payment", hi: "किस्त भुगतान सहेजें" },
   "fleet.confirmDeleteMachine": { en: "Delete {name}? This can't be undone.", hi: "{name} हटाएं? यह पूर्ववत नहीं किया जा सकता।" },
   "fleet.confirmDeleteInstallment": { en: "Delete this installment payment? The machine's paid/due totals and the linked expense will be updated.", hi: "यह किश्त भुगतान हटाएं? मशीन की भुगतान/बकाया राशि और जुड़ा खर्च अपडेट हो जाएगा।" },
+  "fleet.confirmDeleteFuelLog": { en: "Delete this fuel log?", hi: "यह ईंधन लॉग हटाएं?" },
+  "fleet.confirmDeleteMaintenance": { en: "Delete this maintenance log? The linked expense (if any) will be removed too.", hi: "यह मरम्मत लॉग हटाएं? जुड़ा खर्च (यदि कोई हो) भी हटा दिया जाएगा।" },
 };

@@ -9,6 +9,7 @@ import {
   type LucideIcon,
   Package,
   Plus,
+  RefreshCw,
   Trash2,
   TrendingUp,
   Truck,
@@ -554,14 +555,27 @@ export function Overview() {
   const { t } = useTranslation();
   const [dispatchTotals, setDispatchTotals] = useState<DispatchTotals | null>(null);
   const [brickCategories, setBrickCategories] = useState<BrickCategory[]>([]);
+  // Bumped by the manual Refresh button below — changing a `key` this way
+  // forces React to unmount and remount everything under it, which reruns
+  // every child's own fetch-on-mount effect (DashboardStockPanel,
+  // SeasonSummaryCard, ProductionChart, ...) in one action. Each of those
+  // already stays live via its own kiln-event subscriptions, but this
+  // gives a guaranteed, immediate "pull fresh data now" regardless of any
+  // single socket event.
+  const [refreshKey, setRefreshKey] = useState(0);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const kilns = useAuthStore((s) => s.kilns);
   const kiln = kilns.find((k) => k.kilnId === activeKilnId);
 
-  useEffect(() => {
-    if (!activeKilnId) return;
+  function fetchOwnData() {
     api.dispatch.totals(7).then(setDispatchTotals).catch(console.error);
     api.brickCategories.list().then(setBrickCategories).catch(console.error);
+  }
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    fetchOwnData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKilnId]);
 
   useKilnEvent("dispatch:update", () => {
@@ -570,6 +584,15 @@ export function Overview() {
   useKilnEvent("brickCategory:update", () => {
     api.brickCategories.list().then(setBrickCategories).catch(console.error);
   });
+
+  // The manual Refresh button: re-fetch what this component owns directly,
+  // and bump refreshKey to remount everything below it (see refreshKey's
+  // own comment) — together, a guaranteed full refresh of every figure on
+  // this page in one click.
+  function manualRefresh() {
+    fetchOwnData();
+    setRefreshKey((k) => k + 1);
+  }
 
   // brickCategories.quantity (produced minus dispatched, per category) is
   // the one finished-goods figure that's actually kept correct here — the
@@ -594,6 +617,13 @@ export function Overview() {
 
   return (
     <div className="space-y-7">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={manualRefresh}>
+          <RefreshCw className="h-3.5 w-3.5" /> {t("common.refresh")}
+        </Button>
+      </div>
+
+      <div key={refreshKey} className="space-y-7">
       <OverviewHero kilnName={kiln?.name ?? "Bhatta Cloud"} dateLabel={today} todayBricks={todayBricks} />
 
       <div className="space-y-3">
@@ -650,6 +680,7 @@ export function Overview() {
           <QuickEntry />
           <LiveFeed />
         </div>
+      </div>
       </div>
     </div>
   );

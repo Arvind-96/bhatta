@@ -153,6 +153,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.all": { en: "All", hi: "सभी" },
   "common.edit": { en: "Edit", hi: "संपादित करें" },
   "common.delete": { en: "Delete", hi: "हटाएं" },
+  "common.refresh": { en: "Refresh", hi: "रीफ्रेश करें" },
   "common.ledger": { en: "Ledger", hi: "बही खाता" },
   "common.remove": { en: "Remove", hi: "हटाएं" },
   "common.dismiss": { en: "Dismiss", hi: "खारिज करें" },

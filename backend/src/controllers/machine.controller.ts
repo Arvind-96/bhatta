@@ -7,6 +7,8 @@ import {
   createMachineFuelLog,
   createMaintenanceLog,
   deleteInstallmentPayment,
+  deleteMachineFuelLog,
+  deleteMaintenanceLog,
   getMachine,
   listInstallmentPayments,
   listMachineFuelLogs,
@@ -137,6 +139,11 @@ export async function listFuelLogs(req: AuthedRequest, res: Response) {
   res.json(logs);
 }
 
+export async function removeFuelLog(req: AuthedRequest, res: Response) {
+  await deleteMachineFuelLog(req.kiln!.id, req.params.id);
+  res.status(204).send();
+}
+
 const maintenanceSchema = z.object({
   machineId: z.string(),
   description: z.string(),
@@ -161,4 +168,9 @@ export async function listMaintenance(req: AuthedRequest, res: Response) {
   const days = req.query.days ? Number(req.query.days) : 90;
   const logs = await listMaintenanceLogs(req.kiln!.id, req.season!.id, days);
   res.json(logs);
+}
+
+export async function removeMaintenance(req: AuthedRequest, res: Response) {
+  await deleteMaintenanceLog(req.kiln!.id, req.params.id);
+  res.status(204).send();
 }

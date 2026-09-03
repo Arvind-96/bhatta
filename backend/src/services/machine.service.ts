@@ -288,6 +288,7 @@ export async function createMaintenanceLog(input: CreateMaintenanceInput) {
       amount: input.cost,
       notes: input.description,
       date: input.date,
+      machineMaintenanceLogId: _id,
     });
   }
 
@@ -300,6 +301,34 @@ export async function listMaintenanceLogs(kilnId: string, seasonId: string, days
   since.setDate(since.getDate() - days);
   const rows = await db.select().from(machineMaintenanceLogs).where(and(eq(machineMaintenanceLogs.kilnId, kilnId), eq(machineMaintenanceLogs.seasonId, seasonId), gte(machineMaintenanceLogs.date, since))).orderBy(desc(machineMaintenanceLogs.date));
   return withMachine(rows);
+}
+
+// Mirrors deleteInstallmentPayment's reasoning — a mistyped fuel quantity
+// had no way to be corrected. Fuel logs never auto-log an Expense (no cost
+// field), so this is a plain delete with no linked-row reversal needed.
+export async function deleteMachineFuelLog(kilnId: string, logId: string) {
+  const existing = (await db.select().from(machineFuelLogs).where(and(eq(machineFuelLogs._id, logId), eq(machineFuelLogs.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Fuel log not found in this kiln");
+  await db.delete(machineFuelLogs).where(eq(machineFuelLogs._id, logId));
+  emitToKiln(kilnId, "machineFuel:update", { _id: logId, deleted: true });
+}
+
+// Reverses a maintenance log's linked Expense (matched via
+// expenses.machineMaintenanceLogId), same pattern as
+// deleteInstallmentPayment's expense reversal.
+export async function deleteMaintenanceLog(kilnId: string, logId: string) {
+  const existing = (await db.select().from(machineMaintenanceLogs).where(and(eq(machineMaintenanceLogs._id, logId), eq(machineMaintenanceLogs.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Maintenance log not found in this kiln");
+
+  await db.delete(machineMaintenanceLogs).where(eq(machineMaintenanceLogs._id, logId));
+
+  const linkedExpense = (await db.select({ _id: expenses._id }).from(expenses).where(eq(expenses.machineMaintenanceLogId, logId)))[0];
+  if (linkedExpense) {
+    await db.delete(expenses).where(eq(expenses._id, linkedExpense._id));
+    emitToKiln(kilnId, "expense:update", { _id: linkedExpense._id, deleted: true });
+  }
+
+  emitToKiln(kilnId, "machineMaintenance:update", { _id: logId, deleted: true });
 }
 
 // Per-machine rollup for the period — the machine-fleet third of the

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDownCircle, ArrowUpCircle, Boxes, Fuel, IndianRupee, PieChart, Search, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Boxes, Fuel, IndianRupee, PieChart, RefreshCw, Search, Wallet } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PeriodStatCard } from "@/components/dashboard/PeriodStatCard";
@@ -107,10 +107,20 @@ export function FinancialOverview() {
   const [range, setRange] = useState({ from: "", to: "" });
   const [customFlow, setCustomFlow] = useState<FinancialFlow | null>(null);
   const [customLoading, setCustomLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
     setOverview(await api.financialOverview.get());
+  }
+
+  async function manualRefresh() {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   useEffect(() => {
@@ -139,6 +149,12 @@ export function FinancialOverview() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={manualRefresh} disabled={refreshing}>
+          <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} /> {t("common.refresh")}
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <PeriodStatCard
           label={t("financialOverview.currentDues")}
