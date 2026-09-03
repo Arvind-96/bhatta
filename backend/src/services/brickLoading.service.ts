@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { brickCategories, brickLoadingEntries, dispatches, people, ledgerEntries, expenses, BRICK_VEHICLE_TYPES } from "../db/schema";
+import { brickCategories, brickLoadingEntries, dispatches, invoices, people, ledgerEntries, expenses, BRICK_VEHICLE_TYPES } from "../db/schema";
 import type { BrickLineItem, SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { updateLinkedExpensePaymentInfo } from "./expense.service";
 
@@ -487,7 +487,7 @@ export async function listBrickLoadingEntries(kilnId: string, seasonId: string |
       ...rows.flatMap((r) => (r.items ?? []).map((i) => i.categoryId).filter((v): v is string => !!v)),
     ]),
   ];
-  const [driverRows, dispatchRows, categoryRows] = await Promise.all([
+  const [driverRows, dispatchRows, categoryRows, invoiceRows] = await Promise.all([
     driverIds.length ? db.select({ _id: people._id, name: people.name, type: people.type }).from(people).where(inArray(people._id, driverIds)) : [],
     // paymentMode/cashAmount/onlineAmount/amount included so read paths
     // (the Production > Brick Loading report especially) can show how the
@@ -507,9 +507,38 @@ export async function listBrickLoadingEntries(kilnId: string, seasonId: string |
           .where(inArray(dispatches._id, dispatchIds))
       : [],
     categoryIds.length ? db.select({ _id: brickCategories._id, category: brickCategories.category, grade: brickCategories.grade }).from(brickCategories).where(inArray(brickCategories._id, categoryIds)) : [],
+    // A Dispatch's own paymentMode/cashAmount/onlineAmount describe how its
+    // full `amount` was paid — there's no partial-payment concept at the
+    // dispatch level at all. But a dispatch that's been formally invoiced
+    // can be genuinely PARTIALLY paid (invoices.amountPaidNow < netAmount,
+    // a real "customer paid some now, rest due later" case) — the invoice
+    // is the authoritative record of that, so it's resolved here too and
+    // preferred over the dispatch's own fields wherever one exists (see the
+    // Production > Brick Loading report, the main consumer of this).
+    dispatchIds.length
+      ? db
+          .select({ dispatchId: invoices.dispatchId, netAmount: invoices.netAmount, amountPaidNow: invoices.amountPaidNow, paymentMode: invoices.paymentMode, cashAmount: invoices.cashAmount, onlineAmount: invoices.onlineAmount })
+          .from(invoices)
+          .where(and(eq(invoices.kilnId, kilnId), inArray(invoices.dispatchId, dispatchIds)))
+      : [],
   ]);
   const driverById = new Map(driverRows.map((d) => [d._id, d]));
-  const dispatchById = new Map(dispatchRows.map((d) => [d._id, d]));
+  const invoiceByDispatchId = new Map(invoiceRows.filter((i) => i.dispatchId).map((i) => [i.dispatchId as string, i]));
+  const dispatchById = new Map(
+    dispatchRows.map((d) => {
+      const inv = invoiceByDispatchId.get(d._id);
+      return [
+        d._id,
+        {
+          ...d,
+          invoicePaidNow: inv ? inv.amountPaidNow ?? inv.netAmount : (undefined as number | undefined),
+          invoicePaymentMode: inv?.paymentMode,
+          invoiceCashAmount: inv?.cashAmount,
+          invoiceOnlineAmount: inv?.onlineAmount,
+        },
+      ];
+    })
+  );
   const categoryById = new Map(categoryRows.map((c) => [c._id, c]));
   return rows.map((r) => ({
     ...r,

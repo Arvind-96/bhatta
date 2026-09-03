@@ -312,12 +312,30 @@ const brickLoading: ReportDefinition = {
     // both read as null (shown as "—") rather than a misleading 0. Once a
     // dispatch IS linked, its own `amount` (net of any discount applied at
     // the dispatch stage) is shown instead of this row's own `amount` — a
-    // frozen pre-discount snapshot from trip-creation time — so `amount`
-    // always agrees with what cashAmount+onlineAmount actually sum to.
+    // frozen pre-discount snapshot from trip-creation time.
+    //
+    // A Dispatch's own paymentMode/cashAmount/onlineAmount assume the full
+    // amount was paid — there's no partial-payment concept at that level.
+    // But the dispatch may have a formal Invoice with its own
+    // amountPaidNow < netAmount (a real "paid some now, rest due later"
+    // sale — see AddCustomerPaymentModal's own note on this exact shape).
+    // listBrickLoadingEntries resolves that invoice too and attaches it as
+    // invoicePaidNow/invoicePaymentMode/... on the dispatch object; prefer
+    // it here whenever it exists, since it's the more authoritative,
+    // partial-payment-aware source. cashAmount+onlineAmount is therefore
+    // NOT guaranteed to sum to `amount` any more when there's a real due —
+    // the new `due` column makes up the difference explicitly instead of
+    // silently folding an unpaid balance into "cash".
     const detail = rows.map((r) => {
       const dispatch = r.dispatchId && typeof r.dispatchId === "object" ? r.dispatchId : null;
       const amount = dispatch?.amount ?? r.amount ?? 0;
-      const split = dispatch ? effectiveSplit(dispatch.paymentMode, dispatch.cashAmount, dispatch.onlineAmount, amount) : { cash: null, online: null };
+      const hasInvoice = dispatch?.invoicePaidNow != null;
+      const paidNow = hasInvoice ? dispatch!.invoicePaidNow! : amount;
+      const split = dispatch
+        ? hasInvoice
+          ? effectiveSplit(dispatch.invoicePaymentMode, dispatch.invoiceCashAmount, dispatch.invoiceOnlineAmount, paidNow)
+          : effectiveSplit(dispatch.paymentMode, dispatch.cashAmount, dispatch.onlineAmount, amount)
+        : { cash: null, online: null };
       return {
         date: r.date ? r.date.toISOString() : null,
         tripNumber: r.tripNumber ?? "",
@@ -328,13 +346,14 @@ const brickLoading: ReportDefinition = {
         amount,
         cashAmount: split.cash,
         onlineAmount: split.online,
+        due: dispatch ? round2(Math.max(0, amount - paidNow)) : null,
         tipAmount: r.tipAmount ?? 0,
       };
     });
     const { rows: outRows, columns } = groupedOrDetail(
       filters.groupBy,
       detail,
-      ["bricksCount", "amount", "cashAmount", "onlineAmount", "tipAmount"],
+      ["bricksCount", "amount", "cashAmount", "onlineAmount", "due", "tipAmount"],
       [
         { key: "period", labelKey: "reports.col.period", format: "text" },
         { key: "count", labelKey: "reports.col.entries", format: "number" },
@@ -342,6 +361,7 @@ const brickLoading: ReportDefinition = {
         { key: "amount", labelKey: "reports.col.amount", format: "currency" },
         { key: "cashAmount", labelKey: "reports.col.cashAmount", format: "currency" },
         { key: "onlineAmount", labelKey: "reports.col.onlineAmount", format: "currency" },
+        { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
         { key: "tipAmount", labelKey: "reports.col.tipAmount", format: "currency" },
       ],
       [
@@ -354,6 +374,7 @@ const brickLoading: ReportDefinition = {
         { key: "amount", labelKey: "reports.col.amount", format: "currency" },
         { key: "cashAmount", labelKey: "reports.col.cashAmount", format: "currency" },
         { key: "onlineAmount", labelKey: "reports.col.onlineAmount", format: "currency" },
+        { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
         { key: "tipAmount", labelKey: "reports.col.tipAmount", format: "currency" },
       ]
     );
@@ -367,6 +388,7 @@ const brickLoading: ReportDefinition = {
         amount: round2(detail.reduce((s, r) => s + r.amount, 0)),
         cashAmount: round2(detail.reduce((s, r) => s + (r.cashAmount ?? 0), 0)),
         onlineAmount: round2(detail.reduce((s, r) => s + (r.onlineAmount ?? 0), 0)),
+        due: round2(detail.reduce((s, r) => s + (r.due ?? 0), 0)),
         tipAmount: round2(detail.reduce((s, r) => s + r.tipAmount, 0)),
       },
     };
