@@ -2,7 +2,6 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   AlertTriangle,
   Boxes,
-  Flame,
   Fuel,
   IndianRupee,
   LineChart,
@@ -12,16 +11,15 @@ import {
   RefreshCw,
   Trash2,
   TrendingUp,
-  Truck,
   Wallet,
   Zap,
 } from "lucide-react";
-import { StatCard } from "@/components/dashboard/StatCard";
-import { PeriodStatCard } from "@/components/dashboard/PeriodStatCard";
 import { ProductionChart } from "@/components/dashboard/ProductionChart";
 import { StockOverview } from "@/components/dashboard/StockOverview";
 import { StockCompositionDonut } from "@/components/dashboard/StockCompositionDonut";
 import { LiveFeed } from "@/components/dashboard/LiveFeed";
+import { Gauge, GaugeStrip } from "@/components/dashboard/GaugeStrip";
+import { MatchedStamp } from "@/components/dashboard/MatchedStamp";
 import { LedgerModal } from "@/components/people/LedgerModal";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -203,34 +201,27 @@ function SeasonSummaryCard() {
 
   return (
     <Card>
-      <div className="mb-3 flex items-center gap-2">
-        <IndianRupee className="h-4 w-4 text-series-1" />
-        <p className="text-sm font-medium text-ink-primary">{t("overview.financialSummary", { days: summary.days })}</p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+        <div className="flex items-center gap-2">
+          <IndianRupee className="h-4 w-4 text-series-1" />
+          <p className="text-sm font-medium text-ink-primary">{t("overview.financialSummary", { days: summary.days })}</p>
+        </div>
+        <MatchedStamp />
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <div>
-          <p className="text-sm text-ink-muted">{t("overview.revenue")}</p>
-          <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(summary.revenue)}</p>
-        </div>
-        <div>
-          <p className="text-sm text-ink-muted">{t("overview.expenses")}</p>
-          <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(summary.expenseCosts)}</p>
-        </div>
-        <div>
-          <p className="text-sm text-ink-muted">{t("overview.labor")}</p>
-          <p className="text-lg font-semibold tabular-nums text-ink-primary">₹{formatINR(summary.laborCosts)}</p>
-        </div>
-        <div>
-          <p className="text-sm text-ink-muted">{t("overview.netProfit")}</p>
-          <p className={cn("text-lg font-semibold tabular-nums", summary.netProfit >= 0 ? "text-status-good" : "text-status-critical")}>
-            ₹{formatINR(summary.netProfit)}
-          </p>
-        </div>
-        <div>
-          <p className="text-sm text-ink-muted">{t("overview.costPerBrick")}</p>
-          <p className="text-lg font-semibold tabular-nums text-ink-primary">{summary.costPerBrick != null ? `₹${summary.costPerBrick}` : "—"}</p>
-        </div>
+      <div className="mb-4">
+        <span className="font-display text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{t("overview.revenue")}</span>
+        <p className="font-mono text-4xl font-semibold tabular-nums text-series-1">₹{formatINR(summary.revenue)}</p>
       </div>
+      <GaugeStrip className="border-t border-border">
+        <Gauge label={t("overview.expenses")} value={`₹${formatINR(summary.expenseCosts)}`} />
+        <Gauge label={t("overview.labor")} value={`₹${formatINR(summary.laborCosts)}`} />
+        <Gauge
+          label={t("overview.netProfit")}
+          value={`₹${formatINR(summary.netProfit)}`}
+          tone={summary.netProfit >= 0 ? "good" : "critical"}
+        />
+        <Gauge label={t("overview.costPerBrick")} value={summary.costPerBrick != null ? `₹${summary.costPerBrick}` : "—"} />
+      </GaugeStrip>
       <p className="mt-3 text-[11px] text-ink-muted">{t("overview.financialSummaryDisclaimer")}</p>
     </Card>
   );
@@ -296,36 +287,19 @@ function DashboardStockPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <PeriodStatCard
-          label={t("overview.rawBrickStock")}
-          value={stockSummary?.rawBrickStock ?? 0}
-          subtitle={t("overview.moldedNotStacked")}
-          icon={Package}
-          tone="text-series-5"
-        />
-        <PeriodStatCard
-          label={t("overview.firedStock")}
-          value={firedBrickStock}
-          subtitle={t("overview.acrossAllCategories")}
-          icon={Boxes}
-          tone="text-series-3"
-        />
-        <PeriodStatCard
-          label={t("overview.totalDamage")}
-          value={stockSummary?.totalDamage ?? 0}
-          subtitle={t("overview.damageBreakdownSubtitle")}
-          icon={AlertTriangle}
-          critical={!!stockSummary && stockSummary.totalDamage > 0}
-        />
-        <PeriodStatCard
-          label={t("overview.fuelStockAvailable")}
-          value={Math.round(totalFuelStock)}
-          subtitle={t("overview.fuelStockUnit")}
-          icon={Fuel}
-          tone="text-series-6"
-        />
-      </div>
+      <Card>
+        <GaugeStrip>
+          <Gauge label={t("overview.rawBrickStock")} value={(stockSummary?.rawBrickStock ?? 0).toLocaleString("en-IN")} subtitle={t("overview.moldedNotStacked")} />
+          <Gauge label={t("overview.firedStock")} value={firedBrickStock.toLocaleString("en-IN")} subtitle={t("overview.acrossAllCategories")} />
+          <Gauge
+            label={t("overview.totalDamage")}
+            value={(stockSummary?.totalDamage ?? 0).toLocaleString("en-IN")}
+            subtitle={t("overview.damageBreakdownSubtitle")}
+            tone={!!stockSummary && stockSummary.totalDamage > 0 ? "critical" : undefined}
+          />
+          <Gauge label={t("overview.fuelStockAvailable")} value={Math.round(totalFuelStock).toLocaleString("en-IN")} subtitle={t("overview.fuelStockUnit")} />
+        </GaugeStrip>
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
@@ -336,7 +310,7 @@ function DashboardStockPanel() {
               </div>
               <CardTitle>{t("overview.bricksByCategory")}</CardTitle>
             </div>
-            <span className="text-sm font-semibold tabular-nums text-ink-primary">
+            <span className="font-mono text-sm font-semibold tabular-nums text-ink-primary">
               {firedBrickStock.toLocaleString("en-IN")}
             </span>
           </CardHeader>
@@ -353,7 +327,7 @@ function DashboardStockPanel() {
                   className="-mx-2 flex items-center justify-between rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-ink-primary/5"
                 >
                   <span className="text-ink-secondary">{c.grade ? `${c.category} (${c.grade})` : c.category}</span>
-                  <span className="font-semibold tabular-nums text-ink-primary">
+                  <span className="font-mono font-semibold tabular-nums text-ink-primary">
                     {c.quantity.toLocaleString("en-IN")}
                   </span>
                 </li>
@@ -370,7 +344,7 @@ function DashboardStockPanel() {
               </div>
               <CardTitle>{t("overview.bricksSoldByCategory")}</CardTitle>
             </div>
-            <span className="text-sm font-semibold tabular-nums text-ink-primary">
+            <span className="font-mono text-sm font-semibold tabular-nums text-ink-primary">
               {totalBricksSold.toLocaleString("en-IN")}
             </span>
           </CardHeader>
@@ -387,7 +361,7 @@ function DashboardStockPanel() {
                   className="-mx-2 flex items-center justify-between rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-ink-primary/5"
                 >
                   <span className="text-ink-secondary">{c.grade ? `${c.category} (${c.grade})` : c.category}</span>
-                  <span className="font-semibold tabular-nums text-ink-primary">
+                  <span className="font-mono font-semibold tabular-nums text-ink-primary">
                     {c.bricksSold.toLocaleString("en-IN")}
                   </span>
                 </li>
@@ -404,7 +378,7 @@ function DashboardStockPanel() {
               </div>
               <CardTitle>{t("overview.whosePaymentDue")}</CardTitle>
             </div>
-            <span className="text-sm font-semibold tabular-nums text-status-critical">
+            <span className="font-mono text-sm font-semibold tabular-nums text-status-critical">
               ₹{formatINR(totalDuesAmount)}
             </span>
           </CardHeader>
@@ -433,7 +407,7 @@ function DashboardStockPanel() {
                     <span className="text-[11px] text-ink-muted">{personTypeMeta[d.person.type].label}</span>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="font-semibold tabular-nums text-status-critical">
+                    <span className="font-mono font-semibold tabular-nums text-status-critical">
                       ₹{formatINR(d.amountDue)}
                     </span>
                     <button
@@ -514,7 +488,7 @@ function OverviewHero({ kilnName, dateLabel, todayBricks }: { kilnName: string; 
               </linearGradient>
               <linearGradient id="ovChimneyGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0" stopColor="var(--series-1)" />
-                <stop offset="1" stopColor="#2a4d8f" />
+                <stop offset="1" stopColor="var(--series-2)" />
               </linearGradient>
             </defs>
             <rect width="420" height="280" fill="url(#ovSkyGrad)" />
@@ -526,7 +500,7 @@ function OverviewHero({ kilnName, dateLabel, todayBricks }: { kilnName: string; 
             <g className="hero-smoke"><circle cx="114" cy="88" r="7" fill="var(--ink-muted)" opacity=".5" /></g>
             <g className="hero-smoke"><circle cx="120" cy="84" r="5" fill="var(--ink-muted)" opacity=".5" /></g>
             <rect x="104" y="90" width="28" height="88" rx="3" fill="url(#ovChimneyGrad)" />
-            <rect x="98" y="174" width="40" height="14" rx="2" fill="#213a72" />
+            <rect x="98" y="174" width="40" height="14" rx="2" fill="var(--series-2)" />
             <g opacity=".92">
               <rect x="150" y="208" width="34" height="16" rx="2" fill="var(--series-6)" />
               <rect x="150" y="190" width="34" height="16" rx="2" fill="var(--series-3)" />
@@ -537,7 +511,7 @@ function OverviewHero({ kilnName, dateLabel, todayBricks }: { kilnName: string; 
             <g className="hero-truck">
               <rect x="34" y="186" width="46" height="26" rx="3" fill="var(--series-2)" />
               <rect x="80" y="196" width="22" height="16" rx="2" fill="var(--neon)" />
-              <rect x="84" y="199" width="14" height="8" rx="1" fill="#eaf9ff" />
+              <rect x="84" y="199" width="14" height="8" rx="1" fill="var(--series-3)" />
               <circle cx="48" cy="216" r="6" fill="var(--ink-primary)" />
               <circle cx="90" cy="216" r="6" fill="var(--ink-primary)" />
             </g>
@@ -628,34 +602,19 @@ export function Overview() {
 
       <div className="space-y-3">
         <SectionHeading icon={Zap} title={t("overview.sectionTodayProduction")} trailing={today} />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label={t("overview.bricksToday")}
-            value={todayBricks.toLocaleString("en-IN")}
-            delta={todayDelta}
-            deltaDirection={yesterdayBricks && todayBricks >= yesterdayBricks ? "up" : "down"}
-            icon={Flame}
-            tone="text-series-3"
-          />
-          <StatCard
-            label={t("overview.finishedStock")}
-            value={finishedGoods.toLocaleString("en-IN")}
-            icon={Boxes}
-            tone="text-series-6"
-          />
-          <StatCard
-            label={t("overview.dispatched7d")}
-            value={(dispatchTotals?.bricksCount ?? 0).toLocaleString("en-IN")}
-            icon={Truck}
-            tone="text-series-1"
-          />
-          <StatCard
-            label={t("overview.avgDailyOutput")}
-            value={avgDailyOutput.toLocaleString("en-IN")}
-            icon={TrendingUp}
-            tone="text-series-5"
-          />
-        </div>
+        <Card>
+          <GaugeStrip>
+            <Gauge
+              label={t("overview.bricksToday")}
+              value={todayBricks.toLocaleString("en-IN")}
+              delta={todayDelta}
+              deltaDirection={yesterdayBricks && todayBricks >= yesterdayBricks ? "up" : "down"}
+            />
+            <Gauge label={t("overview.finishedStock")} value={finishedGoods.toLocaleString("en-IN")} />
+            <Gauge label={t("overview.dispatched7d")} value={(dispatchTotals?.bricksCount ?? 0).toLocaleString("en-IN")} />
+            <Gauge label={t("overview.avgDailyOutput")} value={avgDailyOutput.toLocaleString("en-IN")} />
+          </GaugeStrip>
+        </Card>
       </div>
 
       <div className="space-y-3">

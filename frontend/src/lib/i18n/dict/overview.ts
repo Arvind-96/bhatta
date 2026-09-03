@@ -5,6 +5,14 @@ import type { Locale } from "../translations";
 // components/layout/KilnSwitcher. Merged into the main dictionary by
 // translations.ts.
 export const overviewDict: Record<string, Record<Locale, string>> = {
+  // The reconciliation trust device shown next to a headline total on
+  // Overview/Financial Overview/Reports — see MatchedStamp.tsx's own
+  // comment on why this exists.
+  "overview.matchedStamp": { en: "Matched", hi: "मिलान" },
+  "overview.matchedStampTooltip": {
+    en: "This figure is cross-checked to match Overview, Financial Overview, and Reports",
+    hi: "यह आंकड़ा ओवरव्यू, फाइनेंशियल ओवरव्यू और रिपोर्ट्स से मिलान करके जांचा गया है",
+  },
   "overview.logProduction": { en: "Log production", hi: "उत्पादन दर्ज करें" },
   "overview.logStock": { en: "Log stock", hi: "स्टॉक दर्ज करें" },
   "overview.batchNumber": { en: "Batch number", hi: "बैच नंबर" },
