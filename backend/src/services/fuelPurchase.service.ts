@@ -4,7 +4,6 @@ import { db } from "../db/client";
 import { fuelPurchases, fuelLogs, suppliers, LEDGER_PAYMENT_MODES } from "../db/schema";
 import { assertSupplierInKiln } from "./supplier.service";
 import { assertFuelTypeExists } from "./fuelType.service";
-import { addLedgerEntry, listLedgerForPerson } from "./ledger.service";
 import { seasonIdsThrough } from "./season.util";
 import { emitToKiln } from "../config/socket";
 
@@ -25,11 +24,14 @@ export interface CreateFuelPurchaseInput {
   notes?: string;
 }
 
-// Weighed in, and (if a supplier is on record) posted straight to their
-// ledger — a DUE for the full invoice amount and a PAID for whatever was
-// handed over right away, same pair-of-entries pattern
-// soilArrival.service.ts uses for landowners. "Pending balance due" is
-// never stored here; it's just that supplier's live ledger balance.
+// Weighed in and, if a supplier is on record, billed against them — same
+// "due = amount - paidAmount, computed live off the row itself, never a
+// separately-posted ledger fact" pattern getSupplierDetail uses for goods
+// invoices (see supplierFuelBalances below). Deliberately does NOT post to
+// ledgerEntries: addLedgerEntry validates personId against the generic
+// `people` table, but a real supplierId lives in the dedicated `suppliers`
+// table (see assertSupplierInKiln) — the two are mutually exclusive, so
+// there's no valid way to post one here, and no need to either.
 export async function createFuelPurchase(input: CreateFuelPurchaseInput) {
   await assertFuelTypeExists(input.kilnId, input.fuelType);
   if (input.supplierId) {
@@ -39,29 +41,6 @@ export async function createFuelPurchase(input: CreateFuelPurchaseInput) {
   const _id = randomUUID();
   await db.insert(fuelPurchases).values({ ...input, _id });
   const purchase = (await db.select().from(fuelPurchases).where(eq(fuelPurchases._id, _id)))[0]!;
-
-  if (input.supplierId && input.amount > 0) {
-    await addLedgerEntry({
-      kilnId: input.kilnId,
-      personId: input.supplierId,
-      direction: "DUE",
-      amount: input.amount,
-      reason: `Fuel purchase: ${input.fuelType} (${input.actualWeightKg.toLocaleString()} kg)`,
-      date: input.date,
-      category: "FUEL",
-    });
-    if (input.paidAmount && input.paidAmount > 0) {
-      await addLedgerEntry({
-        kilnId: input.kilnId,
-        personId: input.supplierId,
-        direction: "PAID",
-        amount: input.paidAmount,
-        reason: "Payment given for fuel purchase",
-        date: input.date,
-        category: "FUEL",
-      });
-    }
-  }
 
   const shortfall = input.invoicedWeightKg - input.actualWeightKg;
   const variance = input.invoicedWeightKg > 0 ? shortfall / input.invoicedWeightKg : 0;
@@ -87,101 +66,26 @@ export interface UpdateFuelPurchaseInput {
   notes?: string;
 }
 
-// Full admin edit — supplierId stays fixed once set (same convention as
-// soilArrival's landownerId), so a revised amount/paidAmount just posts a
-// correction entry for the delta on that same supplier's ledger instead of
-// silently rewriting what was already posted.
+// Full admin edit — amount/paidAmount are plain columns read live by
+// supplierFuelBalances below, so correcting either here is simply a
+// straight update, no separate ledger correction entry to post or keep in
+// sync (see createFuelPurchase's own note on why this never touches
+// ledgerEntries at all).
 export async function updateFuelPurchase(kilnId: string, purchaseId: string, input: UpdateFuelPurchaseInput) {
   const existing = (await db.select().from(fuelPurchases).where(and(eq(fuelPurchases._id, purchaseId), eq(fuelPurchases.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Fuel purchase not found in this kiln");
   if (input.fuelType) await assertFuelTypeExists(kilnId, input.fuelType);
 
-  const oldAmount = existing.amount;
-  const oldPaid = existing.paidAmount ?? 0;
-
   await db.update(fuelPurchases).set(input).where(eq(fuelPurchases._id, purchaseId));
   const updated = (await db.select().from(fuelPurchases).where(eq(fuelPurchases._id, purchaseId)))[0]!;
-
-  if (existing.supplierId && (input.amount !== undefined || input.paidAmount !== undefined)) {
-    const newAmount = updated.amount;
-    const newPaid = updated.paidAmount ?? 0;
-
-    const amountDelta = Math.round((newAmount - oldAmount) * 100) / 100;
-    if (amountDelta > 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.supplierId,
-        direction: "DUE",
-        amount: amountDelta,
-        reason: `Fuel purchase correction: revised up to ₹${newAmount.toLocaleString("en-IN")}`,
-        category: "FUEL",
-      });
-    } else if (amountDelta < 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.supplierId,
-        direction: "PAID",
-        amount: -amountDelta,
-        reason: `Fuel purchase correction: revised down to ₹${newAmount.toLocaleString("en-IN")}`,
-        category: "FUEL",
-      });
-    }
-
-    const paidDelta = Math.round((newPaid - oldPaid) * 100) / 100;
-    if (paidDelta > 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.supplierId,
-        direction: "PAID",
-        amount: paidDelta,
-        reason: `Fuel purchase correction: additional ₹${paidDelta.toLocaleString("en-IN")} paid`,
-        category: "FUEL",
-      });
-    } else if (paidDelta < 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.supplierId,
-        direction: "DUE",
-        amount: -paidDelta,
-        reason: `Fuel purchase correction: payment revised down by ₹${(-paidDelta).toLocaleString("en-IN")}`,
-        category: "FUEL",
-      });
-    }
-  }
 
   emitToKiln(kilnId, "fuelPurchase:update", updated);
   return updated;
 }
 
-// Reverses this purchase's ledger impact (same delta-correction math
-// updateFuelPurchase uses, applied against a target of zero) before
-// removing the row.
 export async function deleteFuelPurchase(kilnId: string, purchaseId: string) {
   const existing = (await db.select().from(fuelPurchases).where(and(eq(fuelPurchases._id, purchaseId), eq(fuelPurchases.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Fuel purchase not found in this kiln");
-
-  if (existing.supplierId) {
-    if (existing.amount > 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.supplierId,
-        direction: "PAID",
-        amount: existing.amount,
-        reason: `Fuel purchase deleted: reversing ₹${existing.amount.toLocaleString("en-IN")}`,
-        category: "FUEL",
-      });
-    }
-    if ((existing.paidAmount ?? 0) > 0) {
-      await addLedgerEntry({
-        kilnId,
-        personId: existing.supplierId,
-        direction: "DUE",
-        amount: existing.paidAmount!,
-        reason: `Fuel purchase deleted: reversing ₹${existing.paidAmount!.toLocaleString("en-IN")} payment given`,
-        category: "FUEL",
-      });
-    }
-  }
 
   await db.delete(fuelPurchases).where(eq(fuelPurchases._id, purchaseId));
   emitToKiln(kilnId, "fuelPurchase:update", { _id: purchaseId, deleted: true });
@@ -219,18 +123,13 @@ export async function fuelStockBalance(kilnId: string, seasonId: string) {
   return totals;
 }
 
-function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]) {
-  const due = entries.filter((e) => e.direction === "DUE").reduce((sum, e) => sum + e.amount, 0);
-  const paid = entries.filter((e) => e.direction === "PAID").reduce((sum, e) => sum + e.amount, 0);
-  return { due, paid, balance: due - paid };
-}
-
-// Per-supplier payment/balance rollup — every SUPPLIER who has at least one
-// fuel purchase on record, their combined fuel-purchase ledger (category
-// FUEL only, so a supplier who also sells soil or something else doesn't
-// have that mixed in here). Purchases are cumulative through the selected
-// season, matching fuelStockBalance; the ledger itself is always cumulative
-// (listLedgerForPerson never filters by season).
+// Per-supplier payment/balance rollup — every real supplier (see
+// createFuelPurchase's note on why this is `suppliers`, not `people`) who
+// has at least one fuel purchase on record. due/paid are summed directly
+// off each purchase row's own amount/paidAmount, same live-computed
+// pattern getSupplierDetail uses for goods invoices — no ledger involved.
+// Purchases are cumulative through the selected season, matching
+// fuelStockBalance.
 export async function supplierFuelBalances(kilnId: string, seasonId: string) {
   const seasonIds = await seasonIdsThrough(kilnId, seasonId);
   const purchases = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), inArray(fuelPurchases.seasonId, seasonIds), isNotNull(fuelPurchases.supplierId)));
@@ -239,22 +138,19 @@ export async function supplierFuelBalances(kilnId: string, seasonId: string) {
 
   const supplierRows = await db.select().from(suppliers).where(and(inArray(suppliers._id, supplierIds), eq(suppliers.kilnId, kilnId)));
 
-  const results = await Promise.all(
-    supplierRows.map(async (supplier) => {
-      const ledger = await listLedgerForPerson(kilnId, supplier._id);
-      const fuelLedger = ledger.filter((e) => e.category === "FUEL");
-      const { due, paid, balance } = sumByDirection(fuelLedger);
-      const supplierPurchases = purchases.filter((p) => p.supplierId === supplier._id);
-      return {
-        supplier: { id: supplier._id, name: supplier.name, phone: supplier.phone ?? null },
-        purchaseCount: supplierPurchases.length,
-        totalWeightKg: supplierPurchases.reduce((sum, p) => sum + p.actualWeightKg, 0),
-        totalDue: due,
-        totalPaid: paid,
-        balance,
-      };
-    })
-  );
+  const results = supplierRows.map((supplier) => {
+    const supplierPurchases = purchases.filter((p) => p.supplierId === supplier._id);
+    const due = Math.round(supplierPurchases.reduce((sum, p) => sum + p.amount, 0) * 100) / 100;
+    const paid = Math.round(supplierPurchases.reduce((sum, p) => sum + (p.paidAmount ?? 0), 0) * 100) / 100;
+    return {
+      supplier: { id: supplier._id, name: supplier.name, phone: supplier.phone ?? null },
+      purchaseCount: supplierPurchases.length,
+      totalWeightKg: supplierPurchases.reduce((sum, p) => sum + p.actualWeightKg, 0),
+      totalDue: due,
+      totalPaid: paid,
+      balance: Math.round((due - paid) * 100) / 100,
+    };
+  });
 
   return results.sort((a, b) => b.balance - a.balance);
 }
