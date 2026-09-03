@@ -345,6 +345,15 @@ function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
   const openStack: { dispatchId: string; remaining: number }[] = [];
   const extraCash = new Map<string, number>();
   const extraOnline = new Map<string, number>();
+  // Every dispatchId that ever had a shortfall pushed gets an entry here,
+  // kept in sync on every push and every partial/full credit application —
+  // including 0 once fully cleared. Deriving this only from what's left in
+  // openStack at the very end would silently drop any dispatch a later
+  // payment fully settled (it's popped off the stack once cleared), and
+  // the caller's own fallback for a "not found" dispatch is the ORIGINAL
+  // pre-payment shortfall, not 0 — so a settled due would wrongly reread
+  // as still fully outstanding.
+  const remainingDue = new Map<string, number>();
 
   function applyCredit(amount: number, paymentMode: string | null, cashAmount: number | null, onlineAmount: number | null) {
     if (amount <= 0) return;
@@ -363,6 +372,7 @@ function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
       cashLeft = round2(cashLeft - fromCash);
       onlineLeft = round2(onlineLeft - fromOnline);
       top.remaining = round2(top.remaining - applied);
+      remainingDue.set(top.dispatchId, top.remaining);
       if (top.remaining <= 0.005) openStack.pop();
     }
   }
@@ -374,6 +384,7 @@ function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
       const shortfall = round2(charge - paidNow);
       if (shortfall > 0.005 && inv.dispatchId) {
         openStack.push({ dispatchId: inv.dispatchId, remaining: shortfall });
+        remainingDue.set(inv.dispatchId, shortfall);
       } else if (shortfall < -0.005) {
         applyCredit(-shortfall, inv.paymentMode, inv.cashAmount, inv.onlineAmount);
       }
@@ -382,10 +393,6 @@ function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
     }
   }
 
-  const remainingDue = new Map<string, number>();
-  for (const item of openStack) {
-    remainingDue.set(item.dispatchId, round2((remainingDue.get(item.dispatchId) ?? 0) + item.remaining));
-  }
   return { remainingDue, extraCash, extraOnline };
 }
 
