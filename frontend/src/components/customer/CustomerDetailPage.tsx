@@ -206,16 +206,32 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
                     </thead>
                     <tbody>
                       {invoices.map((inv) => {
+                        // charge is gated on bricksCount>0 — a 0-brick row
+                        // (AddCustomerPaymentModal's "later payment against
+                        // an existing due") is a payment, not a bill, so it
+                        // has nothing charged on it. Raw (charge - paid)
+                        // then reads negative for exactly that row (paid
+                        // something, charged nothing) — mathematically a
+                        // credit, not a due, and confusing to show as a
+                        // negative number in a "Remaining Due" column right
+                        // next to two positive figures. Clamped at 0 with
+                        // the excess shown as its own Credit label instead,
+                        // same fix already applied to the Reports engine's
+                        // customers/invoices reports (see trade.reports.ts).
                         const charge = inv.bricksCount > 0 ? inv.netAmount : 0;
                         const paid = inv.amountPaidNow ?? inv.netAmount;
-                        const due = Math.round((charge - paid) * 100) / 100;
+                        const rawDue = Math.round((charge - paid) * 100) / 100;
+                        const due = Math.max(0, rawDue);
+                        const credit = Math.max(0, -rawDue);
                         return (
                           <tr key={inv._id} onClick={() => setOpenInvoiceId(inv._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">
                             <td className="py-3 text-ink-primary hover:underline">{formatInvoiceNumber(inv, kilnName)}</td>
                             <td className="py-3 text-ink-secondary">{inv.invoiceDate ? new Date(inv.invoiceDate).toLocaleDateString("en-IN") : "—"}</td>
                             <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(charge)}</td>
                             <td className="py-3 text-right tabular-nums text-status-good">₹{formatINR(paid)}</td>
-                            <td className="py-3 text-right tabular-nums text-status-critical">₹{formatINR(due)}</td>
+                            <td className={`py-3 text-right tabular-nums ${credit > 0 ? "text-status-good" : "text-status-critical"}`}>
+                              {credit > 0 ? `${t("customer.invoiceCreditPrefix")} ₹${formatINR(credit)}` : `₹${formatINR(due)}`}
+                            </td>
                           </tr>
                         );
                       })}

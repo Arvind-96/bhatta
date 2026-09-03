@@ -8,7 +8,7 @@ import { listExpenseTypes } from "../expenseType.service";
 import { listBrickCategories } from "../brickCategory.service";
 import { itemsOrLegacyFallback } from "../brickLineItems.util";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
-import { ReportDefinition, round2 } from "./types";
+import { ReportDefinition, cashOnlineSplit, round2 } from "./types";
 
 // One row per customer, totals scoped to the requested period only (not
 // lifetime balance — the Customer page already shows that) — satisfies
@@ -46,12 +46,30 @@ const customers: ReportDefinition = {
         // creditThisPeriod instead, so the money is still visible, just not
         // disguised as a below-zero "due".
         const rawDue = round2(invoicedThisPeriod - paidThisPeriod);
+        // Cash/online actually collected from THIS customer, summed across
+        // every one of their invoices this period — including a later
+        // top-up payment against an earlier due (AddCustomerPaymentModal's
+        // own 0-brick advance invoice), since that's a real invoice row
+        // like any other and correctly carries its own paymentMode/split.
+        // This is the one place in the app that answers "who paid how much
+        // cash vs online" per customer, correctly netted across however
+        // many separate invoices/payments it took.
+        let cashPaid = 0;
+        let onlinePaid = 0;
+        for (const inv of invoices) {
+          const paidNow = inv.amountPaidNow ?? inv.netAmount;
+          const split = cashOnlineSplit(inv.paymentMode, inv.cashAmount, inv.onlineAmount, paidNow);
+          cashPaid += split.cash;
+          onlinePaid += split.online;
+        }
         return {
           customer: c.name,
           phone: (c.phones ?? [])[0] ?? "",
           invoiceCount: invoices.length,
           invoicedThisPeriod,
           paidThisPeriod,
+          cashPaid: round2(cashPaid),
+          onlinePaid: round2(onlinePaid),
           dueThisPeriod: Math.max(0, rawDue),
           creditThisPeriod: Math.max(0, -rawDue),
         };
@@ -61,6 +79,8 @@ const customers: ReportDefinition = {
     const totals = {
       invoicedThisPeriod: round2(nonZero.reduce((s, r) => s + r.invoicedThisPeriod, 0)),
       paidThisPeriod: round2(nonZero.reduce((s, r) => s + r.paidThisPeriod, 0)),
+      cashPaid: round2(nonZero.reduce((s, r) => s + r.cashPaid, 0)),
+      onlinePaid: round2(nonZero.reduce((s, r) => s + r.onlinePaid, 0)),
       dueThisPeriod: round2(nonZero.reduce((s, r) => s + r.dueThisPeriod, 0)),
       creditThisPeriod: round2(nonZero.reduce((s, r) => s + r.creditThisPeriod, 0)),
     };
@@ -73,6 +93,8 @@ const customers: ReportDefinition = {
         { key: "invoiceCount", labelKey: "reports.col.invoiceCount", format: "number" },
         { key: "invoicedThisPeriod", labelKey: "reports.col.invoicedThisPeriod", format: "currency" },
         { key: "paidThisPeriod", labelKey: "reports.col.paidThisPeriod", format: "currency" },
+        { key: "cashPaid", labelKey: "reports.col.cashAmount", format: "currency" },
+        { key: "onlinePaid", labelKey: "reports.col.onlineAmount", format: "currency" },
         { key: "dueThisPeriod", labelKey: "reports.col.dueThisPeriod", format: "currency" },
         { key: "creditThisPeriod", labelKey: "reports.col.credit", format: "currency" },
       ],

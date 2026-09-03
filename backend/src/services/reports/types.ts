@@ -88,3 +88,25 @@ export function refName(ref: unknown): string | null {
 export function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
+
+// Cash/online split for one row's own contribution to a period total —
+// same convention financialOverview.service.ts's splitByPaymentMode uses
+// (a plain CASH row counts fully as cash, BANK/UPI/GST_INVOICE fully as
+// online, CASH_AND_ONLINE by its own recorded cashAmount:onlineAmount
+// ratio), just row-at-a-time rather than pre-aggregated, so a report can
+// sum it alongside its own other per-row totals. A row with no
+// paymentMode recorded contributes 0 to both (never guessed) — callers
+// summing this across many rows should treat cash+online < amount as
+// "some rows have no payment mode on file" rather than a discrepancy.
+export function cashOnlineSplit(paymentMode: string | null | undefined, cashAmount: number | null | undefined, onlineAmount: number | null | undefined, amount: number) {
+  if (!paymentMode) return { cash: 0, online: 0 };
+  if (paymentMode === "CASH") return { cash: amount, online: 0 };
+  if (paymentMode === "CASH_AND_ONLINE") {
+    const recordedCash = cashAmount ?? 0;
+    const recordedOnline = onlineAmount ?? 0;
+    const recordedTotal = recordedCash + recordedOnline;
+    if (recordedTotal <= 0) return { cash: 0, online: 0 };
+    return { cash: round2((recordedCash / recordedTotal) * amount), online: round2((recordedOnline / recordedTotal) * amount) };
+  }
+  return { cash: 0, online: amount }; // BANK / UPI / GST_INVOICE
+}

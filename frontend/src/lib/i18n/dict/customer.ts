@@ -38,6 +38,7 @@ export const customerDict: Record<string, Record<Locale, string>> = {
   "customer.invoiceTotalHeader": { en: "Total Amount", hi: "कुल राशि" },
   "customer.invoicePaidHeader": { en: "Amount Paid", hi: "भुगतान राशि" },
   "customer.invoiceDueHeader": { en: "Remaining Due", hi: "शेष बकाया" },
+  "customer.invoiceCreditPrefix": { en: "Credit", hi: "क्रेडिट" },
   "customer.addAmountButton": { en: "Add Amount", hi: "राशि जोड़ें" },
   "customer.addAmountTitle": { en: "Add amount / general payment", hi: "राशि / सामान्य भुगतान जोड़ें" },
   "customer.amountPlaceholder": { en: "Amount (₹)", hi: "राशि (₹)" },
