@@ -16,9 +16,9 @@ import { EditDispatchModal } from "@/components/dispatch/EditDispatchModal";
 import { DispatchDetailPage } from "@/components/dispatch/DispatchDetailPage";
 import { BrickLineItemsEditor, emptyLineItemRow, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
-import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import { PaymentSplitFields, isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
 import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
-import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, LaborPaymentMode, Person } from "@/types";
+import type { BrickCategory, BrickLoadingEntry, BrickVehicleType, Dispatch as DispatchEntry, FinishedGoodsReconciliation, LaborPaymentMode, PaymentMode, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -65,6 +65,9 @@ function emptyForm() {
     amount: "",
     amountAutoFilled: true,
     discountAmount: "",
+    paymentMode: "" as "" | PaymentMode,
+    cashAmount: "",
+    onlineAmount: "",
     items: [emptyLineItemRow()] as LineItemRow[],
     placeOfSupply: "",
     notes: "",
@@ -218,6 +221,11 @@ export function Dispatch() {
       setFormError(t("payment.splitMismatch", { total: (Number(form.driverTipAmount) || 0).toLocaleString("en-IN") }));
       return;
     }
+    const netAmountForSplit = tripLocked ? Number(form.amount) || 0 : (Number(form.amount) || 0) - (Number(form.discountAmount) || 0);
+    if (isPaymentSplitMismatched(form.paymentMode, netAmountForSplit, form.cashAmount, form.onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: netAmountForSplit.toLocaleString("en-IN") }));
+      return;
+    }
     setFormError("");
     setLoading(true);
     try {
@@ -229,6 +237,9 @@ export function Dispatch() {
         loadingEntryId: form.loadingEntryId || undefined,
         amount: form.amount ? Number(form.amount) : undefined,
         discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
+        paymentMode: form.paymentMode || undefined,
+        cashAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.cashAmount) : undefined,
+        onlineAmount: form.paymentMode === "CASH_AND_ONLINE" ? Number(form.onlineAmount) : undefined,
         items: tripLocked
           ? undefined
           : form.items
@@ -429,6 +440,32 @@ export function Dispatch() {
                 className={cn(inputClass, tripLocked && "cursor-not-allowed opacity-70")}
               />
             </div>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-muted">{t("common.howWasThisPaid")}</span>
+              <select
+                value={form.paymentMode}
+                onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value as PaymentMode }))}
+                className={inputClass}
+              >
+                <option value="">{t("common.select")}</option>
+                <option value="CASH">{t("dispatch.paymentCash")}</option>
+                <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
+                <option value="UPI">{t("dispatch.paymentUpi")}</option>
+                <option value="GST_INVOICE">{t("dispatch.paymentGstInvoice")}</option>
+                <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
+              </select>
+            </label>
+            {form.paymentMode === "CASH_AND_ONLINE" && (
+              <PaymentSplitFields
+                totalAmount={Math.max(0, (Number(form.amount) || 0) - (Number(form.discountAmount) || 0))}
+                cashAmount={form.cashAmount}
+                onlineAmount={form.onlineAmount}
+                onCashAmountChange={(v) => setForm((f) => ({ ...f, cashAmount: v }))}
+                onOnlineAmountChange={(v) => setForm((f) => ({ ...f, onlineAmount: v }))}
+                inputClassName={inputClass}
+              />
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               <input

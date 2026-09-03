@@ -8,9 +8,9 @@ import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
 import { BrickLineItemsEditor, isValidLineItemRow, lineItemRowsFrom, type LineItemRow } from "@/components/dispatch/BrickLineItemsEditor";
 import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
-import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import { PaymentSplitFields, isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
 import { VehicleNumberInput } from "@/components/shared/VehicleNumberInput";
-import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, LaborPaymentMode, Person } from "@/types";
+import type { BrickCategory, BrickGrade, Dispatch as DispatchEntry, LaborPaymentMode, PaymentMode, Person } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -47,6 +47,9 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
   const [items, setItems] = useState<LineItemRow[]>(lineItemRowsFrom(dispatch));
   const [amount, setAmount] = useState(String(grossAmount));
   const [discountAmount, setDiscountAmount] = useState(dispatch.discountAmount ? String(dispatch.discountAmount) : "");
+  const [paymentMode, setPaymentMode] = useState<PaymentMode | "">(dispatch.paymentMode ?? "");
+  const [cashAmount, setCashAmount] = useState(dispatch.cashAmount != null ? String(dispatch.cashAmount) : "");
+  const [onlineAmount, setOnlineAmount] = useState(dispatch.onlineAmount != null ? String(dispatch.onlineAmount) : "");
   const [driverName, setDriverName] = useState(dispatch.driverName ?? "");
   const [driverPhone, setDriverPhone] = useState(dispatch.driverPhone ?? "");
   const [vehicleNumber, setVehicleNumber] = useState(dispatch.vehicleNumber ? formatVehicleNumber(dispatch.vehicleNumber) : "");
@@ -95,6 +98,11 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
       setFormError(t("payment.splitMismatch", { total: (Number(driverTipAmount) || 0).toLocaleString("en-IN") }));
       return;
     }
+    const netAmountForSplit = Math.max(0, (Number(amount) || 0) - (Number(discountAmount) || 0));
+    if (isPaymentSplitMismatched(paymentMode, netAmountForSplit, cashAmount, onlineAmount)) {
+      setFormError(t("payment.splitMismatch", { total: netAmountForSplit.toLocaleString("en-IN") }));
+      return;
+    }
     setFormError("");
     setSaving(true);
     try {
@@ -111,6 +119,9 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
         })),
         amount: Number(amount),
         discountAmount: discountAmount ? Number(discountAmount) : 0,
+        paymentMode: paymentMode || undefined,
+        cashAmount: paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
+        onlineAmount: paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
         driverName: driverName || undefined,
         driverPhone: driverPhone || undefined,
         vehicleNumber: vehicleNumber || undefined,
@@ -212,6 +223,29 @@ export function EditDispatchModal({ dispatch, onClose, onSaved }: EditDispatchMo
               {t("dispatch.netAmountPreview")}:{" "}
               <span className="font-semibold text-ink-primary">₹{formatINR(Math.max(0, Number(amount) - Number(discountAmount)))}</span>
             </p>
+          )}
+          <label className="col-span-2 flex flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("common.howWasThisPaid")}</span>
+            <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as PaymentMode)} className={inputClass}>
+              <option value="">{t("common.select")}</option>
+              <option value="CASH">{t("dispatch.paymentCash")}</option>
+              <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
+              <option value="UPI">{t("dispatch.paymentUpi")}</option>
+              <option value="GST_INVOICE">{t("dispatch.paymentGstInvoice")}</option>
+              <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
+            </select>
+          </label>
+          {paymentMode === "CASH_AND_ONLINE" && (
+            <div className="col-span-2">
+              <PaymentSplitFields
+                totalAmount={Math.max(0, Number(amount) - Number(discountAmount || 0))}
+                cashAmount={cashAmount}
+                onlineAmount={onlineAmount}
+                onCashAmountChange={setCashAmount}
+                onOnlineAmountChange={setOnlineAmount}
+                inputClassName={inputClass}
+              />
+            </div>
           )}
           <input
             placeholder={t("dispatch.driverNamePlaceholder")}
