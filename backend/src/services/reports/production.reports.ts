@@ -8,9 +8,10 @@ import { listStackingEntries } from "../stacking.service";
 import { listFiringShifts } from "../firingShift.service";
 import { listNikasiEntries } from "../nikasi.service";
 import { listBrickLoadingEntries } from "../brickLoading.service";
+import { listInvoices } from "../dispatchDocuments.service";
 import { listGherCycleCrossChecks } from "../gherCycle.service";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
-import { ReportDefinition, refName, round2 } from "./types";
+import { ReportDefinition, cashOnlineSplit, refName, round2 } from "./types";
 
 function groupedOrDetail<T extends Record<string, unknown>>(
   groupBy: string | undefined,
@@ -292,19 +293,134 @@ const nikasi: ReportDefinition = {
 // CASH_AND_ONLINE — a plain CASH dispatch has them both null even though
 // 100% of it was cash. Reading the raw fields directly (as this report
 // used to) would misreport every single-mode dispatch as "no payment
-// recorded" instead of fully cash or fully online.
+// recorded" instead of fully cash or fully online. Delegates the actual
+// CASH_AND_ONLINE split to the shared cashOnlineSplit (see types.ts) —
+// this used to return the row's raw cashAmount/onlineAmount unscaled,
+// which silently over-reported when `amount` was less than
+// cashAmount+onlineAmount (a partially-paid invoice whose cash/online
+// split was entered against the FULL bill, not just what's actually been
+// collected so far) — e.g. a ₹1,29,500 sale with only ₹1,25,500 paid but
+// cashAmount/onlineAmount recorded as 69,500/60,000 (summing to the full
+// 1,29,500) showed cash+online summing to the FULL amount while ALSO
+// separately claiming ₹4,000 due, double-counting that ₹4,000.
 function effectiveSplit(paymentMode: string | null | undefined, cashAmount: number | null | undefined, onlineAmount: number | null | undefined, amount: number) {
   if (!paymentMode) return { cash: null as number | null, online: null as number | null };
-  if (paymentMode === "CASH") return { cash: amount, online: 0 };
-  if (paymentMode === "CASH_AND_ONLINE") return { cash: cashAmount ?? 0, online: onlineAmount ?? 0 };
-  return { cash: 0, online: amount }; // BANK / UPI / GST_INVOICE
+  return cashOnlineSplit(paymentMode, cashAmount, onlineAmount, amount);
+}
+
+interface FifoInvoiceRow {
+  dispatchId: string | null;
+  bricksCount: number;
+  netAmount: number;
+  amountPaidNow: number | null;
+  paymentMode: string | null;
+  cashAmount: number | null;
+  onlineAmount: number | null;
+  invoiceDate: Date | null;
+  createdAt: Date | null;
+}
+
+// A later top-up payment against an earlier due is logged as its own
+// separate, un-dispatched Invoice (see AddCustomerPaymentModal) — it never
+// touches the original sale's own amountPaidNow, so left alone that
+// original dispatch's own "due" keeps showing the original shortfall
+// forever, even once the customer has genuinely paid it off. This walks
+// one customer's full invoice history in date order and applies every
+// payment — whether it's a later 0-brick top-up or an overpayment on a
+// real sale — to the OLDEST still-open charge first (FIFO), exactly the
+// way a real accounts-receivable ledger works. Returns, per dispatchId:
+// the true remaining due after all of that customer's payments are
+// accounted for, and any EXTRA cash/online that a later payment
+// contributed toward it (so a report row's own cash+online+due still
+// sums to its own billed amount instead of quietly losing track of the
+// ₹X a later, separate payment actually settled).
+function fifoResolveCustomerDues(customerInvoices: FifoInvoiceRow[]) {
+  const sorted = [...customerInvoices].sort((a, b) => (a.invoiceDate ?? a.createdAt ?? new Date(0)).getTime() - (b.invoiceDate ?? b.createdAt ?? new Date(0)).getTime());
+  const openQueue: { dispatchId: string; remaining: number }[] = [];
+  const extraCash = new Map<string, number>();
+  const extraOnline = new Map<string, number>();
+
+  function applyCredit(amount: number, paymentMode: string | null, cashAmount: number | null, onlineAmount: number | null) {
+    if (amount <= 0) return;
+    const split = cashOnlineSplit(paymentMode, cashAmount, onlineAmount, amount);
+    let cashLeft = split.cash;
+    let onlineLeft = split.online;
+    while ((cashLeft > 0.005 || onlineLeft > 0.005) && openQueue.length > 0) {
+      const front = openQueue[0];
+      const totalLeft = round2(cashLeft + onlineLeft);
+      const applied = Math.min(front.remaining, totalLeft);
+      if (applied <= 0) break;
+      const fromCash = totalLeft > 0 ? round2((cashLeft / totalLeft) * applied) : 0;
+      const fromOnline = round2(applied - fromCash);
+      extraCash.set(front.dispatchId, round2((extraCash.get(front.dispatchId) ?? 0) + fromCash));
+      extraOnline.set(front.dispatchId, round2((extraOnline.get(front.dispatchId) ?? 0) + fromOnline));
+      cashLeft = round2(cashLeft - fromCash);
+      onlineLeft = round2(onlineLeft - fromOnline);
+      front.remaining = round2(front.remaining - applied);
+      if (front.remaining <= 0.005) openQueue.shift();
+    }
+  }
+
+  for (const inv of sorted) {
+    const charge = inv.bricksCount > 0 ? inv.netAmount : 0;
+    const paidNow = inv.amountPaidNow ?? inv.netAmount;
+    if (charge > 0) {
+      const shortfall = round2(charge - paidNow);
+      if (shortfall > 0.005 && inv.dispatchId) {
+        openQueue.push({ dispatchId: inv.dispatchId, remaining: shortfall });
+      } else if (shortfall < -0.005) {
+        applyCredit(-shortfall, inv.paymentMode, inv.cashAmount, inv.onlineAmount);
+      }
+    } else {
+      applyCredit(paidNow, inv.paymentMode, inv.cashAmount, inv.onlineAmount);
+    }
+  }
+
+  const remainingDue = new Map<string, number>();
+  for (const item of openQueue) {
+    remainingDue.set(item.dispatchId, round2((remainingDue.get(item.dispatchId) ?? 0) + item.remaining));
+  }
+  return { remainingDue, extraCash, extraOnline };
 }
 
 const brickLoading: ReportDefinition = {
   key: "brickLoading",
   titleKey: "reports.title.brickLoading",
   async run(kilnId, filters) {
-    const rows = await listBrickLoadingEntries(kilnId, null, { driverId: filters.driverId, from: filters.from, to: filters.to });
+    const [rows, allInvoices] = await Promise.all([
+      listBrickLoadingEntries(kilnId, null, { driverId: filters.driverId, from: filters.from, to: filters.to }),
+      // Kiln-wide, not date-filtered — a later payment outside this
+      // report's own date range still has to be able to clear a due
+      // inside it (see fifoResolveCustomerDues below).
+      listInvoices(kilnId, null, {}),
+    ]);
+    const customerKey = (customerId: string | null | undefined, customerName: string) => customerId ?? `name:${customerName.trim().toLowerCase()}`;
+    const invoicesByCustomer = new Map<string, FifoInvoiceRow[]>();
+    for (const inv of allInvoices) {
+      const key = customerKey(inv.customerId, inv.customerName);
+      const list = invoicesByCustomer.get(key) ?? [];
+      list.push({
+        dispatchId: inv.dispatchId,
+        bricksCount: inv.bricksCount,
+        netAmount: inv.netAmount,
+        amountPaidNow: inv.amountPaidNow,
+        paymentMode: inv.paymentMode,
+        cashAmount: inv.cashAmount,
+        onlineAmount: inv.onlineAmount,
+        invoiceDate: inv.invoiceDate,
+        createdAt: inv.createdAt,
+      });
+      invoicesByCustomer.set(key, list);
+    }
+    const remainingDueByDispatch = new Map<string, number>();
+    const extraCashByDispatch = new Map<string, number>();
+    const extraOnlineByDispatch = new Map<string, number>();
+    for (const custInvoices of invoicesByCustomer.values()) {
+      const { remainingDue, extraCash, extraOnline } = fifoResolveCustomerDues(custInvoices);
+      for (const [dispatchId, due] of remainingDue) remainingDueByDispatch.set(dispatchId, due);
+      for (const [dispatchId, cash] of extraCash) extraCashByDispatch.set(dispatchId, cash);
+      for (const [dispatchId, online] of extraOnline) extraOnlineByDispatch.set(dispatchId, online);
+    }
     // The CUSTOMER's own brick payment (mode + split) is never stored on
     // brickLoadingEntries itself — only on whichever Dispatch this trip is
     // linked to (see listBrickLoadingEntries' dispatchId resolution). A
@@ -322,10 +438,13 @@ const brickLoading: ReportDefinition = {
     // listBrickLoadingEntries resolves that invoice too and attaches it as
     // invoicePaidNow/invoicePaymentMode/... on the dispatch object; prefer
     // it here whenever it exists, since it's the more authoritative,
-    // partial-payment-aware source. cashAmount+onlineAmount is therefore
-    // NOT guaranteed to sum to `amount` any more when there's a real due —
-    // the new `due` column makes up the difference explicitly instead of
-    // silently folding an unpaid balance into "cash".
+    // partial-payment-aware source. The raw shortfall (amount - paidNow)
+    // is then corrected by fifoResolveCustomerDues above — a later,
+    // separate top-up payment against this same customer may have already
+    // settled some or all of it, in which case the resolved `due` reads
+    // lower (often 0) than the raw shortfall, and that payment's own
+    // cash/online contribution is folded in via extraCash/extraOnline so
+    // cash+online+due still sums to the billed `amount`.
     const detail = rows.map((r) => {
       const dispatch = r.dispatchId && typeof r.dispatchId === "object" ? r.dispatchId : null;
       const amount = dispatch?.amount ?? r.amount ?? 0;
@@ -336,6 +455,10 @@ const brickLoading: ReportDefinition = {
           ? effectiveSplit(dispatch.invoicePaymentMode, dispatch.invoiceCashAmount, dispatch.invoiceOnlineAmount, paidNow)
           : effectiveSplit(dispatch.paymentMode, dispatch.cashAmount, dispatch.onlineAmount, amount)
         : { cash: null, online: null };
+      const dispatchId = dispatch?._id;
+      const due = dispatch ? round2(remainingDueByDispatch.get(dispatchId ?? "") ?? Math.max(0, amount - paidNow)) : null;
+      const cashAmount = split.cash != null ? round2(split.cash + (extraCashByDispatch.get(dispatchId ?? "") ?? 0)) : split.cash;
+      const onlineAmount = split.online != null ? round2(split.online + (extraOnlineByDispatch.get(dispatchId ?? "") ?? 0)) : split.online;
       return {
         date: r.date ? r.date.toISOString() : null,
         tripNumber: r.tripNumber ?? "",
@@ -344,9 +467,9 @@ const brickLoading: ReportDefinition = {
         vehicleNumber: r.vehicleNumber,
         bricksCount: r.bricksCount,
         amount,
-        cashAmount: split.cash,
-        onlineAmount: split.online,
-        due: dispatch ? round2(Math.max(0, amount - paidNow)) : null,
+        cashAmount,
+        onlineAmount,
+        due,
         tipAmount: r.tipAmount ?? 0,
       };
     });
