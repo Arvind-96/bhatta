@@ -39,11 +39,18 @@ export function AddCustomerPaymentModal({ customer, currentDue, onClose, onSaved
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
+  // currentDue is the raw, unclamped totalDue — a customer with a net
+  // credit balance (paid more than billed) has this go negative, which
+  // would otherwise print a literal minus sign here (e.g. "₹-4,000").
+  // Same clamp-for-display fix as CustomerDetailPage's own dueDisplay.
+  const currentDueDisplay = Math.max(0, currentDue);
   const remainingDueAfter = Math.max(0, currentDue - (Number(amount) || 0));
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setFormError("");
     setSaving(true);
     try {
       const paidAmount = Number(amount);
@@ -65,6 +72,8 @@ export function AddCustomerPaymentModal({ customer, currentDue, onClose, onSaved
       printInvoiceRecord(row, kilnInfo, [], stamp, t("customer.advancePaymentCategoryLabel"));
       onSaved();
       onClose();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -92,7 +101,7 @@ export function AddCustomerPaymentModal({ customer, currentDue, onClose, onSaved
           <div className="rounded-xl border border-series-1/30 bg-series-1/5 px-4 py-3">
             <div className="flex items-center justify-between text-sm">
               <span className="text-ink-secondary">{t("customer.currentDueLabel")}</span>
-              <span className="font-medium tabular-nums text-ink-primary">₹{formatINR(currentDue)}</span>
+              <span className="font-medium tabular-nums text-ink-primary">₹{formatINR(currentDueDisplay)}</span>
             </div>
             <div className="mt-1 flex items-center justify-between text-sm">
               <span className="text-ink-secondary">{t("customer.dueAfterPaymentLabel")}</span>
@@ -100,6 +109,7 @@ export function AddCustomerPaymentModal({ customer, currentDue, onClose, onSaved
             </div>
           </div>
 
+          {formError && <p className="text-sm text-status-critical">{formError}</p>}
           <Button type="submit" disabled={saving}>
             {t("customer.savePayment")}
           </Button>

@@ -3,19 +3,28 @@ import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { createDoctorVisit, deleteDoctorVisit, listDoctorVisits, updateDoctorVisit } from "../services/doctorVisit.service";
 import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
+import { validateCashOnlineSplit } from "../utils/paymentSplit";
 
-const createDoctorVisitSchema = z.object({
-  doctorId: z.string().min(1),
-  personId: z.string().min(1),
-  ailment: z.string().optional(),
-  medicineCost: z.number().min(0).optional(),
-  consultationFee: z.number().min(0).optional(),
-  paymentMode: z.enum(SIMPLE_PAYMENT_MODES).optional(),
-  cashAmount: z.number().min(0).optional(),
-  onlineAmount: z.number().min(0).optional(),
-  date: z.string().optional(),
-  notes: z.string().optional(),
-});
+// Bug fix: neither schema below used to validate that cashAmount +
+// onlineAmount actually sum to (medicineCost + consultationFee) when
+// paymentMode is CASH_AND_ONLINE — the client already checks this
+// (DoctorVisitDetailPage.tsx/Doctor.tsx's isPaymentSplitMismatched), but
+// nothing stopped a malformed request from writing a mismatched split
+// straight to the database and the auto-logged Expense row.
+const createDoctorVisitSchema = z
+  .object({
+    doctorId: z.string().min(1),
+    personId: z.string().min(1),
+    ailment: z.string().optional(),
+    medicineCost: z.number().min(0).optional(),
+    consultationFee: z.number().min(0).optional(),
+    paymentMode: z.enum(SIMPLE_PAYMENT_MODES).optional(),
+    cashAmount: z.number().min(0).optional(),
+    onlineAmount: z.number().min(0).optional(),
+    date: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((data, ctx) => validateCashOnlineSplit(data, (data.medicineCost ?? 0) + (data.consultationFee ?? 0), ctx));
 
 export async function create(req: AuthedRequest, res: Response) {
   const input = createDoctorVisitSchema.parse(req.body);
@@ -33,18 +42,20 @@ export async function list(req: AuthedRequest, res: Response) {
   res.json(await listDoctorVisits(req.kiln!.id, { doctorId, personId }));
 }
 
-const updateDoctorVisitSchema = z.object({
-  doctorId: z.string().min(1).optional(),
-  personId: z.string().min(1).optional(),
-  ailment: z.string().optional(),
-  medicineCost: z.number().min(0).optional(),
-  consultationFee: z.number().min(0).optional(),
-  paymentMode: z.enum(SIMPLE_PAYMENT_MODES).optional(),
-  cashAmount: z.number().min(0).optional(),
-  onlineAmount: z.number().min(0).optional(),
-  date: z.string().optional(),
-  notes: z.string().optional(),
-});
+const updateDoctorVisitSchema = z
+  .object({
+    doctorId: z.string().min(1).optional(),
+    personId: z.string().min(1).optional(),
+    ailment: z.string().optional(),
+    medicineCost: z.number().min(0).optional(),
+    consultationFee: z.number().min(0).optional(),
+    paymentMode: z.enum(SIMPLE_PAYMENT_MODES).optional(),
+    cashAmount: z.number().min(0).optional(),
+    onlineAmount: z.number().min(0).optional(),
+    date: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((data, ctx) => validateCashOnlineSplit(data, (data.medicineCost ?? 0) + (data.consultationFee ?? 0), ctx));
 
 export async function update(req: AuthedRequest, res: Response) {
   const input = updateDoctorVisitSchema.parse(req.body);

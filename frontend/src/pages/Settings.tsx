@@ -153,16 +153,30 @@ function GeofenceSettings() {
 
 function ChamberSettings() {
   const { t } = useTranslation();
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  // Bug fix: this form used to hardcode "24" and never load the kiln's
+  // actual current chamber count — write-only, no way to see what's
+  // configured before overwriting it (and no chamber is itself an "empty
+  // capacity" concept — the count IS just however many chamber rows
+  // already exist for this kiln).
   const [count, setCount] = useState("24");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!activeKilnId) return;
+    api.ghers.list().then((ghers) => {
+      if (ghers.length > 0) setCount(String(ghers.length));
+    });
+  }, [activeKilnId]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!count) return;
     setSaving(true);
     try {
-      await api.ghers.setup(Number(count));
+      const ghers = await api.ghers.setup(Number(count));
+      setCount(String(ghers.length));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -199,16 +213,32 @@ function ChamberSettings() {
 
 function YardCapacitySettings() {
   const { t } = useTranslation();
-  const [capacity, setCapacity] = useState("");
+  const kilns = useAuthStore((s) => s.kilns);
+  const activeKilnId = useAuthStore((s) => s.activeKilnId);
+  const setKilns = useAuthStore((s) => s.setKilns);
+  const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
+
+  // Bug fix: this form used to hardcode its initial state and never load
+  // the currently saved value — write-only, no way to see what's
+  // configured before overwriting it. Same seed-from-store + re-seed-on-
+  // kiln-switch pattern every other Settings card here already uses.
+  const [capacity, setCapacity] = useState(activeKiln?.yardCapacityBricks != null ? String(activeKiln.yardCapacityBricks) : "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setCapacity(activeKiln?.yardCapacityBricks != null ? String(activeKiln.yardCapacityBricks) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKilnId]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!capacity) return;
     setSaving(true);
     try {
-      await api.kilns.updateYardCapacity(Number(capacity));
+      const value = Number(capacity);
+      await api.kilns.updateYardCapacity(value);
+      setKilns(kilns.map((k) => (k.kilnId === activeKilnId ? { ...k, yardCapacityBricks: value } : k)));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {

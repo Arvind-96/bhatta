@@ -17,6 +17,10 @@ export const compareDict: Record<string, Record<Locale, string>> = {
   "compare.metric": { en: "Metric", hi: "मापदंड" },
   "compare.noData": { en: "No data for this module yet.", hi: "इस मॉड्यूल के लिए अभी तक कोई डेटा नहीं है।" },
   "compare.loading": { en: "Loading comparison…", hi: "तुलना लोड हो रही है…" },
+  "compare.salaryAccrualHint": {
+    en: "Accrual view — gross/net salary earned this period, straight from generated slips. Financial Overview and Profit & Loss instead show salary paid in cash, only once it's separately recorded as a payment, so the two can show very different figures for the same period.",
+    hi: "उपार्जित दृश्य — इस अवधि में अर्जित सकल/शुद्ध वेतन, सीधे जनरेट की गई पर्चियों से। फाइनेंशियल ओवरव्यू और लाभ-हानि इसके बजाय नकद में भुगतान किया गया वेतन दिखाते हैं, वह भी तभी जब उसे अलग से भुगतान के रूप में दर्ज किया गया हो — इसलिए दोनों एक ही अवधि के लिए बहुत अलग आंकड़े दिखा सकते हैं।",
+  },
 
   "compare.module.financial": { en: "Financial", hi: "वित्तीय" },
   "compare.module.bricks": { en: "Bricks (Overall)", hi: "ईंटें (कुल)" },

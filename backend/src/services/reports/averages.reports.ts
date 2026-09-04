@@ -6,6 +6,7 @@ import { listSandDeliveries } from "../sandDelivery.service";
 import { listInvoices } from "../dispatchDocuments.service";
 import { totalBricksOf } from "../chamberGrading.service";
 import { listBrickCategories } from "../brickCategory.service";
+import { unbilledDispatchRows } from "./trade.reports";
 import { ReportDefinition, round2 } from "./types";
 
 interface AverageRow extends Record<string, string | number | null> {
@@ -40,7 +41,7 @@ const keyAverages: ReportDefinition = {
       return c;
     };
 
-    const [expenseRows, dueEntries, customerIds, gradingRows, fuelRows, dieselRows, soilRows, sandRows, invoiceRows, categories] = await Promise.all([
+    const [expenseRows, dueEntries, customerIds, gradingRows, fuelRows, dieselRows, soilRows, sandRows, invoiceRows, unbilledRows, categories] = await Promise.all([
       db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), ...dateCond(expenses.date))),
       db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.direction, "DUE"), ...dateCond(ledgerEntries.date))),
       db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "CUSTOMER"))).then((rows) => new Set(rows.map((r) => r._id))),
@@ -50,6 +51,12 @@ const keyAverages: ReportDefinition = {
       listSoilTrips(kilnId, null, { from, to }),
       listSandDeliveries(kilnId, null, { from, to }),
       listInvoices(kilnId, null, { from, to }),
+      // Bug fix: a dispatch that's a real, complete sale but hasn't been
+      // formally invoiced yet was silently missing from "Average sale rate
+      // per brick" — every other invoice-based report (Customers, Invoices,
+      // Sales by Category) was already fixed to merge this in via
+      // trade.reports.ts's unbilledDispatchRows; this one wasn't.
+      unbilledDispatchRows(kilnId, { from, to }),
       listBrickCategories(kilnId),
     ]);
 
@@ -91,7 +98,7 @@ const keyAverages: ReportDefinition = {
     // period, kiln-wide across every category combined. Per-category
     // breakdown already exists (itemWiseAvgSaleRate report); this is the
     // one overall figure.
-    const realSales = invoiceRows.filter((r) => r.bricksCount > 0);
+    const realSales = [...invoiceRows, ...unbilledRows].filter((r) => r.bricksCount > 0);
     const salesAmount = round2(realSales.reduce((s, r) => s + r.netAmount, 0));
     const salesBricks = realSales.reduce((s, r) => s + r.bricksCount, 0);
 

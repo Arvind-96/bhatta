@@ -154,6 +154,7 @@ export function Molding() {
   const [sites, setSites] = useState<PathaiSite[]>([]);
   const [form, setForm] = useState({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", damageFault: "", washedOut: false, siteId: "" });
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
@@ -206,6 +207,7 @@ export function Molding() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.workerId || !form.bricksCount || !form.ratePerThousand) return;
+    setFormError("");
     setLoading(true);
     try {
       await api.molding.create({
@@ -220,6 +222,8 @@ export function Molding() {
       setForm({ workerId: "", bricksCount: "", ratePerThousand: "", damagedCount: "", damageFault: "", washedOut: false, siteId: "" });
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -374,6 +378,7 @@ export function Molding() {
               />
               {t("molding.washedOutByRain")}
             </label>
+            {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
             <Button type="submit" disabled={loading} className="col-span-2">
               {t("molding.saveEntry")}
             </Button>
@@ -455,7 +460,7 @@ export function Molding() {
       {showAddThekedar && (
         <AddPersonModal defaultType="LABOUR_CONTRACTOR" onClose={() => setShowAddThekedar(false)} onCreated={refresh} />
       )}
-      {editingEntry && <EditMoldingEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} onSaved={refresh} />}
+      {editingEntry && <EditMoldingEntryModal entry={editingEntry} sites={sites} onClose={() => setEditingEntry(null)} onSaved={refresh} />}
     </div>
   );
 }

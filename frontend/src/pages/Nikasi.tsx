@@ -223,6 +223,7 @@ export function Nikasi() {
   const [editingEntry, setEditingEntry] = useState<NikasiEntry | null>(null);
   const [form, setForm] = useState({ gherId: "", gangId: "", bricksCount: "", damagedCount: "", damageFault: "", notes: "" });
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const [periodTotals, setPeriodTotals] = useState<NikasiPeriodTotals | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -263,6 +264,7 @@ export function Nikasi() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.gherId || !form.gangId || !form.bricksCount) return;
+    setFormError("");
     setLoading(true);
     try {
       await api.nikasi.create({
@@ -276,6 +278,8 @@ export function Nikasi() {
       setForm({ gherId: "", gangId: "", bricksCount: "", damagedCount: "", damageFault: "", notes: "" });
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -422,6 +426,7 @@ export function Nikasi() {
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               className={inputClass}
             />
+            {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
             <Button type="submit" disabled={loading} className="col-span-2">
               {t("nikasi.saveEntry")}
             </Button>

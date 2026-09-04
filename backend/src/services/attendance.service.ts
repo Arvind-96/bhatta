@@ -34,9 +34,21 @@ async function assertAttendanceEligible(kilnId: string, personId: string) {
   return person;
 }
 
+// `attendances.date` is a calendar-day KEY matched by exact equality
+// (see markAttendance/listAttendanceForDay below), not a real event
+// timestamp — every existing row was written by parsing an admin-picked
+// "YYYY-MM-DD" string through a bare `new Date(...)`, which lands on that
+// date's UTC midnight. This just re-canonicalizes to the same UTC midnight
+// (deterministic regardless of the server process's own local timezone) so
+// the key stays stable and matches what's already stored — it must NOT be
+// swapped for istStartOfDay here, which would shift the key by up to 5.5h
+// and stop matching existing rows. The actual IST-boundary bug for this
+// module is in attendance.controller.ts's "no date given" default, which
+// needs to resolve "today" to the correct IST calendar date BEFORE it
+// reaches this function — see istDateOnly in utils/istTime.ts.
 function startOfDay(date: Date) {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 

@@ -162,6 +162,11 @@ export function Compare() {
   const [rangeB, setRangeB] = useState<DateRangeValue>(() => trailingYearRanges()[1]);
   const [results, setResults] = useState<SeasonYearResult[] | null>(null);
   const [loading, setLoading] = useState(false);
+  // Bug fix: a fetch failure used to fall through to the exact same "No
+  // data" copy as a genuinely empty range — .catch(console.error) left no
+  // visible trace, and a stale result from the last successful fetch could
+  // stay on screen with nothing indicating it was now out of date.
+  const [loadError, setLoadError] = useState("");
   const defaulted = useRef(false);
 
   // Seasons load asynchronously (Dashboard's own effect) after this page
@@ -182,10 +187,17 @@ export function Compare() {
   useEffect(() => {
     if (!activeKilnId || !validRange) return;
     setLoading(true);
+    setLoadError("");
     api.compare
       .get(module, rangeA, rangeB)
-      .then(setResults)
-      .catch(console.error)
+      .then((r) => {
+        setResults(r);
+        setLoadError("");
+      })
+      .catch((err) => {
+        setResults(null);
+        setLoadError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+      })
       .finally(() => setLoading(false));
   }, [activeKilnId, module, rangeA.from, rangeA.to, rangeB.from, rangeB.to, validRange]);
 
@@ -246,8 +258,13 @@ export function Compare() {
       </Card>
 
       <Card>
+        {module === "salary" && (
+          <p className="mb-3 rounded-lg bg-ink-primary/5 px-3 py-2 text-xs text-ink-muted">{t("compare.salaryAccrualHint")}</p>
+        )}
         {loading ? (
           <p className="py-8 text-center text-sm text-ink-muted">{t("compare.loading")}</p>
+        ) : loadError ? (
+          <p className="py-8 text-center text-sm text-status-critical">{loadError}</p>
         ) : !results || metricKeys.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-muted">{t("compare.noData")}</p>
         ) : (

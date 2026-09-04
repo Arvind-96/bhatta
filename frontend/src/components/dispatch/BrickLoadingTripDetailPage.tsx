@@ -42,6 +42,7 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
   const category = typeof trip.categoryId === "object" ? trip.categoryId : null;
   const linkedDispatch = typeof trip.dispatchId === "object" ? trip.dispatchId : null;
   const [addingToDispatch, setAddingToDispatch] = useState(false);
+  const [addToDispatchError, setAddToDispatchError] = useState("");
 
   // Transfers this trip's customer/driver/vehicle/category/amount to a new
   // Dispatch entry via the existing loadingEntryId link (createDispatch
@@ -50,6 +51,7 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
   // it on the Dispatch page.
   async function handleAddToDispatch() {
     if (!confirm(t("dispatchDocs.confirmAddToDispatch"))) return;
+    setAddToDispatchError("");
     setAddingToDispatch(true);
     try {
       const newDispatch = await api.dispatch.create({
@@ -69,6 +71,8 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
         dispatchedOn: trip.date,
       });
       navigateAndHighlight("dispatch", newDispatch._id);
+    } catch (err) {
+      setAddToDispatchError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setAddingToDispatch(false);
     }
@@ -128,6 +132,7 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
             )}
           </div>
         </div>
+        {addToDispatchError && <p className="mt-3 text-sm text-status-critical">{addToDispatchError}</p>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -194,13 +199,16 @@ export function BrickLoadingTripDetailPage({ trip, onBack, onEdit, onDelete }: B
         {linkedDispatch && (
           <Card className="lg:col-span-2">
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.dispatchHeader")}</h4>
-            <button
-              type="button"
-              onClick={() => navigateAndHighlight("dispatch", linkedDispatch._id)}
-              className="text-sm text-series-1 hover:underline"
-            >
-              {linkedDispatch.slipNumber}
-            </button>
+            <span className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigateAndHighlight("dispatch", linkedDispatch._id)}
+                className="text-sm text-series-1 hover:underline"
+              >
+                {linkedDispatch.slipNumber}
+              </button>
+              {linkedDispatch.cancelled && <CancelledBadge label={t("common.cancelledBadge")} />}
+            </span>
           </Card>
         )}
 

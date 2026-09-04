@@ -37,6 +37,11 @@ export const doctorVisits = mysqlTable("doctor_visits", {
   ailment: text("ailment"),
   medicineCost: double("medicineCost").notNull().default(0),
   consultationFee: double("consultationFee").notNull().default(0),
+  // The same simpler Cash/Online/Cash+Online choice as Expense/Driver
+  // Reward/Loading/Unloading Charge (SIMPLE_PAYMENT_MODES) — this value
+  // flows straight through to the auto-logged Expense row's own
+  // paymentMode (see doctorVisit.service.ts), which is SIMPLE_PAYMENT_MODES
+  // too, so the two must stay in the same enum.
   paymentMode: varchar("paymentMode", { length: 20, enum: SIMPLE_PAYMENT_MODES }),
   cashAmount: double("cashAmount"),
   onlineAmount: double("onlineAmount"),

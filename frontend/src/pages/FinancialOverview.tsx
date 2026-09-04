@@ -86,17 +86,22 @@ export function FinancialOverview() {
   const [range, setRange] = useState({ from: "", to: "" });
   const [customFlow, setCustomFlow] = useState<FinancialFlow | null>(null);
   const [customLoading, setCustomLoading] = useState(false);
+  const [customError, setCustomError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
     setOverview(await api.financialOverview.get());
+    setLoadError("");
   }
 
   async function manualRefresh() {
     setRefreshing(true);
     try {
       await refresh();
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setRefreshing(false);
     }
@@ -104,7 +109,12 @@ export function FinancialOverview() {
 
   useEffect(() => {
     if (!activeKilnId) return;
-    refresh().catch(console.error);
+    // Bug fix: this used to only log a failed initial load to the
+    // console — the page then rendered entirely blank (see the `if
+    // (!overview) return null` below) with no indication anything went
+    // wrong, indistinguishable from "still loading."
+    refresh().catch((err) => setLoadError(err instanceof Error ? err.message : t("common.somethingWentWrong")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKilnId]);
 
   useKilnEvent("dispatch:update", () => refresh());
@@ -116,15 +126,37 @@ export function FinancialOverview() {
 
   async function viewCustomRange() {
     if (!range.from || !range.to) return;
+    // Bug fix: a reversed range (from after to) used to silently produce
+    // an empty/zero report instead of an error — Compare's own two-range
+    // picker already validates this; Financial Overview's single range
+    // didn't.
+    if (range.from > range.to) {
+      setCustomError(t("financialOverview.invalidRange"));
+      return;
+    }
     setCustomLoading(true);
+    setCustomError("");
     try {
       setCustomFlow(await api.financialOverview.customRange(range.from, range.to));
+    } catch (err) {
+      setCustomError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setCustomLoading(false);
     }
   }
 
-  if (!overview) return null;
+  if (!overview) {
+    return loadError ? (
+      <Card>
+        <p className="py-8 text-center text-sm text-status-critical">{loadError}</p>
+        <div className="flex justify-center">
+          <Button size="sm" variant="outline" onClick={manualRefresh} disabled={refreshing}>
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} /> {t("common.refresh")}
+          </Button>
+        </div>
+      </Card>
+    ) : null;
+  }
 
   return (
     <div className="space-y-6">
@@ -303,6 +335,7 @@ export function FinancialOverview() {
             <Search className="h-4 w-4" /> {t("financialOverview.viewReport")}
           </Button>
         </div>
+        {customError && <p className="mt-2 text-sm text-status-critical">{customError}</p>}
 
         {customFlow && (
           <div className="mt-4">

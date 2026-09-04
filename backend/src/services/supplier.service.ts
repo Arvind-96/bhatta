@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
-import { suppliers, type RateHistoryEntry, type SupplyListItem } from "../db/schema";
+import { suppliers, supplierInvoices, purchaseOrders, fuelPurchases, type RateHistoryEntry, type SupplyListItem } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
 function itemKey(itemName: string, unit: string) {
@@ -73,9 +73,29 @@ export async function updateSupplier(kilnId: string, supplierId: string, input: 
   return updated;
 }
 
+// No DB-level FK ties supplier_invoices/purchase_orders/fuel_purchases back
+// to suppliers, so a hard delete here used to silently orphan them — the
+// invoice's real due vanished from Debtors & Creditors/Trial Balance (both
+// loop `listSuppliers` to find it), and a PENDING purchase order referencing
+// the deleted supplier could never be fulfilled again ("Supplier not found
+// in this kiln", thrown from inside createSupplierInvoice). Guarded the
+// same check-then-throw way as deleteCustomer/deleteVehicle/
+// deleteBrickCategory: refuse instead of deleting when real history exists.
 export async function deleteSupplier(kilnId: string, supplierId: string) {
   const existing = (await db.select().from(suppliers).where(and(eq(suppliers._id, supplierId), eq(suppliers.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Supplier not found in this kiln");
+
+  const [linkedInvoices, linkedOrders, linkedFuelPurchases] = await Promise.all([
+    db.select({ _id: supplierInvoices._id }).from(supplierInvoices).where(and(eq(supplierInvoices.kilnId, kilnId), eq(supplierInvoices.supplierId, supplierId))),
+    db.select({ _id: purchaseOrders._id }).from(purchaseOrders).where(and(eq(purchaseOrders.kilnId, kilnId), eq(purchaseOrders.supplierId, supplierId))),
+    db.select({ _id: fuelPurchases._id }).from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), eq(fuelPurchases.supplierId, supplierId))),
+  ]);
+  if (linkedInvoices.length > 0 || linkedOrders.length > 0 || linkedFuelPurchases.length > 0) {
+    throw new Error(
+      `Cannot delete this supplier — ${linkedInvoices.length} invoice(s), ${linkedOrders.length} purchase order(s), and ${linkedFuelPurchases.length} fuel purchase(s) are linked to them. Those records would become untraceable.`
+    );
+  }
+
   await db.delete(suppliers).where(eq(suppliers._id, supplierId));
   emitToKiln(kilnId, "supplier:update", { _id: supplierId, deleted: true });
 }

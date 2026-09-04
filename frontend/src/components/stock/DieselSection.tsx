@@ -39,6 +39,7 @@ export function DieselSection() {
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [vehicleForm, setVehicleForm] = useState({ name: "", type: "", initialMeterReading: "", oilTankCapacity: "", notes: "" });
   const [savingVehicle, setSavingVehicle] = useState(false);
+  const [vehicleError, setVehicleError] = useState("");
 
   const [showLogForm, setShowLogForm] = useState(false);
 
@@ -88,8 +89,13 @@ export function DieselSection() {
 
   async function deleteVehicle(vehicle: KilnVehicle) {
     if (!confirm(t("stock.confirmRemoveVehicle", { name: vehicle.name }))) return;
-    await api.kilnVehicles.remove(vehicle._id);
-    await refresh();
+    setVehicleError("");
+    try {
+      await api.kilnVehicles.remove(vehicle._id);
+      await refresh();
+    } catch (err) {
+      setVehicleError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   const openEntry = entries.find((e) => e._id === openEntryId) ?? null;
@@ -184,6 +190,8 @@ export function DieselSection() {
           </form>
         </Card>
       )}
+
+      {vehicleError && <p className="text-sm text-status-critical">{vehicleError}</p>}
 
       {vehicles.length === 0 ? (
         <Card>

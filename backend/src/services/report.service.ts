@@ -12,9 +12,12 @@ import { moldingContractorSummary } from "./molding.service";
 import { listFiringShifts } from "./firingShift.service";
 import { listSoilArrivals } from "./soilArrival.service";
 import { listSoilContracts } from "./soilContract.service";
+import { listSandDeliveries } from "./sandDelivery.service";
+import { listSandContracts } from "./sandContract.service";
 import { listLandLeaseContracts } from "./landLeaseContract.service";
 import { listBrickLoadingEntries } from "./brickLoading.service";
 import { listDispatchesForCustomer } from "./dispatch.service";
+import { listDoctorVisits } from "./doctorVisit.service";
 
 // One complete "everything about this person, from the start of records to
 // now" report, fanning out to each module's own already-scoped list
@@ -35,6 +38,17 @@ export async function getPersonFullReport(kilnId: string, personId: string) {
   ]);
   sections.ledger = ledger;
   sections.paymentReceipts = paymentReceipts;
+
+  // Bug fix: a doctor visit can be logged against ANY person (personId on
+  // doctorVisits isn't gated to a specific PersonType) — but this report
+  // never attached them, so the one place explicitly designed to show
+  // "everything about this person, from one search box" had no doctor-
+  // visit section for anyone, ever. They only ever surfaced indirectly as
+  // a generic "Doctor / Medical" line in the Expenses report, with no way
+  // to see "every time this specific person got sick" from their own
+  // profile.
+  const doctorVisits = await listDoctorVisits(kilnId, { personId });
+  if (doctorVisits.length > 0) sections.doctorVisits = doctorVisits;
 
   const isLabourish = person.type === "WORKER" || person.type === "HELPER" || person.type === "LABOUR_CONTRACTOR";
   if (isLabourish) {
@@ -89,6 +103,20 @@ export async function getPersonFullReport(kilnId: string, personId: string) {
     ]);
     sections.soilArrivals = soilArrivals;
     sections.soilContracts = soilContracts;
+  }
+
+  // Bug fix: every other contract-bearing person type (LANDOWNER above,
+  // LAND_LEASE below) already had its contracts/deliveries attached here —
+  // SAND_CONTRACTOR was simply missed, so searching one from the Reports
+  // page's "search any person" box returned only ledger entries, none of
+  // their actual sand contracts/deliveries.
+  if (person.type === "SAND_CONTRACTOR") {
+    const [sandDeliveries, sandContracts] = await Promise.all([
+      listSandDeliveries(kilnId, null, { sandContractorId: personId }),
+      listSandContracts(kilnId, { sandContractorId: personId }),
+    ]);
+    sections.sandDeliveries = sandDeliveries;
+    sections.sandContracts = sandContracts;
   }
 
   if (person.type === "LAND_LEASE") {

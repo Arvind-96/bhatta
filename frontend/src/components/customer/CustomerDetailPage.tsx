@@ -37,6 +37,7 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
   const [editing, setEditing] = useState(false);
   const [showAddAmount, setShowAddAmount] = useState(false);
   const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   async function refresh() {
     const [detailData, categoryData] = await Promise.all([api.customers.detail(customerId), api.brickCategories.list()]);
@@ -61,8 +62,13 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
   async function handleDelete() {
     if (!detail) return;
     if (!confirm(t("customer.confirmDeleteCustomer", { name: detail.customer.name }))) return;
-    await api.customers.remove(customerId);
-    onDeleted();
+    setDeleteError("");
+    try {
+      await api.customers.remove(customerId);
+      onDeleted();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   if (!detail) {
@@ -136,6 +142,7 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
                 </button>
               </div>
             </div>
+            {deleteError && <p className="mt-3 text-sm text-status-critical">{deleteError}</p>}
           </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -217,22 +224,26 @@ export function CustomerDetailPage({ customerId, onBack, onDeleted }: CustomerDe
                     </thead>
                     <tbody>
                       {invoices.map((inv) => {
-                        // charge is gated on bricksCount>0 — a 0-brick row
-                        // (AddCustomerPaymentModal's "later payment against
-                        // an existing due") is a payment, not a bill, so it
-                        // has nothing charged on it. Raw (charge - paid)
-                        // then reads negative for exactly that row (paid
-                        // something, charged nothing) — mathematically a
-                        // credit, not a due, and confusing to show as a
-                        // negative number in a "Remaining Due" column right
-                        // next to two positive figures. Clamped at 0 with
-                        // the excess shown as its own Credit label instead,
-                        // same fix already applied to the Reports engine's
-                        // customers/invoices reports (see trade.reports.ts).
+                        // Bug fix: this used to show each invoice's raw,
+                        // unresolved (charge − paid), which could disagree
+                        // with the Reports "Invoices" report's own FIFO-
+                        // settled due for the identical invoice whenever a
+                        // later top-up payment cleared an earlier
+                        // shortfall. inv.fifoDue (customer.service.ts's
+                        // fifoResolveInvoiceDues) is the same settlement
+                        // logic, so the two screens can no longer disagree.
+                        // charge/paid below are still shown as their own
+                        // columns (what was billed, what came in against
+                        // THIS invoice specifically) — only the Due column
+                        // changed. credit (a 0-brick payment row, or an
+                        // invoice paid for more than it charged) is still
+                        // its own raw per-row figure — FIFO settlement is
+                        // about clearing an EARLIER invoice's due, not
+                        // this row's own credit display.
                         const charge = inv.bricksCount > 0 ? inv.netAmount : 0;
                         const paid = inv.amountPaidNow ?? inv.netAmount;
                         const rawDue = Math.round((charge - paid) * 100) / 100;
-                        const due = Math.max(0, rawDue);
+                        const due = inv.fifoDue;
                         const credit = Math.max(0, -rawDue);
                         return (
                           <tr key={inv._id} onClick={() => setOpenInvoiceId(inv._id)} className="cursor-pointer border-b border-border/60 last:border-0 hover:bg-ink-primary/5">

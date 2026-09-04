@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { StackingEntry, StackingStage } from "@/types";
+import type { PathaiSite, StackingEntry, StackingStage } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
 interface EditStackingEntryModalProps {
   entry: StackingEntry;
+  sites?: PathaiSite[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -21,7 +22,7 @@ interface EditStackingEntryModalProps {
 // silently rewrite the wage already posted to the gang's ledger; the
 // backend posts a correction entry for the difference instead (see
 // stacking.service.ts's updateStackingEntry).
-export function EditStackingEntryModal({ entry, onClose, onSaved }: EditStackingEntryModalProps) {
+export function EditStackingEntryModal({ entry, sites = [], onClose, onSaved }: EditStackingEntryModalProps) {
   const { t } = useTranslation();
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
   const [damageCount, setDamageCount] = useState(String(entry.damageCount));
@@ -31,6 +32,11 @@ export function EditStackingEntryModal({ entry, onClose, onSaved }: EditStacking
   const [mode, setMode] = useState<"" | "BUGGI" | "TRACTOR">(entry.mode ?? "");
   const [tractorNumber, setTractorNumber] = useState(entry.tractorNumber ?? "");
   const [buggiCount, setBuggiCount] = useState(entry.buggiCount ? String(entry.buggiCount) : "");
+  // Bug fix: this used to have no siteId control at all, even though both
+  // the update schema and the create form (for PHAD_TO_STOCK entries)
+  // support it — a wrongly-picked site could never be corrected after
+  // the fact.
+  const [siteId, setSiteId] = useState(entry.siteId ?? "");
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -44,6 +50,7 @@ export function EditStackingEntryModal({ entry, onClose, onSaved }: EditStacking
         damageCount: Number(damageCount),
         damageFault: Number(damageCount) > 0 && damageFault ? (damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         stage: stage || undefined,
+        siteId: stage === "PHAD_TO_STOCK" ? siteId || undefined : undefined,
         qualityRating,
         mode: mode || undefined,
         tractorNumber: mode === "TRACTOR" ? tractorNumber || undefined : undefined,
@@ -134,6 +141,16 @@ export function EditStackingEntryModal({ entry, onClose, onSaved }: EditStacking
               onChange={(e) => setBuggiCount(e.target.value)}
               className={cn(inputClass, "col-span-2")}
             />
+          )}
+          {stage === "PHAD_TO_STOCK" && sites.length > 0 && (
+            <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className={cn(inputClass, "col-span-2")}>
+              <option value="">{t("pathaiSite.transportedFromSiteOptional")}</option>
+              {sites.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           )}
           <input
             placeholder={t("common.notes")}

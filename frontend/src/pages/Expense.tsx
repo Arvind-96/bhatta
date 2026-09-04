@@ -40,7 +40,17 @@ export function Expense() {
   const filtered = expenseTypes.filter((tp) => !search.trim() || tp.name.toLowerCase().includes(search.trim().toLowerCase()));
 
   if (openTypeId) {
-    return <ExpenseTypeDetailPage expenseTypeId={openTypeId} expenseTypes={expenseTypes} onBack={() => setOpenTypeId(null)} />;
+    return (
+      <ExpenseTypeDetailPage
+        expenseTypeId={openTypeId}
+        expenseTypes={expenseTypes}
+        onBack={() => setOpenTypeId(null)}
+        onDeleted={() => {
+          setOpenTypeId(null);
+          refresh();
+        }}
+      />
+    );
   }
 
   return (

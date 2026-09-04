@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
@@ -15,6 +15,7 @@ interface ExpenseTypeDetailPageProps {
   expenseTypeId: string;
   expenseTypes: ExpenseType[];
   onBack: () => void;
+  onDeleted: () => void;
 }
 
 function monthKey(dateStr: string) {
@@ -40,11 +41,22 @@ function paymentModeSummary(e: Expense, t: (key: string) => string) {
 // then every expense logged under it grouped date-wise into month
 // sections, newest month first. Search matches the raw transaction-date
 // string so typing a day, month name, or year all work the same way.
-export function ExpenseTypeDetailPage({ expenseTypeId, expenseTypes, onBack }: ExpenseTypeDetailPageProps) {
+export function ExpenseTypeDetailPage({ expenseTypeId, expenseTypes, onBack, onDeleted }: ExpenseTypeDetailPageProps) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<ExpenseTypeDetail | null>(null);
   const [search, setSearch] = useState("");
   const [openExpenseId, setOpenExpenseId] = useState<string | null>(null);
+
+  async function handleDeleteType() {
+    if (!detail) return;
+    if (!confirm(t("expense.confirmDeleteExpenseType", { name: detail.expenseType.name, amount: formatINR(detail.totalPaid) }))) return;
+    try {
+      await api.expenseTypes.remove(expenseTypeId);
+      onDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
+  }
 
   async function refresh() {
     setDetail(await api.expenseTypes.detail(expenseTypeId));
@@ -111,7 +123,15 @@ export function ExpenseTypeDetailPage({ expenseTypeId, expenseTypes, onBack }: E
       </button>
 
       <Card className="mb-4">
-        <h3 className="mb-3 text-lg font-semibold text-ink-primary">{expenseType.name}</h3>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold text-ink-primary">{expenseType.name}</h3>
+          <button
+            onClick={handleDeleteType}
+            className="flex shrink-0 items-center gap-1 rounded-lg border border-status-critical/30 bg-status-critical/5 px-3 py-1.5 text-xs font-medium text-status-critical hover:bg-status-critical/10"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> {t("expense.deleteExpenseType")}
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl border border-border bg-ink-primary/5 px-3 py-2 text-center">
             <p className="text-xs text-ink-muted">{t("customer.totalPaidLabel")}</p>

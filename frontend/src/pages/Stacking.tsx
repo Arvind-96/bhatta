@@ -385,6 +385,7 @@ export function Stacking() {
     siteId: "",
   });
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
@@ -441,9 +442,18 @@ export function Stacking() {
 
   const gangsForStage = form.stage ? gangs.filter((g) => g.stackingStage === form.stage) : [];
 
+  // A stacking entry only advances the chamber's cycle when it's currently
+  // EMPTY (starting fresh) or STACKING (continuing); anything else
+  // (FIRING/READY/UNLOADING) means the backend will save the entry but
+  // reject the status/cycle update — warn before submit so this doesn't
+  // come as a surprise (see stacking.service.ts's createStackingEntry).
+  const selectedGher = form.gherId ? ghers.find((g) => g._id === form.gherId) : undefined;
+  const selectedGherNotStackable = !!selectedGher && selectedGher.status !== "EMPTY" && selectedGher.status !== "STACKING" && !!selectedGher.status;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.gherId || !form.stage || !form.gangId || !form.bricksCount) return;
+    setFormError("");
     setLoading(true);
     try {
       await api.stacking.create({
@@ -474,6 +484,8 @@ export function Stacking() {
       });
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -746,7 +758,7 @@ export function Stacking() {
         />
       )}
       {editingEntry && (
-        <EditStackingEntryModal entry={editingEntry} onClose={() => setEditingEntry(null)} onSaved={refresh} />
+        <EditStackingEntryModal entry={editingEntry} sites={sites} onClose={() => setEditingEntry(null)} onSaved={refresh} />
       )}
     </div>
   );

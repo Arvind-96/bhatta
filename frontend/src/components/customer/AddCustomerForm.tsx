@@ -36,9 +36,11 @@ export function AddCustomerForm({ existing, onClose, onSaved }: AddCustomerFormP
   const [openingPaid, setOpeningPaid] = useState(existing ? String(existing.openingPaid) : "");
   const [openingDue, setOpeningDue] = useState(existing ? String(existing.openingDue) : "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setFormError("");
     setSaving(true);
     try {
       const payload = {
@@ -52,6 +54,8 @@ export function AddCustomerForm({ existing, onClose, onSaved }: AddCustomerFormP
       };
       const saved = existing ? await api.customers.update(existing._id, payload) : await api.customers.create(payload);
       onSaved(saved);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -208,6 +212,7 @@ export function AddCustomerForm({ existing, onClose, onSaved }: AddCustomerFormP
           <p className="mt-1 text-xs text-ink-muted">{t("customer.openingBalanceHint")}</p>
         </div>
 
+        {formError && <p className="text-sm text-status-critical">{formError}</p>}
         <Button type="submit" disabled={saving}>
           {existing ? t("common.saveChanges") : t("customer.saveCustomer")}
         </Button>

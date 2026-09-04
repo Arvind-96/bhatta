@@ -5,6 +5,7 @@ import { fuelLogs, ghers } from "../db/schema";
 import { assertGherInKiln } from "./gher.service";
 import { assertFuelTypeExists } from "./fuelType.service";
 import { emitToKiln } from "../config/socket";
+import { istStartOfDay } from "../utils/istTime";
 
 export interface CreateFuelLogInput {
   kilnId: string;
@@ -91,14 +92,18 @@ export async function totalFuelConsumed(kilnId: string, seasonIds: string[], sin
 // was fed into chambers today / this week / this month / this year, so the
 // admin doesn't have to page through the raw log to see the picture.
 export async function fuelLogPeriodTotals(kilnId: string, seasonId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthAgo = new Date();
-  monthAgo.setDate(monthAgo.getDate() - 30);
-  const yearAgo = new Date();
-  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  // Bug fix: server-local midnight (the VPS runs in UTC, not IST) used to
+  // decide "today" here — a fuel log entered between IST midnight and
+  // 5:30am fell out of "Today" and only appeared once the server's own
+  // UTC day rolled over. Same istStartOfDay fix already applied to
+  // kilnVehicle.service.ts's dieselPeriodTotals.
+  const now = new Date();
+  const startOfDay = istStartOfDay(now);
+  const weekAgo = istStartOfDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+  const monthAgo = istStartOfDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(now.getFullYear() - 1);
+  const yearAgo = istStartOfDay(oneYearAgo);
 
   const [today, week, month, year] = await Promise.all([
     db.select().from(fuelLogs).where(and(eq(fuelLogs.kilnId, kilnId), eq(fuelLogs.seasonId, seasonId), gte(fuelLogs.date, startOfDay))),

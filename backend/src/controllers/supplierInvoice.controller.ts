@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
+import { validateCashOnlineSplit } from "../utils/paymentSplit";
 import {
   createSupplierInvoice,
   getSupplierDetail,
@@ -16,7 +17,7 @@ const itemSchema = z.object({
   quantity: z.number().min(0),
 });
 
-const createSchema = z.object({
+const baseSchema = z.object({
   supplierId: z.string(),
   date: z.coerce.date().optional(),
   itemsReceived: z.array(itemSchema).optional(),
@@ -26,7 +27,15 @@ const createSchema = z.object({
   cashAmount: z.number().min(0).optional(),
   onlineAmount: z.number().min(0).optional(),
 });
-const updateSchema = createSchema.partial();
+// Bug fix: unlike purchaseOrder.controller.ts's fulfillSchema, this never
+// validated that cashAmount + onlineAmount actually sum to amountPaid when
+// paymentMode is CASH_AND_ONLINE — the client already checks this
+// (AddSupplierInvoiceForm.tsx's isPaymentSplitMismatched), but nothing
+// stopped a malformed request from writing a mismatched split straight to
+// the database, silently throwing off every report built on cashAmount/
+// onlineAmount (Financial Overview, Day Book, P&L).
+const createSchema = baseSchema.superRefine((data, ctx) => validateCashOnlineSplit(data, data.amountPaid ?? 0, ctx));
+const updateSchema = baseSchema.partial().superRefine((data, ctx) => validateCashOnlineSplit(data, data.amountPaid ?? 0, ctx));
 
 export async function create(req: AuthedRequest, res: Response) {
   const input = createSchema.parse(req.body);

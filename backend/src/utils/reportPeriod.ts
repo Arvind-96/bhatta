@@ -1,3 +1,5 @@
+import { istDateOnly } from "./istTime";
+
 export type ReportGroupBy = "none" | "day" | "week" | "month" | "quarter" | "year";
 
 function pad(n: number) {
@@ -6,8 +8,11 @@ function pad(n: number) {
 
 // Monday-start ISO week key ("2026-W34") — matches the common "7-day
 // kharchi cycle" mental model better than a Sunday-start week would.
-function isoWeekKey(date: Date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+// `istMidnight` is already resolved to the correct IST calendar date
+// (UTC-midnight-anchored — see istDateOnly), so every getUTC* read here is
+// reading IST wall-clock date components, not the server's own timezone.
+function isoWeekKey(istMidnight: Date) {
+  const d = new Date(istMidnight);
   const day = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - day);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
@@ -17,17 +22,28 @@ function isoWeekKey(date: Date) {
 
 // The bucket key AND its human-readable label — the label is what a report
 // row actually displays (the key is only used to group rows together).
+//
+// Bug fix: this used to read `date.getFullYear()`/`getMonth()`/`getDate()`
+// — the server's own local timezone (UTC on the VPS), not IST. An entry
+// timestamped between IST midnight and 5:30am landed in the previous
+// day's/week's/month's bucket instead of the correct one — the same class
+// of bug already fixed for Financial Overview/Profit & Loss/Compare/
+// Reports' own date filter via istTime.ts, but this grouping path was
+// never migrated to it. Resolving to the IST calendar date FIRST (via
+// istDateOnly), then reading its components with UTC getters, makes every
+// bucket below IST-correct regardless of server timezone.
 export function bucketForDate(date: Date, period: Exclude<ReportGroupBy, "none">): { key: string; label: string } {
-  const y = date.getFullYear();
-  const m = date.getMonth();
+  const ist = istDateOnly(date);
+  const y = ist.getUTCFullYear();
+  const m = ist.getUTCMonth();
   const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   switch (period) {
     case "day": {
-      const key = `${y}-${pad(m + 1)}-${pad(date.getDate())}`;
+      const key = `${y}-${pad(m + 1)}-${pad(ist.getUTCDate())}`;
       return { key, label: key };
     }
     case "week": {
-      const key = isoWeekKey(date);
+      const key = isoWeekKey(ist);
       return { key, label: key };
     }
     case "month": {
@@ -49,6 +65,18 @@ export function bucketForDate(date: Date, period: Exclude<ReportGroupBy, "none">
 // Collapses detail rows into period buckets, summing the given numeric
 // fields and keeping a count — used by any report when the caller asks for
 // groupBy=day/week/month/quarter/year instead of the raw detail rows.
+// Bug fix: a row with no date (every date column in this app is nullable —
+// a real, reachable state for legacy rows) used to be silently dropped
+// entirely by `continue` here — invisible in the grouped view, but still
+// counted by every report that separately totals off the full ungrouped
+// detail array. That made the visible grouped rows not sum to the report's
+// own footer, and meant the same report's Total could change purely by
+// toggling Group By. Routing it into an explicit "No date" bucket instead
+// keeps every row accounted for exactly once, in both views. Sorted last
+// (its key starts with "9999", after any real year) since a row's actual
+// date is unknown, not a legitimate late period.
+const NO_DATE_KEY = "9999-unknown";
+
 export function groupRowsByPeriod<T extends Record<string, unknown>>(
   rows: T[],
   dateField: keyof T,
@@ -59,8 +87,7 @@ export function groupRowsByPeriod<T extends Record<string, unknown>>(
   for (const row of rows) {
     const raw = row[dateField];
     const date = raw instanceof Date ? raw : raw ? new Date(raw as string) : null;
-    if (!date) continue;
-    const { key, label } = bucketForDate(date, period);
+    const { key, label } = date ? bucketForDate(date, period) : { key: NO_DATE_KEY, label: "No date" };
     let bucket = buckets.get(key);
     if (!bucket) {
       bucket = { period: label, count: 0, sums: Object.fromEntries(sumFields.map((f) => [String(f), 0])) };

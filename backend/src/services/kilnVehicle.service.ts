@@ -4,6 +4,7 @@ import { db } from "../db/client";
 import { kilnVehicles, vehicleDieselEntries, people, LEDGER_PAYMENT_MODES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { emitToKiln } from "../config/socket";
+import { istStartOfDay } from "../utils/istTime";
 
 export interface CreateVehicleInput {
   kilnId: string;
@@ -26,9 +27,24 @@ export async function listVehicles(kilnId: string) {
   return db.select().from(kilnVehicles).where(eq(kilnVehicles.kilnId, kilnId)).orderBy(asc(kilnVehicles.type), asc(kilnVehicles.name));
 }
 
+// No DB-level FK ties vehicleDieselEntries.vehicleId back to kilnVehicles,
+// so a hard delete here used to silently orphan them — vehicleDieselSummary
+// and dieselPeriodTotals both still summed the orphaned rows (bucketed
+// under "Unknown vehicle"), while the Reports → Vehicle Work report
+// (which iterates only over currently-existing vehicles) silently dropped
+// them entirely — the two pages then disagreed on the same underlying
+// data. Guarded the same check-then-throw way as deleteCustomer in
+// customer.service.ts: refuse instead of deleting when diesel history
+// still exists, and tell the admin why.
 export async function deleteVehicle(kilnId: string, vehicleId: string) {
   const existing = (await db.select().from(kilnVehicles).where(and(eq(kilnVehicles._id, vehicleId), eq(kilnVehicles.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Vehicle not found in this kiln");
+
+  const linkedEntries = await db.select({ _id: vehicleDieselEntries._id }).from(vehicleDieselEntries).where(eq(vehicleDieselEntries.vehicleId, vehicleId));
+  if (linkedEntries.length > 0) {
+    throw new Error(`Cannot delete this vehicle — ${linkedEntries.length} diesel entry(ies) are linked to it. Its diesel history would become untraceable.`);
+  }
+
   await db.delete(kilnVehicles).where(eq(kilnVehicles._id, vehicleId));
   emitToKiln(kilnId, "kilnVehicle:update", { _id: vehicleId, deleted: true });
   return existing;
@@ -89,6 +105,8 @@ export interface UpdateDieselEntryInput {
   quantityLiters?: number;
   initialMeterReading?: number;
   driverId?: string | null;
+  costAmount?: number;
+  paymentMode?: Exclude<(typeof LEDGER_PAYMENT_MODES)[number], "CASH_AND_ONLINE">;
   date?: Date;
   notes?: string;
 }
@@ -202,14 +220,13 @@ export async function vehicleDieselSummary(kilnId: string, seasonId: string | nu
 // The Stock page's diesel-usage-at-a-glance — how much diesel went into
 // each vehicle today / this week / this month / this year.
 export async function dieselPeriodTotals(kilnId: string, seasonId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthAgo = new Date();
-  monthAgo.setDate(monthAgo.getDate() - 30);
-  const yearAgo = new Date();
-  yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+  const now = new Date();
+  const startOfDay = istStartOfDay(now);
+  const weekAgo = istStartOfDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+  const monthAgo = istStartOfDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(now.getFullYear() - 1);
+  const yearAgo = istStartOfDay(oneYearAgo);
 
   const [vehicles, today, week, month, year] = await Promise.all([
     db.select().from(kilnVehicles).where(eq(kilnVehicles.kilnId, kilnId)),
@@ -221,13 +238,22 @@ export async function dieselPeriodTotals(kilnId: string, seasonId: string) {
 
   const vehicleNameById = new Map(vehicles.map((v) => [v._id, v.name]));
 
+  // Bucket by vehicleId (not name) while summing, matching
+  // vehicleDieselSummary above — kilnVehicles.name is only indexed, not
+  // unique, so two same-named vehicles would otherwise silently merge
+  // their totals into a single reported row. Only resolve id -> display
+  // name at the very end, once each vehicle already has its own bucket.
   function byVehicle(entries: typeof today) {
     const totals = new Map<string, number>();
     for (const e of entries) {
-      const name = vehicleNameById.get(e.vehicleId) ?? "Unknown vehicle";
-      totals.set(name, (totals.get(name) ?? 0) + e.quantityLiters);
+      totals.set(e.vehicleId, (totals.get(e.vehicleId) ?? 0) + e.quantityLiters);
     }
-    return Object.fromEntries(totals);
+    const result: Record<string, number> = {};
+    for (const [vehicleId, total] of totals) {
+      const name = vehicleNameById.get(vehicleId) ?? "Unknown vehicle";
+      result[name] = (result[name] ?? 0) + total;
+    }
+    return result;
   }
 
   return {

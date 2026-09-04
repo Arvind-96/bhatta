@@ -3,6 +3,8 @@ import { listSaleOrders } from "../saleOrder.service";
 import { listPurchaseOrders } from "../purchaseOrder.service";
 import { listBrickCategories } from "../brickCategory.service";
 import { listSuppliers } from "../supplier.service";
+import { listCustomers } from "../customer.service";
+import { unbilledDispatchRows, belongsToCustomer } from "./trade.reports";
 import { ReportDefinition, round2 } from "./types";
 
 // Average ₹/brick actually realized per category over the period — the
@@ -12,10 +14,19 @@ const itemWiseAvgSaleRate: ReportDefinition = {
   key: "itemWiseAvgSaleRate",
   titleKey: "reports.title.itemWiseAvgSaleRate",
   async run(kilnId, filters) {
-    const [rows, categories] = await Promise.all([
+    // Bug fix: a dispatch that's a real, complete sale but hasn't been
+    // formally invoiced yet was silently missing from this report — same
+    // undercount, same fix as keyAverages's "Average sale rate per brick"
+    // (averages.reports.ts), and the same customerId-scoping approach the
+    // Invoices report already established (belongsToCustomer).
+    const [invoiceRows, unbilledAll, categories, targetCustomer] = await Promise.all([
       listInvoices(kilnId, null, { customerId: filters.customerId, from: filters.from, to: filters.to }),
+      unbilledDispatchRows(kilnId, { from: filters.from, to: filters.to }),
       listBrickCategories(kilnId),
+      filters.customerId ? listCustomers(kilnId).then((cs) => cs.find((c) => c._id === filters.customerId)) : Promise.resolve(undefined),
     ]);
+    const unbilledRows = filters.customerId ? unbilledAll.filter((d) => targetCustomer && belongsToCustomer(d, targetCustomer._id, targetCustomer.name)) : unbilledAll;
+    const rows = [...invoiceRows, ...unbilledRows];
     const categoryById = new Map(categories.map((c) => [c._id, c.category]));
 
     const byCategory = new Map<string, { bricksCount: number; amount: number }>();

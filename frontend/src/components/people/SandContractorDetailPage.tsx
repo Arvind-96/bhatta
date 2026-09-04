@@ -224,53 +224,25 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
   // remaining-due shown alongside each row still needs to build up
   // chronologically, same computation LandownerDetailPage uses.
   //
-  // For PER_TROLLEY contracts specifically, no DUE ledger entry is ever
-  // posted for the agreed totalContractValue (only real deliveries bill
-  // their own DUE later, per sandContract.service.ts) -- so without this,
-  // the running "remaining due" would clamp to 0 the moment the advance
-  // (PAID) posts, same root cause as the Contract Payment Summary card's
-  // contractBalance above. Each contract's totalContractValue is folded in
-  // as a synthetic DUE contribution dated at its own startDate, merged into
-  // the same chronological pass, so per-row Remaining Due tracks the
-  // agreed contract total rather than only what's actually been billed.
+  // Bug fix: this used to ALSO inject each PER_TROLLEY contract's full
+  // totalContractValue as a synthetic DUE at contract start, on the
+  // premise that no real DUE ever gets posted for it — but that premise
+  // was wrong: sandDelivery.service.ts's createSandDelivery DOES post a
+  // real DUE per delivery unconditionally (every delivery bills its own
+  // total, regardless of rateType). Keeping the synthetic injection meant
+  // the running due counted the contract's full value once as a lump sum,
+  // THEN counted it again as each real delivery's own DUE posted —
+  // doubling once every trolley had actually arrived. Real ledger entries
+  // (an advance PAID at signing, each delivery's own DUE as it arrives)
+  // already accumulate to the correct total on their own, same as every
+  // other contract type — nothing owed for undelivered trolleys is the
+  // economically correct state, not a display bug to paper over.
   const runningTotalsById = new Map<string, { paidSoFar: number; remainingDue: number }>();
   {
-    // Only PER_TROLLEY contracts need this -- PER_THOUSAND_BRICKS already
-    // gets a real DUE entry posted for totalContractValue at creation time
-    // (see sandContract.service.ts), so adding it again here would
-    // double-count.
-    const contractDue = contracts
-      .filter((c) => c.rateType === "PER_TROLLEY")
-      .map((c) => ({
-        date: c.startDate ?? c.createdAt,
-        amount: c.totalContractValue,
-      }));
+    const sorted = [...ledgerEntries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let paid = 0;
     let due = 0;
-    // Sorting by exact timestamp breaks the common case: a contract with no
-    // explicit startDate falls back to its createdAt (a precise moment,
-    // e.g. 07:53am), which sorts AFTER its own advance's ledger entry (whose
-    // `date` is a plain transaction day, i.e. midnight) even though the
-    // contract's value logically becomes due before or alongside any
-    // payment posted against it that same day. Compare by calendar day
-    // first; on a tie, the contract's due always counts before that day's
-    // ledger entries.
-    const dayStart = (d: string) => new Date(new Date(d).toDateString()).getTime();
-    const timeline = [
-      ...ledgerEntries.map((e) => ({ date: e.date, type: "entry" as const, entry: e })),
-      ...contractDue.map((c) => ({ date: c.date, type: "contract" as const, amount: c.amount })),
-    ].sort((a, b) => {
-      const dayDiff = dayStart(a.date) - dayStart(b.date);
-      if (dayDiff !== 0) return dayDiff;
-      if (a.type === b.type) return 0;
-      return a.type === "contract" ? -1 : 1;
-    });
-    for (const item of timeline) {
-      if (item.type === "contract") {
-        due += item.amount;
-        continue;
-      }
-      const entry = item.entry;
+    for (const entry of sorted) {
       if (entry.direction === "PAID") paid += entry.amount;
       else due += entry.amount;
       runningTotalsById.set(entry._id, { paidSoFar: paid, remainingDue: Math.max(0, due - paid) });

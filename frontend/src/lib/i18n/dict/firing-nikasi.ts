@@ -92,6 +92,10 @@ export const firingNikasiDict: Record<string, Record<Locale, string>> = {
     en: "Fuel ₹{fuel} + Stacking ₹{stacking} = ₹{total} total this cycle",
     hi: "ईंधन ₹{fuel} + स्टैकिंग ₹{stacking} = इस चक्र में कुल ₹{total}",
   },
+  "firing.fuelCostMissingWarning": {
+    en: "Cost/brick is understated — no purchase rate found for: {types}. Log a fuel purchase for these types so their real cost counts.",
+    hi: "लागत/ईंट कम दिखाई जा रही है — इनके लिए कोई खरीद दर नहीं मिली: {types}। इनका वास्तविक खर्च गिनने के लिए इन प्रकारों की ईंधन खरीद दर्ज करें।",
+  },
   "firing.rawBricksInChambersLabel": { en: "Raw bricks currently in chambers", hi: "चैंबर में मौजूद कच्ची ईंटें" },
   "firing.totalFinishedStockLabel": { en: "Total finished stock (all categories)", hi: "कुल तैयार स्टॉक (सभी श्रेणियाँ)" },
   "firing.selectChamberForDetailPlaceholder": { en: "Select a chamber for details…", hi: "विवरण के लिए एक घेर चुनें…" },

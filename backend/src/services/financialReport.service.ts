@@ -122,9 +122,17 @@ export async function chamberCostReport(kilnId: string, seasonId: string, gherId
     fuelTotals.set(p.fuelType, t);
   }
 
+  // Bug fix: a fuel type fed into this chamber with zero matching purchase
+  // rows (a name mismatch against fuelPurchases.fuelType, or genuinely not
+  // yet purchase-logged) used to silently cost ₹0/kg, dropping that fuel's
+  // real cost out of costPerBrick with no warning. Now tracks which fuel
+  // types this happened for, so the caller can surface it instead of
+  // presenting an understated cost as if it were complete.
+  const fuelTypesMissingCost = new Set<string>();
   const fuelCost = fuelLogRows.reduce((sum, log) => {
     const t = fuelTotals.get(log.fuelType);
     const costPerKg = t && t.weight > 0 ? t.amount / t.weight : 0;
+    if (!t || t.weight <= 0) fuelTypesMissingCost.add(log.fuelType);
     return sum + log.quantityKg * costPerKg;
   }, 0);
 
@@ -150,5 +158,6 @@ export async function chamberCostReport(kilnId: string, seasonId: string, gherId
     totalCost: Math.round(totalCost),
     bricksProduced,
     costPerBrick: bricksProduced > 0 ? Math.round((totalCost / bricksProduced) * 100) / 100 : null,
+    fuelTypesMissingCost: Array.from(fuelTypesMissingCost),
   };
 }

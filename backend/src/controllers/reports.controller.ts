@@ -5,6 +5,7 @@ import { reportRegistry, ReportFilters, ReportResult } from "../services/reports
 import { dashboardSummary } from "../services/reports/dashboard";
 import { ReportGroupBy } from "../utils/reportPeriod";
 import { isWhatsAppConfigured, sendWhatsAppText } from "../services/whatsapp.service";
+import { istStartOfDayString, istEndOfDayString } from "../utils/istTime";
 
 const GROUP_BY_VALUES: ReportGroupBy[] = ["none", "day", "week", "month", "quarter", "year"];
 
@@ -12,15 +13,19 @@ function str(v: unknown): string | undefined {
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
+// Bug fix: this used to parse "YYYY-MM-DD" via a bare `new Date(s)` (UTC
+// midnight) then, for `to`, push it to `setUTCHours(23,59,59,999)` — both
+// UTC-anchored, not IST. Every report on the Reports page runs through
+// this (see filtersFromQuery below), so an entry logged between IST
+// midnight and 5:30am was silently excluded from the `from` day and
+// silently included from the day after `to` — the exact bug already fixed
+// for Financial Overview/Profit & Loss/Compare via istTime.ts; applying
+// the same fix here.
 function dateParam(v: unknown, endOfDay = false): Date | undefined {
   const s = str(v);
   if (!s) return undefined;
-  const d = new Date(s);
+  const d = endOfDay ? istEndOfDayString(s) : istStartOfDayString(s);
   if (Number.isNaN(d.getTime())) return undefined;
-  // A plain "YYYY-MM-DD" `to` value parses as that day's UTC midnight —
-  // push it to the end of the day so same-day entries (which carry a real
-  // time-of-day, not midnight) aren't silently excluded by the lte() filter.
-  if (endOfDay) d.setUTCHours(23, 59, 59, 999);
   return d;
 }
 

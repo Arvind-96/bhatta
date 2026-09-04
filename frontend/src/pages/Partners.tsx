@@ -12,6 +12,7 @@ import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn } from "@/lib/utils";
+import { totalPartnerShareWith } from "@/lib/partnerShare";
 import type { Person } from "@/types";
 
 const inputClass =

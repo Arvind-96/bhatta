@@ -226,6 +226,31 @@ async function postFile<T>(path: string, fieldName: string, file: File | Blob, s
   return res.json();
 }
 
+// Shared by reports.run and reports.sendText so the two can never forward a
+// different filter set for the same report — see reports.sendText's own
+// comment for the bug this fixes.
+function reportFilterQueryString(params: ReportRunParams): string {
+  const q = new URLSearchParams();
+  if (params.from) q.set("from", params.from);
+  if (params.to) q.set("to", params.to);
+  if (params.groupBy) q.set("groupBy", params.groupBy);
+  if (params.personId) q.set("personId", params.personId);
+  if (params.personType) q.set("personType", params.personType);
+  if (params.customerId) q.set("customerId", params.customerId);
+  if (params.supplierId) q.set("supplierId", params.supplierId);
+  if (params.agentId) q.set("agentId", params.agentId);
+  if (params.vehicleId) q.set("vehicleId", params.vehicleId);
+  if (params.driverId) q.set("driverId", params.driverId);
+  if (params.category) q.set("category", params.category);
+  if (params.contractorId) q.set("contractorId", params.contractorId);
+  if (params.categoryId) q.set("categoryId", params.categoryId);
+  if (params.damageFault) q.set("damageFault", params.damageFault);
+  if (params.damageThreshold != null) q.set("damageThreshold", String(params.damageThreshold));
+  if (params.workType) q.set("workType", params.workType);
+  if (params.status) q.set("status", params.status);
+  return q.toString();
+}
+
 export interface AuthResponse {
   token: string;
   user: AuthUser;
@@ -1058,6 +1083,7 @@ export const api = {
     create: (input: { name: string; openingPaid?: number; openingDue?: number }) => post<ExpenseType>("/expense-types", input, true),
     update: (id: string, input: Partial<{ name: string; openingPaid: number; openingDue: number }>) =>
       patch<ExpenseType>(`/expense-types/${id}`, input, true),
+    remove: (id: string) => del<void>(`/expense-types/${id}`, true),
   },
 
   molding: {
@@ -1417,11 +1443,28 @@ export const api = {
       const qs = params.toString();
       return get<VehicleDieselEntry[]>(`/kiln-vehicles/diesel${qs ? `?${qs}` : ""}`, true);
     },
-    logDiesel: (input: { vehicleId: string; quantityLiters: number; initialMeterReading?: number; driverId?: string; date?: string; notes?: string }) =>
-      post<VehicleDieselEntry>("/kiln-vehicles/diesel", input, true),
+    logDiesel: (input: {
+      vehicleId: string;
+      quantityLiters: number;
+      initialMeterReading?: number;
+      driverId?: string;
+      costAmount?: number;
+      paymentMode?: SimplePaymentMode;
+      date?: string;
+      notes?: string;
+    }) => post<VehicleDieselEntry>("/kiln-vehicles/diesel", input, true),
     updateDiesel: (
       id: string,
-      input: Partial<{ vehicleId: string; quantityLiters: number; initialMeterReading: number; driverId: string | null; date: string; notes: string }>
+      input: Partial<{
+        vehicleId: string;
+        quantityLiters: number;
+        initialMeterReading: number;
+        driverId: string | null;
+        costAmount: number;
+        paymentMode: SimplePaymentMode;
+        date: string;
+        notes: string;
+      }>
     ) => patch<VehicleDieselEntry>(`/kiln-vehicles/diesel/${id}`, input, true),
     removeDiesel: (id: string) => del(`/kiln-vehicles/diesel/${id}`, true),
     dieselPeriodTotals: () => get<DieselPeriodTotals>("/kiln-vehicles/diesel/period-totals", true),
@@ -1689,33 +1732,19 @@ export const api = {
 
   reports: {
     run: (key: string, params: ReportRunParams = {}) => {
-      const q = new URLSearchParams();
-      if (params.from) q.set("from", params.from);
-      if (params.to) q.set("to", params.to);
-      if (params.groupBy) q.set("groupBy", params.groupBy);
-      if (params.personId) q.set("personId", params.personId);
-      if (params.personType) q.set("personType", params.personType);
-      if (params.customerId) q.set("customerId", params.customerId);
-      if (params.supplierId) q.set("supplierId", params.supplierId);
-      if (params.agentId) q.set("agentId", params.agentId);
-      if (params.vehicleId) q.set("vehicleId", params.vehicleId);
-      if (params.driverId) q.set("driverId", params.driverId);
-      if (params.category) q.set("category", params.category);
-      if (params.contractorId) q.set("contractorId", params.contractorId);
-      if (params.categoryId) q.set("categoryId", params.categoryId);
-      if (params.damageFault) q.set("damageFault", params.damageFault);
-      if (params.damageThreshold != null) q.set("damageThreshold", String(params.damageThreshold));
-      if (params.workType) q.set("workType", params.workType);
-      if (params.status) q.set("status", params.status);
-      const qs = q.toString();
+      const qs = reportFilterQueryString(params);
       return get<ReportResult>(`/reports/${key}${qs ? `?${qs}` : ""}`, true);
     },
     dashboardSummary: () => get<DashboardSummary>("/reports/dashboard-summary", true),
+    // Bug fix: this used to forward only from/to, silently dropping every
+    // other filter (customer/agent/vehicle/category/damageFault/groupBy/
+    // etc.) the admin had actually picked on screen — the WhatsApp text
+    // came out as the kiln-wide, unfiltered report while the on-screen
+    // table (via `run` above, which already forwarded every filter)
+    // showed the correctly narrowed one. Reuses the exact same
+    // query-string builder as `run` so the two can never diverge again.
     sendText: (key: string, to: string, params: ReportRunParams = {}) => {
-      const q = new URLSearchParams();
-      if (params.from) q.set("from", params.from);
-      if (params.to) q.set("to", params.to);
-      const qs = q.toString();
+      const qs = reportFilterQueryString(params);
       return post<{ sent: boolean }>(`/reports/${key}/send-text${qs ? `?${qs}` : ""}`, { to }, true);
     },
   },

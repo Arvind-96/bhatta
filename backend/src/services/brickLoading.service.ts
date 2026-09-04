@@ -520,7 +520,7 @@ export async function listBrickLoadingEntries(kilnId: string, seasonId: string |
     // to.
     dispatchIds.length
       ? db
-          .select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName, amount: dispatches.amount, paymentMode: dispatches.paymentMode, cashAmount: dispatches.cashAmount, onlineAmount: dispatches.onlineAmount })
+          .select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, customerName: dispatches.customerName, amount: dispatches.amount, paymentMode: dispatches.paymentMode, cashAmount: dispatches.cashAmount, onlineAmount: dispatches.onlineAmount, cancelled: dispatches.cancelled })
           .from(dispatches)
           .where(inArray(dispatches._id, dispatchIds))
       : [],

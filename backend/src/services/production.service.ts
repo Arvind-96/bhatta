@@ -5,6 +5,7 @@ import { productionLogs } from "../db/schema";
 import { addLedgerEntry } from "./ledger.service";
 import { assertPersonOfType } from "./person.service";
 import { emitToKiln } from "../config/socket";
+import { istStartOfDay, istDateKeyString } from "../utils/istTime";
 
 export interface CreateProductionInput {
   kilnId: string;
@@ -77,8 +78,9 @@ export async function createProductionLog(input: CreateProductionInput) {
 }
 
 export async function getTodayProduction(kilnId: string, seasonId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  // Bug fix: server-local (UTC) midnight, not IST — see fuelLog.service.ts's
+  // fuelLogPeriodTotals for the same fix and full explanation.
+  const startOfDay = istStartOfDay(new Date());
 
   return await db.select().from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), eq(productionLogs.seasonId, seasonId), gte(productionLogs.producedOn, startOfDay))).orderBy(desc(productionLogs.producedOn));
 }
@@ -91,7 +93,11 @@ export async function getProductionSeries(kilnId: string, seasonId: string, days
 
   const byDay = new Map<string, number>();
   for (const log of logs) {
-    const key = log.producedOn!.toISOString().slice(0, 10);
+    // Bug fix: `.toISOString().slice(0, 10)` reads the UTC calendar day —
+    // a log timestamped between IST midnight and 5:30am was bucketed onto
+    // the previous day's bar in the trend chart. istDateKeyString resolves
+    // the correct IST calendar day instead.
+    const key = istDateKeyString(log.producedOn!);
     byDay.set(key, (byDay.get(key) ?? 0) + log.bricksCount);
   }
 

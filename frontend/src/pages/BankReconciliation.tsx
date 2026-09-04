@@ -116,6 +116,7 @@ export function BankReconciliation() {
   const [summary, setSummary] = useState<BankReconciliationSummary | null>(null);
   const [addingTxn, setAddingTxn] = useState(false);
   const [selectedTxnId, setSelectedTxnId] = useState<string | null>(null);
+  const [matchError, setMatchError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
 
@@ -158,8 +159,13 @@ export function BankReconciliation() {
 
   async function matchWith(entry: BookEntry) {
     if (!selectedTxnId) return;
-    await api.bankTransactions.match(selectedTxnId, entry.type, entry.id);
-    setSelectedTxnId(null);
+    setMatchError("");
+    try {
+      await api.bankTransactions.match(selectedTxnId, entry.type, entry.id);
+      setSelectedTxnId(null);
+    } catch (err) {
+      setMatchError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   return (
@@ -263,6 +269,7 @@ export function BankReconciliation() {
               <CardHeader>
                 <CardTitle>{t("bankRecon.bookEntries")}</CardTitle>
               </CardHeader>
+              {matchError && <p className="mb-2 text-sm text-status-critical">{matchError}</p>}
               <div className="flex flex-col gap-1.5">
                 {bookEntries.length === 0 && <p className="py-4 text-center text-sm text-ink-muted">{t("reports.workspace.noData")}</p>}
                 {bookEntries.map((entry) => (

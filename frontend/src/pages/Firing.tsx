@@ -251,9 +251,19 @@ function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entr
   const [nikasiForm, setNikasiForm] = useState({ gangId: "", bricksCount: "" });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  function refreshCost() {
     api.financialReports.chamberCost(gher._id).then(setCost).catch(console.error);
-  }, [gher._id]);
+  }
+
+  useEffect(refreshCost, [gher._id]);
+  // Bug fix: this tile used to only refetch when the selected chamber
+  // itself changed — its three sibling stat tiles in this same panel all
+  // update live from these events (see useChamberActivity above), but
+  // logging fuel/stacking for the currently-open chamber via this panel's
+  // own quick-log forms visibly bumped those while leaving ₹/brick stale.
+  useKilnEvent("stacking:update", refreshCost);
+  useKilnEvent("fuelLog:update", refreshCost);
+  useKilnEvent("grading:update", refreshCost);
 
   useEffect(() => {
     setOpenForm("");
@@ -341,6 +351,11 @@ function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entr
       {cost && (
         <p className="mt-3 text-sm text-ink-muted">
           {t("firing.chamberCostBreakdown", { fuel: formatINR(cost.fuelCost), stacking: formatINR(cost.stackingCost), total: formatINR(cost.totalCost) })}
+        </p>
+      )}
+      {cost && cost.fuelTypesMissingCost.length > 0 && (
+        <p className="mt-1.5 text-xs text-status-critical">
+          {t("firing.fuelCostMissingWarning", { types: cost.fuelTypesMissingCost.join(", ") })}
         </p>
       )}
 
@@ -1163,7 +1178,12 @@ function GradingTab() {
                       <td className="py-3 text-right tabular-nums font-medium text-ink-primary">{g.totalOutput.toLocaleString("en-IN")}</td>
                       <td className="py-3 text-right">
                         {g.recoveryPercent != null ? (
-                          <Badge variant={g.recoveryPercent >= 85 ? "good" : g.recoveryPercent >= 70 ? "warning" : "critical"}>
+                          // Bug fix: recoveryPercent = output/stacked is never bounded
+                          // at 100% — a value over that is physically impossible (more
+                          // bricks graded than were ever stacked this cycle) and always
+                          // points to a data-entry error, so it must never read as
+                          // "good" green like a genuinely high recovery rate would.
+                          <Badge variant={g.recoveryPercent > 100 ? "critical" : g.recoveryPercent >= 85 ? "good" : g.recoveryPercent >= 70 ? "warning" : "critical"}>
                             {g.recoveryPercent}%
                           </Badge>
                         ) : (

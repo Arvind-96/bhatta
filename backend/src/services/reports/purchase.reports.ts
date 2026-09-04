@@ -118,6 +118,7 @@ const purchaseBySupplier: ReportDefinition = {
       rows: detail,
       totals: {
         totalBillAmount: round2(detail.reduce((s, r) => s + r.totalBillAmount, 0)),
+        amountPaid: round2(detail.reduce((s, r) => s + r.amountPaid, 0)),
         due: round2(detail.reduce((s, r) => s + r.due, 0)),
         credit: round2(detail.reduce((s, r) => s + r.credit, 0)),
       },

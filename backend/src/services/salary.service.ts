@@ -2,11 +2,12 @@ import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
 import { randomUUID } from "crypto";
-import { and, desc, eq, gte, inArray, isNotNull, lt, lte } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNotNull, lt, lte } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
 import { kilns, people, salarySlips, ledgerEntries } from "../db/schema";
 import { attendanceSummaryForMonth, MonthAttendanceSummary } from "./attendance.service";
 import { addLedgerEntry, deleteLedgerEntry, updateLedgerEntry } from "./ledger.service";
+import { istDateOnly } from "../utils/istTime";
 import { emitToKiln } from "../config/socket";
 
 const SLIPS_DIR = path.join(DATA_DIR, "salary-slips");
@@ -422,8 +423,21 @@ export interface ListSalarySlipsForKilnFilter {
 export async function listSalarySlipsForKiln(kilnId: string, filter: ListSalarySlipsForKilnFilter = {}) {
   const conditions = [eq(salarySlips.kilnId, kilnId)];
   if (filter.personId) conditions.push(eq(salarySlips.personId, filter.personId));
-  if (filter.from) conditions.push(gte(salarySlips.month, `${filter.from.getFullYear()}-${String(filter.from.getMonth() + 1).padStart(2, "0")}`));
-  if (filter.to) conditions.push(lte(salarySlips.month, `${filter.to.getFullYear()}-${String(filter.to.getMonth() + 1).padStart(2, "0")}`));
+  // Bug fix: `filter.from`/`filter.to` already carry the correct IST
+  // instant (resolved upstream by reports.controller.ts's dateParam via
+  // istStartOfDayString/istEndOfDayString) — but reading `.getFullYear()`/
+  // `.getMonth()` on that instant uses the server's own (UTC) local
+  // getters, which can read the wrong month for any date within ~5.5h of
+  // an IST month boundary (e.g. an IST Sept-1 instant is still Aug 31 in
+  // UTC). istDateOnly re-resolves the correct IST calendar date first.
+  if (filter.from) {
+    const d = istDateOnly(filter.from);
+    conditions.push(gte(salarySlips.month, `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`));
+  }
+  if (filter.to) {
+    const d = istDateOnly(filter.to);
+    conditions.push(lte(salarySlips.month, `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`));
+  }
 
   const rows = await db.select().from(salarySlips).where(and(...conditions)).orderBy(desc(salarySlips.month));
   const personIds = [...new Set(rows.map((r) => r.personId))];
@@ -463,6 +477,17 @@ export async function updateSalarySlip(kilnId: string, slipId: string, input: Up
   const existing = (await db.select().from(salarySlips).where(and(eq(salarySlips._id, slipId), eq(salarySlips.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Salary slip not found in this kiln");
   await db.update(salarySlips).set(input).where(eq(salarySlips._id, slipId));
+  // Bug fix: a manual correction here used to only change the slip's own
+  // displayed numbers — the linked SALARY ledger entry (posted at
+  // generation time as grossSalary - deductions, i.e. "this month
+  // earned") was left at its old amount, silently diverging from what the
+  // corrected slip shows and from ledgerBalanceBefore's carried-forward
+  // math for every later month. Only regenerating the slip kept them in
+  // sync before; a plain correction now does too.
+  if (input.deductions !== undefined && existing.salaryLedgerEntryId) {
+    const thisMonthEarned = Math.round((existing.grossSalary - input.deductions) * 100) / 100;
+    await updateLedgerEntry(kilnId, existing.salaryLedgerEntryId, { amount: thisMonthEarned });
+  }
   const updated = (await db.select().from(salarySlips).where(eq(salarySlips._id, slipId)))[0]!;
   emitToKiln(kilnId, "salary:update", updated);
   return updated;
@@ -471,6 +496,23 @@ export async function updateSalarySlip(kilnId: string, slipId: string, input: Up
 export async function deleteSalarySlip(kilnId: string, slipId: string) {
   const existing = (await db.select().from(salarySlips).where(and(eq(salarySlips._id, slipId), eq(salarySlips.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Salary slip not found in this kiln");
+
+  // Bug fix: carriedForward on every already-generated LATER month's slip
+  // is a frozen snapshot of ledgerBalanceBefore taken at ITS OWN
+  // generation time — which included this month's own SALARY entry. Once
+  // that entry is deleted below, every later slip's stored carriedForward/
+  // netSalary is stale until regenerated. Find them (chronological order,
+  // since each regeneration's own correct carriedForward depends on the
+  // previous month's ledger entry already being fixed) before deleting
+  // this one, then regenerate each afterward — generateSalarySlip is
+  // idempotent (updates in place, keyed on personId+month), so this can't
+  // duplicate anything.
+  const laterSlips = await db
+    .select({ month: salarySlips.month })
+    .from(salarySlips)
+    .where(and(eq(salarySlips.kilnId, kilnId), eq(salarySlips.personId, existing.personId), gt(salarySlips.month, existing.month)))
+    .orderBy(salarySlips.month);
+
   await db.delete(salarySlips).where(eq(salarySlips._id, slipId));
   // Also removes the linked SALARY ledger entry (see generateSalarySlip's
   // salaryLedgerEntryId) — otherwise this month's "earned" entry would
@@ -483,4 +525,8 @@ export async function deleteSalarySlip(kilnId: string, slipId: string) {
     fs.rm(p, { force: true }, () => {});
   }
   emitToKiln(kilnId, "salary:update", { _id: slipId, deleted: true });
+
+  for (const { month } of laterSlips) {
+    await generateSalarySlip(kilnId, existing.personId, month).catch(() => {});
+  }
 }

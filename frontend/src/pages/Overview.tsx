@@ -180,16 +180,22 @@ function QuickEntry() {
 
 function SeasonSummaryCard() {
   const [summary, setSummary] = useState<SeasonFinancialSummary | null>(null);
+  const [loadError, setLoadError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
 
   async function refresh() {
     setSummary(await api.financialReports.summary(90));
+    setLoadError("");
   }
 
   useEffect(() => {
     if (!activeKilnId) return;
-    refresh().catch(console.error);
+    // Bug fix: this used to only log a failed load to the console — the
+    // card then rendered nothing at all (see the `if (!summary) return
+    // null` below), indistinguishable from "still loading."
+    refresh().catch((err) => setLoadError(err instanceof Error ? err.message : t("common.somethingWentWrong")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKilnId]);
 
   useKilnEvent("dispatch:update", () => refresh());
@@ -197,7 +203,13 @@ function SeasonSummaryCard() {
   useKilnEvent("ledger:update", () => refresh());
   useKilnEvent("invoice:update", () => refresh());
 
-  if (!summary) return null;
+  if (!summary) {
+    return loadError ? (
+      <Card>
+        <p className="py-6 text-center text-sm text-status-critical">{loadError}</p>
+      </Card>
+    ) : null;
+  }
 
   return (
     <Card>
@@ -410,15 +422,21 @@ function DashboardStockPanel() {
                     <span className="font-mono font-semibold tabular-nums text-status-critical">
                       ₹{formatINR(d.amountDue)}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => openLedgerFor(d.person.id)}
-                      className="text-ink-muted hover:text-status-critical"
-                      aria-label={t("overview.resolveDue", { name: d.person.name })}
-                      title={t("overview.resolveDue", { name: d.person.name })}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {/* Suppliers live in their own table, not `people` — there's
+                        no ledger to open for one; correcting their due means
+                        editing the Supplier Invoice (or fuel purchase) itself,
+                        from the Suppliers/Fuel page. */}
+                    {d.person.type !== "SUPPLIER" && (
+                      <button
+                        type="button"
+                        onClick={() => openLedgerFor(d.person.id)}
+                        className="text-ink-muted hover:text-status-critical"
+                        aria-label={t("overview.resolveDue", { name: d.person.name })}
+                        title={t("overview.resolveDue", { name: d.person.name })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}

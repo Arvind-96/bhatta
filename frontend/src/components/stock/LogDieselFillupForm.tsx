@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useTranslation } from "@/hooks/useTranslation";
-import type { KilnVehicle, Person, VehicleDieselEntry } from "@/types";
+import type { KilnVehicle, Person, SimplePaymentMode, VehicleDieselEntry } from "@/types";
 
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -31,7 +31,10 @@ function driverIdOf(entry: VehicleDieselEntry) {
 // live preview of that vehicle's most recent prior reading (or its
 // baseline, for a brand-new vehicle), the same figure the server
 // independently re-derives and stores at save time (see
-// kilnVehicle.service.ts's lastKnownMeterReading).
+// kilnVehicle.service.ts's lastKnownMeterReading). Cost is optional (a
+// fill-up can be logged from just the liters and settled later) and, when
+// given, single-mode only (CASH/BANK/UPI) — vehicleDieselEntries has no
+// cashAmount/onlineAmount split columns the way Invoices/Dispatches do.
 export function LogDieselFillupForm({ vehicles, drivers, entries, existing, onSaved, onCancel }: LogDieselFillupFormProps) {
   const { t } = useTranslation();
   const existingVehicleId = existing ? vehicleIdOf(existing) : "";
@@ -42,8 +45,11 @@ export function LogDieselFillupForm({ vehicles, drivers, entries, existing, onSa
   const [quantityLiters, setQuantityLiters] = useState(existing ? String(existing.quantityLiters) : "");
   const [initialMeterReading, setInitialMeterReading] = useState(existing?.initialMeterReading != null ? String(existing.initialMeterReading) : "");
   const [driverId, setDriverId] = useState(existing ? driverIdOf(existing) ?? "" : "");
+  const [costAmount, setCostAmount] = useState(existing?.costAmount != null ? String(existing.costAmount) : "");
+  const [paymentMode, setPaymentMode] = useState<SimplePaymentMode | "">(existing?.paymentMode ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const vehicleTypes = Array.from(new Set(vehicles.map((v) => v.type)));
   const filteredVehicles = vehicleType ? vehicles.filter((v) => v.type === vehicleType) : vehicles;
@@ -69,6 +75,7 @@ export function LogDieselFillupForm({ vehicles, drivers, entries, existing, onSa
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!vehicleId || !quantityLiters) return;
+    setFormError("");
     setSaving(true);
     try {
       const payload = {
@@ -76,6 +83,8 @@ export function LogDieselFillupForm({ vehicles, drivers, entries, existing, onSa
         quantityLiters: Number(quantityLiters),
         initialMeterReading: initialMeterReading ? Number(initialMeterReading) : undefined,
         driverId: driverId || undefined,
+        costAmount: costAmount ? Number(costAmount) : undefined,
+        paymentMode: paymentMode || undefined,
         notes: notes || undefined,
       };
       if (existing) {
@@ -84,6 +93,8 @@ export function LogDieselFillupForm({ vehicles, drivers, entries, existing, onSa
         await api.kilnVehicles.logDiesel(payload);
       }
       onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -127,6 +138,22 @@ export function LogDieselFillupForm({ vehicles, drivers, entries, existing, onSa
           className={inputClass}
         />
 
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          placeholder={t("stock.costOptional")}
+          value={costAmount}
+          onChange={(e) => setCostAmount(e.target.value)}
+          className={inputClass}
+        />
+        <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as SimplePaymentMode | "")} className={inputClass}>
+          <option value="">{t("billing.paymentModeOptional")}</option>
+          <option value="CASH">{t("billing.paymentCash")}</option>
+          <option value="BANK">{t("billing.paymentBank")}</option>
+          <option value="UPI">{t("billing.paymentUpi")}</option>
+        </select>
+
         <div className="col-span-2 rounded-xl border border-border bg-ink-primary/5 px-3 py-2">
           <p className="text-xs text-ink-muted">{t("stock.todaysLastMeterReadingLabel")}</p>
           <p className="text-sm font-semibold tabular-nums text-ink-primary">
@@ -151,6 +178,7 @@ export function LogDieselFillupForm({ vehicles, drivers, entries, existing, onSa
           className={`${inputClass} col-span-2`}
         />
 
+        {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
         <div className="col-span-2 flex gap-2">
           <Button type="submit" disabled={saving} className="flex-1">
             {t("common.save")}

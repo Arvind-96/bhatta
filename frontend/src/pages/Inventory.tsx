@@ -25,6 +25,7 @@ export function Inventory() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", quantity: "", unit: "", notes: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
@@ -82,8 +83,13 @@ export function Inventory() {
 
   async function deleteItem(item: InventoryItem) {
     if (!confirm(t("inventory.confirmDelete", { name: item.name }))) return;
-    await api.inventory.remove(item._id);
-    await refresh();
+    setDeleteError("");
+    try {
+      await api.inventory.remove(item._id);
+      await refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   const { page, setPage, pageCount, pageItems: pagedItems, total } = usePagination(items, 10);
@@ -96,6 +102,8 @@ export function Inventory() {
           <Plus className="h-4 w-4" /> {t("inventory.addItem")}
         </Button>
       </div>
+
+      {deleteError && <p className="text-sm text-status-critical">{deleteError}</p>}
 
       {showForm && (
         <Card>

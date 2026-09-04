@@ -47,7 +47,7 @@ type SyntheticRow = InvoiceRow & { _synthetic: true };
 // surface. Callers that need one customer's slice filter afterward with
 // belongsToCustomer below, the same customerId-OR-matching-name fallback
 // listInvoicesForCustomer already established for real invoices.
-async function unbilledDispatchRows(kilnId: string, filters: { from?: Date; to?: Date }): Promise<SyntheticRow[]> {
+export async function unbilledDispatchRows(kilnId: string, filters: { from?: Date; to?: Date }): Promise<SyntheticRow[]> {
   const dateRange = [];
   if (filters.from) dateRange.push(gte(dispatches.dispatchedOn, filters.from));
   if (filters.to) dateRange.push(lte(dispatches.dispatchedOn, filters.to));
@@ -111,7 +111,7 @@ async function unbilledDispatchRows(kilnId: string, filters: { from?: Date; to?:
 // for real invoices — a row belongs to this customer if it's explicitly
 // linked by id, or if it's unlinked (customerId null) but its own
 // customerName matches case/whitespace-insensitively.
-function belongsToCustomer(row: { customerId?: string | null; customerName: string }, customerId: string, customerName: string): boolean {
+export function belongsToCustomer(row: { customerId?: string | null; customerName: string }, customerId: string, customerName: string): boolean {
   if (row.customerId) return row.customerId === customerId;
   return row.customerName.trim().toLowerCase() === customerName.trim().toLowerCase();
 }
@@ -514,7 +514,15 @@ const salesByCustomerCategory: ReportDefinition = {
         { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
         { key: "amount", labelKey: "reports.col.totalBillAmount", format: "currency" },
         { key: "paid", labelKey: "reports.col.paidThisPeriod", format: "currency" },
-        { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+        // Bug fix (labeling): this is a period-net figure (this period's
+        // billed share minus paid share), the same kind of metric the
+        // Customers report correctly labels "Due (period)" — not the FIFO-
+        // resolved standing due the Invoices report's own "Due" column
+        // means. Reusing that plain label here read as the same resolved
+        // figure when it isn't, which is exactly the F6 finding: two
+        // reports named "Due" that can legitimately disagree for the same
+        // customer/period since they answer different questions.
+        { key: "due", labelKey: "reports.col.dueThisPeriod", format: "currency" },
         { key: "credit", labelKey: "reports.col.credit", format: "currency" },
       ],
       rows: detail,

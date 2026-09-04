@@ -44,6 +44,7 @@ function BrickStockSection() {
   const [productionHistory, setProductionHistory] = useState<BrickProductionEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<StockLoadingEntry[]>([]);
 
+  const [categoryError, setCategoryError] = useState("");
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [newGrade, setNewGrade] = useState("");
@@ -60,9 +61,11 @@ function BrickStockSection() {
 
   const [productionForm, setProductionForm] = useState({ categoryId: "", bricksCount: "", notes: "" });
   const [savingProduction, setSavingProduction] = useState(false);
+  const [productionError, setProductionError] = useState("");
 
   const [loadingForm, setLoadingForm] = useState({ categoryId: "", bricksCount: "", notes: "" });
   const [savingLoading, setSavingLoading] = useState(false);
+  const [loadingError, setLoadingError] = useState("");
 
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -92,6 +95,7 @@ function BrickStockSection() {
   async function addCategory(e: FormEvent) {
     e.preventDefault();
     if (!newCategory.trim()) return;
+    setCategoryError("");
     setSavingCategory(true);
     try {
       await api.brickCategories.create(newCategory.trim(), newPrice ? Number(newPrice) : undefined, newGrade.trim() || undefined);
@@ -100,6 +104,11 @@ function BrickStockSection() {
       setNewPrice("");
       setShowAddCategory(false);
       await refresh();
+    } catch (err) {
+      // Bug fix: this used to have no catch at all — the backend's own
+      // friendly duplicate-category-name rejection was silently swallowed,
+      // the form just sat there with no indication anything went wrong.
+      setCategoryError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingCategory(false);
     }
@@ -107,8 +116,13 @@ function BrickStockSection() {
 
   async function deleteCategory(category: BrickCategory) {
     if (!confirm(t("stock.confirmRemoveCategory", { name: category.category }))) return;
-    await api.brickCategories.remove(category._id);
-    await refresh();
+    setCategoryError("");
+    try {
+      await api.brickCategories.remove(category._id);
+      await refresh();
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   function startEditQuantity(category: BrickCategory) {
@@ -144,6 +158,7 @@ function BrickStockSection() {
   async function logProduction(e: FormEvent) {
     e.preventDefault();
     if (!productionForm.categoryId || !productionForm.bricksCount) return;
+    setProductionError("");
     setSavingProduction(true);
     try {
       await api.brickCategories.logProduction({
@@ -153,19 +168,26 @@ function BrickStockSection() {
       });
       setProductionForm({ categoryId: "", bricksCount: "", notes: "" });
       await refresh();
+    } catch (err) {
+      setProductionError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingProduction(false);
     }
   }
 
   async function removeProductionEntry(id: string) {
-    await api.brickCategories.removeProduction(id);
-    await refresh();
+    try {
+      await api.brickCategories.removeProduction(id);
+      await refresh();
+    } catch (err) {
+      setProductionError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function logLoading(e: FormEvent) {
     e.preventDefault();
     if (!loadingForm.categoryId || !loadingForm.bricksCount) return;
+    setLoadingError("");
     setSavingLoading(true);
     try {
       await api.brickCategories.logLoading({
@@ -175,6 +197,8 @@ function BrickStockSection() {
       });
       setLoadingForm({ categoryId: "", bricksCount: "", notes: "" });
       await refresh();
+    } catch (err) {
+      setLoadingError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingLoading(false);
     }
@@ -259,6 +283,8 @@ function BrickStockSection() {
           </form>
         </Card>
       )}
+
+      {categoryError && <p className="text-sm text-status-critical">{categoryError}</p>}
 
       {categories.length === 0 ? (
         <Card>
@@ -387,6 +413,7 @@ function BrickStockSection() {
                 onChange={(e) => setProductionForm((f) => ({ ...f, notes: e.target.value }))}
                 className={inputClass}
               />
+              {productionError && <p className="text-sm text-status-critical">{productionError}</p>}
               <Button type="submit" disabled={savingProduction}>
                 {t("stock.addToStock")}
               </Button>
@@ -426,6 +453,7 @@ function BrickStockSection() {
                 onChange={(e) => setLoadingForm((f) => ({ ...f, notes: e.target.value }))}
                 className={inputClass}
               />
+              {loadingError && <p className="text-sm text-status-critical">{loadingError}</p>}
               <Button type="submit" disabled={savingLoading}>
                 {t("stock.deductFromStock")}
               </Button>

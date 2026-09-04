@@ -62,7 +62,16 @@ export async function createChamberGrading(input: CreateGradingInput) {
     });
   }
 
-  await db.update(ghers).set({ status: "EMPTY", updatedAt: new Date() }).where(eq(ghers._id, input.gherId));
+  // The UNLOADING→EMPTY flip below is only valid coming from UNLOADING —
+  // forcing it from any other status (e.g. a grading logged against a
+  // chamber that's still FIRING/READY, or already back to EMPTY) would
+  // silently corrupt the chamber's real lifecycle state. The grading
+  // itself is still recorded above (real data), so we only skip the
+  // status flip and flag it with an error instead of failing silently.
+  const canCompleteUnloading = gher.status === "UNLOADING";
+  if (canCompleteUnloading) {
+    await db.update(ghers).set({ status: "EMPTY", updatedAt: new Date() }).where(eq(ghers._id, input.gherId));
+  }
 
   // Overall yield (every category combined) — a well-defined figure
   // regardless of which categories this kiln happens to have set up,
@@ -73,6 +82,12 @@ export async function createChamberGrading(input: CreateGradingInput) {
 
   emitToKiln(input.kilnId, "gher:update", (await db.select().from(ghers).where(eq(ghers._id, input.gherId)))[0]);
   emitToKiln(input.kilnId, "grading:update", { ...grading, totalOutput, recoveryPercent });
+
+  if (!canCompleteUnloading) {
+    throw new Error(
+      `Grading recorded, but chamber #${gher.number} was ${gher.status} (not UNLOADING) — its status was NOT reset to EMPTY. Advance the chamber to UNLOADING before completing this grading.`
+    );
+  }
 
   return { grading, totalOutput, recoveryPercent };
 }

@@ -98,6 +98,30 @@ export async function getSupplierDetail(kilnId: string, supplierId: string) {
   return { supplier, invoices: invoiceRows, totalPaid, totalDue };
 }
 
+// Every supplier with a real outstanding balance across all their invoices
+// (all-time, same "no season filter" convention getSupplierDetail already
+// uses — an invoice due doesn't reset at a season boundary). Feeds
+// person.service.ts's listPaymentsDue, which used to be structurally
+// unable to see supplier debt at all (suppliers live in their own table,
+// never in `people`/`ledgerEntries`) — Financial Overview/Dashboard's
+// "Total Dues" (whose own doc comment always claimed to mean "labor/
+// contractors/suppliers") silently excluded every supplier due, while
+// Reports → Debtors & Creditors (which loops suppliers directly) already
+// included them, so the two disagreed by exactly this amount.
+export async function listSupplierDuesAcrossKiln(kilnId: string) {
+  const [supplierRows, invoiceRows] = await Promise.all([
+    db.select().from(suppliers).where(eq(suppliers.kilnId, kilnId)),
+    db.select().from(supplierInvoices).where(eq(supplierInvoices.kilnId, kilnId)),
+  ]);
+  const dueBySupplier = new Map<string, number>();
+  for (const inv of invoiceRows) {
+    dueBySupplier.set(inv.supplierId, (dueBySupplier.get(inv.supplierId) ?? 0) + (inv.totalBillAmount - inv.amountPaid));
+  }
+  return supplierRows
+    .map((s) => ({ supplier: { id: s._id, name: s.name, phone: s.phone ?? null }, amountDue: Math.round((dueBySupplier.get(s._id) ?? 0) * 100) / 100 }))
+    .filter((r) => r.amountDue > 0);
+}
+
 // Keeps the linked Expense row (matched via expenses.supplierInvoiceId) in
 // sync with any amountPaid/date/payment edit — same reasoning as
 // updateDoctorVisit. An invoice that had no payment yet (no linked

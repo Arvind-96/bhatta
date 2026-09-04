@@ -184,6 +184,7 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.thisMonth": { en: "This month", hi: "इस महीने" },
   "common.thisYear": { en: "This year", hi: "इस वर्ष" },
   "common.close": { en: "Close", hi: "बंद करें" },
+  "common.retry": { en: "Retry", hi: "फिर कोशिश करें" },
   "common.back": { en: "Back", hi: "वापस" },
   "common.confirm": { en: "Confirm", hi: "पुष्टि करें" },
   "common.view": { en: "View", hi: "देखें" },

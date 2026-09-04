@@ -8,7 +8,8 @@ import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { cn, formatINR } from "@/lib/utils";
 import { ProfileViewField } from "@/components/people/ProfileViewField";
-import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
+import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
+import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
 import { printDoctorVisit } from "@/lib/printDocument";
 import type { Doctor as DoctorRecord, DoctorVisit, LaborPaymentMode, Person } from "@/types";
 
@@ -215,24 +216,16 @@ export function DoctorVisitDetailPage({ visit, doctors, people, onBack, onDelete
             />
 
             {(Number(medicineCost) || 0) + (Number(consultationFee) || 0) > 0 && (
-              <div className="col-span-2 flex flex-col gap-2">
-                <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as LaborPaymentMode)} className={inputClass}>
-                  <option value="CASH">{t("dispatch.paymentCash")}</option>
-                  <option value="BANK">{t("dispatch.paymentBankTransfer")}</option>
-                  <option value="UPI">{t("dispatch.paymentUpi")}</option>
-                  <option value="CASH_AND_ONLINE">{t("common.paymentModeCashAndOnline")}</option>
-                </select>
-                {paymentMode === "CASH_AND_ONLINE" && (
-                  <PaymentSplitFields
-                    totalAmount={(Number(medicineCost) || 0) + (Number(consultationFee) || 0)}
-                    cashAmount={cashAmount}
-                    onlineAmount={onlineAmount}
-                    onCashAmountChange={setCashAmount}
-                    onOnlineAmountChange={setOnlineAmount}
-                    inputClassName={inputClass}
-                  />
-                )}
-              </div>
+              <AmountPaymentModeFields
+                amount={(Number(medicineCost) || 0) + (Number(consultationFee) || 0)}
+                paymentMode={paymentMode}
+                cashAmount={cashAmount}
+                onlineAmount={onlineAmount}
+                onPaymentModeChange={setPaymentMode}
+                onCashAmountChange={setCashAmount}
+                onOnlineAmountChange={setOnlineAmount}
+                inputClassName={inputClass}
+              />
             )}
 
             <input

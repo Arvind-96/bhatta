@@ -132,6 +132,8 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
       });
       onSaved();
       onClose();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -155,12 +157,14 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.customerPartySection")}</p>
             <div className="grid grid-cols-2 gap-2">
               <input
+                required
                 placeholder={t("brickLoading.customerNamePlaceholder")}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 className={inputClass}
               />
               <input
+                required
                 placeholder={t("brickLoading.customerPhonePlaceholder")}
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
@@ -185,12 +189,14 @@ export function EditBrickLoadingEntryModal({ entry, onClose, onSaved }: EditBric
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">{t("brickLoading.driverSection")}</p>
             <div className="grid grid-cols-2 gap-2">
               <input
+                required
                 placeholder={t("brickLoading.driverNamePlaceholder")}
                 value={driverName}
                 onChange={(e) => setDriverName(e.target.value)}
                 className={inputClass}
               />
               <input
+                required
                 placeholder={t("brickLoading.driverPhonePlaceholder")}
                 value={driverPhone}
                 onChange={(e) => setDriverPhone(e.target.value)}

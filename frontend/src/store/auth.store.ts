@@ -21,6 +21,7 @@ export interface UserKiln {
   defaultTermsAndConditions?: string;
   dayShiftStart?: string;
   dayShiftEnd?: string;
+  yardCapacityBricks?: number;
   needsSetup?: boolean;
 }
 

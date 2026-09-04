@@ -16,6 +16,12 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   loading,
+  // Surfaces a backend refusal (e.g. a delete guard's "still linked to N
+  // records" message) right in the dialog instead of it being silently
+  // swallowed — every caller's onConfirm is expected to catch its own
+  // rejected promise and pass the message here, rather than throwing back
+  // out to an unhandled rejection.
+  error,
 }: {
   title: string;
   detail: string;
@@ -23,6 +29,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
   loading?: boolean;
+  error?: string;
 }) {
   const { t } = useTranslation();
   return (
@@ -33,6 +40,7 @@ export function ConfirmDialog({
         </span>
         <h3 className="mt-3 text-sm font-semibold text-ink-primary">{title}</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">{detail}</p>
+        {error && <p className="mt-2 text-sm text-status-critical">{error}</p>}
         <div className="mt-5 flex justify-center gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel} disabled={loading}>
             {t("common.cancel")}

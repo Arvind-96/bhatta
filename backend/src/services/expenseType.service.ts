@@ -74,6 +74,42 @@ export async function getExpenseTypeDetail(kilnId: string, expenseTypeId: string
   return { expenseType, expenses: rows, totalPaid, totalDue };
 }
 
+// Deleting an Expense Type cascades to delete every expense logged under
+// it too — "delete the type" means "this category of spending never
+// happened," not "hide the type but leave its amounts still counted
+// everywhere" (Financial Overview, Profit & Loss, Day Book, Trial Balance
+// all sum `expenses` directly, with no expenseType-active filter to hide
+// behind). Refuses instead when any of those expenses were auto-logged
+// from another feature (a Brick Loading trip, Dispatch, Doctor Visit,
+// Supplier Invoice, or Machine payment) — deleting those out from under
+// their source would desync the source's own totals (e.g. a Machine's
+// totalPaid/remainingDue) from what the Expense page then shows, the same
+// guard expense.service.ts's deleteExpense already enforces for a single
+// row. Only plain, directly-entered expenses (no source link) are ever
+// cascade-deleted here.
+export async function deleteExpenseType(kilnId: string, expenseTypeId: string) {
+  const existing = (await db.select().from(expenseTypes).where(and(eq(expenseTypes._id, expenseTypeId), eq(expenseTypes.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Expense type not found in this kiln");
+
+  const rows = await db.select().from(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.expenseTypeId, expenseTypeId)));
+  const autoLogged = rows.filter(
+    (e) => e.dispatchId || e.brickLoadingEntryId || e.doctorVisitId || e.supplierInvoiceId || e.machineInstallmentPaymentId || e.machineMaintenanceLogId
+  );
+  if (autoLogged.length > 0) {
+    throw new Error(
+      `Cannot delete "${existing.name}" — ${autoLogged.length} of its expense(s) were auto-logged from another feature (a Brick Loading trip, Dispatch, Doctor Visit, Supplier Invoice, or Machine payment). Remove those from their source first, so that feature's own totals stay in sync.`
+    );
+  }
+
+  if (rows.length > 0) {
+    await db.delete(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.expenseTypeId, expenseTypeId)));
+  }
+  await db.delete(expenseTypes).where(eq(expenseTypes._id, expenseTypeId));
+  emitToKiln(kilnId, "expenseType:update", { _id: expenseTypeId, deleted: true });
+  emitToKiln(kilnId, "expense:update", { expenseTypeId, deleted: true });
+  return { deletedExpenseCount: rows.length };
+}
+
 export async function updateExpenseType(kilnId: string, expenseTypeId: string, input: Partial<ExpenseTypeInput>) {
   const existing = (await db.select().from(expenseTypes).where(and(eq(expenseTypes._id, expenseTypeId), eq(expenseTypes.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Expense type not found in this kiln");

@@ -62,6 +62,7 @@ export function Fleet() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const [openMachineId, setOpenMachineId] = useState<string | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
@@ -81,6 +82,7 @@ export function Fleet() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.name) return;
+    setFormError("");
     setLoading(true);
     try {
       await api.machines.create({
@@ -99,6 +101,8 @@ export function Fleet() {
       setForm(emptyForm());
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -214,6 +218,7 @@ export function Fleet() {
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               className={cn(inputClass, "col-span-2")}
             />
+            {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
             <Button type="submit" disabled={loading} className="col-span-2">
               {t("fleet.saveMachine")}
             </Button>

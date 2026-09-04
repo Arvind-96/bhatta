@@ -7,6 +7,8 @@ import { people, ledgerEntries, customers, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES
 import { getCustomerDetail } from "./customer.service";
 import { getCurrentSeasonId } from "./season.util";
 import { listLedgerForKiln } from "./ledger.service";
+import { listSupplierDuesAcrossKiln } from "./supplierInvoice.service";
+import { totalFuelPurchaseSupplierDues } from "./fuelPurchase.service";
 import { emitToKiln } from "../config/socket";
 
 export type PersonType = (typeof PERSON_TYPES)[number];
@@ -91,7 +93,29 @@ function deriveStackingStage(input: { workType?: WorkType; stackingStage?: "PHAD
   return input.stackingStage;
 }
 
+// Guards against the SUM of every active PARTNER's profitSharePercent in a
+// kiln exceeding 100% — nothing else on the create/update path stops an
+// admin from giving five partners 30% each. `excludePersonId` leaves the
+// partner currently being saved out of the "other partners" sum (their own
+// new value is passed in as `newSharePercent` and added back separately),
+// so re-saving an already-registered partner's own percentage doesn't
+// double-count their old stored figure against itself.
+async function assertPartnerShareWithinLimit(kilnId: string, excludePersonId: string | undefined, newSharePercent: number) {
+  const otherPartners = await db
+    .select({ profitSharePercent: people.profitSharePercent })
+    .from(people)
+    .where(and(eq(people.kilnId, kilnId), eq(people.type, "PARTNER"), eq(people.active, true), excludePersonId ? ne(people._id, excludePersonId) : undefined));
+  const othersTotal = otherPartners.reduce((sum, p) => sum + (p.profitSharePercent ?? 0), 0);
+  const total = Math.round((othersTotal + newSharePercent) * 100) / 100;
+  if (total > 100) {
+    throw new Error(`Total partner profit share would be ${total}% — cannot exceed 100%.`);
+  }
+}
+
 export async function createPerson(input: CreatePersonInput) {
+  if (input.type === "PARTNER" && input.profitSharePercent != null) {
+    await assertPartnerShareWithinLimit(input.kilnId, undefined, input.profitSharePercent);
+  }
   if (input.contractorId) {
     await assertPersonOfType(input.kilnId, input.contractorId, ["LABOUR_CONTRACTOR"]);
   }
@@ -338,6 +362,14 @@ export async function updatePerson(kilnId: string, personId: string, input: Upda
   const existing = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Person not found");
 
+  if (existing.type === "PARTNER") {
+    const effectiveActive = input.active ?? existing.active;
+    const effectiveShare = input.profitSharePercent !== undefined ? input.profitSharePercent : existing.profitSharePercent;
+    if (effectiveActive && effectiveShare != null) {
+      await assertPartnerShareWithinLimit(kilnId, personId, effectiveShare);
+    }
+  }
+
   await db.update(people)
     .set({ ...input, stackingStage: deriveStackingStage(input) })
     .where(and(eq(people._id, personId), eq(people.kilnId, kilnId)));
@@ -488,13 +520,26 @@ export async function personLedgerBalances(kilnId: string) {
   return results;
 }
 
+// Bug fix (admin decision): this used to be structurally unable to see
+// Supplier debt at all — suppliers live in their own `suppliers` table,
+// never in `people`/`ledgerEntries`, which every row here otherwise comes
+// from. Financial Overview/Dashboard's "Total Dues" (built on this
+// function) claims to mean "what the kiln owes labor/contractors/
+// suppliers," but silently excluded every supplier due — while Reports →
+// Debtors & Creditors (which loops suppliers directly) already included
+// them, so the two disagreed by exactly that amount. Now merges in both
+// supplier debt streams (goods invoices and fuel purchases — two
+// genuinely separate systems, see supplierInvoice.service.ts's
+// listSupplierDuesAcrossKiln and fuelPurchase.service.ts's
+// totalFuelPurchaseSupplierDues), combined into one row per supplier so a
+// supplier with both kinds of debt doesn't appear twice.
 export async function listPaymentsDue(kilnId: string) {
   const rows = await db
     .select()
     .from(people)
     .where(and(eq(people.kilnId, kilnId), ne(people.type, "CUSTOMER")));
 
-  const results = [];
+  const results: { person: { id: string; name: string; type: string; phone: string | null }; amountDue: number }[] = [];
   for (const person of rows) {
     const entries = await db
       .select()
@@ -507,6 +552,16 @@ export async function listPaymentsDue(kilnId: string) {
         amountDue: balance,
       });
     }
+  }
+
+  const [goodsDues, fuelDues] = await Promise.all([listSupplierDuesAcrossKiln(kilnId), totalFuelPurchaseSupplierDues(kilnId)]);
+  const supplierDueById = new Map<string, { name: string; phone: string | null; amountDue: number }>();
+  for (const { supplier, amountDue } of [...goodsDues, ...fuelDues]) {
+    const existing = supplierDueById.get(supplier.id);
+    supplierDueById.set(supplier.id, { name: supplier.name, phone: supplier.phone, amountDue: (existing?.amountDue ?? 0) + amountDue });
+  }
+  for (const [id, s] of supplierDueById) {
+    results.push({ person: { id, name: s.name, type: "SUPPLIER", phone: s.phone }, amountDue: Math.round(s.amountDue * 100) / 100 });
   }
 
   return results.sort((a, b) => b.amountDue - a.amountDue);

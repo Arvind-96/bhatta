@@ -123,6 +123,15 @@ function FulfillModal({ order, onClose, onSaved }: { order: SaleOrder; onClose: 
       setError(t("saleOrder.bricksCountExceedsPending", { pending }));
       return;
     }
+    // Bug fix: this used to fall back to 0 silently (`Number(amount) ||
+    // 0`) — a blank amount field (common for a multi-category order,
+    // where there's no single rate to pre-fill from) submitted a real ₹0
+    // dispatch with no warning, which then flowed into every revenue
+    // report as-is.
+    if (!amount || Number(amount) <= 0) {
+      setError(t("saleOrder.fulfillAmountRequired"));
+      return;
+    }
     if (isPaymentSplitMismatched(paymentMode, Number(amount) || 0, cashAmount, onlineAmount)) {
       setError(t("payment.splitMismatch", { total: Number(amount) || 0 }));
       return;
@@ -163,7 +172,7 @@ function FulfillModal({ order, onClose, onSaved }: { order: SaleOrder; onClose: 
         <form onSubmit={handleSubmit} className="flex flex-col gap-2.5">
           <input type="number" min={1} max={pending} placeholder={t("brickLoading.bricksLoadedPlaceholder")} value={bricksCount} onChange={(e) => setBricksCount(e.target.value)} className={inputClass} />
           <p className="text-xs text-ink-muted">{t("saleOrder.pendingCount", { pending })}</p>
-          <input type="number" min={0} placeholder={t("common.amount")} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputClass} />
+          <input required type="number" min={0} placeholder={t("common.amount")} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputClass} />
           <input placeholder={t("dispatch.vehicleNumberPlaceholder")} value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className={inputClass} />
           <input placeholder={t("dispatch.driverNamePlaceholder")} value={driverName} onChange={(e) => setDriverName(e.target.value)} className={inputClass} />
           <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value as PaymentMode)} className={inputClass}>
@@ -198,6 +207,8 @@ export function SaleOrders() {
   const [mode, setMode] = useState<"list" | "add">("list");
   const [fulfilling, setFulfilling] = useState<SaleOrder | null>(null);
   const [cancelling, setCancelling] = useState<SaleOrder | null>(null);
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [cancelError, setCancelError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
 
@@ -295,12 +306,24 @@ export function SaleOrders() {
           title={t("common.cancel")}
           detail={t("saleOrder.confirmCancel", { serial: cancelling.sequenceNumber ?? "" })}
           confirmLabel={t("common.cancel")}
-          loading={false}
-          onCancel={() => setCancelling(null)}
-          onConfirm={async () => {
-            await api.saleOrders.cancel(cancelling._id);
+          loading={cancelSaving}
+          error={cancelError}
+          onCancel={() => {
             setCancelling(null);
-            refresh();
+            setCancelError("");
+          }}
+          onConfirm={async () => {
+            setCancelSaving(true);
+            setCancelError("");
+            try {
+              await api.saleOrders.cancel(cancelling._id);
+              setCancelling(null);
+              refresh();
+            } catch (err) {
+              setCancelError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+            } finally {
+              setCancelSaving(false);
+            }
           }}
         />
       )}

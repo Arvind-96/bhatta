@@ -33,6 +33,9 @@ export const reportsDict: Record<string, Record<Locale, string>> = {
   "reports.firingShifts": { en: "Firing shifts", hi: "पकाई शिफ्ट" },
   "reports.soilArrivals": { en: "Soil arrivals", hi: "मिट्टी आगमन" },
   "reports.soilContracts": { en: "Soil contracts", hi: "मिट्टी अनुबंध" },
+  "reports.sandDeliveries": { en: "Sand deliveries", hi: "रेत आपूर्ति" },
+  "reports.sandContracts": { en: "Sand contracts", hi: "रेत अनुबंध" },
+  "reports.doctorVisits": { en: "Doctor visits", hi: "डॉक्टर विज़िट" },
   "reports.brickLoadingTrips": { en: "Brick loading trips", hi: "ईंट लदाई ट्रिप" },
   "reports.dispatchHistory": { en: "Dispatch / billing history", hi: "डिस्पैच / बिलिंग इतिहास" },
 

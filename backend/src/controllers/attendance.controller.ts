@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { attendanceForPersonMonth, listAttendanceForDay, listAttendanceRoster, markAttendance } from "../services/attendance.service";
+import { istDateOnly } from "../utils/istTime";
 
 const markSchema = z.object({
   personId: z.string(),
@@ -23,7 +24,12 @@ export async function mark(req: AuthedRequest, res: Response) {
 }
 
 export async function listForDay(req: AuthedRequest, res: Response) {
-  const date = req.query.date ? new Date(String(req.query.date)) : new Date();
+  // Bug fix: defaulting to a bare `new Date()` resolved "today" in the
+  // server's own (UTC) calendar day, not IST — during the ~5.5h window
+  // where it's already tomorrow in IST but still "today" in UTC, this
+  // silently showed yesterday's roster. istDateOnly resolves the correct
+  // IST calendar date first.
+  const date = req.query.date ? new Date(String(req.query.date)) : istDateOnly(new Date());
   const records = await listAttendanceForDay(req.kiln!.id, date);
   res.json(records);
 }
@@ -45,6 +51,7 @@ const rosterQuerySchema = z.object({
 
 export async function roster(req: AuthedRequest, res: Response) {
   const { date } = rosterQuerySchema.parse(req.query);
-  const entries = await listAttendanceRoster(req.kiln!.id, date ? new Date(date) : new Date());
+  // Same IST-"today" bug fix as listForDay above.
+  const entries = await listAttendanceRoster(req.kiln!.id, date ? new Date(date) : istDateOnly(new Date()));
   res.json(entries);
 }

@@ -13,6 +13,7 @@ import { createCustomer, findCustomerByName } from "./customer.service";
 import { autoLogExpense } from "./expense.service";
 import { summarizeItems, itemsOrLegacyFallback, bricksByCategory } from "./brickLineItems.util";
 import { emitToKiln } from "../config/socket";
+import { istStartOfDay, istEndOfDay, istDateKeyString } from "../utils/istTime";
 
 export type BrickGrade = (typeof BRICK_GRADES)[number];
 export type PaymentMode = (typeof DISPATCH_PAYMENT_MODES)[number];
@@ -38,26 +39,34 @@ async function assertCustomerInKiln(kilnId: string, customerId: string) {
   if (!customer) throw new Error("Referenced customer not found in this kiln");
 }
 
-// Same server-local-midnight convention used everywhere else in this app
-// (see attendance.service.ts's startOfDay) — keeps the slip number's "day"
-// boundary consistent with how every other day-bucketed query in this
-// codebase already resolves it.
+// Bug fix: this used to zero the time-of-day in the server's OWN local
+// timezone (the VPS runs in UTC, not IST) — a dispatch logged between IST
+// midnight and 5:30am got the PREVIOUS calendar day's date embedded in its
+// printed slip number (generateSlipNumber below), and could be grouped
+// into the wrong day's sequence. dispatchedOn is a real timestamp being
+// range-filtered here (gte/lte), not an equality-matched calendar-day key
+// — same class of fix already applied to Financial Overview/Profit &
+// Loss/Compare/diesel totals via the shared istTime.ts helpers.
 function startOfDay(date: Date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return istStartOfDay(date);
 }
 
 function endOfDay(date: Date) {
-  const d = startOfDay(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
+  return istEndOfDay(date);
 }
 
+// Bug fix: this used to read the date via server-LOCAL getters
+// (`.getDate()`/`.getMonth()`/`.getFullYear()`). That was harmless while
+// `startOfDay` above also computed server-local midnight (both wrong the
+// same way, so they cancelled out) — but now that `startOfDay` returns the
+// real UTC instant of IST midnight (e.g. IST midnight on the 5th = 18:30
+// UTC on the 4th), reading THAT instant via UTC-local getters on this UTC
+// server would print the 4th, not the 5th. istDateKeyString resolves the
+// correct IST calendar day regardless of what instant (dayStart or a raw
+// timestamp) is passed in.
 function formatDDMMYYYY(date: Date) {
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  return `${dd}-${mm}-${date.getFullYear()}`;
+  const [y, m, d] = istDateKeyString(date).split("-");
+  return `${d}-${m}-${y}`;
 }
 
 // e.g. "JVS Bricks" -> "JVS" — the kiln's own short prefix, not a fixed
@@ -346,14 +355,27 @@ export async function createDispatch(rawInput: CreateDispatchInput) {
     // for it if nothing matched, carrying over every detail the trip
     // itself collected. A name that already matches an existing profile is
     // left untouched (never duplicated).
-    if (loadingEntry.customerName?.trim() && !(await findCustomerByName(input.kilnId, loadingEntry.customerName))) {
-      await createCustomer(input.kilnId, {
-        name: loadingEntry.customerName.trim(),
-        phones: loadingEntry.customerPhone ? [loadingEntry.customerPhone] : [],
-        addresses: loadingEntry.customerAddress ? [loadingEntry.customerAddress] : [],
-        drivers: loadingEntry.driverName ? [{ name: loadingEntry.driverName, phone: loadingEntry.driverPhone ?? "", address: "" }] : [],
-        vehicles: [{ vehicleType: loadingEntry.vehicleType, vehicleNumber: loadingEntry.vehicleNumber }],
-      });
+    //
+    // Bug fix: this used to resolve/create the customer but never write its
+    // id back onto the dispatch, so a trip turned into a dispatch via
+    // "Add to Dispatch" (which never sends its own customerId) got
+    // customerId=null forever, relying entirely on name-matching downstream
+    // to ever reconnect to the customer's balance. Now resolves (or
+    // creates) the profile and links it, unless the caller already gave an
+    // explicit customerId (e.g. the Log Dispatch page's own trip picker).
+    if (loadingEntry.customerName?.trim() && !dispatch.customerId) {
+      let matchedCustomer = await findCustomerByName(input.kilnId, loadingEntry.customerName);
+      if (!matchedCustomer) {
+        matchedCustomer = await createCustomer(input.kilnId, {
+          name: loadingEntry.customerName.trim(),
+          phones: loadingEntry.customerPhone ? [loadingEntry.customerPhone] : [],
+          addresses: loadingEntry.customerAddress ? [loadingEntry.customerAddress] : [],
+          drivers: loadingEntry.driverName ? [{ name: loadingEntry.driverName, phone: loadingEntry.driverPhone ?? "", address: "" }] : [],
+          vehicles: [{ vehicleType: loadingEntry.vehicleType, vehicleNumber: loadingEntry.vehicleNumber }],
+        });
+      }
+      await db.update(dispatches).set({ customerId: matchedCustomer._id }).where(eq(dispatches._id, dispatch._id));
+      dispatch = (await db.select().from(dispatches).where(eq(dispatches._id, dispatch._id)))[0]!;
     }
   }
 
@@ -427,6 +449,7 @@ export interface DeliveryAdjustmentInput {
 export async function recordDeliveryAdjustment(kilnId: string, dispatchId: string, input: DeliveryAdjustmentInput) {
   const dispatch = (await db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))))[0];
   if (!dispatch) throw new Error("Dispatch not found in this kiln");
+  if (dispatch.cancelled) throw new Error("Cannot adjust a cancelled dispatch");
 
   const update: Record<string, unknown> = {};
   if (input.breakageCount != null) update.breakageCount = input.breakageCount;
@@ -509,6 +532,7 @@ export interface UpdateDispatchInput {
 export async function updateDispatch(kilnId: string, dispatchId: string, input: UpdateDispatchInput) {
   const existing = (await db.select().from(dispatches).where(and(eq(dispatches._id, dispatchId), eq(dispatches.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Dispatch not found in this kiln");
+  if (existing.cancelled) throw new Error("Cannot edit a cancelled dispatch");
 
   if (input.driverId) {
     await assertPersonOfType(kilnId, input.driverId, ["DRIVER"]);
@@ -779,6 +803,18 @@ export async function cancelDispatch(kilnId: string, dispatchId: string) {
           amount: pending,
           reason: `Invoice cancelled — reversing pending due on sale to ${row.customerName}`,
           category: "PARTNER_DUE",
+          // Dated to the invoice's own date, not "now" (the cancellation
+          // moment) — same convention updateInvoice's syncAttributionLedger
+          // uses. Without this, cancelling an old invoice posts a same-day
+          // reversal that inflates "money spent" for whatever period
+          // contains the cancellation, not the sale itself.
+          date: row.invoiceDate ?? undefined,
+          // Bug fix (admin decision): the invoice was cancelled — the
+          // admin never actually received this money, so its cancellation
+          // shouldn't inflate "money spent" either. This PAID entry only
+          // zeroes out a liability that will now never be paid, not real
+          // cash leaving the business. See ledgerEntries.isReversal.
+          isReversal: true,
         });
       }
     }
@@ -798,6 +834,8 @@ export async function cancelDispatch(kilnId: string, dispatchId: string) {
           amount: commission,
           reason: `Invoice cancelled — reversing commission on sale to ${row.customerName}`,
           category: "COMMISSION",
+          date: row.invoiceDate ?? undefined,
+          isReversal: true,
         });
       }
     }
@@ -874,12 +912,20 @@ export async function listDispatches(kilnId: string, seasonId: string, days?: nu
   const rows = await db.select().from(dispatches).where(and(...conditions)).orderBy(desc(dispatches.dispatchedOn));
 
   const driverIds = [...new Set(rows.map((r) => r.driverId).filter((v): v is string => !!v))];
-  const customerIds = [...new Set(rows.map((r) => r.customerId).filter((v): v is string => !!v))];
-  const ids = [...new Set([...driverIds, ...customerIds])];
   // phone/address/gstNumber included so print templates (Gate Pass/Challan)
   // can show client address/GSTIN and driver mobile without a second round trip.
-  const peopleRows = ids.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone, address: people.address, gstNumber: people.gstNumber }).from(people).where(inArray(people._id, ids)) : [];
+  const peopleRows = driverIds.length ? await db.select({ _id: people._id, name: people.name, phone: people.phone, address: people.address, gstNumber: people.gstNumber }).from(people).where(inArray(people._id, driverIds)) : [];
   const personById = new Map(peopleRows.map((p) => [p._id, p]));
+
+  // Bug fix: dispatches.customerId references the dedicated `customers`
+  // table (see assertCustomerInKiln above), not `people` — resolving it
+  // against `people` here always missed (the two tables never share ids),
+  // silently falling back to the raw id string downstream.
+  const customerIds = [...new Set(rows.map((r) => r.customerId).filter((v): v is string => !!v))];
+  const customerRows = customerIds.length
+    ? await db.select({ _id: customers._id, name: customers.name, phones: customers.phones, addresses: customers.addresses }).from(customers).where(inArray(customers._id, customerIds))
+    : [];
+  const customerById = new Map(customerRows.map((c) => [c._id, { _id: c._id, name: c.name, phone: c.phones?.[0], address: c.addresses?.[0] }]));
 
   const categoryIds = [
     ...new Set([
@@ -896,7 +942,7 @@ export async function listDispatches(kilnId: string, seasonId: string, days?: nu
     ...r,
     items: r.items?.map((i) => ({ ...i, categoryId: i.categoryId ? categoryById.get(i.categoryId) ?? i.categoryId : i.categoryId })),
     driverId: r.driverId ? personById.get(r.driverId) ?? r.driverId : r.driverId,
-    customerId: r.customerId ? personById.get(r.customerId) ?? r.customerId : r.customerId,
+    customerId: r.customerId ? customerById.get(r.customerId) ?? r.customerId : r.customerId,
     categoryId: r.categoryId ? categoryById.get(r.categoryId) ?? r.categoryId : r.categoryId,
   }));
 }

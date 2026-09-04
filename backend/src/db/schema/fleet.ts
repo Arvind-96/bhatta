@@ -173,8 +173,8 @@ export const vehicleDieselEntries = mysqlTable("vehicle_diesel_entries", {
   // kilnVehicle.service.ts's createDieselEntry and
   // StaffDetailPage/DriverDieselHistory.tsx).
   driverId: varchar("driverId", { length: 64 }),
-  // Nullable, kept only for entries created before this field was removed
-  // from the Log Diesel Fill-up form — never populated by new entries.
+  // Nullable — older entries (from when this field was briefly missing
+  // from the Log Diesel Fill-up form) simply have no cost recorded.
   costAmount: double("costAmount"),
   paymentMode: varchar("paymentMode", { length: 50, enum: LEDGER_PAYMENT_MODES }),
   date: dateColumn(),

@@ -67,12 +67,25 @@ async function syncAttributionLedger(
       reason: `${reason} (correction)`,
       category,
       date,
+      // A downward correction (delta < 0) posts PAID purely to reduce a
+      // liability that turned out to be smaller than first recorded — no
+      // cash actually moved. See ledgerEntries.isReversal's schema comment.
+      isReversal: delta < 0,
     });
     return;
   }
 
   if (oldId && oldAmount > 0) {
-    await addLedgerEntry({ kilnId, personId: oldId, direction: "PAID", amount: oldAmount, reason: `${reason} (reversed — reattributed)`, category, date });
+    await addLedgerEntry({
+      kilnId,
+      personId: oldId,
+      direction: "PAID",
+      amount: oldAmount,
+      reason: `${reason} (reversed — reattributed)`,
+      category,
+      date,
+      isReversal: true,
+    });
   }
   if (newId && newAmount > 0) {
     await addLedgerEntry({ kilnId, personId: newId, direction: "DUE", amount: newAmount, reason, category, date });
@@ -197,6 +210,7 @@ export async function listChallans(kilnId: string, seasonId: string | null, filt
 export async function updateChallan(kilnId: string, id: string, rawInput: Partial<Omit<ChallanInput, "dispatchId">>) {
   const existing = (await db.select().from(challans).where(and(eq(challans._id, id), eq(challans.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Challan not found in this kiln");
+  if (existing.cancelled) throw new Error("Cannot edit a cancelled challan");
   const input = applyItemsAggregate(rawInput);
   try {
     await db.update(challans).set(input).where(eq(challans._id, id));
@@ -308,6 +322,7 @@ export async function listGatePasses(kilnId: string, seasonId: string | null, fi
 export async function updateGatePass(kilnId: string, id: string, rawInput: Partial<Omit<GatePassInput, "dispatchId">>) {
   const existing = (await db.select().from(gatePasses).where(and(eq(gatePasses._id, id), eq(gatePasses.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Gate pass not found in this kiln");
+  if (existing.cancelled) throw new Error("Cannot edit a cancelled gate pass");
   const input = applyItemsAggregate(rawInput);
   try {
     await db.update(gatePasses).set(input).where(eq(gatePasses._id, id));
@@ -402,6 +417,14 @@ export function financialYearSession(date: Date): string {
 export async function createInvoice(kilnId: string, seasonId: string, rawInput: InvoiceInput) {
   if (rawInput.dispatchId) await assertDispatch(kilnId, rawInput.dispatchId);
   const input = applyItemsAggregate(rawInput);
+  // Round to the nearest paisa before this hits the DB — CreateInvoiceForm
+  // computes gross/net client-side with plain float arithmetic (no
+  // rounding), so a value like 12345.670000000001 can arrive here; same
+  // Math.round(x * 100) / 100 convention dispatch.service.ts uses
+  // everywhere it touches money.
+  input.netAmount = Math.round(input.netAmount * 100) / 100;
+  if (input.grossAmount != null) input.grossAmount = Math.round(input.grossAmount * 100) / 100;
+  if (input.ratePerBrick != null) input.ratePerBrick = Math.round(input.ratePerBrick * 100) / 100;
   const invoiceDate = input.invoiceDate ?? new Date();
   const session = financialYearSession(invoiceDate);
   // MAX-based, not COUNT-based — same collision-after-delete bug
@@ -540,7 +563,16 @@ export async function listInvoicesForCustomer(kilnId: string, customerId: string
 export async function updateInvoice(kilnId: string, id: string, rawInput: Partial<Omit<InvoiceInput, "dispatchId">>) {
   const existing = (await db.select().from(invoices).where(and(eq(invoices._id, id), eq(invoices.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Invoice not found in this kiln");
+  if (existing.cancelled) throw new Error("Cannot edit a cancelled invoice");
   const input = applyItemsAggregate(rawInput);
+  // Round to the nearest paisa before this hits the DB — CreateInvoiceForm
+  // computes gross/net client-side with plain float arithmetic (no
+  // rounding), so a value like 12345.670000000001 can arrive here; same
+  // Math.round(x * 100) / 100 convention dispatch.service.ts uses
+  // everywhere it touches money.
+  if (input.netAmount != null) input.netAmount = Math.round(input.netAmount * 100) / 100;
+  if (input.grossAmount != null) input.grossAmount = Math.round(input.grossAmount * 100) / 100;
+  if (input.ratePerBrick != null) input.ratePerBrick = Math.round(input.ratePerBrick * 100) / 100;
   try {
     await db.update(invoices).set(input).where(eq(invoices._id, id));
   } catch (err) {
@@ -609,6 +641,19 @@ export async function cancelInvoice(kilnId: string, id: string) {
         amount: pending,
         reason: `Invoice cancelled — reversing pending due on sale to ${existing.customerName}`,
         category: "PARTNER_DUE",
+        // Bug fix: dated to the invoice's own date, not "now" — same
+        // convention updateInvoice's syncAttributionLedger and
+        // dispatch.service.ts's cancelDispatch cascade already use.
+        // Without this, cancelling an old invoice posts a same-day
+        // reversal that inflates money-spent figures for whatever period
+        // contains the cancellation, not the sale itself.
+        date: existing.invoiceDate ?? undefined,
+        // Bug fix (admin decision): the invoice was cancelled — the admin
+        // never actually received this money, so its cancellation
+        // shouldn't inflate "money spent" either. This PAID entry only
+        // zeroes out a liability that will now never be paid; it isn't
+        // real cash leaving the business. See ledgerEntries.isReversal.
+        isReversal: true,
       });
     }
   }
@@ -622,6 +667,8 @@ export async function cancelInvoice(kilnId: string, id: string) {
         amount: commission,
         reason: `Invoice cancelled — reversing commission on sale to ${existing.customerName}`,
         category: "COMMISSION",
+        date: existing.invoiceDate ?? undefined,
+        isReversal: true,
       });
     }
   }

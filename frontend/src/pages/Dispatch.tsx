@@ -280,7 +280,11 @@ export function Dispatch() {
     return true;
   }
 
-  const totalAmountPreview = (Number(form.amount) || 0) + (Number(form.transportCost) || 0);
+  // Net of discount, same subtraction as handleSubmit's netAmountForSplit —
+  // dispatches.amount is stored net of discount, so this preview must agree
+  // with it rather than showing the pre-discount gross.
+  const netAmountForTotal = tripLocked ? Number(form.amount) || 0 : (Number(form.amount) || 0) - (Number(form.discountAmount) || 0);
+  const totalAmountPreview = netAmountForTotal + (Number(form.transportCost) || 0);
   const openDispatch = dispatches.find((d) => d._id === openDispatchId) ?? null;
 
   const listView = (

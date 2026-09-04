@@ -40,11 +40,27 @@ export async function createSaleOrder(input: CreateSaleOrderInput) {
   let bricksCount = input.bricksCount ?? 0;
   let categoryId = input.categoryId;
   let items: BrickLineItem[] | undefined = input.items;
+  // Bug fix: the create form computes a rate per brick and a total amount
+  // from its line items but never sent either to the backend — `summary`
+  // was computed here only for bricksCount/categoryId, and its own
+  // pricePerBrick/amount were silently discarded. That left
+  // ratePerBrick permanently null, so the Fulfill modal's amount pre-fill
+  // (which reads order.ratePerBrick) never fired — an admin who didn't
+  // notice the blank amount field could submit a ₹0 dispatch that then
+  // flowed into every revenue report as-is. Now falls back to the
+  // items-derived rate/amount whenever the admin didn't type one
+  // explicitly (ratePerBrick only when the order is single-category,
+  // matching summarizeItems' own "only meaningful for one item" rule;
+  // estimatedAmount always has a real per-order total to fall back to).
+  let ratePerBrick = input.ratePerBrick;
+  let estimatedAmount = input.estimatedAmount;
   if (input.items && input.items.length > 0) {
     const summary = summarizeItems(input.items);
     items = summary.items;
     bricksCount = summary.bricksCount;
     categoryId = summary.categoryId ?? categoryId;
+    ratePerBrick = ratePerBrick ?? summary.pricePerBrick;
+    estimatedAmount = estimatedAmount ?? (summary.amount > 0 ? summary.amount : undefined);
   }
   if (bricksCount <= 0) throw new Error("Sale order must have a positive bricks count");
 
@@ -61,8 +77,8 @@ export async function createSaleOrder(input: CreateSaleOrderInput) {
     categoryId,
     items,
     bricksCount,
-    ratePerBrick: input.ratePerBrick,
-    estimatedAmount: input.estimatedAmount,
+    ratePerBrick,
+    estimatedAmount,
     orderDate: input.orderDate,
     expectedDeliveryDate: input.expectedDeliveryDate,
     notes: input.notes,
@@ -100,8 +116,21 @@ export async function getSaleOrder(kilnId: string, saleOrderId: string) {
   return row;
 }
 
+// Bug fix: no UI reaches this endpoint today, but it's a live, callable
+// API with no guard at all — a direct call could silently rewrite items/
+// bricksCount on an order that's already PARTIALLY_FULFILLED/FULFILLED
+// (desyncing it from the Dispatches fulfillment already created against
+// its *original* items), or set bricksCount below bricksFulfilled
+// (making "pending" negative). Editing a still-open (PENDING) order is
+// unaffected.
 export async function updateSaleOrder(kilnId: string, saleOrderId: string, input: Partial<CreateSaleOrderInput>) {
-  await getSaleOrder(kilnId, saleOrderId);
+  const existing = await getSaleOrder(kilnId, saleOrderId);
+  if (existing.status === "PARTIALLY_FULFILLED" || existing.status === "FULFILLED") {
+    throw new Error(`Cannot edit this sale order — it's already ${existing.status.toLowerCase().replace("_", " ")}. Cancel or fulfill it instead.`);
+  }
+  if (input.bricksCount !== undefined && input.bricksCount < existing.bricksFulfilled) {
+    throw new Error(`Cannot set bricks count below ${existing.bricksFulfilled} already fulfilled.`);
+  }
   await db.update(saleOrders).set(input).where(eq(saleOrders._id, saleOrderId));
   const updated = (await db.select().from(saleOrders).where(eq(saleOrders._id, saleOrderId)))[0]!;
   emitToKiln(kilnId, "saleOrder:update", updated);
@@ -147,6 +176,30 @@ export async function fulfillSaleOrder(kilnId: string, seasonId: string, saleOrd
     throw new Error(`Only ${remaining} bricks remain pending on this order`);
   }
 
+  // Bug fix: this used to pass only the order's single aggregate
+  // categoryId into createDispatch, never `items` — for a multi-category
+  // order, createDispatch's own stock deduction then took the entire
+  // fulfilled quantity out of just that first/aggregate category,
+  // permanently overstating every OTHER category the order actually
+  // covered. Distribute this fulfillment batch across the order's real
+  // per-category breakdown, proportional to each category's own share of
+  // the order — correct both for fulfilling the whole remaining order in
+  // one shot and for a partial fulfillment, without needing the admin to
+  // type a per-category split themselves (the Fulfill form only collects
+  // one flat bricksCount). The last item absorbs the rounding remainder so
+  // the parts always sum to exactly input.bricksCount.
+  const fulfillItems =
+    order.items && order.items.length > 1
+      ? (() => {
+          const orderTotal = order.items!.reduce((s, i) => s + i.bricksCount, 0);
+          if (orderTotal <= 0) return undefined;
+          const parts = order.items!.map((i) => ({ categoryId: i.categoryId, bricksCount: Math.round((i.bricksCount / orderTotal) * input.bricksCount) }));
+          const allocated = parts.reduce((s, p) => s + p.bricksCount, 0);
+          parts[parts.length - 1].bricksCount += input.bricksCount - allocated;
+          return parts.filter((p) => p.bricksCount > 0);
+        })()
+      : undefined;
+
   const dispatch = await createDispatch({
     kilnId,
     seasonId: order.seasonId ?? seasonId,
@@ -157,6 +210,7 @@ export async function fulfillSaleOrder(kilnId: string, seasonId: string, saleOrd
     bricksCount: input.bricksCount,
     amount: input.amount,
     categoryId: order.categoryId ?? undefined,
+    items: fulfillItems,
     driverId: input.driverId,
     driverName: input.driverName,
     driverPhone: input.driverPhone,

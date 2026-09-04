@@ -179,9 +179,42 @@ const MATCH_COLUMN: Record<BookEntryType, "matchedLedgerEntryId" | "matchedInvoi
   SUPPLIER_INVOICE: "matchedSupplierInvoiceId",
 };
 
+// Re-derives the exact same online-portion amount listUnmatchedBookEntries
+// computed for this row, so matchTransaction can check it against the
+// bank statement line being matched to it — without this, a ₹50,000 bank
+// credit could be matched to a ₹500 ledger entry and both silently flip
+// to "reconciled", corrupting the reconciliation summary's implied
+// guarantee that a reconciled transaction and its book entry actually
+// agree.
+async function bookEntryAmount(kilnId: string, entryType: BookEntryType, entryId: string): Promise<number | null> {
+  if (entryType === "LEDGER") {
+    const row = (await db.select().from(ledgerEntries).where(and(eq(ledgerEntries._id, entryId), eq(ledgerEntries.kilnId, kilnId))))[0];
+    return row ? onlinePortion(row.paymentMode, row.amount, row.onlineAmount) : null;
+  }
+  if (entryType === "INVOICE") {
+    const row = (await db.select().from(invoices).where(and(eq(invoices._id, entryId), eq(invoices.kilnId, kilnId))))[0];
+    return row ? onlinePortion(row.paymentMode, row.amountPaidNow ?? row.netAmount, row.onlineAmount) : null;
+  }
+  if (entryType === "EXPENSE") {
+    const row = (await db.select().from(expenses).where(and(eq(expenses._id, entryId), eq(expenses.kilnId, kilnId))))[0];
+    return row ? onlinePortion(row.paymentMode, row.amount, row.onlineAmount) : null;
+  }
+  const row = (await db.select().from(supplierInvoices).where(and(eq(supplierInvoices._id, entryId), eq(supplierInvoices.kilnId, kilnId))))[0];
+  return row ? onlinePortion(row.paymentMode, row.amountPaid, row.onlineAmount) : null;
+}
+
 export async function matchTransaction(kilnId: string, bankTransactionId: string, entryType: BookEntryType, entryId: string) {
   const existing = (await db.select().from(bankTransactions).where(and(eq(bankTransactions._id, bankTransactionId), eq(bankTransactions.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Bank transaction not found in this kiln");
+
+  const entryAmount = await bookEntryAmount(kilnId, entryType, entryId);
+  if (entryAmount === null) throw new Error("The record you're matching to was not found in this kiln");
+  if (Math.round(Math.abs(entryAmount - existing.amount) * 100) / 100 > 0.01) {
+    throw new Error(
+      `Amount mismatch — this bank transaction is ₹${existing.amount.toLocaleString("en-IN")} but the record you're matching to is ₹${entryAmount.toLocaleString("en-IN")}. Match to the correct record, or correct the amount on one side first.`
+    );
+  }
+
   await db.update(bankTransactions).set({ reconciled: true, [MATCH_COLUMN[entryType]]: entryId }).where(eq(bankTransactions._id, bankTransactionId));
   const updated = (await db.select().from(bankTransactions).where(eq(bankTransactions._id, bankTransactionId)))[0]!;
   emitToKiln(kilnId, "bankTransaction:update", updated);

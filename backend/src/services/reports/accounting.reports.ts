@@ -7,6 +7,7 @@ import { getCurrentSeasonId } from "../season.util";
 import { dayBook } from "../dayBook.service";
 import { listReturnedDispatches } from "../dispatch.service";
 import { listBrickLoadingEntries } from "../brickLoading.service";
+import { groupRowsByPeriod } from "../../utils/reportPeriod";
 import { ReportDefinition, round2 } from "./types";
 
 // "Debtors" (owe the kiln money) and "Creditors" (the kiln owes them) in
@@ -129,8 +130,12 @@ const dayBookReport: ReportDefinition = {
   key: "dayBook",
   titleKey: "reports.title.dayBook",
   async run(kilnId, filters) {
-    const date = filters.from ?? new Date();
-    const entries = await dayBook(kilnId, date);
+    // Bug fix: this used to silently ignore both the "to" date (always a
+    // single day, whatever "from" was) and Group By, with nothing in the
+    // UI indicating either control had no effect for this report.
+    const from = filters.from ?? new Date();
+    const to = filters.to ?? from;
+    const entries = await dayBook(kilnId, from, to);
     const detail = entries.map((e) => ({
       time: e.time ? e.time.toISOString() : null,
       type: e.type,
@@ -139,6 +144,24 @@ const dayBookReport: ReportDefinition = {
       cashAmount: e.direction === "OUT" ? -e.cashAmount : e.cashAmount,
       onlineAmount: e.direction === "OUT" ? -e.onlineAmount : e.onlineAmount,
     }));
+    if (filters.groupBy && filters.groupBy !== "none") {
+      const grouped = groupRowsByPeriod(detail, "time", ["cashAmount", "onlineAmount"], filters.groupBy as never);
+      return {
+        reportKey: "dayBook",
+        titleKey: "reports.title.dayBook",
+        columns: [
+          { key: "period", labelKey: "reports.col.period", format: "text" },
+          { key: "count", labelKey: "reports.col.entries", format: "number" },
+          { key: "cashAmount", labelKey: "reports.col.cashAmount", format: "currency" },
+          { key: "onlineAmount", labelKey: "reports.col.onlineAmount", format: "currency" },
+        ],
+        rows: grouped,
+        totals: {
+          cashAmount: round2(grouped.reduce((s, r) => s + (r.cashAmount as number), 0)),
+          onlineAmount: round2(grouped.reduce((s, r) => s + (r.onlineAmount as number), 0)),
+        },
+      };
+    }
     return {
       reportKey: "dayBook",
       titleKey: "reports.title.dayBook",

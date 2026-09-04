@@ -42,8 +42,6 @@ const createDieselSchema = z.object({
   quantityLiters: z.number().positive(),
   initialMeterReading: z.number().min(0).optional(),
   driverId: z.string().optional(),
-  // Kept accepted (unused by the current form) so an old entry that still
-  // carries these can be edited without them being rejected.
   costAmount: z.number().nonnegative().optional(),
   paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
   date: z.string().optional(),
@@ -73,6 +71,8 @@ const updateDieselSchema = z.object({
   quantityLiters: z.number().positive().optional(),
   initialMeterReading: z.number().min(0).optional(),
   driverId: z.string().nullable().optional(),
+  costAmount: z.number().nonnegative().optional(),
+  paymentMode: z.enum(LEDGER_PAYMENT_MODES).exclude(["CASH_AND_ONLINE"]).optional(),
   date: z.string().optional(),
   notes: z.string().optional(),
 });

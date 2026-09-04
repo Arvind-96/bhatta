@@ -29,11 +29,21 @@ function StatTile({ label, value, tone }: { label: string; value: number; tone?:
   );
 }
 
+// Bug fix: `.toISOString().slice(0, 10)` reads the UTC calendar date, not
+// IST — during the ~5.5h window where it's already tomorrow in IST but
+// still today in UTC, the default range's own endpoints landed a day
+// early. istDateOnlyString mirrors the backend's istDateOnly/
+// istDateKeyString convention (utils/istTime.ts) on the frontend side.
+function istDateOnlyString(date: Date) {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const ist = new Date(date.getTime() + IST_OFFSET_MS);
+  return ist.toISOString().slice(0, 10);
+}
+
 function defaultRange() {
   const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 30);
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+  return { from: istDateOnlyString(from), to: istDateOnlyString(to) };
 }
 
 // The Profit & Loss page — a dedicated cash-basis P&L for an admin-picked
@@ -51,12 +61,22 @@ export function ProfitLoss() {
   const [range, setRange] = useState(defaultRange);
   const [statement, setStatement] = useState<ProfitLossStatement | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
+    // Bug fix: a reversed range (from after to) used to silently produce
+    // an empty/zero statement instead of an error.
+    if (range.from > range.to) {
+      setError(t("financialOverview.invalidRange"));
+      return;
+    }
     setLoading(true);
+    setError("");
     try {
       setStatement(await api.profitLoss.get(range));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -93,6 +113,7 @@ export function ProfitLoss() {
             <Search className="h-4 w-4" /> {t("financialOverview.viewReport")}
           </Button>
         </div>
+        {error && <p className="mt-2 text-sm text-status-critical">{error}</p>}
       </Card>
 
       {statement && (
@@ -119,12 +140,20 @@ export function ProfitLoss() {
             <StatTile label={t("profitLoss.totalSales")} value={statement.totalSales} tone="good" />
             <StatTile label={t("profitLoss.totalExpenses")} value={statement.totalExpenses} tone="critical" />
             <StatTile label={t("profitLoss.totalAdvancesGiven")} value={statement.totalAdvancesGiven} tone="critical" />
-            <StatTile label={t("profitLoss.totalAdvancesReceived")} value={statement.totalAdvancesReceived} tone="good" />
             <StatTile label={t("profitLoss.cashReceived")} value={statement.cashReceived} tone="good" />
             <StatTile label={t("profitLoss.cashGiven")} value={statement.cashGiven} tone="critical" />
             <StatTile label={t("profitLoss.onlinePaymentsReceived")} value={statement.onlinePaymentsReceived} tone="good" />
             <StatTile label={t("profitLoss.onlinePaymentsMade")} value={statement.onlinePaymentsMade} tone="critical" />
+            {(statement.moneyInUnspecified !== 0 || statement.moneyOutUnspecified !== 0) && (
+              <>
+                <StatTile label={t("profitLoss.moneyInUnspecified")} value={statement.moneyInUnspecified} />
+                <StatTile label={t("profitLoss.moneyOutUnspecified")} value={statement.moneyOutUnspecified} />
+              </>
+            )}
           </div>
+          {(statement.moneyInUnspecified !== 0 || statement.moneyOutUnspecified !== 0) && (
+            <p className="text-xs text-ink-muted">{t("profitLoss.unspecifiedHint")}</p>
+          )}
 
           <Card>
             <CardHeader>

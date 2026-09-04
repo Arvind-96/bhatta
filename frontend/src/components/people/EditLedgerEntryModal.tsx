@@ -94,10 +94,16 @@ export function EditLedgerEntryModal({ entry, onClose }: EditLedgerEntryModalPro
 
   async function handleDelete() {
     if (!confirm(t("people.confirmDeleteLedgerEntry"))) return;
+    setError("");
     setDeleting(true);
     try {
       await api.ledger.remove(entry._id);
       onClose();
+    } catch (err) {
+      // Bug fix: this destructive, irreversible action had no catch at
+      // all — weaker error handling than the edit submit right above it,
+      // which does catch correctly.
+      setError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setDeleting(false);
     }

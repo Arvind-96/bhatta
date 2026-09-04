@@ -29,6 +29,10 @@ export interface AddLedgerEntryInput {
   cashAmount?: number;
   onlineAmount?: number;
   category?: LedgerCategory;
+  // See ledgerEntries.isReversal's own schema comment — set this only when
+  // posting a PAID entry purely to zero out a DUE liability that's being
+  // cancelled/reattributed/corrected down, never for a real settlement.
+  isReversal?: boolean;
 }
 
 // Every ledger write funnels through here, so this is the one place that

@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { AmountPaymentModeFields } from "@/components/shared/AmountPaymentModeFields";
+import { isPaymentSplitMismatched } from "@/components/shared/PaymentSplitFields";
 import { api } from "@/lib/api";
 import { useKilnEvent } from "@/hooks/useKilnEvent";
 import { useAuthStore } from "@/store/auth.store";
 import { useTranslation } from "@/hooks/useTranslation";
 import { formatINR, cn } from "@/lib/utils";
-import type { PurchaseOrder, Supplier, SupplierInvoiceItem, SupplyUnit } from "@/types";
+import type { PurchaseOrder, Supplier, SupplierInvoiceItem, SupplyUnit, LaborPaymentMode } from "@/types";
 
 const SUPPLY_UNITS: SupplyUnit[] = ["KG", "PIECE", "METER"];
 
@@ -115,14 +117,28 @@ function FulfillModal({ order, onClose, onSaved }: { order: PurchaseOrder; onClo
   const [itemsReceived, setItemsReceived] = useState<SupplierInvoiceItem[]>(order.items && order.items.length > 0 ? order.items : [emptyItem()]);
   const [totalBillAmount, setTotalBillAmount] = useState(order.expectedAmount ? String(order.expectedAmount) : "");
   const [amountPaid, setAmountPaid] = useState("");
+  // Bug fix: the backend and API client already accept paymentMode/
+  // cashAmount/onlineAmount (see api.purchaseOrders.fulfill) — this modal
+  // just never collected them, so every PO-sourced Supplier Invoice (and
+  // its auto-logged Expense) landed entirely in "unspecified" on
+  // Financial Overview/P&L/Day Book's cash/online breakdown.
+  const [paymentMode, setPaymentMode] = useState<LaborPaymentMode | "">("");
+  const [cashAmount, setCashAmount] = useState("");
+  const [onlineAmount, setOnlineAmount] = useState("");
   const [markFulfilled, setMarkFulfilled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const paidAmountNumber = amountPaid ? Number(amountPaid) : 0;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!totalBillAmount || Number(totalBillAmount) <= 0) {
       setError(t("purchaseOrder.billAmountPlaceholder"));
+      return;
+    }
+    if (paymentMode === "CASH_AND_ONLINE" && isPaymentSplitMismatched(paymentMode, paidAmountNumber, cashAmount, onlineAmount)) {
+      setError(t("payment.splitMismatch", { total: paidAmountNumber.toLocaleString("en-IN") }));
       return;
     }
     setSaving(true);
@@ -132,6 +148,9 @@ function FulfillModal({ order, onClose, onSaved }: { order: PurchaseOrder; onClo
         itemsReceived: itemsReceived.filter((r) => r.itemName.trim() && r.quantity > 0),
         totalBillAmount: Number(totalBillAmount),
         amountPaid: amountPaid ? Number(amountPaid) : undefined,
+        paymentMode: paymentMode || undefined,
+        cashAmount: paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
+        onlineAmount: paymentMode === "CASH_AND_ONLINE" ? Number(onlineAmount) : undefined,
         markFulfilled,
       });
       onSaved();
@@ -156,6 +175,18 @@ function FulfillModal({ order, onClose, onSaved }: { order: PurchaseOrder; onClo
           <ItemsEditor items={itemsReceived} onChange={setItemsReceived} />
           <input type="number" min={0} placeholder={t("purchaseOrder.billAmountPlaceholder")} value={totalBillAmount} onChange={(e) => setTotalBillAmount(e.target.value)} className={inputClass} />
           <input type="number" min={0} placeholder={t("purchaseOrder.amountPaidPlaceholder")} value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} className={inputClass} />
+          {paidAmountNumber > 0 && (
+            <AmountPaymentModeFields
+              amount={paidAmountNumber}
+              paymentMode={paymentMode}
+              cashAmount={cashAmount}
+              onlineAmount={onlineAmount}
+              onPaymentModeChange={setPaymentMode}
+              onCashAmountChange={setCashAmount}
+              onOnlineAmountChange={setOnlineAmount}
+              inputClassName={inputClass}
+            />
+          )}
           <label className="flex items-center gap-2 text-sm text-ink-secondary">
             <input type="checkbox" checked={markFulfilled} onChange={(e) => setMarkFulfilled(e.target.checked)} />
             {t("purchaseOrder.markFulfilledLabel")}
@@ -182,6 +213,8 @@ export function PurchaseOrders() {
   const [mode, setMode] = useState<"list" | "add">("list");
   const [fulfilling, setFulfilling] = useState<PurchaseOrder | null>(null);
   const [cancelling, setCancelling] = useState<PurchaseOrder | null>(null);
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [cancelError, setCancelError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
 
@@ -279,12 +312,24 @@ export function PurchaseOrders() {
           title={t("common.cancel")}
           detail={t("purchaseOrder.confirmCancel", { serial: cancelling.sequenceNumber ?? "" })}
           confirmLabel={t("common.cancel")}
-          loading={false}
-          onCancel={() => setCancelling(null)}
-          onConfirm={async () => {
-            await api.purchaseOrders.cancel(cancelling._id);
+          loading={cancelSaving}
+          error={cancelError}
+          onCancel={() => {
             setCancelling(null);
-            refresh();
+            setCancelError("");
+          }}
+          onConfirm={async () => {
+            setCancelSaving(true);
+            setCancelError("");
+            try {
+              await api.purchaseOrders.cancel(cancelling._id);
+              setCancelling(null);
+              refresh();
+            } catch (err) {
+              setCancelError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+            } finally {
+              setCancelSaving(false);
+            }
           }}
         />
       )}

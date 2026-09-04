@@ -34,7 +34,11 @@ const vehicles: ReportDefinition = {
         { key: "distanceCovered", labelKey: "reports.col.distanceCovered", format: "number" },
       ],
       rows: detail,
-      totals: { totalLiters: round2(detail.reduce((s, r) => s + r.totalLiters, 0)) },
+      totals: {
+        fillUpCount: detail.reduce((s, r) => s + r.fillUpCount, 0),
+        totalLiters: round2(detail.reduce((s, r) => s + r.totalLiters, 0)),
+        distanceCovered: round2(detail.reduce((s, r) => s + r.distanceCovered, 0)),
+      },
     };
   },
 };
@@ -218,6 +222,12 @@ const vehicleWork: ReportDefinition = {
         { key: "averagePerFillUp", labelKey: "reports.col.averagePerFillUp", format: "number" },
       ],
       rows: detail,
+      // averagePerFillUp deliberately excluded — an average of per-row
+      // averages isn't a meaningful total the way a summed count/quantity is.
+      totals: {
+        fillUpCount: detail.reduce((s, r) => s + r.fillUpCount, 0),
+        quantity: round2(detail.reduce((s, r) => s + r.quantity, 0)),
+      },
     };
   },
 };

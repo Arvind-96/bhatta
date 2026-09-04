@@ -72,6 +72,7 @@ export function Suppliers() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [openSupplierId, setOpenSupplierId] = useState<string | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
@@ -292,12 +293,19 @@ export function Suppliers() {
           detail={t("supplier.confirmDeleteSupplier", { name: pendingDeleteSupplier.name })}
           confirmLabel={t("common.delete")}
           loading={deleting}
-          onCancel={() => setPendingDeleteId(null)}
+          error={deleteError}
+          onCancel={() => {
+            setPendingDeleteId(null);
+            setDeleteError("");
+          }}
           onConfirm={async () => {
             setDeleting(true);
+            setDeleteError("");
             try {
               await api.suppliers.remove(pendingDeleteSupplier._id);
               setPendingDeleteId(null);
+            } catch (err) {
+              setDeleteError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
             } finally {
               setDeleting(false);
             }

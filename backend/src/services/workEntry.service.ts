@@ -174,10 +174,15 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // anyone mapped under a Pakayi contractor is folded into that contractor's
 // card rather than listed separately here.
 export async function pakayiOperatorSummary(kilnId: string, seasonId: string) {
+  // Bug fix (admin decision): deactivating an operator used to silently
+  // drop their real historical production from this summary — the loop
+  // below already skips anyone with zero entries this season, so dropping
+  // the active filter here doesn't add clutter, it only stops hiding real
+  // production the moment someone leaves.
   const operators = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.pakayiContractorId), eq(people.active, true)))
+    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.pakayiContractorId)))
     .orderBy(asc(people.name));
 
   const allEntries = await db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.seasonId, seasonId), eq(workEntries.workType, "PAKAYI")));
@@ -230,17 +235,23 @@ export async function pakayiOperatorSummary(kilnId: string, seasonId: string) {
 // work_entries table (filtered to workType PAKAYI) instead of a dedicated
 // entries table, since Pakayi never got one of its own.
 export async function pakayiContractorSummary(kilnId: string, seasonId: string) {
+  // Bug fix (admin decision): deactivating a worker/contractor used to
+  // silently drop their real historical production from this summary —
+  // fetches every worker/contractor regardless of `active`; only a
+  // currently-active, otherwise-irrelevant PAKAYI-tagged person gets in
+  // for free below — a deactivated one still needs real entries to show
+  // up, same as before.
   const [allContractors, workers, allEntries] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"))).orderBy(asc(people.name)),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]))),
     db.select().from(workEntries).where(and(eq(workEntries.kilnId, kilnId), eq(workEntries.seasonId, seasonId), eq(workEntries.workType, "PAKAYI"))),
   ]);
 
   const workerIdsWithEntries = new Set(allEntries.map((e) => e.personId));
-  const relevantWorkers = workers.filter((w) => w.workType === "PAKAYI" || workerIdsWithEntries.has(w._id));
+  const relevantWorkers = workers.filter((w) => (w.active && w.workType === "PAKAYI") || workerIdsWithEntries.has(w._id));
 
   const contractorIdsWithWorkers = new Set(relevantWorkers.filter((w) => w.pakayiContractorId).map((w) => w.pakayiContractorId!));
-  const contractors = allContractors.filter((c) => c.workType === "PAKAYI" || contractorIdsWithWorkers.has(c._id));
+  const contractors = allContractors.filter((c) => (c.active && c.workType === "PAKAYI") || contractorIdsWithWorkers.has(c._id));
 
   const contractorResults = await Promise.all(
     contractors.map(async (contractor) => {

@@ -6,25 +6,29 @@ import { flowForRange } from "./financialOverview.service";
 // The Profit & Loss page's own line items — built on top of
 // financialOverview.service.ts's flowForRange (the same cash-basis
 // money-in/money-out accounting Financial Overview already uses, so this
-// page's totals can never disagree with that one), plus two additional
-// breakouts flowForRange doesn't expose on its own: Advances Given and
-// Advances Received, both subsets already folded into moneyOut/moneyIn
-// above (not added on top of them — showing "who got an advance" as
-// detail, not extra money).
+// page's totals can never disagree with that one), plus one additional
+// breakout flowForRange doesn't expose on its own: Advances Given, a
+// subset already folded into moneyOut above (not added on top of it —
+// showing "who got an advance" as detail, not extra money).
 //
 // Advances Given = ledger entries where the kiln paid someone money under
 // category ADVANCE (direction PAID) — staff/contractor/supplier advances,
 // same definition salary.service.ts and molding.service.ts already use.
-// Advances Received = the mirror case, a DUE-direction ADVANCE entry —
-// someone (most commonly a Partner) put capital into the kiln that the
-// kiln now owes back, recorded as a liability the same way every other
-// DUE entry increases what's owed to that person.
+//
+// Removed by admin decision: "Advances Received" (the mirror DUE-direction
+// ADVANCE case) used to be shown here, but every entry that ever populated
+// it turned out to be a Soil/Sand/Land-Lease contract's advance being
+// revised down or reversed on delete — a correction to money the kiln
+// already PAID OUT, not real capital coming in. There is no working UI
+// path for the figure's actual intended source (a Partner injecting
+// capital — LedgerModal.tsx hides the ADVANCE category entirely for
+// Partner-type people), so it never meant what it claimed to.
 //
 // Overall profit/loss is exactly (money in) − (money out) — the same
 // netCashFlow flowForRange itself computes — so "Total Sales"/"Total
-// Expenses"/"Total Advances Given/Received" are informational breakdowns
-// of that one number, never separately added into it (that would
-// double-count rupees already inside moneyIn/moneyOut).
+// Expenses"/"Total Advances Given" are informational breakdowns of that
+// one number, never separately added into it (that would double-count
+// rupees already inside moneyIn/moneyOut).
 export async function profitLossStatement(kilnId: string, seasonId: string | null, since: Date, until?: Date) {
   const dateRange = until ? and(gte(ledgerEntries.date, since), lte(ledgerEntries.date, until)) : gte(ledgerEntries.date, since);
 
@@ -33,11 +37,10 @@ export async function profitLossStatement(kilnId: string, seasonId: string | nul
     db
       .select()
       .from(ledgerEntries)
-      .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.category, "ADVANCE"), dateRange)),
+      .where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.category, "ADVANCE"), eq(ledgerEntries.direction, "PAID"), dateRange)),
   ]);
 
-  const advancesGiven = Math.round(advanceRows.filter((e) => e.direction === "PAID").reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
-  const advancesReceived = Math.round(advanceRows.filter((e) => e.direction === "DUE").reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
+  const advancesGiven = Math.round(advanceRows.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
 
   const netProfit = flow.netCashFlow;
 
@@ -54,13 +57,30 @@ export async function profitLossStatement(kilnId: string, seasonId: string | nul
 
   return {
     totalSales: flow.moneyReceived,
-    totalExpenses: flow.breakdown.expenses,
+    // Bug fix: this used to be `flow.breakdown.expenses`, which is ONLY the
+    // Expense-table total — it silently excluded fuel purchases, diesel,
+    // and every other PAID ledger entry (wages, salaries, soil/sand
+    // settlements, kharchi, medical, festival, advances), all of which ARE
+    // included in `flow.moneySpent` and in Cash Given/Online Payments Made
+    // right next to this tile. `moneySpent` is the comprehensive figure —
+    // matching how Total Sales already correctly uses the comprehensive
+    // `flow.moneyReceived`, not a subset of it.
+    totalExpenses: flow.moneySpent,
     totalAdvancesGiven: advancesGiven,
-    totalAdvancesReceived: advancesReceived,
     cashReceived: flow.moneyIn.cash,
     cashGiven: flow.moneyOut.cash,
     onlinePaymentsReceived: flow.moneyIn.online,
     onlinePaymentsMade: flow.moneyOut.online,
+    // Bug fix: a row with no paymentMode recorded (legacy data, or a form —
+    // e.g. CreateChallanForm.tsx — that never collects one) contributes to
+    // neither cash nor online; without surfacing that gap explicitly,
+    // Cash Received + Online Payments Received can silently fall short of
+    // Total Sales with no explanation on the page. Financial Overview
+    // already surfaces this same figure (moneyInUnspecified/
+    // moneyOutUnspecified) — exposing it here too instead of only in the
+    // frontend's field naming.
+    moneyInUnspecified: flow.moneyIn.unspecified,
+    moneyOutUnspecified: flow.moneyOut.unspecified,
     totalMoneyIn: flow.moneyReceived,
     totalMoneyOut: flow.moneySpent,
     netProfit,

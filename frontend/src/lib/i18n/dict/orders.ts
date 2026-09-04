@@ -16,6 +16,7 @@ export const ordersDict: Record<string, Record<Locale, string>> = {
   "saleOrder.fulfillOrder": { en: "Fulfill / Deliver", hi: "पूर्ण / डिलीवर करें" },
   "saleOrder.pendingCount": { en: "{pending} bricks pending on this order", hi: "इस ऑर्डर में {pending} ईंटें लंबित" },
   "saleOrder.bricksCountExceedsPending": { en: "Cannot deliver more than the {pending} bricks still pending.", hi: "लंबित {pending} ईंटों से ज़्यादा डिलीवर नहीं कर सकते।" },
+  "saleOrder.fulfillAmountRequired": { en: "Enter the sale amount for this delivery — it can't be left blank.", hi: "इस डिलीवरी के लिए बिक्री राशि दर्ज करें — इसे खाली नहीं छोड़ा जा सकता।" },
   "saleOrder.confirmCancel": { en: "Cancel Sale Order SO-{serial}? This cannot be undone.", hi: "सेल ऑर्डर SO-{serial} रद्द करें? यह वापस नहीं हो सकता।" },
   "saleOrder.status.PENDING": { en: "Pending", hi: "लंबित" },
   "saleOrder.status.PARTIALLY_FULFILLED": { en: "Partially fulfilled", hi: "आंशिक रूप से पूर्ण" },

@@ -3,6 +3,7 @@ import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { purchaseOrders, type PurchaseOrderItem } from "../db/schema";
 import { createSupplierInvoice, type SupplierInvoiceInput } from "./supplierInvoice.service";
+import { assertSupplierInKiln } from "./supplier.service";
 import { emitToKiln } from "../config/socket";
 
 export type PurchaseOrderStatus = (typeof purchaseOrders.$inferSelect)["status"];
@@ -25,7 +26,12 @@ async function nextSequenceNumber(kilnId: string, seasonId: string) {
   return (maxRow?.max ?? 0) + 1;
 }
 
+// Bug fix: this used to silently accept any supplierId, including a bogus
+// or cross-kiln one — the bad reference only surfaced later, at
+// fulfillment time (or never, if the order was just left pending).
+// createSupplierInvoice already validates this the same way.
 export async function createPurchaseOrder(input: CreatePurchaseOrderInput) {
+  await assertSupplierInKiln(input.kilnId, input.supplierId);
   const _id = randomUUID();
   const sequenceNumber = await nextSequenceNumber(input.kilnId, input.seasonId);
   await db.insert(purchaseOrders).values({ ...input, _id, sequenceNumber });
@@ -59,8 +65,17 @@ export async function getPurchaseOrder(kilnId: string, purchaseOrderId: string) 
   return row;
 }
 
+// Bug fix: no UI reaches this endpoint today, but it's a live, callable
+// API with no guard at all — nothing stopped a direct call from silently
+// rewriting items/supplier/expectedAmount on an order that's already
+// PARTIALLY_FULFILLED or FULFILLED, desyncing it from the Supplier
+// Invoice(s) that fulfillment already created against its *original*
+// items. Editing a still-open (PENDING) order is unaffected by this guard.
 export async function updatePurchaseOrder(kilnId: string, purchaseOrderId: string, input: Partial<CreatePurchaseOrderInput>) {
-  await getPurchaseOrder(kilnId, purchaseOrderId);
+  const existing = await getPurchaseOrder(kilnId, purchaseOrderId);
+  if (existing.status === "PARTIALLY_FULFILLED" || existing.status === "FULFILLED") {
+    throw new Error(`Cannot edit this purchase order — it's already ${existing.status.toLowerCase().replace("_", " ")}. Cancel or fulfill it instead.`);
+  }
   await db.update(purchaseOrders).set(input).where(eq(purchaseOrders._id, purchaseOrderId));
   const updated = (await db.select().from(purchaseOrders).where(eq(purchaseOrders._id, purchaseOrderId)))[0]!;
   emitToKiln(kilnId, "purchaseOrder:update", updated);

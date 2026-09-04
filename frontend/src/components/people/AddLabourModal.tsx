@@ -82,6 +82,16 @@ export function AddLabourModal({ defaultContractorId, onClose, onCreated }: AddL
   const [photo, setPhoto] = useState<File | Blob | null>(null);
   const [identityProof, setIdentityProof] = useState<File | null>(null);
   const [uploadWarning, setUploadWarning] = useState("");
+  const [formError, setFormError] = useState("");
+  // Bug fix: the family-member/supply-item creation loops below run AFTER
+  // the person record already exists, with no catch — if any iteration
+  // failed, the exception used to be unhandled (button re-enabled, no
+  // visible error), and resubmitting called api.people.create again with
+  // the same name, creating a second, duplicate person record. Tracking
+  // the already-created person here means a retry after a partial failure
+  // resumes (reuses the same person, only retries the remaining family/
+  // supply drafts) instead of creating a duplicate.
+  const [createdPerson, setCreatedPerson] = useState<Person | null>(null);
 
   const [familyDrafts, setFamilyDrafts] = useState<FamilyDraft[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -106,23 +116,27 @@ export function AddLabourModal({ defaultContractorId, onClose, onCreated }: AddL
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    setFormError("");
     setLoading(true);
     try {
-      const person = await api.people.create({
-        type: "WORKER",
-        name: name.trim(),
-        age: age ? Number(age) : undefined,
-        sex: sex || undefined,
-        phone: phone || undefined,
-        idNumber: idNumber || undefined,
-        workType: workType || undefined,
-        contractorId: contractorId || undefined,
-        payType: payType || undefined,
-        monthlySalary: payType === "MONTHLY" && monthlySalary ? Number(monthlySalary) : undefined,
-        ratePerThousand: payType === "PER_THOUSAND" && ratePerThousand ? Number(ratePerThousand) : undefined,
-        nickname: nickname.trim() || undefined,
-        joiningDate: joiningDate || undefined,
-      });
+      const person =
+        createdPerson ??
+        (await api.people.create({
+          type: "WORKER",
+          name: name.trim(),
+          age: age ? Number(age) : undefined,
+          sex: sex || undefined,
+          phone: phone || undefined,
+          idNumber: idNumber || undefined,
+          workType: workType || undefined,
+          contractorId: contractorId || undefined,
+          payType: payType || undefined,
+          monthlySalary: payType === "MONTHLY" && monthlySalary ? Number(monthlySalary) : undefined,
+          ratePerThousand: payType === "PER_THOUSAND" && ratePerThousand ? Number(ratePerThousand) : undefined,
+          nickname: nickname.trim() || undefined,
+          joiningDate: joiningDate || undefined,
+        }));
+      if (!createdPerson) setCreatedPerson(person);
 
       // Best-effort follow-ups — the person is already saved by this point,
       // so a failure here must never look like the whole submission failed,
@@ -171,6 +185,8 @@ export function AddLabourModal({ defaultContractorId, onClose, onCreated }: AddL
       } else {
         onClose();
       }
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -441,6 +457,7 @@ export function AddLabourModal({ defaultContractorId, onClose, onCreated }: AddL
             </div>
           </div>
 
+          {formError && <p className="mt-2 text-sm text-status-critical">{formError}</p>}
           {uploadWarning ? (
             <div className="mt-2 flex flex-col gap-2 rounded-xl border border-status-warning/30 bg-status-warning/10 p-3">
               <p className="text-sm text-status-warning">{uploadWarning}</p>
@@ -450,7 +467,7 @@ export function AddLabourModal({ defaultContractorId, onClose, onCreated }: AddL
             </div>
           ) : (
             <Button type="submit" disabled={loading} className="mt-2 w-full">
-              {t("people.addLabourModalTitle")}
+              {createdPerson ? t("common.retry") : t("people.addLabourModalTitle")}
             </Button>
           )}
         </form>

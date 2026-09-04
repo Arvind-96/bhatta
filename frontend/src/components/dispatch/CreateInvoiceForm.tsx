@@ -253,6 +253,8 @@ export function CreateInvoiceForm({
       ]);
       printInvoiceRecord(row, { ...kilnInfo, signatureDataUri }, categories, stamp);
       onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }

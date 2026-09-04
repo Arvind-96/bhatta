@@ -2,6 +2,7 @@ import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
 import { DISPATCH_PAYMENT_MODES } from "../db/schema";
+import { validateCashOnlineSplit } from "../utils/paymentSplit";
 import {
   createChallan,
   listChallans,
@@ -118,7 +119,12 @@ export async function deleteGatePassHandler(req: AuthedRequest, res: Response) {
   res.status(204).end();
 }
 
-const invoiceSchema = z.object({
+// Kept as a plain ZodObject (no .superRefine() chained directly onto it) so
+// invoiceUpdateSchema below can still derive from it via .omit()/.partial()
+// — those aren't available once .superRefine() turns it into a ZodEffects.
+// invoiceSchema/invoiceUpdateSchema each chain their own .superRefine()
+// afterward instead (see below), same end result.
+const invoiceBaseSchema = z.object({
   // Absent for a Customer-page-originated invoice (Add Amount, or a
   // Customer-aware Create Invoice) — bricksCount is 0 in exactly that
   // case, hence nonnegative() rather than positive() below.
@@ -151,10 +157,30 @@ const invoiceSchema = z.object({
   invoiceDate: z.string().min(1, "Transaction date is required"),
   notes: z.string().optional(),
 });
-const invoiceUpdateSchema = invoiceSchema
+
+// Cash/online must sum to what's actually being collected right now —
+// amountPaidNow when given, else the full netAmount (same "unset =
+// fully paid" convention dispatchDocuments.service.ts's createInvoice/
+// partnerPendingAmount already use), mirroring dispatch.controller.ts's
+// own createSchema.superRefine pattern for the "amount net of discount"
+// case (Invoice's equivalent net figure is netAmount, already
+// gross-minus-discount by the time it reaches this schema).
+const invoiceSchema = invoiceBaseSchema.superRefine((data, ctx) => {
+  validateCashOnlineSplit(data, data.amountPaidNow ?? data.netAmount, ctx);
+});
+const invoiceUpdateSchema = invoiceBaseSchema
   .omit({ dispatchId: true, partnerId: true, agentId: true })
   .partial()
-  .extend({ partnerId: z.string().nullable().optional(), agentId: z.string().nullable().optional() });
+  .extend({ partnerId: z.string().nullable().optional(), agentId: z.string().nullable().optional() })
+  // Every field is optional on an update, so this only runs when there's
+  // actually something to check against — a narrower field-only edit that
+  // touches neither amountPaidNow nor netAmount simply skips it, same
+  // "narrower edit skips the guard" convention dispatch.controller.ts's own
+  // updateSchema uses for its `amount === undefined` check.
+  .superRefine((data, ctx) => {
+    if (data.amountPaidNow === undefined && data.netAmount === undefined) return;
+    validateCashOnlineSplit(data, data.amountPaidNow ?? data.netAmount ?? 0, ctx);
+  });
 
 export async function createInvoiceHandler(req: AuthedRequest, res: Response) {
   const input = invoiceSchema.parse(req.body);

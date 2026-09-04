@@ -102,7 +102,24 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
     setLabour(detail.person);
     setBalance(detail.balance);
     setLedgerEntries(ledger);
-    setThekedars(contractors);
+    // Bug fix: api.people.list only ever returns active contractors, so a
+    // labourer whose contractor was since deactivated showed "No thekedar
+    // assigned" (a false read of their real, still-stored contractorId)
+    // and had no matching option in the Edit dropdown — silently orphaning
+    // the link on the next unrelated save, since re-submitting the form
+    // with contractorId defaulted to "" would actually clear it. Fetching
+    // and appending the assigned-but-deactivated contractor keeps both the
+    // display and the dropdown honest about who's really assigned.
+    if (detail.person.contractorId && !contractors.some((c) => c._id === detail.person.contractorId)) {
+      try {
+        const assigned = await api.people.get(detail.person.contractorId);
+        setThekedars([...contractors, assigned.person]);
+      } catch {
+        setThekedars(contractors);
+      }
+    } else {
+      setThekedars(contractors);
+    }
     setWorkEntries(work);
     setFamily(familyData);
     setInventoryItems(inventory);
@@ -413,7 +430,7 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
                 <option value="">{t("people.noThekedarIndependent")}</option>
                 {thekedars.map((t) => (
                   <option key={t._id} value={t._id}>
-                    {t.name}
+                    {t.active ? t.name : `${t.name} (${t.status})`}
                   </option>
                 ))}
               </select>

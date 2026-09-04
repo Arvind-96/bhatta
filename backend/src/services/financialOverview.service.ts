@@ -2,6 +2,7 @@ import { and, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { dispatches, expenses, fuelPurchases, vehicleDieselEntries, ledgerEntries, invoices } from "../db/schema";
 import { listPaymentsDue, customerCreditAging } from "./person.service";
+import { istStartOfDay, istDateOnly } from "../utils/istTime";
 
 function round2(n: number) {
   return Math.round(n * 100) / 100;
@@ -112,8 +113,12 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
     // ledgerEntries.seasonId is optional (not reliably populated — see
     // ledger.service.ts's AddLedgerEntryInput comment) and left unfiltered
     // here regardless of seasonId; the date-range bound already scopes this
-    // to the requested window.
-    db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), dateRange(ledgerEntries.date), eq(ledgerEntries.direction, "PAID"))),
+    // to the requested window. isReversal=false excludes a PAID entry
+    // posted purely to zero out a cancelled/reattributed/corrected-down
+    // liability (see ledgerEntries.isReversal's schema comment) — no real
+    // cash moved for one of those, so counting it here would inflate
+    // "money spent" for money the kiln never actually paid out.
+    db.select().from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), dateRange(ledgerEntries.date), eq(ledgerEntries.direction, "PAID"), eq(ledgerEntries.isReversal, false))),
     db.select().from(invoices).where(and(eq(invoices.kilnId, kilnId), eq(invoices.cancelled, false), seasonId ? eq(invoices.seasonId, seasonId) : undefined, invoiceDateRange)),
     // Kiln-wide, NOT date-ranged — this only answers "does this dispatch
     // have an invoice at all, ever", so a dispatch logged inside the period
@@ -139,7 +144,17 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
   const expenseCosts = expenseRows.reduce((sum, e) => sum + e.amount, 0);
   const fuelCosts = fuelPurchaseRows.reduce((sum, p) => sum + p.amount, 0);
   const dieselCosts = dieselRows.reduce((sum, d) => sum + (d.costAmount ?? 0), 0);
-  const otherPaymentEntries = paidEntries.filter((e) => e.category !== "FUEL");
+  // Bug fix: this used to exclude ledger category "FUEL" on the premise
+  // that fuel-purchase-supplier settlements were "already counted via
+  // FuelPurchase.amount above." That's false — createFuelPurchase
+  // (fuelPurchase.service.ts) deliberately never posts to ledgerEntries at
+  // all (suppliers live in a dedicated `suppliers` table, not `people`,
+  // so there's no valid ledger link). No current code path creates a
+  // FUEL-category ledger entry; the only way one exists is legacy data or
+  // a manual reassignment via EditLedgerEntryModal.tsx (which still offers
+  // "Fuel" as a category). Excluding it here silently dropped that real
+  // money from moneySpent/otherPayments for any kiln with such a row.
+  const otherPaymentEntries = paidEntries;
   const otherPayments = otherPaymentEntries.reduce((sum, e) => sum + e.amount, 0);
   const moneySpent = expenseCosts + fuelCosts + dieselCosts + otherPayments;
 
@@ -194,31 +209,28 @@ async function currentPosition(kilnId: string) {
   };
 }
 
-// This kiln operates in India (IST, UTC+5:30) but the VPS/Node process may
-// run in any timezone (currently UTC) — using `new Date(); setHours(...)`
-// would silently compute the day/period boundary in whatever timezone the
-// SERVER happens to be in, not the business's own calendar day. IST is 5.5
-// hours ahead of UTC, so entries logged just after IST midnight (already
-// "today" to the admin) can still carry yesterday's UTC date — this
-// converts "now" to its IST wall-clock date/time first, zeroes the
-// time-of-day there, then converts that IST midnight back to the real UTC
-// instant it corresponds to, so the boundary always matches the business's
-// actual calendar day regardless of server timezone.
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-function istStartOfDay(date: Date): Date {
-  const istNow = new Date(date.getTime() + IST_OFFSET_MS);
-  istNow.setUTCHours(0, 0, 0, 0);
-  return new Date(istNow.getTime() - IST_OFFSET_MS);
-}
-
 export async function financialOverview(kilnId: string, seasonId: string) {
   const now = new Date();
+  // Bug fix: `now.getFullYear()` reads the server's own (UTC) local year —
+  // during the ~5.5h window each year where it's already Jan 1 in IST but
+  // still Dec 31 UTC, this resolved "last year" a day early relative to
+  // istStartOfDay's own IST-correct boundary below. istDateOnly resolves
+  // the correct IST calendar year first.
   const oneYearAgo = new Date(now);
-  oneYearAgo.setFullYear(now.getFullYear() - 1);
+  oneYearAgo.setFullYear(istDateOnly(now).getUTCFullYear() - 1);
 
   const startOfDay = istStartOfDay(now);
   const weekAgo = istStartOfDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
-  const monthAgo = istStartOfDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+  // Bug fix (admin decision): "This month" used to be a rolling trailing-
+  // 30-day window — the Reports page has a "This Month" preset with the
+  // exact same label that means the true calendar month (1st to today),
+  // so the two could show different figures for what looked like the same
+  // thing. Now the true IST calendar month: 1st of the current month
+  // through today. istDateOnly resolves "today" to its IST calendar date
+  // first, so this can't be thrown off by the server's own timezone.
+  const todayIst = istDateOnly(now);
+  const firstOfMonth = new Date(Date.UTC(todayIst.getUTCFullYear(), todayIst.getUTCMonth(), 1));
+  const monthAgo = istStartOfDay(firstOfMonth);
   const yearAgo = istStartOfDay(oneYearAgo);
 
   const [today, week, month, year, position] = await Promise.all([

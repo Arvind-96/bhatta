@@ -5,6 +5,7 @@ import { moldingEntries, people, ledgerEntries } from "../db/schema";
 import { addLedgerEntry } from "./ledger.service";
 import { assertPersonOfType } from "./person.service";
 import { emitToKiln } from "../config/socket";
+import { istStartOfDay } from "../utils/istTime";
 
 export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
 
@@ -229,8 +230,9 @@ export async function listMoldingEntries(kilnId: string, seasonId: string | null
 }
 
 export async function todayMoldingTotal(kilnId: string, seasonId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  // Bug fix: server-local (UTC) midnight, not IST — see fuelLogPeriodTotals
+  // in fuelLog.service.ts for the same fix and full explanation.
+  const startOfDay = istStartOfDay(new Date());
   const entries = await db
     .select()
     .from(moldingEntries)
@@ -262,12 +264,10 @@ export async function damagedMoldedSince(kilnId: string, seasonIds: string[], si
 // at the top of the Molding page, distinct from the Pathai-scoped
 // contractor breakdown below.
 export async function moldingPeriodTotals(kilnId: string, seasonId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthAgo = new Date();
-  monthAgo.setDate(monthAgo.getDate() - 30);
+  const now = new Date();
+  const startOfDay = istStartOfDay(now);
+  const weekAgo = istStartOfDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+  const monthAgo = istStartOfDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
 
   const [today, week, month, todayDamaged, weekDamaged, monthDamaged] = await Promise.all([
     todayMoldingTotal(kilnId, seasonId),
@@ -307,18 +307,27 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // seasonId is nullable — pass null for an all-time, every-season view (see
 // report.service.ts's full person report).
 export async function moldingContractorSummary(kilnId: string, seasonId: string | null) {
+  // Bug fix (admin decision): deactivating a worker/contractor used to
+  // silently drop their real historical production from this summary,
+  // even though the underlying entries and their ledger balance stayed
+  // correct everywhere else — the production actually happened, so it
+  // must keep counting here too. Fetches every worker/contractor
+  // regardless of `active`, and below only lets a currently-active,
+  // otherwise-irrelevant PATHAI-tagged person clutter the page for free —
+  // a deactivated one still needs real entries to show up, same as
+  // before.
   const [allContractors, workers, allEntries] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"), eq(people.active, true))),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"))).orderBy(asc(people.name)),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "WORKER"))),
     db.select().from(moldingEntries).where(seasonId ? and(eq(moldingEntries.kilnId, kilnId), eq(moldingEntries.seasonId, seasonId)) : eq(moldingEntries.kilnId, kilnId)),
   ]);
 
   const workerIdsWithEntries = new Set(allEntries.map((e) => e.workerId));
-  const isPathaiRelevant = (w: (typeof workers)[number]) => w.workType === "PATHAI" || workerIdsWithEntries.has(w._id);
+  const isPathaiRelevant = (w: (typeof workers)[number]) => (w.active && w.workType === "PATHAI") || workerIdsWithEntries.has(w._id);
   const relevantWorkers = workers.filter(isPathaiRelevant);
 
   const contractorIdsWithRelevantWorkers = new Set(relevantWorkers.filter((w) => w.contractorId).map((w) => w.contractorId!));
-  const contractors = allContractors.filter((c) => c.workType === "PATHAI" || contractorIdsWithRelevantWorkers.has(c._id));
+  const contractors = allContractors.filter((c) => (c.active && c.workType === "PATHAI") || contractorIdsWithRelevantWorkers.has(c._id));
 
   const contractorResults = await Promise.all(
     contractors.map(async (contractor) => {

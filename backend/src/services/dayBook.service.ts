@@ -1,6 +1,9 @@
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "../db/client";
 import { ledgerEntries, invoices, expenses, supplierInvoices, people, customers, suppliers } from "../db/schema";
+import { istStartOfDay, istEndOfDay } from "../utils/istTime";
+import { cashOnlineSplit } from "./reports/types";
+import { unbilledDispatchRows } from "./reports/trade.reports";
 
 export interface DayBookEntry {
   time: Date | null;
@@ -12,22 +15,37 @@ export interface DayBookEntry {
   direction: "IN" | "OUT";
 }
 
+// Bug fix: this used to return the row's raw cashAmount/onlineAmount
+// unscaled for CASH_AND_ONLINE — those are recorded against the row's
+// FULL amount at creation time, but the figure being reported here
+// (paidNow for an invoice, the row's own amount otherwise) can be less on
+// a partially-paid row, so returning them unscaled double-counted the
+// still-due remainder (documented already for this exact bug class in
+// reports/production.reports.ts's own comment). Delegates to the shared,
+// already-scaled `cashOnlineSplit` every other report uses instead of
+// keeping a second, independently-drifting copy of this formula.
 function cashOnline(paymentMode: string | null | undefined, totalAmount: number, cashAmount: number | null | undefined, onlineAmount: number | null | undefined) {
-  if (paymentMode === "CASH_AND_ONLINE") return { cash: cashAmount ?? 0, online: onlineAmount ?? 0 };
-  if (paymentMode === "CASH") return { cash: totalAmount, online: 0 };
-  if (paymentMode) return { cash: 0, online: totalAmount };
-  return { cash: 0, online: 0 };
+  return cashOnlineSplit(paymentMode, cashAmount, onlineAmount, totalAmount);
 }
 
-// Every transaction that touched money on one given day, across the app's
-// four independent subledgers — nothing like this existed before (each
-// subledger has always been viewed in isolation, one module at a time).
-// Genuinely new cross-table logic, not a wrapper over an existing function.
-export async function dayBook(kilnId: string, date: Date): Promise<DayBookEntry[]> {
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
+// Every transaction that touched money across the app's four independent
+// subledgers, over a given date range — nothing like this existed before
+// (each subledger has always been viewed in isolation, one module at a
+// time). Genuinely new cross-table logic, not a wrapper over an existing
+// function.
+//
+// Bug fix: this used to hard-lock to a single calendar day (`to` was
+// silently ignored, with no UI indication it even existed for this report)
+// and never included cash from a same-day sale that hasn't been formally
+// invoiced yet — unlike Customers/Invoices/Sales-by-Category, which were
+// explicitly fixed to include unbilled dispatches earlier this session.
+export async function dayBook(kilnId: string, from: Date, to: Date = from): Promise<DayBookEntry[]> {
+  // Bug fix: server-local (UTC) midnight, not IST — see fuelLog.service.ts's
+  // fuelLogPeriodTotals for the same fix and full explanation. Day Book is
+  // a cash-reconciliation tool read against the physical calendar day, so
+  // this boundary mattering is especially visible here.
+  const dayStart = istStartOfDay(from);
+  const dayEnd = istEndOfDay(to);
 
   const entries: DayBookEntry[] = [];
 
@@ -66,6 +84,25 @@ export async function dayBook(kilnId: string, date: Date): Promise<DayBookEntry[
       type: "INVOICE",
       party: customerName ?? row.customerName,
       description: `Invoice #${row.sequenceNumber ?? row._id.slice(0, 8)}`,
+      cashAmount: cash,
+      onlineAmount: online,
+      direction: "IN",
+    });
+  }
+
+  // Same real sale, same money, just no GST document printed against it
+  // yet — see unbilledDispatchRows' own doc comment. Already excludes any
+  // dispatch that has a (non-cancelled) invoice, so this can never
+  // double-count against the invoiceRows block above.
+  const unbilledRows = await unbilledDispatchRows(kilnId, { from: dayStart, to: dayEnd });
+  for (const row of unbilledRows) {
+    const paidNow = row.amountPaidNow ?? row.netAmount;
+    const { cash, online } = cashOnline(row.paymentMode, paidNow, row.cashAmount, row.onlineAmount);
+    entries.push({
+      time: row.invoiceDate,
+      type: "INVOICE",
+      party: row.customerName,
+      description: `Dispatch (not yet invoiced) — ${row.dispatchId?.slice(0, 8) ?? row._id}`,
       cashAmount: cash,
       onlineAmount: online,
       direction: "IN",

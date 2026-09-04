@@ -208,7 +208,12 @@ export function CreatePaymentReceiptModal({ kilnName, onClose, onCreated }: Crea
               className={cn(inputClass, "w-full")}
             >
               <option value="">{t("billing.selectPersonTypePlaceholder")}</option>
-              {PERSON_TYPES.map((pt) => (
+              {/* Customer removed from this list on request — a customer
+                  payment already has its own dedicated path
+                  (AddCustomerPaymentModal, from the Customer's own profile
+                  page), so it isn't offered here as a second way to do the
+                  same thing. */}
+              {PERSON_TYPES.filter((pt) => pt !== "CUSTOMER").map((pt) => (
                 <option key={pt} value={pt}>
                   {personTypeMeta[pt].label}
                 </option>

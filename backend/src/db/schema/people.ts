@@ -225,6 +225,22 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
   cashAmount: double("cashAmount"),
   onlineAmount: double("onlineAmount"),
   contractId: varchar("contractId", { length: 64 }),
+  // True only for a PAID entry posted purely to zero out a DUE liability
+  // that's being cancelled/reattributed/corrected down — e.g. reversing a
+  // Partner's PARTNER_DUE or an Agent's COMMISSION when the invoice that
+  // created it is cancelled, reattributed to someone else, or corrected to
+  // a lower amount (see dispatchDocuments.service.ts's cancelInvoice/
+  // syncAttributionLedger, dispatch.service.ts's cancelDispatch). No real
+  // cash ever moved for one of these — it's pure bookkeeping to stop
+  // showing a liability that will now never actually be paid — so
+  // financialOverview.service.ts's flowForRange excludes them from
+  // "money spent" while every balance/due calculation elsewhere still
+  // counts them normally (the liability genuinely is gone). A real
+  // settlement (the kiln actually paying someone what they're due) is
+  // NEVER marked this way, even though it can carry the identical
+  // category+direction — this column is the only thing that tells the two
+  // apart.
+  isReversal: boolean("isReversal").notNull().default(false),
   date: dateColumn(),
   createdAt: createdAtColumn(),
 }, (t) => ({

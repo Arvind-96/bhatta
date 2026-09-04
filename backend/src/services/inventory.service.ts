@@ -72,9 +72,20 @@ export async function updateInventoryItem(kilnId: string, itemId: string, input:
   return updated;
 }
 
+// No DB-level FK ties suppliedItems.itemId back to inventoryItems, so a
+// hard delete here used to silently orphan them — a worker's supply
+// history would resolve the item to a raw id string instead of its name,
+// permanently. Guarded the same check-then-throw way as deleteCustomer/
+// deleteVehicle/deleteBrickCategory/deleteSupplier.
 export async function deleteInventoryItem(kilnId: string, itemId: string) {
   const existing = (await db.select().from(inventoryItems).where(and(eq(inventoryItems._id, itemId), eq(inventoryItems.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Inventory item not found in this kiln");
+
+  const linkedSupplies = await db.select({ _id: suppliedItems._id }).from(suppliedItems).where(and(eq(suppliedItems.kilnId, kilnId), eq(suppliedItems.itemId, itemId)));
+  if (linkedSupplies.length > 0) {
+    throw new Error(`Cannot delete this item — it's been supplied to workers ${linkedSupplies.length} time(s). That history would become untraceable.`);
+  }
+
   await db.delete(inventoryItems).where(eq(inventoryItems._id, itemId));
   emitToKiln(kilnId, "inventory:update", { _id: itemId, deleted: true });
   return existing;

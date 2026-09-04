@@ -72,6 +72,10 @@ async function listMemberships(userId: string) {
         bankIfscCode: kiln?.bankIfscCode ?? undefined,
         signaturePath: kiln?.signaturePath ?? undefined,
         defaultTermsAndConditions: kiln?.defaultTermsAndConditions ?? undefined,
+        // Bug fix: Settings' Yard Capacity form used to be write-only —
+        // this field was never part of the session payload it reads from,
+        // so there was no way to even populate the "currently saved" value.
+        yardCapacityBricks: kiln?.yardCapacityBricks ?? undefined,
         needsSetup: await needsSetup(m.kilnId, kiln?.onboardedAt),
       };
     })
@@ -162,6 +166,7 @@ export async function defaultKilnPublicInfo() {
     bankIfscCode: kiln.bankIfscCode ?? undefined,
     signaturePath: kiln.signaturePath ?? undefined,
     defaultTermsAndConditions: kiln.defaultTermsAndConditions ?? undefined,
+    yardCapacityBricks: kiln.yardCapacityBricks ?? undefined,
     needsSetup: await needsSetup(kiln._id, kiln.onboardedAt),
   };
 }

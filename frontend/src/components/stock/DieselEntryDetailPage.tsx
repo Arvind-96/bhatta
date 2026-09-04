@@ -118,6 +118,7 @@ export function DieselEntryDetailPage({ entry, vehicles, drivers, entries, onBac
           <Field label={t("stock.todaysLastMeterReadingLabel")} value={entry.lastMeterReading} />
           <Field label={t("stock.distanceSinceLastFillLabel")} value={distanceSinceLastFill} />
           <Field label={t("stock.cost")} value={entry.costAmount} />
+          <Field label={t("common.paymentMode")} value={entry.paymentMode} />
         </div>
         {entry.notes && (
           <div className="mt-4">

@@ -155,7 +155,11 @@ const molding: ReportDefinition = {
       titleKey: "reports.title.molding",
       columns,
       rows: outRows,
-      totals: { bricksCount: detail.reduce((s, r) => s + r.bricksCount, 0), wage: round2(detail.reduce((s, r) => s + r.wage, 0)) },
+      totals: {
+        bricksCount: detail.reduce((s, r) => s + r.bricksCount, 0),
+        damagedCount: detail.reduce((s, r) => s + r.damagedCount, 0),
+        wage: round2(detail.reduce((s, r) => s + r.wage, 0)),
+      },
     };
   },
 };
@@ -242,7 +246,10 @@ const firing: ReportDefinition = {
       titleKey: "reports.title.firing",
       columns,
       rows: outRows,
-      totals: { bonusAmount: round2(detail.reduce((s, r) => s + r.bonusAmount, 0)) },
+      totals: {
+        overtimeHours: round2(detail.reduce((s, r) => s + r.overtimeHours, 0)),
+        bonusAmount: round2(detail.reduce((s, r) => s + r.bonusAmount, 0)),
+      },
     };
   },
 };
@@ -252,13 +259,21 @@ const nikasi: ReportDefinition = {
   titleKey: "reports.title.nikasi",
   async run(kilnId, filters) {
     const rows = await listNikasiEntries(kilnId, null, { gangId: filters.personId, from: filters.from, to: filters.to });
-    const detail = rows.map((r) => ({
-      date: r.date ? r.date.toISOString() : null,
-      gang: refName(r.gangId),
-      gher: typeof r.gherId === "object" && r.gherId ? String((r.gherId as { number?: number }).number ?? "") : String(r.gherId ?? ""),
-      bricksCount: r.bricksCount,
-      damagedCount: r.damagedCount ?? 0,
-    }));
+    // Bug fix: this report exposed a "Fault" filter in the UI
+    // (reportDefinitions.ts) but never applied it — picking a fault value
+    // silently returned every row unfiltered, unlike the molding/stacking
+    // reports right next to it, which do filter on damageFault. Mirrors
+    // their exact pattern.
+    const detail = rows
+      .filter((r) => !filters.damageFault || r.damageFault === filters.damageFault)
+      .map((r) => ({
+        date: r.date ? r.date.toISOString() : null,
+        gang: refName(r.gangId),
+        gher: typeof r.gherId === "object" && r.gherId ? String((r.gherId as { number?: number }).number ?? "") : String(r.gherId ?? ""),
+        bricksCount: r.bricksCount,
+        damagedCount: r.damagedCount ?? 0,
+        damageFault: r.damageFault ?? "",
+      }));
     const { rows: outRows, columns } = groupedOrDetail(
       filters.groupBy,
       detail,
@@ -275,6 +290,7 @@ const nikasi: ReportDefinition = {
         { key: "gher", labelKey: "reports.col.gher", format: "text" },
         { key: "bricksCount", labelKey: "reports.col.bricksCount", format: "number" },
         { key: "damagedCount", labelKey: "reports.col.damagedCount", format: "number" },
+        { key: "damageFault", labelKey: "reports.col.damageFault", format: "text" },
       ]
     );
     return {

@@ -151,9 +151,21 @@ function linkedSourceLabel(e: typeof expenses.$inferSelect): string | null {
 export async function updateExpense(kilnId: string, expenseId: string, input: UpdateExpenseInput) {
   const existing = (await db.select().from(expenses).where(and(eq(expenses._id, expenseId), eq(expenses.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Expense not found in this kiln");
-  if (input.amount !== undefined && input.amount !== existing.amount) {
+  // Bug fix: this used to guard `amount` only — paymentMode/cashAmount/
+  // onlineAmount/date could still be edited directly on an auto-logged
+  // row with no guard at all, desyncing it from the source record's own
+  // copy of those same fields (updateLinkedExpensePaymentInfo above is
+  // the ONE sanctioned way that sync happens, source → expense; editing
+  // the expense side directly bypasses it with no way back).
+  const touchesGuardedField =
+    (input.amount !== undefined && input.amount !== existing.amount) ||
+    (input.paymentMode !== undefined && input.paymentMode !== existing.paymentMode) ||
+    (input.cashAmount !== undefined && input.cashAmount !== existing.cashAmount) ||
+    (input.onlineAmount !== undefined && input.onlineAmount !== existing.onlineAmount) ||
+    (input.date !== undefined && input.date.getTime() !== existing.date?.getTime());
+  if (touchesGuardedField) {
     const source = linkedSourceLabel(existing);
-    if (source) throw new Error(`This expense was auto-logged from ${source} — edit the amount there instead, so its own totals stay in sync.`);
+    if (source) throw new Error(`This expense was auto-logged from ${source} — edit the amount/payment details there instead, so its own totals stay in sync.`);
   }
 
   await db.update(expenses).set(input).where(eq(expenses._id, expenseId));

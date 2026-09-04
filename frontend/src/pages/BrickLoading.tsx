@@ -264,6 +264,8 @@ export function BrickLoading() {
       setForm({ ...emptyForm, date: new Date().toISOString().slice(0, 10), items: [emptyLineItemRow()] });
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -620,16 +622,23 @@ export function BrickLoading() {
                     <td className="py-3 tabular-nums text-ink-secondary">{entry.amount ? `₹${formatINR(entry.amount)}` : "—"}</td>
                     <td className="py-3 text-ink-secondary">
                       {linkedDispatch ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigateAndHighlight("dispatch", linkedDispatch._id);
-                          }}
-                          className="text-series-1 hover:underline"
-                        >
-                          {linkedDispatch.slipNumber}
-                        </button>
+                        <span className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateAndHighlight("dispatch", linkedDispatch._id);
+                            }}
+                            className="text-series-1 hover:underline"
+                          >
+                            {linkedDispatch.slipNumber}
+                          </button>
+                          {linkedDispatch.cancelled && (
+                            <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-xs font-semibold text-ink-muted">
+                              {t("common.cancelledBadge")}
+                            </span>
+                          )}
+                        </span>
                       ) : (
                         "—"
                       )}

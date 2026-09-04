@@ -357,6 +357,47 @@ function PersonLookupPanel() {
             </SectionCard>
           )}
 
+          {s?.sandDeliveries && s.sandDeliveries.length > 0 && (
+            <SectionCard title={t("reports.sandDeliveries")} count={s.sandDeliveries.length}>
+              <div className="space-y-1">
+                {s.sandDeliveries.map((d) => (
+                  <div key={d._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
+                    <span className="text-ink-secondary">{fmtDate(d.date)}</span>
+                    <span className="tabular-nums text-ink-primary">{d.trolleyCount} trolleys</span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {s?.sandContracts && s.sandContracts.length > 0 && (
+            <SectionCard title={t("reports.sandContracts")} count={s.sandContracts.length}>
+              <div className="space-y-1">
+                {s.sandContracts.map((c) => (
+                  <div key={c._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
+                    <span className="text-ink-secondary">{c.contractNumber}</span>
+                    <span className="tabular-nums text-ink-primary">₹{formatINR(c.totalContractValue)}</span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
+          {s?.doctorVisits && s.doctorVisits.length > 0 && (
+            <SectionCard title={t("reports.doctorVisits")} count={s.doctorVisits.length}>
+              <div className="space-y-1">
+                {s.doctorVisits.map((v) => (
+                  <div key={v._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
+                    <span className="text-ink-secondary">
+                      {fmtDate(v.date)} {v.ailment ? `· ${v.ailment}` : ""}
+                    </span>
+                    <span className="tabular-nums text-ink-primary">₹{formatINR(v.medicineCost + v.consultationFee)}</span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          )}
+
           {s?.brickLoadingEntries && s.brickLoadingEntries.length > 0 && (
             <SectionCard title={t("reports.brickLoadingTrips")} count={s.brickLoadingEntries.length}>
               <div className="space-y-1">

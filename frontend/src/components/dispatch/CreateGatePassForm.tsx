@@ -49,6 +49,7 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
   const [gatePassDate, setGatePassDate] = useState((existing?.gatePassDate ?? dispatch?.dispatchedOn ?? new Date().toISOString()).slice(0, 10));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     if (existing) return;
@@ -60,6 +61,7 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
     e.preventDefault();
     const validItems = items.filter(isValidLineItemRow);
     if (validItems.length === 0) return;
+    setFormError("");
     setSaving(true);
     try {
       const lineItems = validItems.map((row) => ({ categoryId: row.categoryId, bricksCount: Number(row.bricksCount) }));
@@ -81,6 +83,8 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
       const { stamp } = await resolvePaymentInfo({ customerName, remainingOnThisDoc: 0 });
       printGatePassRecord(row, kilnInfo, categories, stamp);
       onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -125,6 +129,7 @@ export function CreateGatePassForm({ dispatch, categories, existing, onClose, on
           <DateInput required value={gatePassDate} onChange={(e) => setGatePassDate(e.target.value)} className={inputClass} />
         </label>
         <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className="col-span-2 h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1" />
+        {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
         <Button type="submit" disabled={saving} className="col-span-2">
           {existing ? t("dispatchDocs.saveAndReprintGatePass") : t("dispatchDocs.generateGatePass")}
         </Button>

@@ -4,7 +4,7 @@ import { Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import type { MoldingEntry } from "@/types";
+import type { MoldingEntry, PathaiSite } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const inputClass =
@@ -12,6 +12,7 @@ const inputClass =
 
 interface EditMoldingEntryModalProps {
   entry: MoldingEntry;
+  sites?: PathaiSite[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -20,13 +21,17 @@ interface EditMoldingEntryModalProps {
 // never silently rewrites the worker's wage (or the contractor's commission,
 // if any); the backend posts correction entries for the deltas instead
 // (see molding.service.ts's updateMoldingEntry).
-export function EditMoldingEntryModal({ entry, onClose, onSaved }: EditMoldingEntryModalProps) {
+export function EditMoldingEntryModal({ entry, sites = [], onClose, onSaved }: EditMoldingEntryModalProps) {
   const { t } = useTranslation();
   const [bricksCount, setBricksCount] = useState(String(entry.bricksCount));
   const [ratePerThousand, setRatePerThousand] = useState(String(entry.ratePerThousand));
   const [damagedCount, setDamagedCount] = useState(entry.damagedCount ? String(entry.damagedCount) : "");
   const [damageFault, setDamageFault] = useState(entry.damageFault ?? "");
   const [washedOut, setWashedOut] = useState(entry.washedOut ?? false);
+  // Bug fix: this used to have no siteId control at all, even though both
+  // the update schema and the create form support picking a Pathai site —
+  // a wrongly-picked site could never be corrected after the fact.
+  const [siteId, setSiteId] = useState(entry.siteId ?? "");
   const [notes, setNotes] = useState(entry.notes ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -41,6 +46,7 @@ export function EditMoldingEntryModal({ entry, onClose, onSaved }: EditMoldingEn
         damagedCount: damagedCount ? Number(damagedCount) : 0,
         damageFault: damagedCount && damageFault ? (damageFault as "LABOURER" | "CONTRACTOR" | "OTHER") : undefined,
         washedOut,
+        siteId: siteId || undefined,
         notes: notes || undefined,
       });
       onSaved();
@@ -103,6 +109,16 @@ export function EditMoldingEntryModal({ entry, onClose, onSaved }: EditMoldingEn
               <option value="LABOURER">{t("reports.damageFault.LABOURER")}</option>
               <option value="CONTRACTOR">{t("reports.damageFault.CONTRACTOR")}</option>
               <option value="OTHER">{t("reports.damageFault.OTHER")}</option>
+            </select>
+          )}
+          {sites.length > 0 && (
+            <select value={siteId} onChange={(e) => setSiteId(e.target.value)} className={`col-span-2 ${inputClass}`}>
+              <option value="">{t("pathaiSite.noSpecificSite")}</option>
+              {sites.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
             </select>
           )}
           <label className="flex items-center gap-2 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary">

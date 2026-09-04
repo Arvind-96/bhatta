@@ -43,15 +43,35 @@ export interface CreateStackingInput {
 // status update.
 export async function createStackingEntry(input: CreateStackingInput) {
   await assertPersonOfType(input.kilnId, input.gangId, ["LABOUR_CONTRACTOR", "WORKER", "HELPER"]);
-  await assertGherInKiln(input.kilnId, input.gherId);
+  const gher = await assertGherInKiln(input.kilnId, input.gherId);
 
   const _id = randomUUID();
   await db.insert(stackingEntries).values({ ...input, _id });
   const entry = (await db.select().from(stackingEntries).where(eq(stackingEntries._id, _id)))[0]!;
 
-  await updateGherStatus(input.kilnId, input.seasonId, input.gherId, "STACKING");
+  // Only EMPTY→STACKING (starting a fresh cycle) and STACKING→STACKING
+  // (continuing the current stacking phase) may drive updateGherStatus's
+  // side effect — it unconditionally resets cycleStartedAt and opens a new
+  // gherCycles row. A chamber that's already moved on to FIRING/READY/
+  // UNLOADING must not have its cycle silently reset just because someone
+  // logs a (likely backdated/corrective) stacking entry against it, so we
+  // skip the status/cycle update in that case. The production record above
+  // is still real and gets saved regardless — we still throw afterwards so
+  // the admin sees a clear error and knows the chamber's status/cycle was
+  // NOT touched, rather than silently succeeding.
+  const canAdvanceStatus = gher.status === "EMPTY" || gher.status === "STACKING" || gher.status == null;
+  if (canAdvanceStatus) {
+    await updateGherStatus(input.kilnId, input.seasonId, input.gherId, "STACKING");
+  }
 
   emitToKiln(input.kilnId, "stacking:update", entry);
+
+  if (!canAdvanceStatus) {
+    throw new Error(
+      `Stacking entry recorded, but chamber #${gher.number} is currently ${gher.status} (not EMPTY/STACKING) — its status and cycle were NOT reset. Advance the chamber back to EMPTY before stacking a new cycle.`
+    );
+  }
+
   return entry;
 }
 
@@ -167,10 +187,15 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // always covered by stackingContractorSummary (even their own direct
 // entries), never listed here.
 export async function stackingOperatorSummary(kilnId: string, seasonId: string) {
+  // Bug fix (admin decision): deactivating an operator used to silently
+  // drop their real historical production from this summary — the loop
+  // below already skips anyone with zero entries this season, so dropping
+  // the active filter here doesn't add clutter, it only stops hiding real
+  // production the moment someone leaves.
   const operators = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true)))
+    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"])))
     .orderBy(asc(people.name));
   const independentOperators = operators.filter((o) => !o.bharaiContractorId);
 
@@ -236,11 +261,27 @@ export async function stackingOperatorSummary(kilnId: string, seasonId: string) 
 // contractor themself) and ledger, plus the contractor's own vehicle/driver
 // roster. Same shape as molding.service.ts's moldingContractorSummary.
 export async function stackingContractorSummary(kilnId: string, seasonId: string) {
-  const [contractors, laborers, vehicles] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
+  // Bug fix (admin decision): deactivating a contractor (or one of their
+  // laborers) used to silently drop their gang's real historical
+  // production from this summary — unlike stackingOperatorSummary, every
+  // fetched contractor gets a card here regardless of production, so the
+  // active filter was the only thing gating inclusion. Fetches every
+  // contractor/laborer regardless of `active`, then keeps a contractor's
+  // card only if they're currently active OR their gang (themself or any
+  // of their laborers) has real entries this season — preserves "an
+  // inactive, never-produced contractor doesn't clutter the page" while
+  // fixing "an inactive contractor who genuinely produced disappears."
+  const [allContractors, laborers, vehicles, allEntries] = await Promise.all([
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"))).orderBy(asc(people.name)),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]))),
     db.select().from(stackingVehicles).where(eq(stackingVehicles.kilnId, kilnId)),
+    db.select().from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.seasonId, seasonId))),
   ]);
+
+  const gangIdsWithEntries = new Set(allEntries.map((e) => e.gangId));
+  const contractors = allContractors.filter(
+    (c) => c.active || gangIdsWithEntries.has(c._id) || laborers.some((w) => w.bharaiContractorId === c._id && gangIdsWithEntries.has(w._id))
+  );
 
   const contractorResults = await Promise.all(
     contractors.map(async (contractor) => {

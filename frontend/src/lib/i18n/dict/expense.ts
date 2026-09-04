@@ -33,6 +33,11 @@ export const expenseDict: Record<string, Record<Locale, string>> = {
   "expense.noExpensesYet": { en: "No expenses logged yet.", hi: "अभी तक कोई खर्च दर्ज नहीं हुआ।" },
   "expense.noExpensesMatchSearch": { en: "No expenses match your search.", hi: "आपकी खोज से कोई खर्च मेल नहीं खाता।" },
   "expense.confirmDeleteExpense": { en: "Delete this expense of ₹{amount}? This cannot be undone.", hi: "₹{amount} का यह खर्च हटाएं? इसे वापस नहीं लाया जा सकता।" },
+  "expense.deleteExpenseType": { en: "Delete Expense Type", hi: "खर्च प्रकार हटाएं" },
+  "expense.confirmDeleteExpenseType": {
+    en: "Delete \"{name}\" and every expense logged under it (₹{amount} total)? This removes them completely and cannot be undone.",
+    hi: "\"{name}\" और इसके तहत दर्ज हर खर्च (कुल ₹{amount}) हटाएं? यह उन्हें पूरी तरह हटा देगा और वापस नहीं लाया जा सकता।",
+  },
   "expense.printExpense": { en: "Print", hi: "प्रिंट करें" },
   "expense.quantityLabel": { en: "Quantity", hi: "मात्रा" },
   "expense.notesPlaceholder": { en: "Notes (optional)", hi: "टिप्पणी (वैकल्पिक)" },

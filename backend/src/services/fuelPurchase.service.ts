@@ -154,3 +154,25 @@ export async function supplierFuelBalances(kilnId: string, seasonId: string) {
 
   return results.sort((a, b) => b.balance - a.balance);
 }
+
+// All-time equivalent of supplierFuelBalances above (no season scoping —
+// same "a debt doesn't reset at a season boundary" convention
+// supplierInvoice.service.ts's listSupplierDuesAcrossKiln uses), positive
+// balances only. Feeds person.service.ts's listPaymentsDue — see that
+// function's own comment for why fuel-purchase-supplier debt needs to
+// reach it at all.
+export async function totalFuelPurchaseSupplierDues(kilnId: string) {
+  const purchases = await db.select().from(fuelPurchases).where(and(eq(fuelPurchases.kilnId, kilnId), isNotNull(fuelPurchases.supplierId)));
+  if (purchases.length === 0) return [];
+  const supplierIds = Array.from(new Set(purchases.map((p) => p.supplierId!)));
+  const supplierRows = await db.select().from(suppliers).where(and(inArray(suppliers._id, supplierIds), eq(suppliers.kilnId, kilnId)));
+
+  return supplierRows
+    .map((supplier) => {
+      const supplierPurchases = purchases.filter((p) => p.supplierId === supplier._id);
+      const due = supplierPurchases.reduce((sum, p) => sum + p.amount, 0);
+      const paid = supplierPurchases.reduce((sum, p) => sum + (p.paidAmount ?? 0), 0);
+      return { supplier: { id: supplier._id, name: supplier.name, phone: supplier.phone ?? null }, amountDue: Math.round((due - paid) * 100) / 100 };
+    })
+    .filter((r) => r.amountDue > 0);
+}

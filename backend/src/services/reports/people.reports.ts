@@ -250,6 +250,8 @@ const salary: ReportDefinition = {
       grossSalary: round2(detail.reduce((s, r) => s + r.grossSalary, 0)),
       deductions: round2(detail.reduce((s, r) => s + r.deductions, 0)),
       netSalary: round2(detail.reduce((s, r) => s + r.netSalary, 0)),
+      daysPresent: detail.reduce((s, r) => s + r.daysPresent, 0),
+      daysAbsent: detail.reduce((s, r) => s + r.daysAbsent, 0),
     };
     return {
       reportKey: "salary",

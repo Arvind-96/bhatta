@@ -45,4 +45,8 @@ export const partnerDict: Record<string, Record<Locale, string>> = {
   "partner.pendingHeader": { en: "Pending", hi: "बकाया" },
   "partner.confirmDeleteAsset": { en: "Delete this contribution?", hi: "क्या यह योगदान हटाएं?" },
   "partner.linkToPartnerPlaceholder": { en: "Sold through Partner (optional)", hi: "साझेदार के माध्यम से बेचा (वैकल्पिक)" },
+  "partner.shareExceedsLimit": {
+    en: "Total partner profit share would be {total}% — cannot exceed 100%.",
+    hi: "कुल साझेदार लाभ हिस्सा {total}% होगा — यह 100% से अधिक नहीं हो सकता।",
+  },
 };

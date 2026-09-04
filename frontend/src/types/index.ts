@@ -373,9 +373,18 @@ export interface Customer {
   createdAt: string;
 }
 
+// FIFO-resolved remaining due for this one invoice (a later top-up
+// payment can fully clear an earlier invoice's shortfall, not just its
+// own) — see customer.service.ts's fifoResolveInvoiceDues. Only populated
+// here, on the Customer page's own invoice table; the plain `Invoice`
+// type elsewhere in the app has no equivalent field.
+export interface CustomerInvoiceRow extends Invoice {
+  fifoDue: number;
+}
+
 export interface CustomerDetail {
   customer: Customer;
-  invoices: Invoice[];
+  invoices: CustomerInvoiceRow[];
   totalPaid: number;
   totalDue: number;
   isNewCustomer: boolean;
@@ -559,8 +568,6 @@ export interface VehicleDieselEntry {
   initialMeterReading?: number;
   lastMeterReading?: number;
   driverId?: { _id: string; name: string; phone?: string } | string;
-  // Legacy fields — no longer settable from the Log Diesel Fill-up form,
-  // kept only so an old entry that still carries one can display/edit it.
   costAmount?: number;
   paymentMode?: SimplePaymentMode;
   date: string;
@@ -1390,7 +1397,7 @@ export interface BrickLoadingEntry {
   pricePerBrick?: number;
   items?: BrickLineItem[];
   placeOfSupply?: string;
-  dispatchId?: { _id: string; slipNumber: string; customerName: string } | string;
+  dispatchId?: { _id: string; slipNumber: string; customerName: string; cancelled?: boolean } | string;
   date: string;
   unloadingDate?: string;
   createdAt: string;
@@ -1795,6 +1802,11 @@ export interface ChamberCostReport {
   totalCost: number;
   bricksProduced: number;
   costPerBrick: number | null;
+  // Fuel types fed into this chamber with no matching purchase-rate data —
+  // their cost silently contributed ₹0/kg to the figures above instead of
+  // their real cost, so costPerBrick is understated whenever this is
+  // non-empty.
+  fuelTypesMissingCost: string[];
 }
 
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "LATE";
@@ -1877,6 +1889,9 @@ export interface PersonFullReport {
     firingShifts?: FiringShift[];
     soilArrivals?: SoilArrival[];
     soilContracts?: SoilContract[];
+    sandDeliveries?: SandDelivery[];
+    sandContracts?: SandContract[];
+    doctorVisits?: DoctorVisit[];
     brickLoadingEntries?: BrickLoadingEntry[];
     dispatches?: Dispatch[];
   };
@@ -1893,11 +1908,12 @@ export interface ProfitLossStatement {
   totalSales: number;
   totalExpenses: number;
   totalAdvancesGiven: number;
-  totalAdvancesReceived: number;
   cashReceived: number;
   cashGiven: number;
   onlinePaymentsReceived: number;
   onlinePaymentsMade: number;
+  moneyInUnspecified: number;
+  moneyOutUnspecified: number;
   totalMoneyIn: number;
   totalMoneyOut: number;
   netProfit: number;

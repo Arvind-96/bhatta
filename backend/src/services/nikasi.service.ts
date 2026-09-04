@@ -5,6 +5,7 @@ import { nikasiEntries, people, ledgerEntries, ghers } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { assertGherInKiln } from "./gher.service";
 import { emitToKiln } from "../config/socket";
+import { istStartOfDay } from "../utils/istTime";
 
 export type DamageFault = "LABOURER" | "CONTRACTOR" | "OTHER";
 
@@ -126,12 +127,12 @@ export async function totalNikasiDamage(kilnId: string, seasonIds: string[], sin
 // other module writes this collection), so unlike the Pathai-tagged
 // contractor breakdown below, there's no ambiguity to filter out here.
 export async function nikasiPeriodTotals(kilnId: string, seasonId: string) {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const monthAgo = new Date();
-  monthAgo.setDate(monthAgo.getDate() - 30);
+  // Bug fix: server-local (UTC) midnight, not IST — see fuelLogPeriodTotals
+  // in fuelLog.service.ts for the same fix and full explanation.
+  const now = new Date();
+  const startOfDay = istStartOfDay(now);
+  const weekAgo = istStartOfDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+  const monthAgo = istStartOfDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
 
   const [todayEntries, weekEntries, monthEntries] = await Promise.all([
     db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId), gte(nikasiEntries.date, startOfDay))),
@@ -173,10 +174,15 @@ function sumByDirection(entries: { direction: "DUE" | "PAID"; amount: number }[]
 // `continue` below already excludes anyone with zero entries, so nothing
 // irrelevant leaks in from removing the workType filter.
 export async function nikasiOperatorSummary(kilnId: string, seasonId: string) {
+  // Bug fix (admin decision): deactivating an operator used to silently
+  // drop their real historical production from this summary — the loop
+  // below already skips anyone with zero entries this season, so dropping
+  // the active filter here doesn't add clutter, it only stops hiding real
+  // production the moment someone leaves.
   const operators = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.nikasiContractorId), eq(people.active, true)))
+    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), isNull(people.nikasiContractorId)))
     .orderBy(asc(people.name));
 
   const allEntries = await db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId)));
@@ -241,17 +247,23 @@ export async function nikasiOperatorSummary(kilnId: string, seasonId: string) {
 // included if they're tagged "NIKASI" themselves, or have at least one
 // Nikasi-relevant laborer by that same rule.
 export async function nikasiContractorSummary(kilnId: string, seasonId: string) {
+  // Bug fix (admin decision): deactivating a worker/contractor used to
+  // silently drop their real historical production from this summary —
+  // fetches every worker/contractor regardless of `active`; only a
+  // currently-active, otherwise-irrelevant NIKASI-tagged person gets in
+  // for free below — a deactivated one still needs real entries to show
+  // up, same as before.
   const [allContractors, laborers, allEntries] = await Promise.all([
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"), eq(people.active, true))).orderBy(asc(people.name)),
-    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]), eq(people.active, true))),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), eq(people.type, "LABOUR_CONTRACTOR"))).orderBy(asc(people.name)),
+    db.select().from(people).where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER"]))),
     db.select().from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.seasonId, seasonId))),
   ]);
 
   const gangIdsWithEntries = new Set(allEntries.map((e) => e.gangId));
-  const relevantLaborers = laborers.filter((w) => w.workType === "NIKASI" || gangIdsWithEntries.has(w._id));
+  const relevantLaborers = laborers.filter((w) => (w.active && w.workType === "NIKASI") || gangIdsWithEntries.has(w._id));
 
   const contractorIdsWithLaborers = new Set(relevantLaborers.filter((w) => w.nikasiContractorId).map((w) => w.nikasiContractorId!));
-  const contractors = allContractors.filter((c) => c.workType === "NIKASI" || contractorIdsWithLaborers.has(c._id));
+  const contractors = allContractors.filter((c) => (c.active && c.workType === "NIKASI") || contractorIdsWithLaborers.has(c._id));
 
   const contractorResults = await Promise.all(
     contractors.map(async (contractor) => {
