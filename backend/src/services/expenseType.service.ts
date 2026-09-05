@@ -4,6 +4,7 @@ import { db } from "../db/client";
 import { expenseTypes, expenses } from "../db/schema";
 import { seasonIdsThrough } from "./season.util";
 import { emitToKiln } from "../config/socket";
+import { clearBankMatchForExpense } from "./bankTransaction.service";
 
 export interface ExpenseTypeInput {
   name: string;
@@ -103,6 +104,10 @@ export async function deleteExpenseType(kilnId: string, expenseTypeId: string) {
 
   if (rows.length > 0) {
     await db.delete(expenses).where(and(eq(expenses.kilnId, kilnId), eq(expenses.expenseTypeId, expenseTypeId)));
+    // Bug fix: same bank-reconciliation orphan as deleteExpense's single-row
+    // case — a plain expense under this type can independently have been
+    // bank-reconciled, and this cascade used to leave that match dangling.
+    for (const row of rows) await clearBankMatchForExpense(kilnId, row._id);
   }
   await db.delete(expenseTypes).where(eq(expenseTypes._id, expenseTypeId));
   emitToKiln(kilnId, "expenseType:update", { _id: expenseTypeId, deleted: true });

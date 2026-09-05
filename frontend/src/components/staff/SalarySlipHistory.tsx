@@ -100,8 +100,12 @@ export function SalarySlipHistory({ personId, ledgerEntries }: SalarySlipHistory
 
   async function deleteSlip(slip: SalarySlip) {
     if (!confirm(t("salary.confirmDeleteSlip", { month: monthLabel(slip.month) }))) return;
-    await api.salary.remove(slip._id);
-    await refreshSlips();
+    try {
+      await api.salary.remove(slip._id);
+      await refreshSlips();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   return (

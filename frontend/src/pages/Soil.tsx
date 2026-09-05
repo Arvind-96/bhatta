@@ -235,8 +235,12 @@ function ContractsTab({ onOpenLandowner }: { onOpenLandowner: (id: string) => vo
           })
         : t("soil.confirmDeleteContract", { contractNumber: contract.contractNumber });
     if (!confirm(warning)) return;
-    await api.soilContracts.remove(contract._id);
-    refresh();
+    try {
+      await api.soilContracts.remove(contract._id);
+      refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   const landownerIdsWithContract = new Set(

@@ -33,6 +33,8 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
   const [editingInvoice, setEditingInvoice] = useState<SupplierInvoice | null>(null);
   const [pendingDeleteInvoiceId, setPendingDeleteInvoiceId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteInvoiceError, setDeleteInvoiceError] = useState("");
+  const [deleteSupplierError, setDeleteSupplierError] = useState("");
   const activeKiln = useAuthStore((s) => s.kilns.find((k) => k.kilnId === s.activeKilnId));
 
   async function refresh() {
@@ -58,8 +60,13 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
   async function handleDeleteSupplier() {
     if (!detail) return;
     if (!confirm(t("supplier.confirmDeleteSupplier", { name: detail.supplier.name }))) return;
-    await api.suppliers.remove(supplierId);
-    onDeleted();
+    setDeleteSupplierError("");
+    try {
+      await api.suppliers.remove(supplierId);
+      onDeleted();
+    } catch (err) {
+      setDeleteSupplierError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   // Total received per suppliesList item, summed from this supplier's own
@@ -154,6 +161,7 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
                 </button>
               </div>
             </div>
+            {deleteSupplierError && <p className="mt-3 text-sm text-status-critical">{deleteSupplierError}</p>}
           </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -304,12 +312,19 @@ export function SupplierDetailPage({ supplierId, onBack, onDeleted }: SupplierDe
           detail={t("supplier.confirmDeleteInvoice")}
           confirmLabel={t("common.delete")}
           loading={deleting}
-          onCancel={() => setPendingDeleteInvoiceId(null)}
+          error={deleteInvoiceError}
+          onCancel={() => {
+            setPendingDeleteInvoiceId(null);
+            setDeleteInvoiceError("");
+          }}
           onConfirm={async () => {
             setDeleting(true);
+            setDeleteInvoiceError("");
             try {
               await api.supplierInvoices.remove(pendingDeleteInvoice._id);
               setPendingDeleteInvoiceId(null);
+            } catch (err) {
+              setDeleteInvoiceError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
             } finally {
               setDeleting(false);
             }

@@ -54,6 +54,8 @@ export function EditWorkEntryModal({ entry, onClose, onSaved }: EditWorkEntryMod
       await api.workEntries.remove(entry._id);
       onSaved();
       onClose();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setDeleting(false);
     }

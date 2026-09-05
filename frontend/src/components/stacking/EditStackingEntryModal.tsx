@@ -71,6 +71,8 @@ export function EditStackingEntryModal({ entry, sites = [], onClose, onSaved }: 
       await api.stacking.remove(entry._id);
       onSaved();
       onClose();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setDeleting(false);
     }

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { brickCategories, brickProductionEntries, stockLoadingEntries, brickLoadingEntries, dispatches, saleOrders } from "../db/schema";
+import { brickCategories, brickProductionEntries, stockLoadingEntries, brickLoadingEntries, dispatches, saleOrders, challans, gatePasses, invoices } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
 // Free-form name, admin-defined — not a fixed vocabulary. pricePerBrick
@@ -66,22 +66,25 @@ export async function updateBrickCategory(
 // stockLoadingEntries/brickLoadingEntries.categoryId only, on the theory
 // that document items[] arrays (dispatches/invoices/challans/gatePasses)
 // are display-only copies that never move brickCategories.quantity. That
-// holds for invoices/challans/gatePasses (confirmed: no code path deducts
-// stock from any of those three), but NOT for dispatches — a manually
-// created (non-trip-linked) dispatch deducts quantity directly
-// (createDispatch, dispatch.service.ts) and is never hard-deleted (cancel
-// keeps the row, categoryId included), so it's a real, reachable orphan
-// path the original guard missed entirely. Same for a booked-but-unfulfilled
-// Sale Order (saleOrders.categoryId) — it hasn't touched quantity yet, so
-// nothing else here would catch it, but fulfilling it after its category
-// was deleted becomes a silent no-op deduction that never happens, quietly
-// overstating every other category's stock from then on. And the trips
-// check itself only looked at brickLoadingEntries' own aggregate/first-item
-// categoryId column, missing any additional category referenced inside a
-// multi-category trip's items[] array, which the actual deduction/restore
-// code does iterate in full. Checking items[] JSON in application code
-// (not a JSON SQL query) since category deletion is a rare admin action,
-// not a hot path.
+// holds for invoices/challans/gatePasses' STOCK impact (confirmed: no code
+// path deducts stock from any of those three), but they're still real
+// historical documents that resolve categoryId to a name for display/print
+// — deleting a category still referenced by one leaves it showing a raw id
+// instead of a name, the exact failure mode this guard exists to prevent.
+// NOT checked for dispatches — a manually created (non-trip-linked)
+// dispatch deducts quantity directly (createDispatch, dispatch.service.ts)
+// and is never hard-deleted (cancel keeps the row, categoryId included), so
+// it's a real, reachable orphan path. Same for a booked-but-unfulfilled
+// Sale Order (saleOrders.categoryId/items[]) — it hasn't touched quantity
+// yet, so nothing else here would catch it, but fulfilling it after its
+// category was deleted becomes a silent no-op deduction that never
+// happens, quietly overstating every other category's stock from then on.
+// Every one of these six checks (production/loading/trips/dispatches/
+// challans/gatePasses/invoices/sale-orders) is applied through
+// referencesCategory so a multi-category items[] entry is caught even when
+// it's not that row's own aggregate/first-item categoryId — checking
+// items[] JSON in application code (not a JSON SQL query) since category
+// deletion is a rare admin action, not a hot path.
 export async function deleteBrickCategory(kilnId: string, categoryId: string) {
   const existing = (await db.select().from(brickCategories).where(and(eq(brickCategories._id, categoryId), eq(brickCategories.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Brick category not found in this kiln");
@@ -89,19 +92,36 @@ export async function deleteBrickCategory(kilnId: string, categoryId: string) {
   const referencesCategory = (row: { categoryId: string | null; items?: { categoryId?: string }[] | null }) =>
     row.categoryId === categoryId || (row.items ?? []).some((i) => i.categoryId === categoryId);
 
-  const [linkedProduction, linkedLoading, tripRows, dispatchRows, saleOrderRows] = await Promise.all([
+  const [linkedProduction, linkedLoading, tripRows, dispatchRows, saleOrderRows, challanRows, gatePassRows, invoiceRows] = await Promise.all([
     db.select({ _id: brickProductionEntries._id }).from(brickProductionEntries).where(eq(brickProductionEntries.categoryId, categoryId)),
     db.select({ _id: stockLoadingEntries._id }).from(stockLoadingEntries).where(eq(stockLoadingEntries.categoryId, categoryId)),
     db.select({ _id: brickLoadingEntries._id, categoryId: brickLoadingEntries.categoryId, items: brickLoadingEntries.items }).from(brickLoadingEntries).where(eq(brickLoadingEntries.kilnId, kilnId)),
     db.select({ _id: dispatches._id, categoryId: dispatches.categoryId, items: dispatches.items }).from(dispatches).where(eq(dispatches.kilnId, kilnId)),
-    db.select({ _id: saleOrders._id }).from(saleOrders).where(and(eq(saleOrders.kilnId, kilnId), eq(saleOrders.categoryId, categoryId))),
+    db.select({ _id: saleOrders._id, categoryId: saleOrders.categoryId, items: saleOrders.items }).from(saleOrders).where(eq(saleOrders.kilnId, kilnId)),
+    db.select({ _id: challans._id, categoryId: challans.categoryId, items: challans.items }).from(challans).where(eq(challans.kilnId, kilnId)),
+    db.select({ _id: gatePasses._id, categoryId: gatePasses.categoryId, items: gatePasses.items }).from(gatePasses).where(eq(gatePasses.kilnId, kilnId)),
+    db.select({ _id: invoices._id, categoryId: invoices.categoryId, items: invoices.items }).from(invoices).where(eq(invoices.kilnId, kilnId)),
   ]);
   const linkedTrips = tripRows.filter(referencesCategory);
   const linkedDispatches = dispatchRows.filter(referencesCategory);
+  const linkedSaleOrders = saleOrderRows.filter(referencesCategory);
+  const linkedChallans = challanRows.filter(referencesCategory);
+  const linkedGatePasses = gatePassRows.filter(referencesCategory);
+  const linkedInvoices = invoiceRows.filter(referencesCategory);
 
-  if ((existing.quantity ?? 0) !== 0 || linkedProduction.length > 0 || linkedLoading.length > 0 || linkedTrips.length > 0 || linkedDispatches.length > 0 || saleOrderRows.length > 0) {
+  if (
+    (existing.quantity ?? 0) !== 0 ||
+    linkedProduction.length > 0 ||
+    linkedLoading.length > 0 ||
+    linkedTrips.length > 0 ||
+    linkedDispatches.length > 0 ||
+    linkedSaleOrders.length > 0 ||
+    linkedChallans.length > 0 ||
+    linkedGatePasses.length > 0 ||
+    linkedInvoices.length > 0
+  ) {
     throw new Error(
-      `Cannot delete this category — it has ${existing.quantity ?? 0} bricks in stock and is referenced by ${linkedProduction.length} production, ${linkedLoading.length} loading, ${linkedTrips.length} brick loading, ${linkedDispatches.length} dispatch, and ${saleOrderRows.length} sale order record(s). Bring its stock to 0 and clear its history first.`
+      `Cannot delete this category — it has ${existing.quantity ?? 0} bricks in stock and is referenced by ${linkedProduction.length} production, ${linkedLoading.length} loading, ${linkedTrips.length} brick loading, ${linkedDispatches.length} dispatch, ${linkedSaleOrders.length} sale order, ${linkedChallans.length} challan, ${linkedGatePasses.length} gate pass, and ${linkedInvoices.length} invoice record(s). Bring its stock to 0 and clear its history first.`
     );
   }
 

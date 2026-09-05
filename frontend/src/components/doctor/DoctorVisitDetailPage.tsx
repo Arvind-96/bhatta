@@ -108,6 +108,8 @@ export function DoctorVisitDetailPage({ visit, doctors, people, onBack, onDelete
     try {
       await api.doctorVisits.remove(visit._id);
       onDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setDeleting(false);
     }

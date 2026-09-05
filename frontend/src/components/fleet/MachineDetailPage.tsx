@@ -146,8 +146,12 @@ export function MachineDetailPage({ machineId, onBack }: MachineDetailPageProps)
 
   async function deleteInstallment(paymentId: string) {
     if (!confirm(t("fleet.confirmDeleteInstallment"))) return;
-    await api.machines.installments.remove(machineId, paymentId);
-    await refresh();
+    try {
+      await api.machines.installments.remove(machineId, paymentId);
+      await refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   const backButton = (

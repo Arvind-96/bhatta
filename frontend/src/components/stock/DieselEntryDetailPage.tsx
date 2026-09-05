@@ -49,8 +49,12 @@ export function DieselEntryDetailPage({ entry, vehicles, drivers, entries, onBac
 
   async function handleDelete() {
     if (!confirm(t("stock.confirmDeleteDieselEntry"))) return;
-    await api.kilnVehicles.removeDiesel(entry._id);
-    onDeleted();
+    try {
+      await api.kilnVehicles.removeDiesel(entry._id);
+      onDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   function handlePrint() {

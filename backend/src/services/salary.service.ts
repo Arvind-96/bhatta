@@ -519,7 +519,18 @@ export async function deleteSalarySlip(kilnId: string, slipId: string) {
   // linger in the ledger even though the slip claiming it now doesn't
   // exist, corrupting every later month's carried-forward balance.
   if (existing.salaryLedgerEntryId) {
-    await deleteLedgerEntry(kilnId, existing.salaryLedgerEntryId).catch(() => {});
+    // Bug fix: this used to swallow every failure silently, including a
+    // genuine one (e.g. the bank-reconciliation cleanup inside
+    // deleteLedgerEntry throwing) — leaving the person's ledger balance
+    // silently wrong (the SALARY due entry never reversed) with zero trace
+    // anywhere. Logged now so it's at least diagnosable in the server logs
+    // instead of vanishing; the slip itself is already deleted by this
+    // point regardless; the "not found" case (this same entry deleted via
+    // some other path) is expected and not worth logging.
+    await deleteLedgerEntry(kilnId, existing.salaryLedgerEntryId).catch((err) => {
+      if (err instanceof Error && err.message.includes("not found")) return;
+      console.error(`deleteSalarySlip: failed to reverse ledger entry ${existing.salaryLedgerEntryId} for slip ${slipId}`, err);
+    });
   }
   for (const p of [existing.pdfPathEn, existing.pdfPathHi]) {
     fs.rm(p, { force: true }, () => {});
@@ -527,6 +538,8 @@ export async function deleteSalarySlip(kilnId: string, slipId: string) {
   emitToKiln(kilnId, "salary:update", { _id: slipId, deleted: true });
 
   for (const { month } of laterSlips) {
-    await generateSalarySlip(kilnId, existing.personId, month).catch(() => {});
+    await generateSalarySlip(kilnId, existing.personId, month).catch((err) => {
+      console.error(`deleteSalarySlip: failed to regenerate ${existing.personId}'s ${month} slip after deleting an earlier one`, err);
+    });
   }
 }

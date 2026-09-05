@@ -275,9 +275,14 @@ export function Dispatch() {
 
   async function cancelDispatch(d: DispatchEntry) {
     if (!confirm(t("dispatch.confirmDeleteDispatch", { slipNumber: d.slipNumber }))) return false;
-    await api.dispatch.remove(d._id);
-    await refresh();
-    return true;
+    try {
+      await api.dispatch.remove(d._id);
+      await refresh();
+      return true;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+      return false;
+    }
   }
 
   // Net of discount, same subtraction as handleSubmit's netAmountForSplit —

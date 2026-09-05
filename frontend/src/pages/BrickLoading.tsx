@@ -118,6 +118,7 @@ export function BrickLoading() {
   const [openTripId, setOpenTripId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [search, setSearch] = useState("");
   const emptyForm = {
     customerName: "",
@@ -273,10 +274,14 @@ export function BrickLoading() {
 
   async function cancelEntry(entry: BrickLoadingEntry) {
     setDeleting(true);
+    setDeleteError("");
     try {
       await api.brickLoading.remove(entry._id);
       await refresh();
       return true;
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+      return false;
     } finally {
       setDeleting(false);
     }
@@ -672,7 +677,11 @@ export function BrickLoading() {
               detail={t("brickLoading.confirmDeleteTrip", { vehicleNumber: target.vehicleNumber })}
               confirmLabel={t("common.confirmCancelAction")}
               loading={deleting}
-              onCancel={() => setPendingDeleteId(null)}
+              error={deleteError}
+              onCancel={() => {
+                setPendingDeleteId(null);
+                setDeleteError("");
+              }}
               onConfirm={async () => {
                 if (await cancelEntry(target)) {
                   setPendingDeleteId(null);

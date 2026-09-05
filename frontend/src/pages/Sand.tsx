@@ -182,8 +182,12 @@ function SandContractsTab({ onOpenContractor }: { onOpenContractor: (id: string)
 
   async function remove(contract: SandContract) {
     if (!confirm(t("sand.confirmDeleteContract", { contractNumber: contract.contractNumber }))) return;
-    await api.sandContracts.remove(contract._id);
-    refresh();
+    try {
+      await api.sandContracts.remove(contract._id);
+      refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function printContract(contract: SandContract) {

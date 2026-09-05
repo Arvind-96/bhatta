@@ -53,8 +53,12 @@ export function ChallanDetailPage({ challan, categories, onBack, onDeleted }: Ch
 
   async function handleDelete() {
     if (!confirm(t("dispatchDocs.confirmDeleteChallan", { number: challan.sequenceNumber ?? "—" }))) return;
-    await api.challans.remove(challan._id);
-    onDeleted();
+    try {
+      await api.challans.remove(challan._id);
+      onDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function handlePrint() {

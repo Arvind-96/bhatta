@@ -51,8 +51,12 @@ export function DriverDieselHistory({ personId }: { personId: string }) {
 
   async function handleDelete(entry: VehicleDieselEntry) {
     if (!confirm(t("stock.confirmDeleteDieselEntry"))) return;
-    await api.kilnVehicles.removeDiesel(entry._id);
-    await refresh();
+    try {
+      await api.kilnVehicles.removeDiesel(entry._id);
+      await refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   function handlePrint(entry: VehicleDieselEntry) {

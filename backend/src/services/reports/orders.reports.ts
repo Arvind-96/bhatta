@@ -157,7 +157,12 @@ const purchaseOrderDetail: ReportDefinition = {
         { key: "status", labelKey: "reports.col.status", format: "text" },
       ],
       rows: detail,
-      totals: { expectedAmount: round2(detail.reduce((s, r) => s + r.expectedAmount, 0)) },
+      // Bug fix: this used to sum expectedAmount across every row including
+      // CANCELLED orders, inflating the total by orders that were never
+      // actually placed/fulfilled. The row list still shows cancelled
+      // orders (with their status visible), same as the list-page
+      // convention — only the total excludes them.
+      totals: { expectedAmount: round2(detail.filter((r) => r.status !== "CANCELLED").reduce((s, r) => s + r.expectedAmount, 0)) },
     };
   },
 };

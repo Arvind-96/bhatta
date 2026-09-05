@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, eq, desc, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../db/client";
-import { ledgerEntries, people, LEDGER_PAYMENT_MODES, LEDGER_CATEGORIES, PERSON_TYPES } from "../db/schema";
+import { ledgerEntries, people, LEDGER_PAYMENT_MODES, LEDGER_CATEGORIES, PERSON_TYPES, salarySlips, bankTransactions } from "../db/schema";
 import { emitToKiln } from "../config/socket";
 
 export type LedgerPaymentMode = (typeof LEDGER_PAYMENT_MODES)[number];
@@ -77,11 +77,37 @@ export async function updateLedgerEntry(kilnId: string, entryId: string, input: 
   return updated;
 }
 
+// Bug fix: this used to delete unconditionally, with two consequences no
+// admin would expect from the generic "Edit entry" screen on a person's
+// ledger. (1) A SALARY entry that generateSalarySlip posted is linked back
+// from salarySlips.salaryLedgerEntryId — deleting it out from under the
+// slip left the slip displaying stale earned/net numbers while the
+// person's actual balance silently lost that DUE amount, and permanently
+// broke any later edit to that slip's deductions (updateSalarySlip →
+// updateLedgerEntry would throw "not found"). Now guarded the same
+// check-then-throw way as every other delete-guard in this app: refuse and
+// point the admin at deleteSalarySlip instead, which reverses this exact
+// entry correctly as part of deleting the slip. (2) A bank-reconciled
+// entry (bankTransactions.matchedLedgerEntryId) stayed marked `reconciled`
+// against a row that no longer existed, permanently inflating
+// bankReconciliationSummary's reconciled total and hiding that statement
+// line from ever needing to be re-matched — now cleared the same way
+// unmatchTransaction already does.
 export async function deleteLedgerEntry(kilnId: string, entryId: string) {
   const existing = (await db.select().from(ledgerEntries).where(and(eq(ledgerEntries._id, entryId), eq(ledgerEntries.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Ledger entry not found in this kiln");
 
+  const linkedSlip = (await db.select({ _id: salarySlips._id }).from(salarySlips).where(eq(salarySlips.salaryLedgerEntryId, entryId)))[0];
+  if (linkedSlip) throw new Error("This entry belongs to a salary slip — delete the salary slip instead, which reverses it correctly.");
+
   await db.delete(ledgerEntries).where(eq(ledgerEntries._id, entryId));
+
+  const matchedTxns = await db.select({ _id: bankTransactions._id }).from(bankTransactions).where(eq(bankTransactions.matchedLedgerEntryId, entryId));
+  if (matchedTxns.length > 0) {
+    await db.update(bankTransactions).set({ matchedLedgerEntryId: null, reconciled: false }).where(eq(bankTransactions.matchedLedgerEntryId, entryId));
+    for (const t of matchedTxns) emitToKiln(kilnId, "bankTransaction:update", (await db.select().from(bankTransactions).where(eq(bankTransactions._id, t._id)))[0]);
+  }
+
   emitToKiln(kilnId, "ledger:update", { _id: entryId, deleted: true });
 }
 

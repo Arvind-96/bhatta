@@ -76,8 +76,12 @@ function FuelTypesSection({ fuelTypes, onChanged }: { fuelTypes: FuelType[]; onC
 
   async function remove(ft: FuelType) {
     if (!confirm(t("fuel.confirmRemoveFuelType", { name: ft.name }))) return;
-    await api.fuelTypes.remove(ft._id);
-    onChanged();
+    try {
+      await api.fuelTypes.remove(ft._id);
+      onChanged();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   return (
@@ -267,6 +271,8 @@ function EditFuelPurchaseModal({
     try {
       await api.fuelPurchases.remove(purchase._id);
       onClose();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setDeleting(false);
     }
@@ -663,6 +669,8 @@ function EditFuelLogModal({
     try {
       await api.fuelLogs.remove(log._id);
       onClose();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setDeleting(false);
     }

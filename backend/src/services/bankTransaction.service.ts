@@ -221,6 +221,21 @@ export async function matchTransaction(kilnId: string, bankTransactionId: string
   return updated;
 }
 
+// Shared by every place that hard-deletes an Expense row directly
+// (deleteExpense, deleteExpenseType's cascade, deleteDoctorVisit's linked-
+// expense cleanup) — a reconciled bank transaction pointing at that
+// expense would otherwise stay `reconciled:true` against a row that no
+// longer exists, permanently inflating bankReconciliationSummary's
+// reconciled total and hiding that statement line from ever needing to be
+// re-matched. Same reset unmatchTransaction already applies, scoped to
+// just this one match column.
+export async function clearBankMatchForExpense(kilnId: string, expenseId: string) {
+  const matched = await db.select({ _id: bankTransactions._id }).from(bankTransactions).where(and(eq(bankTransactions.kilnId, kilnId), eq(bankTransactions.matchedExpenseId, expenseId)));
+  if (matched.length === 0) return;
+  await db.update(bankTransactions).set({ matchedExpenseId: null, reconciled: false }).where(and(eq(bankTransactions.kilnId, kilnId), eq(bankTransactions.matchedExpenseId, expenseId)));
+  for (const t of matched) emitToKiln(kilnId, "bankTransaction:update", (await db.select().from(bankTransactions).where(eq(bankTransactions._id, t._id)))[0]);
+}
+
 export async function unmatchTransaction(kilnId: string, bankTransactionId: string) {
   const existing = (await db.select().from(bankTransactions).where(and(eq(bankTransactions._id, bankTransactionId), eq(bankTransactions.kilnId, kilnId))))[0];
   if (!existing) throw new Error("Bank transaction not found in this kiln");

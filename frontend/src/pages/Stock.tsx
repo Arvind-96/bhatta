@@ -205,8 +205,12 @@ function BrickStockSection() {
   }
 
   async function removeLoadingEntry(id: string) {
-    await api.brickCategories.removeLoading(id);
-    await refresh();
+    try {
+      await api.brickCategories.removeLoading(id);
+      await refresh();
+    } catch (err) {
+      setLoadingError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   return (

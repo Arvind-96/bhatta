@@ -80,6 +80,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
     returnReason: dispatch.returnReason ?? "",
   });
   const [savingAdjustment, setSavingAdjustment] = useState(false);
+  const [docActionError, setDocActionError] = useState("");
 
   async function submitAdjustment(e: FormEvent) {
     e.preventDefault();
@@ -138,18 +139,33 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
 
   async function cancelChallan(c: Challan) {
     if (!confirm(t("dispatchDocs.confirmDeleteChallan", { number: c.sequenceNumber ?? "—" }))) return;
-    await api.challans.remove(c._id);
-    await refreshDocs();
+    setDocActionError("");
+    try {
+      await api.challans.remove(c._id);
+      await refreshDocs();
+    } catch (err) {
+      setDocActionError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
   async function cancelGatePass(g: GatePassRecord) {
     if (!confirm(t("dispatchDocs.confirmDeleteGatePass", { number: g.sequenceNumber ?? "—" }))) return;
-    await api.gatePasses.remove(g._id);
-    await refreshDocs();
+    setDocActionError("");
+    try {
+      await api.gatePasses.remove(g._id);
+      await refreshDocs();
+    } catch (err) {
+      setDocActionError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
   async function cancelInvoice(i: Invoice) {
     if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: formatInvoiceNumber(i, kilnInfo.name) }))) return;
-    await api.invoices.remove(i._id);
-    await refreshDocs();
+    setDocActionError("");
+    try {
+      await api.invoices.remove(i._id);
+      await refreshDocs();
+    } catch (err) {
+      setDocActionError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function printChallan(c: Challan) {
@@ -200,6 +216,7 @@ export function DispatchDetailPage({ dispatch, categories, onBack, onEdit, onDel
             </div>
           )}
         </div>
+        {docActionError && <p className="mt-3 text-sm text-status-critical">{docActionError}</p>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">

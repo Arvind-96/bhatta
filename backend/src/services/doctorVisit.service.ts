@@ -5,6 +5,7 @@ import { doctorVisits, people, expenses, doctors } from "../db/schema";
 import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { assertDoctorInKiln } from "./doctor.service";
 import { autoLogExpense } from "./expense.service";
+import { clearBankMatchForExpense } from "./bankTransaction.service";
 import { emitToKiln } from "../config/socket";
 
 export type DoctorVisitPaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
@@ -158,6 +159,9 @@ export async function deleteDoctorVisit(kilnId: string, visitId: string) {
   const linkedExpense = (await db.select({ _id: expenses._id }).from(expenses).where(eq(expenses.doctorVisitId, visitId)))[0];
   if (linkedExpense) {
     await db.delete(expenses).where(eq(expenses._id, linkedExpense._id));
+    // Bug fix: same bank-reconciliation orphan as deleteExpense's own fix —
+    // this visit's expense could independently have been bank-reconciled.
+    await clearBankMatchForExpense(kilnId, linkedExpense._id);
     emitToKiln(kilnId, "expense:update", { _id: linkedExpense._id, deleted: true });
   }
 

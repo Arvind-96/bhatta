@@ -5,6 +5,7 @@ import { expenses, soilTrips, dispatches, EXPENSE_CATEGORIES } from "../db/schem
 import { SIMPLE_PAYMENT_MODES } from "../db/schema/_helpers";
 import { emitToKiln } from "../config/socket";
 import { findOrCreateExpenseType } from "./expenseType.service";
+import { clearBankMatchForExpense } from "./bankTransaction.service";
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export type ExpensePaymentMode = (typeof SIMPLE_PAYMENT_MODES)[number];
@@ -181,6 +182,10 @@ export async function deleteExpense(kilnId: string, expenseId: string) {
   if (source) throw new Error(`This expense was auto-logged from ${source} — delete it there instead, so its own totals stay in sync.`);
 
   await db.delete(expenses).where(eq(expenses._id, expenseId));
+  // Bug fix: a bank-reconciled expense used to stay "matched" against a
+  // row that no longer exists after this delete — see
+  // clearBankMatchForExpense's own doc comment.
+  await clearBankMatchForExpense(kilnId, expenseId);
   emitToKiln(kilnId, "expense:update", { _id: expenseId, deleted: true });
 }
 

@@ -59,8 +59,12 @@ export function InvoiceDetailPage({ invoice, categories, onBack, onDeleted }: In
 
   async function handleDelete() {
     if (!confirm(t("dispatchDocs.confirmDeleteInvoice", { number: formatInvoiceNumber(invoice, kilnInfo.name) }))) return;
-    await api.invoices.remove(invoice._id);
-    onDeleted();
+    try {
+      await api.invoices.remove(invoice._id);
+      onDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function handlePrint() {

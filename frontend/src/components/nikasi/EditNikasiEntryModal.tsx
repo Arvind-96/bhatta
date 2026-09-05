@@ -52,6 +52,8 @@ export function EditNikasiEntryModal({ entry, onClose, onSaved }: EditNikasiEntr
       await api.nikasi.remove(entry._id);
       onSaved();
       onClose();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setDeleting(false);
     }

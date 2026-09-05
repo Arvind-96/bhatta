@@ -50,8 +50,12 @@ export function GatePassDetailPage({ gatePass, categories, onBack, onDeleted }: 
 
   async function handleDelete() {
     if (!confirm(t("dispatchDocs.confirmDeleteGatePass", { number: gatePass.sequenceNumber ?? "—" }))) return;
-    await api.gatePasses.remove(gatePass._id);
-    onDeleted();
+    try {
+      await api.gatePasses.remove(gatePass._id);
+      onDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function handlePrint() {

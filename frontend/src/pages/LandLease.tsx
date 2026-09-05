@@ -62,8 +62,12 @@ export function LandLease() {
   async function remove(contract: LandLeaseContract, e: MouseEvent) {
     e.stopPropagation();
     if (!confirm(t("soil.confirmDeleteContract", { contractNumber: contract.contractNumber }))) return;
-    await api.landLeaseContracts.remove(contract._id);
-    refresh();
+    try {
+      await api.landLeaseContracts.remove(contract._id);
+      refresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   const landLeaseIdsWithContract = new Set(
