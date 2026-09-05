@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { landLeaseContracts, lands, people, LAND_LEASE_CONTRACT_STATUSES, LAND_LEASE_RATE_TYPES, LAND_LEASE_DEPTH_UNITS } from "../db/schema";
+import { landLeaseContracts, lands, people, ledgerEntries, LAND_LEASE_CONTRACT_STATUSES, LAND_LEASE_RATE_TYPES, LAND_LEASE_DEPTH_UNITS } from "../db/schema";
 import { assertLandInKiln } from "./land.service";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry, contractLedgerBalance, LedgerPaymentMode } from "./ledger.service";
@@ -278,6 +278,9 @@ export async function updateLandLeaseContract(kilnId: string, contractId: string
         reason: `Land lease contract ${existing.contractNumber} correction: revised value to ₹${newTotalValue.toLocaleString("en-IN")}`,
         category: "SOIL",
         contractId,
+        // Bug fix: no cash actually moved — see soilContract.service.ts's
+        // identical fix for the confirmed live impact.
+        isReversal: true,
       });
     }
   }
@@ -341,8 +344,19 @@ export async function deleteLandLeaseContract(kilnId: string, contractId: string
       reason: `Land lease contract ${existing.contractNumber} deleted — reversing contract value`,
       category: "SOIL",
       contractId,
+      // Bug fix: no cash actually moved — see soilContract.service.ts's
+      // identical fix for the confirmed live impact.
+      isReversal: true,
     });
   }
+
+  // Bug fix: every ledger entry ever posted against this contract (at
+  // creation and by the reversals just above) kept its contractId pointing
+  // at a row about to not exist — same orphan class already fixed for
+  // soilTrips/soilArrivals/jcbWorkLogs/sandDeliveries, just missed here.
+  // The balance itself is unaffected (always summed by personId, never by
+  // contractId), this only clears a now-meaningless reference tag.
+  await db.update(ledgerEntries).set({ contractId: null }).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.contractId, contractId)));
 
   await db.delete(landLeaseContracts).where(eq(landLeaseContracts._id, contractId));
   emitToKiln(kilnId, "landLeaseContract:update", { _id: contractId, deleted: true });

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { soilContracts, soilTrips, soilArrivals, jcbWorkLogs, lands, people, SOIL_CONTRACT_STATUSES, SOIL_CONTRACT_RATE_TYPES, DEPTH_UNITS } from "../db/schema";
+import { soilContracts, soilTrips, soilArrivals, jcbWorkLogs, lands, people, ledgerEntries, SOIL_CONTRACT_STATUSES, SOIL_CONTRACT_RATE_TYPES, DEPTH_UNITS } from "../db/schema";
 import { assertLandInKiln } from "./land.service";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry, contractLedgerBalance, LedgerPaymentMode } from "./ledger.service";
@@ -475,6 +475,12 @@ export async function updateSoilContract(kilnId: string, contractId: string, inp
         reason: `Soil contract ${existing.contractNumber} correction: revised value to ₹${newTotalValue.toLocaleString("en-IN")}`,
         category: "SOIL",
         contractId,
+        // Bug fix: a downward correction posts PAID purely to reduce a
+        // liability that turned out to be smaller than first recorded — no
+        // cash actually moved. Without this flag, flowForRange counted it
+        // as real money spent (confirmed live: this exact bug inflated
+        // Financial Overview/Profit & Loss by the corrected amount).
+        isReversal: true,
       });
     }
   }
@@ -543,6 +549,12 @@ export async function deleteSoilContract(kilnId: string, contractId: string) {
       reason: `Soil contract ${existing.contractNumber} deleted — reversing contract value`,
       category: "SOIL",
       contractId,
+      // Bug fix: no real cash moved — this only zeroes out a liability
+      // that will now never be paid since the contract is gone. Without
+      // this flag, flowForRange counted it as real money spent (confirmed
+      // live via a deleted test contract inflating Financial Overview/
+      // Profit & Loss's "money spent" by this exact amount).
+      isReversal: true,
     });
   }
 
@@ -555,10 +567,16 @@ export async function deleteSoilContract(kilnId: string, contractId: string) {
   // to" for one of these would silently resolve to nothing. Clearing the
   // now-dangling reference instead of leaving it dangling makes that
   // explicit ("no contract") rather than broken.
+  // Bug fix: ledgerEntries posted against this contract (at creation and
+  // by the reversals just above) had the same dangling-contractId gap —
+  // found live via an exhaustive orphan scan. Balance is unaffected
+  // (always summed by personId, never contractId), this only clears the
+  // now-meaningless reference tag.
   await Promise.all([
     db.update(soilTrips).set({ contractId: null }).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.contractId, contractId))),
     db.update(soilArrivals).set({ contractId: null }).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.contractId, contractId))),
     db.update(jcbWorkLogs).set({ contractId: null }).where(and(eq(jcbWorkLogs.kilnId, kilnId), eq(jcbWorkLogs.contractId, contractId))),
+    db.update(ledgerEntries).set({ contractId: null }).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.contractId, contractId))),
   ]);
 
   await db.delete(soilContracts).where(eq(soilContracts._id, contractId));

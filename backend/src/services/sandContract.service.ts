@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { sandContracts, sandDeliveries, people, SAND_CONTRACT_RATE_TYPES } from "../db/schema";
+import { sandContracts, sandDeliveries, people, ledgerEntries, SAND_CONTRACT_RATE_TYPES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry, LedgerPaymentMode } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
@@ -166,6 +166,9 @@ export async function updateSandContract(kilnId: string, contractId: string, inp
         reason: `Sand contract ${existing.contractNumber} correction: revised value to ₹${newTotalValue.toLocaleString("en-IN")}`,
         category: "SAND",
         contractId,
+        // Bug fix: no cash actually moved — see soilContract.service.ts's
+        // identical fix for the confirmed live impact.
+        isReversal: true,
       });
     }
   }
@@ -232,6 +235,9 @@ export async function deleteSandContract(kilnId: string, contractId: string) {
       reason: `Sand contract ${existing.contractNumber} deleted — reversing contract value`,
       category: "SAND",
       contractId,
+      // Bug fix: no cash actually moved — see soilContract.service.ts's
+      // identical fix for the confirmed live impact.
+      isReversal: true,
     });
   }
 
@@ -245,6 +251,11 @@ export async function deleteSandContract(kilnId: string, contractId: string) {
   // Clearing the now-dangling reference makes that explicit ("no
   // contract") instead of leaving it dangling.
   await db.update(sandDeliveries).set({ contractId: null }).where(and(eq(sandDeliveries.kilnId, kilnId), eq(sandDeliveries.contractId, contractId)));
+  // Bug fix: ledgerEntries posted against this contract had the same
+  // dangling-contractId gap — found live via an exhaustive orphan scan.
+  // Balance is unaffected (always summed by personId, never contractId),
+  // this only clears the now-meaningless reference tag.
+  await db.update(ledgerEntries).set({ contractId: null }).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.contractId, contractId)));
 
   await db.delete(sandContracts).where(eq(sandContracts._id, contractId));
   emitToKiln(kilnId, "sandContract:update", { _id: contractId, deleted: true });

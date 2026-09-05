@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PieChart, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { PieChart, RefreshCw, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
@@ -96,6 +96,11 @@ export function ProfitLoss() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} /> {t("common.refresh")}
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>{t("profitLoss.dateRangeHeading")}</CardTitle>
