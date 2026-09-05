@@ -58,15 +58,28 @@ export async function seasonFinancialSummary(kilnId: string, seasonId: string, d
     invoiceRows.reduce((sum, inv) => sum + (inv.amountPaidNow ?? inv.netAmount), 0) +
     unInvoicedDispatches.reduce((sum, d) => sum + d.amount, 0);
   const expenseCosts = expenseRows.reduce((sum, e) => sum + e.amount, 0);
-  const fuelCosts = fuelPurchaseRows.reduce((sum, p) => sum + p.amount, 0);
+  // Bug fix: this used to sum p.amount — the full bill FuelPurchase records
+  // against the supplier — not what was actually paid. Same fix as
+  // financialOverview.service.ts's flowForRange: fuelPurchases.amount and
+  // .paidAmount are deliberately separate columns ("due = amount -
+  // paidAmount", the same pattern Supplier Invoices use), so a partially-
+  // or un-paid fuel purchase was inflating "cost" by however much of the
+  // bill hasn't actually been paid yet. The unpaid remainder already shows
+  // up separately as a supplier due.
+  const fuelCosts = fuelPurchaseRows.reduce((sum, p) => sum + (p.paidAmount ?? 0), 0);
   const dieselCosts = dieselRows.reduce((sum, d) => sum + (d.costAmount ?? 0), 0);
-  // A FuelPurchase with a linked supplier also posts its own "FUEL"-category
-  // DUE ledger entry (fuelPurchase.service.ts's createFuelPurchase) — same
-  // double-count risk financialOverview.service.ts's flowForRange already
-  // guards against, and the same fix: exclude category FUEL here since
-  // fuelPurchaseRows above already counts that cost directly.
+  // Bug fix: the comment this exclusion was built on is false —
+  // createFuelPurchase deliberately never posts to ledgerEntries at all
+  // (suppliers live in a dedicated `suppliers` table, not `people`, so
+  // there's no valid ledger link — see its own doc comment). No current
+  // code path creates a FUEL-category ledger entry; the only way one
+  // exists is legacy data or a manual reassignment via
+  // EditLedgerEntryModal.tsx. Excluding it here silently dropped that real
+  // money from totalCosts — same bug already fixed in flowForRange, missed
+  // here since this is a second, independently-coded implementation of the
+  // same idea (see this file's own doc comment on why the two exist).
   const laborCosts = dueEntries
-    .filter((e) => !customerIds.has(e.personId) && e.category !== "FUEL")
+    .filter((e) => !customerIds.has(e.personId))
     .reduce((sum, e) => sum + e.amount, 0);
   const totalCosts = expenseCosts + laborCosts + fuelCosts + dieselCosts;
 

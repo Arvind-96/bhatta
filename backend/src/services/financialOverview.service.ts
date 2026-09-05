@@ -142,7 +142,19 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
   );
 
   const expenseCosts = expenseRows.reduce((sum, e) => sum + e.amount, 0);
-  const fuelCosts = fuelPurchaseRows.reduce((sum, p) => sum + p.amount, 0);
+  // Bug fix: this used to sum p.amount — the full bill FuelPurchase records
+  // against the supplier — not what was actually paid. fuelPurchases.amount
+  // and .paidAmount are deliberately separate columns (see
+  // fuelPurchase.service.ts's createFuelPurchase: "due = amount -
+  // paidAmount, computed live off the row itself", the exact same pattern
+  // Supplier Invoices use), so a partially- or un-paid fuel purchase was
+  // inflating "money spent" by however much of the bill hasn't actually
+  // been paid to the supplier yet — cash that hasn't left the business.
+  // The unpaid remainder already correctly shows up separately as a
+  // supplier due (see person.service.ts's listPaymentsDue /
+  // totalFuelPurchaseSupplierDues) — nothing is lost by excluding it here,
+  // it just now counts in the right place instead of both.
+  const fuelCosts = fuelPurchaseRows.reduce((sum, p) => sum + (p.paidAmount ?? 0), 0);
   const dieselCosts = dieselRows.reduce((sum, d) => sum + (d.costAmount ?? 0), 0);
   // Bug fix: this used to exclude ledger category "FUEL" on the premise
   // that fuel-purchase-supplier settlements were "already counted via
@@ -171,7 +183,7 @@ export async function flowForRange(kilnId: string, seasonId: string | null, sinc
   };
   const outSplits = [
     splitByPaymentMode(expenseRows, (e) => e.amount),
-    splitByPaymentMode(fuelPurchaseRows, (p) => p.amount),
+    splitByPaymentMode(fuelPurchaseRows, (p) => p.paidAmount ?? 0),
     splitByPaymentMode(dieselRows, (d) => d.costAmount ?? 0),
     splitByPaymentMode(otherPaymentEntries, (e) => e.amount),
   ];
