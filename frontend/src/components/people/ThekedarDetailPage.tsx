@@ -205,11 +205,9 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
     }
   }
 
-  // Soft delete — active:false drops them from every people list app-wide
-  // (see person.service.ts's listPeople), but their ledger/production
-  // history is kept intact. Their labour keeps its contractorId link (the
-  // Person document isn't removed), it just won't show "under X" on
-  // lists that resolve the name from the active-only contractor list.
+  // Permanent delete — refused by the backend (deletePerson) if this
+  // contractor has any real history, including labourers still listing
+  // them as their contractor.
   async function deleteProfile() {
     if (!thekedar) return;
     const warning =

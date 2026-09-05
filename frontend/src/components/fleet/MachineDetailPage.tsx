@@ -110,14 +110,17 @@ export function MachineDetailPage({ machineId, onBack }: MachineDetailPageProps)
     }
   }
 
-  // Soft delete — active:false, matching the same convention as staff/
-  // people profiles, so its purchase/installment/expense history stays
-  // intact rather than being orphaned by a hard delete.
+  // Permanent delete — refused by the backend if this machine has any
+  // real history (installment payments, fuel logs, maintenance logs).
   async function deleteMachine() {
     if (!machine) return;
     if (!confirm(t("fleet.confirmDeleteMachine", { name: machine.name }))) return;
-    await api.machines.remove(machineId);
-    onBack();
+    try {
+      await api.machines.remove(machineId);
+      onBack();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   function handlePrint() {

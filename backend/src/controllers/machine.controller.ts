@@ -7,6 +7,7 @@ import {
   createMachineFuelLog,
   createMaintenanceLog,
   deleteInstallmentPayment,
+  deleteMachine,
   deleteMachineFuelLog,
   deleteMaintenanceLog,
   getMachine,
@@ -76,11 +77,8 @@ export async function update(req: AuthedRequest, res: Response) {
   res.json(machine);
 }
 
-// Soft delete — active:false, matching the same convention as people/staff
-// profiles, rather than a hard DELETE that would orphan its fuel/
-// maintenance/installment history.
 export async function remove(req: AuthedRequest, res: Response) {
-  await updateMachine(req.kiln!.id, req.params.id, { active: false });
+  await deleteMachine(req.kiln!.id, req.params.id);
   res.status(204).send();
 }
 

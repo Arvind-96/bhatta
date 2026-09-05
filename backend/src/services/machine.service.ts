@@ -149,6 +149,36 @@ export async function updateMachine(kilnId: string, machineId: string, input: Up
   return updated;
 }
 
+// Permanent delete — replaces the previous silent active:false swap
+// (which hid the machine everywhere while its own confirm dialog claimed
+// it was being deleted). Refused, same check-then-throw pattern as
+// deletePerson/deleteCustomer/deleteSupplier, if any real history exists
+// against it — installment payments, fuel logs, or maintenance logs each
+// have their own linked Expense row, so blocking here also protects those
+// from being orphaned.
+export async function deleteMachine(kilnId: string, machineId: string) {
+  const existing = await assertMachineInKiln(kilnId, machineId);
+
+  const [installmentRows, fuelLogRows, maintenanceRows] = await Promise.all([
+    db.select({ _id: machineInstallmentPayments._id }).from(machineInstallmentPayments).where(and(eq(machineInstallmentPayments.kilnId, kilnId), eq(machineInstallmentPayments.machineId, machineId))),
+    db.select({ _id: machineFuelLogs._id }).from(machineFuelLogs).where(and(eq(machineFuelLogs.kilnId, kilnId), eq(machineFuelLogs.machineId, machineId))),
+    db.select({ _id: machineMaintenanceLogs._id }).from(machineMaintenanceLogs).where(and(eq(machineMaintenanceLogs.kilnId, kilnId), eq(machineMaintenanceLogs.machineId, machineId))),
+  ]);
+
+  const blockers: string[] = [];
+  if (installmentRows.length) blockers.push(`${installmentRows.length} installment payment(s)`);
+  if (fuelLogRows.length) blockers.push(`${fuelLogRows.length} fuel log(s)`);
+  if (maintenanceRows.length) blockers.push(`${maintenanceRows.length} maintenance log(s)`);
+
+  if (blockers.length > 0) {
+    throw new Error(`Cannot delete ${existing.name} — it has real history: ${blockers.join(", ")}. Deleting it would erase that history, so this is refused.`);
+  }
+
+  await db.delete(machines).where(and(eq(machines._id, machineId), eq(machines.kilnId, kilnId)));
+  emitToKiln(kilnId, "machine:update", { _id: machineId, deleted: true });
+  return existing;
+}
+
 export interface CreateInstallmentPaymentInput {
   kilnId: string;
   seasonId: string;
