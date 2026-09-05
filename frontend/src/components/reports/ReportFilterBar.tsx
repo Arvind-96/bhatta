@@ -5,7 +5,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { usePersonTypeMeta, useWorkTypeLabels, PERSON_TYPES } from "@/components/people/personTypes";
 import { cn } from "@/lib/utils";
 import type { ReportDefinitionMeta, ReportGroupBy, ReportRunParams } from "@/types/reports";
-import type { Customer, ExpenseType, KilnVehicle, Person, Supplier, SalesAgentSummary, BrickCategory } from "@/types";
+import type { Customer, ExpenseType, KilnVehicle, Person, Supplier, SalesAgentSummary, BrickCategory, Doctor } from "@/types";
 
 const selectClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
@@ -60,13 +60,14 @@ interface ReportFilterBarProps {
   suppliers?: Supplier[];
   salesAgents?: SalesAgentSummary[];
   brickCategories?: BrickCategory[];
+  doctors?: Doctor[];
 }
 
 // Renders exactly the filter widgets a report needs: date range + preset
 // chips + groupBy are available to every report; the rest are a small
 // closed set of shared widgets (person/personType/customer/vehicle/driver/
 // expenseCategory) switched on by definition.filters.
-export function ReportFilterBar({ definition, params, onChange, onGenerate, loading, people, customers, vehicles, expenseTypes, suppliers = [], salesAgents = [], brickCategories = [] }: ReportFilterBarProps) {
+export function ReportFilterBar({ definition, params, onChange, onGenerate, loading, people, customers, vehicles, expenseTypes, suppliers = [], salesAgents = [], brickCategories = [], doctors = [] }: ReportFilterBarProps) {
   const { t } = useTranslation();
   const personTypeMeta = usePersonTypeMeta();
   const workTypeLabels = useWorkTypeLabels();
@@ -301,6 +302,18 @@ export function ReportFilterBar({ definition, params, onChange, onGenerate, load
               value={params.supplierId ?? ""}
               onChange={(v) => onChange({ ...params, supplierId: v || undefined })}
               options={suppliers.map((s) => ({ value: s._id, label: s.name }))}
+              placeholder={t("reports.filter.all")}
+            />
+          </label>
+        )}
+
+        {definition.filters.includes("doctor") && (
+          <label className="flex min-w-[200px] flex-col gap-1">
+            <span className="text-xs text-ink-muted">{t("reports.filter.doctor")}</span>
+            <SearchableSelect
+              value={params.doctorId ?? ""}
+              onChange={(v) => onChange({ ...params, doctorId: v || undefined })}
+              options={doctors.map((d) => ({ value: d._id, label: d.name }))}
               placeholder={t("reports.filter.all")}
             />
           </label>

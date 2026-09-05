@@ -35,6 +35,7 @@ export const REPORT_DEFINITIONS: ReportDefinitionMeta[] = [
   // Resources
   { key: "vehicles", group: "resources", labelKey: "reports.title.vehicles", filters: ["vehicle"] },
   { key: "diesel", group: "resources", labelKey: "reports.title.diesel", filters: ["vehicle", "driver"] },
+  { key: "fuel", group: "resources", labelKey: "reports.title.fuel", filters: ["supplier"] },
   { key: "stock", group: "resources", labelKey: "reports.title.stock", filters: [] },
   { key: "inventory", group: "resources", labelKey: "reports.title.inventory", filters: [] },
   { key: "vehicleWork", group: "resources", labelKey: "reports.title.vehicleWork", filters: [] },
@@ -44,6 +45,7 @@ export const REPORT_DEFINITIONS: ReportDefinitionMeta[] = [
   { key: "labourLedger", group: "admin", labelKey: "reports.title.labourLedger", filters: ["personType", "workType", "status", "person", "contractor", "ledgerCategory"] },
   { key: "labourByContractor", group: "admin", labelKey: "reports.title.labourByContractor", filters: ["workType", "status", "contractor"] },
   { key: "salary", group: "admin", labelKey: "reports.title.salary", filters: ["person"] },
+  { key: "doctorVisits", group: "admin", labelKey: "reports.title.doctorVisits", filters: ["doctor", "person"] },
   { key: "labourWorkReport", group: "admin", labelKey: "reports.title.labourWorkReport", filters: ["person", "personType"] },
   { key: "debtorsAndCreditors", group: "admin", labelKey: "reports.title.debtorsAndCreditors", filters: [] },
   { key: "trialBalance", group: "admin", labelKey: "reports.title.trialBalance", filters: [] },

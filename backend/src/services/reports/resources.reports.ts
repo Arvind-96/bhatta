@@ -1,4 +1,5 @@
 import { listDieselEntries, vehicleDieselSummary } from "../kilnVehicle.service";
+import { listAllFuelPurchases } from "../fuelPurchase.service";
 import { listStockEntries } from "../stock.service";
 import { listBrickCategories } from "../brickCategory.service";
 import { listInventoryItemsForPeriod } from "../inventory.service";
@@ -83,6 +84,82 @@ const diesel: ReportDefinition = {
       ],
       rows: detail,
       totals: { quantityLiters: round2(detail.reduce((s, r) => s + r.quantityLiters, 0)) },
+    };
+  },
+};
+
+// Same bill/paid/due breakdown as the Purchase Register report — a fuel
+// purchase is billed the same way a Supplier Invoice is (fuelPurchases.
+// amount/paidAmount, "due = amount - paidAmount, computed live off the
+// row itself" — see fuelPurchase.service.ts's own note on why this is a
+// separate table from supplierInvoices, not merged into it).
+const fuel: ReportDefinition = {
+  key: "fuel",
+  titleKey: "reports.title.fuel",
+  async run(kilnId, filters) {
+    const all = await listAllFuelPurchases(kilnId);
+    const rows = all.filter((r) => {
+      const supplierId = r.supplierId && typeof r.supplierId === "object" ? r.supplierId._id : r.supplierId;
+      if (filters.supplierId && supplierId !== filters.supplierId) return false;
+      if (filters.from && (!r.date || r.date < filters.from)) return false;
+      if (filters.to && (!r.date || r.date > filters.to)) return false;
+      return true;
+    });
+    const detail = rows.map((r) => ({
+      date: r.date ? r.date.toISOString() : null,
+      fuelType: r.fuelType,
+      supplier: refName(r.supplierId),
+      invoicedWeightKg: r.invoicedWeightKg,
+      actualWeightKg: r.actualWeightKg,
+      billAmount: r.amount,
+      amountPaid: r.paidAmount ?? 0,
+      due: Math.max(0, round2(r.amount - (r.paidAmount ?? 0))),
+    }));
+
+    if (filters.groupBy && filters.groupBy !== "none") {
+      const grouped = groupRowsByPeriod(detail, "date", ["invoicedWeightKg", "actualWeightKg", "billAmount", "amountPaid", "due"], filters.groupBy);
+      return {
+        reportKey: "fuel",
+        titleKey: "reports.title.fuel",
+        columns: [
+          { key: "period", labelKey: "reports.col.period", format: "text" },
+          { key: "count", labelKey: "reports.col.entries", format: "number" },
+          { key: "actualWeightKg", labelKey: "reports.col.actualWeightKg", format: "number" },
+          { key: "billAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
+          { key: "amountPaid", labelKey: "reports.col.amountPaid", format: "currency" },
+          { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+        ],
+        rows: grouped,
+        totals: {
+          actualWeightKg: round2(grouped.reduce((s, r) => s + (r.actualWeightKg as number), 0)),
+          billAmount: round2(grouped.reduce((s, r) => s + (r.billAmount as number), 0)),
+          amountPaid: round2(grouped.reduce((s, r) => s + (r.amountPaid as number), 0)),
+          due: round2(grouped.reduce((s, r) => s + (r.due as number), 0)),
+        },
+      };
+    }
+
+    return {
+      reportKey: "fuel",
+      titleKey: "reports.title.fuel",
+      columns: [
+        { key: "date", labelKey: "reports.col.date", format: "date" },
+        { key: "fuelType", labelKey: "reports.col.fuelType", format: "text" },
+        { key: "supplier", labelKey: "reports.col.supplier", format: "text" },
+        { key: "invoicedWeightKg", labelKey: "reports.col.invoicedWeightKg", format: "number" },
+        { key: "actualWeightKg", labelKey: "reports.col.actualWeightKg", format: "number" },
+        { key: "billAmount", labelKey: "reports.col.totalBillAmount", format: "currency" },
+        { key: "amountPaid", labelKey: "reports.col.amountPaid", format: "currency" },
+        { key: "due", labelKey: "reports.col.dueAmount", format: "currency" },
+      ],
+      rows: detail,
+      totals: {
+        invoicedWeightKg: round2(detail.reduce((s, r) => s + r.invoicedWeightKg, 0)),
+        actualWeightKg: round2(detail.reduce((s, r) => s + r.actualWeightKg, 0)),
+        billAmount: round2(detail.reduce((s, r) => s + r.billAmount, 0)),
+        amountPaid: round2(detail.reduce((s, r) => s + r.amountPaid, 0)),
+        due: round2(detail.reduce((s, r) => s + r.due, 0)),
+      },
     };
   },
 };
@@ -232,4 +309,4 @@ const vehicleWork: ReportDefinition = {
   },
 };
 
-export const resourcesReports: ReportDefinition[] = [vehicles, diesel, stock, inventory, vehicleWork];
+export const resourcesReports: ReportDefinition[] = [vehicles, diesel, fuel, stock, inventory, vehicleWork];

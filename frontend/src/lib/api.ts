@@ -238,6 +238,7 @@ function reportFilterQueryString(params: ReportRunParams): string {
   if (params.personType) q.set("personType", params.personType);
   if (params.customerId) q.set("customerId", params.customerId);
   if (params.supplierId) q.set("supplierId", params.supplierId);
+  if (params.doctorId) q.set("doctorId", params.doctorId);
   if (params.agentId) q.set("agentId", params.agentId);
   if (params.vehicleId) q.set("vehicleId", params.vehicleId);
   if (params.driverId) q.set("driverId", params.driverId);

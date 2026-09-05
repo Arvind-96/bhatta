@@ -39,6 +39,7 @@ function filtersFromQuery(query: AuthedRequest["query"]): ReportFilters {
     personType: str(query.personType),
     customerId: str(query.customerId),
     supplierId: str(query.supplierId),
+    doctorId: str(query.doctorId),
     agentId: str(query.agentId),
     vehicleId: str(query.vehicleId),
     driverId: str(query.driverId),

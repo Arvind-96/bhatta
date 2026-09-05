@@ -2,6 +2,7 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "../../db/client";
 import { listLedgerForKiln } from "../ledger.service";
 import { listSalarySlipsForKiln } from "../salary.service";
+import { listDoctorVisits } from "../doctorVisit.service";
 import { listPeople, resolveContractorGang, findPeopleIds, PersonType, WorkType } from "../person.service";
 import { LEDGER_CATEGORIES, moldingEntries, stackingEntries, nikasiEntries, people } from "../../db/schema";
 import { groupRowsByPeriod } from "../../utils/reportPeriod";
@@ -272,6 +273,73 @@ const salary: ReportDefinition = {
   },
 };
 
+// listDoctorVisits has no built-in date range, so it's applied here —
+// same post-fetch filtering convention purchase.reports.ts's
+// filteredInvoices uses for the same reason (its own list function
+// predates having a report to filter for).
+const doctorVisits: ReportDefinition = {
+  key: "doctorVisits",
+  titleKey: "reports.title.doctorVisits",
+  async run(kilnId, filters) {
+    const all = await listDoctorVisits(kilnId, { doctorId: filters.doctorId, personId: filters.personId });
+    const rows = all.filter((r) => {
+      if (filters.from && (!r.date || r.date < filters.from)) return false;
+      if (filters.to && (!r.date || r.date > filters.to)) return false;
+      return true;
+    });
+    const detail = rows.map((r) => ({
+      date: r.date ? r.date.toISOString() : null,
+      doctor: refName(r.doctorId),
+      person: refName(r.personId),
+      ailment: r.ailment ?? "",
+      medicineCost: r.medicineCost ?? 0,
+      consultationFee: r.consultationFee ?? 0,
+      totalCost: round2((r.medicineCost ?? 0) + (r.consultationFee ?? 0)),
+    }));
+
+    if (filters.groupBy && filters.groupBy !== "none") {
+      const grouped = groupRowsByPeriod(detail, "date", ["medicineCost", "consultationFee", "totalCost"], filters.groupBy);
+      return {
+        reportKey: "doctorVisits",
+        titleKey: "reports.title.doctorVisits",
+        columns: [
+          { key: "period", labelKey: "reports.col.period", format: "text" },
+          { key: "count", labelKey: "reports.col.entries", format: "number" },
+          { key: "medicineCost", labelKey: "reports.col.medicineCost", format: "currency" },
+          { key: "consultationFee", labelKey: "reports.col.consultationFee", format: "currency" },
+          { key: "totalCost", labelKey: "reports.col.totalCost", format: "currency" },
+        ],
+        rows: grouped,
+        totals: {
+          medicineCost: round2(grouped.reduce((s, r) => s + (r.medicineCost as number), 0)),
+          consultationFee: round2(grouped.reduce((s, r) => s + (r.consultationFee as number), 0)),
+          totalCost: round2(grouped.reduce((s, r) => s + (r.totalCost as number), 0)),
+        },
+      };
+    }
+
+    return {
+      reportKey: "doctorVisits",
+      titleKey: "reports.title.doctorVisits",
+      columns: [
+        { key: "date", labelKey: "reports.col.date", format: "date" },
+        { key: "doctor", labelKey: "reports.col.doctor", format: "text" },
+        { key: "person", labelKey: "reports.col.person", format: "text" },
+        { key: "ailment", labelKey: "reports.col.ailment", format: "text" },
+        { key: "medicineCost", labelKey: "reports.col.medicineCost", format: "currency" },
+        { key: "consultationFee", labelKey: "reports.col.consultationFee", format: "currency" },
+        { key: "totalCost", labelKey: "reports.col.totalCost", format: "currency" },
+      ],
+      rows: detail,
+      totals: {
+        medicineCost: round2(detail.reduce((s, r) => s + r.medicineCost, 0)),
+        consultationFee: round2(detail.reduce((s, r) => s + r.consultationFee, 0)),
+        totalCost: round2(detail.reduce((s, r) => s + r.totalCost, 0)),
+      },
+    };
+  },
+};
+
 function dateKey(d: Date | null) {
   return d ? d.toISOString().slice(0, 10) : "unknown";
 }
@@ -440,4 +508,4 @@ const labourWorkReport: ReportDefinition = {
   },
 };
 
-export const peopleReports: ReportDefinition[] = [labourLedger, labourByContractor, salary, labourWorkReport];
+export const peopleReports: ReportDefinition[] = [labourLedger, labourByContractor, salary, labourWorkReport, doctorVisits];

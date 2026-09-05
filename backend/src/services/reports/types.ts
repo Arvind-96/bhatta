@@ -51,6 +51,7 @@ export interface ReportFilters {
   personType?: string;
   customerId?: string;
   supplierId?: string;
+  doctorId?: string;
   agentId?: string;
   vehicleId?: string;
   driverId?: string;

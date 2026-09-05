@@ -102,6 +102,18 @@ export async function listFuelPurchases(kilnId: string, seasonId: string, days =
   return rows.map((r) => ({ ...r, supplierId: r.supplierId ? supplierById.get(r.supplierId) ?? r.supplierId : r.supplierId }));
 }
 
+// Kiln-wide, every season, unfiltered by date — feeds the Reports page's
+// Fuel Purchases report, which needs its own admin-picked date range/
+// supplier filter rather than the Fuel page's own fixed "last N days of
+// this season" window (listFuelPurchases above).
+export async function listAllFuelPurchases(kilnId: string) {
+  const rows = await db.select().from(fuelPurchases).where(eq(fuelPurchases.kilnId, kilnId)).orderBy(desc(fuelPurchases.date));
+  const supplierIds = [...new Set(rows.map((r) => r.supplierId).filter((v): v is string => !!v))];
+  const supplierRows = supplierIds.length ? await db.select({ _id: suppliers._id, name: suppliers.name }).from(suppliers).where(inArray(suppliers._id, supplierIds)) : [];
+  const supplierById = new Map(supplierRows.map((s) => [s._id, s]));
+  return rows.map((r) => ({ ...r, supplierId: r.supplierId ? supplierById.get(r.supplierId) ?? r.supplierId : r.supplierId }));
+}
+
 // Physical stock on hand per fuel type = everything actually weighed in,
 // minus everything fed into a chamber so far — cumulative through the
 // selected season (like reconciliation.service.ts's stock figures), so
