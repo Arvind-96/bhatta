@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Bell, Check, ChevronDown, ChevronsUpDown, Hammer, History, LogOut, Menu, Plus, Search, Settings as SettingsIcon } from "lucide-react";
+import { Bell, Check, ChevronDown, ChevronsUpDown, History, LogOut, Menu, Search, Settings as SettingsIcon } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboard.store";
 import { useAuthStore } from "@/store/auth.store";
 import { useUiStore } from "@/store/ui.store";
@@ -130,15 +130,6 @@ export function Topbar() {
       </div>
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <button
-          onClick={() => setView("molding")}
-          className="gradient-brand hidden items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold text-white shadow-glow-1 transition-all hover:-translate-y-0.5 hover:shadow-glow-1-lg active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface sm:flex"
-        >
-          <Plus className="h-4 w-4" />
-          <Hammer className="h-4 w-4" />
-          <span className="hidden lg:inline">{t("topbar.logProduction")}</span>
-        </button>
-
         <LanguageSwitcher />
         <Badge variant={badge.variant}>
           <span className={`h-1.5 w-1.5 rounded-full ${badge.dot} ${status === "online" ? "animate-pulse-ring" : ""}`} />

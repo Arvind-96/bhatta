@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { Plus, Hammer, Receipt, Truck, X } from "lucide-react";
+import { useEffect } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Overview } from "@/pages/Overview";
@@ -41,8 +40,6 @@ import { useLiveProduction } from "@/hooks/useLiveProduction";
 import { useUiStore } from "@/store/ui.store";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
-import { useTranslation } from "@/hooks/useTranslation";
-import { cn } from "@/lib/utils";
 import { SetupWizard } from "@/components/onboarding/SetupWizard";
 
 const VIEWS = {
@@ -81,61 +78,6 @@ const VIEWS = {
   reports: Reports,
   settings: Settings,
 };
-
-const QUICK_ACTIONS = [
-  { key: "topbar.logProduction", icon: Hammer, view: "molding" as const, tone: "text-series-1" },
-  { key: "topbar.newReceipt", icon: Receipt, view: "invoices" as const, tone: "text-series-3" },
-  { key: "topbar.newSoilTrip", icon: Truck, view: "soil" as const, tone: "text-series-5" },
-];
-
-function QuickActionButton() {
-  const [open, setOpen] = useState(false);
-  const setView = useUiStore((s) => s.setView);
-  const { t } = useTranslation();
-
-  return (
-    <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
-      {open && (
-        <>
-          <div className="fixed inset-0 -z-10" onClick={() => setOpen(false)} />
-          <div className="glass-panel flex w-64 flex-col gap-1 rounded-2xl p-2 shadow-glass">
-            <p className="px-2.5 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-ink-muted">
-              {t("topbar.quickActions")}
-            </p>
-            {QUICK_ACTIONS.map((action) => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.key}
-                  onClick={() => {
-                    setView(action.view);
-                    setOpen(false);
-                  }}
-                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-medium text-ink-secondary hover:bg-ink-primary/5 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                >
-                  <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-ink-primary/5", action.tone)}>
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  {t(action.key)}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-label={t("topbar.quickActions")}
-        className={cn(
-          "gradient-brand flex h-14 w-14 items-center justify-center rounded-full text-white shadow-glow-1-lg transition-transform hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-series-1 focus-visible:ring-offset-2 focus-visible:ring-offset-plane",
-          open && "rotate-45"
-        )}
-      >
-        {open ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
-      </button>
-    </div>
-  );
-}
 
 export function Dashboard() {
   useSocket();
@@ -181,7 +123,6 @@ export function Dashboard() {
           <ActiveView key={activeSeasonId} />
         </main>
       </div>
-      <QuickActionButton />
     </div>
   );
 }

@@ -88,10 +88,6 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "topbar.notifications": { en: "Notifications", hi: "सूचनाएं" },
   "topbar.noNotificationsYet": { en: "No notifications yet.", hi: "अभी तक कोई सूचना नहीं।" },
   "topbar.switchKiln": { en: "Switch kiln", hi: "भट्टा बदलें" },
-  "topbar.quickActions": { en: "Quick actions", hi: "त्वरित कार्रवाई" },
-  "topbar.logProduction": { en: "Log production", hi: "उत्पादन दर्ज करें" },
-  "topbar.newReceipt": { en: "New payment receipt", hi: "नई भुगतान रसीद" },
-  "topbar.newSoilTrip": { en: "Log soil trip", hi: "मिट्टी की ट्रिप दर्ज करें" },
   "topbar.viewingArchivedSeason": {
     en: "Viewing archived season \"{season}\" — read-only",
     hi: "संग्रहीत सीज़न \"{season}\" देख रहे हैं — केवल पढ़ने योग्य",

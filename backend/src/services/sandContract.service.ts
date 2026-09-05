@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { sandContracts, people, SAND_CONTRACT_RATE_TYPES } from "../db/schema";
+import { sandContracts, sandDeliveries, people, SAND_CONTRACT_RATE_TYPES } from "../db/schema";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry, LedgerPaymentMode } from "./ledger.service";
 import { emitToKiln } from "../config/socket";
@@ -234,6 +234,17 @@ export async function deleteSandContract(kilnId: string, contractId: string) {
       contractId,
     });
   }
+
+  // Bug fix: Sand Deliveries already logged against this contract were
+  // never touched by a delete — real, historical events that correctly
+  // aren't deleted themselves, but their own contractId kept pointing at a
+  // row that no longer exists. The money was never at risk (each
+  // delivery's own amount/ledger entries stand independently of the
+  // contract row), but anywhere the app tries to show "which contract this
+  // belongs to" for one of these would silently resolve to nothing.
+  // Clearing the now-dangling reference makes that explicit ("no
+  // contract") instead of leaving it dangling.
+  await db.update(sandDeliveries).set({ contractId: null }).where(and(eq(sandDeliveries.kilnId, kilnId), eq(sandDeliveries.contractId, contractId)));
 
   await db.delete(sandContracts).where(eq(sandContracts._id, contractId));
   emitToKiln(kilnId, "sandContract:update", { _id: contractId, deleted: true });

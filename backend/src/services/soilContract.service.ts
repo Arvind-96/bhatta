@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { soilContracts, soilTrips, soilArrivals, lands, people, SOIL_CONTRACT_STATUSES, SOIL_CONTRACT_RATE_TYPES, DEPTH_UNITS } from "../db/schema";
+import { soilContracts, soilTrips, soilArrivals, jcbWorkLogs, lands, people, SOIL_CONTRACT_STATUSES, SOIL_CONTRACT_RATE_TYPES, DEPTH_UNITS } from "../db/schema";
 import { assertLandInKiln } from "./land.service";
 import { assertPersonOfType } from "./person.service";
 import { addLedgerEntry, contractLedgerBalance, LedgerPaymentMode } from "./ledger.service";
@@ -545,6 +545,21 @@ export async function deleteSoilContract(kilnId: string, contractId: string) {
       contractId,
     });
   }
+
+  // Bug fix: Soil Trips/Arrivals/JCB Work Logs already logged against this
+  // contract were never touched by a delete — real, historical events that
+  // correctly aren't deleted themselves, but their own contractId kept
+  // pointing at a row that no longer exists. The money was never at risk
+  // (their own amount/ledger entries stand independently of the contract
+  // row), but anywhere the app tries to show "which contract this belongs
+  // to" for one of these would silently resolve to nothing. Clearing the
+  // now-dangling reference instead of leaving it dangling makes that
+  // explicit ("no contract") rather than broken.
+  await Promise.all([
+    db.update(soilTrips).set({ contractId: null }).where(and(eq(soilTrips.kilnId, kilnId), eq(soilTrips.contractId, contractId))),
+    db.update(soilArrivals).set({ contractId: null }).where(and(eq(soilArrivals.kilnId, kilnId), eq(soilArrivals.contractId, contractId))),
+    db.update(jcbWorkLogs).set({ contractId: null }).where(and(eq(jcbWorkLogs.kilnId, kilnId), eq(jcbWorkLogs.contractId, contractId))),
+  ]);
 
   await db.delete(soilContracts).where(eq(soilContracts._id, contractId));
   emitToKiln(kilnId, "soilContract:update", { _id: contractId, deleted: true });
