@@ -181,13 +181,15 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
     }
   }
 
-  // Soft delete — same pattern as LandownerDetailPage/LabourDetailPage.
+  // Permanent delete — refused by the backend if this contractor has any
+  // real history (contracts, deliveries, ledger entries). Use the
+  // Absconded toggle instead to just take them off the active list.
   async function deleteProfile() {
     if (!contractor) return;
     if (!confirm(t("people.confirmDeleteSandContractorProfile", { name: contractor.name }))) return;
     setProfileError("");
     try {
-      await api.people.update(sandContractorId, { active: false });
+      await api.people.remove(sandContractorId);
       onBack();
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));

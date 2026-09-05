@@ -5,6 +5,7 @@ import {
   contractorNetBalance,
   createPerson,
   customerCreditAging,
+  deletePerson,
   getPersonFilePath,
   getPersonWithBalance,
   listOutstandingAdvances,
@@ -153,6 +154,11 @@ export async function update(req: AuthedRequest, res: Response) {
     partnershipDate: input.partnershipDate ? new Date(input.partnershipDate) : undefined,
   });
   res.json(person);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deletePerson(req.kiln!.id, req.params.id);
+  res.status(204).send();
 }
 
 export async function uploadPhoto(req: AuthedRequest & { file?: Express.Multer.File }, res: Response) {

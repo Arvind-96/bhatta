@@ -70,6 +70,7 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
   const [nickname, setNickname] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [profileError, setProfileError] = useState("");
   const [saving, setSaving] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -174,13 +175,20 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
     }
   }
 
-  // Soft delete — active:false drops them from the Staff page (and every
-  // other people list), but their ledger history stays intact.
+  // Permanent delete — refused by the backend if this staff member has
+  // any real history (ledger entries, attendance, salary slips, diesel
+  // entries, etc). Use the Absconded toggle instead to just take them off
+  // the active list.
   async function deleteProfile() {
     if (!staff) return;
     if (!confirm(t("staff.confirmDeleteProfile", { name: staff.name }))) return;
-    await api.people.update(staffId, { active: false });
-    onBack();
+    setProfileError("");
+    try {
+      await api.people.remove(staffId);
+      onBack();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   function printEntry(entry: LedgerEntry) {
@@ -272,6 +280,7 @@ export function StaffDetailPage({ staffId, onBack }: StaffDetailPageProps) {
             </button>
           </div>
         </div>
+        {profileError && <p className="mt-3 text-sm text-status-critical">{profileError}</p>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -13,6 +13,7 @@ import {
   listLedger,
   merge,
   paymentsDue,
+  remove,
   report,
   update,
   uploadIdentityProof as uploadIdentityProofHandler,
@@ -33,6 +34,7 @@ personRouter.get("/payments-due", asyncHandler(paymentsDue));
 personRouter.get("/credit-aging", asyncHandler(creditAging));
 personRouter.get("/:id", asyncHandler(getOne));
 personRouter.patch("/:id", asyncHandler(update));
+personRouter.delete("/:id", asyncHandler(remove));
 personRouter.post("/:id/ledger", asyncHandler(addLedger));
 personRouter.get("/:id/ledger", asyncHandler(listLedger));
 personRouter.get("/:id/contractor-balance", asyncHandler(contractorBalance));

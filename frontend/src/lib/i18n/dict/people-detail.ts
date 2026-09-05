@@ -47,12 +47,12 @@ export const peopleDetailDict: Record<string, Record<Locale, string>> = {
     hi: "क्या {name} को परिवार से हटाना है? अगर उनकी अपनी मज़दूर प्रोफ़ाइल है तो वह नहीं हटेगी।",
   },
   "people.confirmDeleteLabourProfile": {
-    en: "Delete {name}'s profile? Their past work/ledger records are kept, but they'll no longer appear in any list.",
-    hi: "{name} की प्रोफ़ाइल हटाएं? उनके पुराने काम और खाता-बही रिकॉर्ड सुरक्षित रहेंगे, लेकिन वे अब किसी सूची में नहीं दिखेंगे।",
+    en: "Permanently delete {name}'s profile? This cannot be undone. If they have any real work or ledger history, this will be refused — use \"Mark Absconded\" instead to just take them off the active list.",
+    hi: "{name} की प्रोफ़ाइल स्थायी रूप से हटाएं? इसे वापस नहीं लिया जा सकता। अगर उनका कोई वास्तविक काम या खाता-बही इतिहास है, तो यह अस्वीकार हो जाएगा — केवल सक्रिय सूची से हटाने के लिए \"अनुपस्थित चिह्नित करें\" का उपयोग करें।",
   },
   "people.confirmDeleteLandownerProfile": {
-    en: "Delete {name}'s profile? Their contracts, land, and payment records are kept, but they'll no longer appear in any list.",
-    hi: "{name} की प्रोफ़ाइल हटाएं? उनके अनुबंध, खेत और भुगतान रिकॉर्ड सुरक्षित रहेंगे, लेकिन वे अब किसी सूची में नहीं दिखेंगे।",
+    en: "Permanently delete {name}'s profile? This cannot be undone. If they have any real contracts, land, or payment history, this will be refused to protect that history.",
+    hi: "{name} की प्रोफ़ाइल स्थायी रूप से हटाएं? इसे वापस नहीं लिया जा सकता। अगर उनके कोई वास्तविक अनुबंध, खेत या भुगतान इतिहास है, तो उसे सुरक्षित रखने के लिए यह अस्वीकार हो जाएगा।",
   },
   "people.labourType": { en: "Labour ({type})", hi: "मज़दूर ({type})" },
   "people.underThekedar": { en: " · under ", hi: " · ठेकेदार: " },
@@ -126,8 +126,8 @@ export const peopleDetailDict: Record<string, Record<Locale, string>> = {
     hi: " {count} मज़दूर अभी भी उनसे जुड़े हैं।",
   },
   "people.confirmDeleteThekedarProfile": {
-    en: "Delete {name}'s profile?{warning} Their past records are kept, but they'll no longer appear in any list.",
-    hi: "{name} की प्रोफ़ाइल हटाएं?{warning} उनके पुराने रिकॉर्ड सुरक्षित रहेंगे, लेकिन वे अब किसी सूची में नहीं दिखेंगे।",
+    en: "Permanently delete {name}'s profile?{warning} This cannot be undone. If they have any real history, this will be refused — use \"Mark Absconded\" instead to just take them off the active list.",
+    hi: "{name} की प्रोफ़ाइल स्थायी रूप से हटाएं?{warning} इसे वापस नहीं लिया जा सकता। अगर उनका कोई वास्तविक इतिहास है, तो यह अस्वीकार हो जाएगा — केवल सक्रिय सूची से हटाने के लिए \"अनुपस्थित चिह्नित करें\" का उपयोग करें।",
   },
   "people.thekedarWorkTypeNotSet": {
     en: "Kis kaam ka thekedar (work type) — not set",

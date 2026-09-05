@@ -670,6 +670,7 @@ export const api = {
     create: (input: Partial<Person> & { type: PersonType; name: string }) =>
       post<Person>("/people", input, true),
     update: (id: string, input: Partial<Person>) => patch<Person>(`/people/${id}`, input, true),
+    remove: (id: string) => del<void>(`/people/${id}`, true),
     get: (id: string) => get<{ person: Person; balance: number }>(`/people/${id}`, true),
     addLedger: (
       id: string,

@@ -325,17 +325,17 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
     }
   }
 
-  // Soft delete — active:false immediately drops them from every people
-  // list app-wide (see person.service.ts's listPeople), but their existing
-  // work entries and ledger history stay intact and still show their name
-  // wherever those records are already referenced, so past wages/production
-  // are never lost or orphaned.
+  // Permanent delete — refused by the backend (deletePerson) if this
+  // person has any real history (ledger entries, work entries, contracts,
+  // etc.), so this can never silently erase real wages/production. Use
+  // the Absconded toggle instead to just take someone off the active list
+  // without losing their history.
   async function deleteProfile() {
     if (!labour) return;
     if (!confirm(t("people.confirmDeleteLabourProfile", { name: labour.name }))) return;
     setProfileError("");
     try {
-      await api.people.update(labourId, { active: false });
+      await api.people.remove(labourId);
       onBack();
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));

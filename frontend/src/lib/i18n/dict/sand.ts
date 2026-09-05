@@ -10,8 +10,8 @@ export const sandDict: Record<string, Record<Locale, string>> = {
   "people.noSandContractorsYet": { en: "No sand contractors added yet.", hi: "अभी तक कोई रेत ठेकेदार नहीं जोड़ा गया।" },
   "people.addSandContractorModalTitle": { en: "Add Sand Contractor", hi: "रेत ठेकेदार जोड़ें" },
   "people.confirmDeleteSandContractorProfile": {
-    en: "Delete {name}'s profile? Their contracts and payment records are kept, but they'll no longer appear in any list.",
-    hi: "{name} की प्रोफ़ाइल हटाएं? उनके अनुबंध और भुगतान रिकॉर्ड सुरक्षित रहेंगे, लेकिन वे अब किसी सूची में नहीं दिखेंगे।",
+    en: "Permanently delete {name}'s profile? This cannot be undone. If they have any real contracts or payment history, this will be refused to protect that history.",
+    hi: "{name} की प्रोफ़ाइल स्थायी रूप से हटाएं? इसे वापस नहीं लिया जा सकता। अगर उनके कोई वास्तविक अनुबंध या भुगतान इतिहास है, तो उसे सुरक्षित रखने के लिए यह अस्वीकार हो जाएगा।",
   },
 
   "sand.perTrolley": { en: "Per Trolley", hi: "प्रति ट्रॉली" },

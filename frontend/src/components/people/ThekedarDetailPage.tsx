@@ -222,7 +222,7 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
     if (!confirm(t("people.confirmDeleteThekedarProfile", { name: thekedar.name, warning }))) return;
     setProfileError("");
     try {
-      await api.people.update(thekedarId, { active: false });
+      await api.people.remove(thekedarId);
       onBack();
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));

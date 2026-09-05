@@ -27,8 +27,8 @@ export const staffDict: Record<string, Record<Locale, string>> = {
   "staff.advanceCategoryFestival": { en: "Festival (Tyohar)", hi: "त्योहार" },
   "staff.advanceCategoryOther": { en: "Other", hi: "अन्य" },
   "staff.confirmDeleteProfile": {
-    en: "Delete {name}'s profile? Their past ledger records are kept, but they'll no longer appear in any list.",
-    hi: "{name} की प्रोफ़ाइल हटाएं? उनके पुराने खाता-बही रिकॉर्ड सुरक्षित रहेंगे, लेकिन वे अब किसी भी सूची में नहीं दिखेंगे।",
+    en: "Permanently delete {name}'s profile? This cannot be undone. If they have any real ledger/attendance/salary history, this will be refused to protect that history.",
+    hi: "{name} की प्रोफ़ाइल स्थायी रूप से हटाएं? इसे वापस नहीं लिया जा सकता। अगर उनका कोई वास्तविक खाता-बही/हाज़िरी/वेतन इतिहास है, तो उसे सुरक्षित रखने के लिए यह अस्वीकार हो जाएगा।",
   },
   "staff.backToStaff": { en: "Back to Staff", hi: "स्टाफ़ पर वापस जाएं" },
   "staff.advanceSalaryButton": { en: "Advance / Salary", hi: "एडवांस / वेतन" },

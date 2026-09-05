@@ -209,12 +209,15 @@ export function LandLeaseDetailPage({ landLeaseId, onBack }: LandLeaseDetailPage
     }
   }
 
+  // Permanent delete — refused by the backend if this party has any real
+  // history (contracts, ledger entries). Use the Absconded toggle instead
+  // to just take them off the active list.
   async function deleteProfile() {
     if (!landLease) return;
     if (!confirm(t("people.confirmDeleteLandownerProfile", { name: landLease.name }))) return;
     setProfileError("");
     try {
-      await api.people.update(landLeaseId, { active: false });
+      await api.people.remove(landLeaseId);
       onBack();
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));

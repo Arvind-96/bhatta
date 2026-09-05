@@ -3,7 +3,41 @@ import fs from "fs";
 import path from "path";
 import { and, asc, eq, ne, or, sql } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
-import { people, ledgerEntries, customers, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES, STACKING_STAGES } from "../db/schema";
+import {
+  people,
+  ledgerEntries,
+  customers,
+  paymentReceipts,
+  attendances,
+  familyMembers,
+  suppliedItems,
+  salarySlips,
+  doctorVisits,
+  moldingEntries,
+  stackingEntries,
+  nikasiEntries,
+  firingShifts,
+  loadingEntries,
+  productionLogs,
+  stackingVehicles,
+  labourSessions,
+  soilContracts,
+  sandContracts,
+  landLeaseContracts,
+  lands,
+  soilTrips,
+  soilArrivals,
+  jcbWorkLogs,
+  sandDeliveries,
+  vehicleDieselEntries,
+  brickLoadingEntries,
+  partnerAssets,
+  invoices,
+  PERSON_TYPES,
+  SEX_OPTIONS,
+  WORK_TYPES,
+  STACKING_STAGES,
+} from "../db/schema";
 import { getCustomerDetail } from "./customer.service";
 import { getCurrentSeasonId } from "./season.util";
 import { listLedgerForKiln } from "./ledger.service";
@@ -376,6 +410,126 @@ export async function updatePerson(kilnId: string, personId: string, input: Upda
   const person = (await db.select().from(people).where(eq(people._id, personId)))[0]!;
   emitToKiln(kilnId, "person:update", person);
   return person;
+}
+
+// Permanent, irreversible removal — the People page's "Delete" action.
+// Separate from the existing "Mark absconded"/active:false toggle (which
+// just hides someone from active lists while keeping their real history
+// intact) — this genuinely erases the row, so it's only ever safe for a
+// person with NO real history at all (a duplicate entered twice, a test
+// record, someone added by mistake). Never for a person with genuine
+// business activity, since erasing real financial/production history is
+// exactly what this app's audit-trail design exists to prevent. Refuses
+// (same check-then-throw pattern as deleteCustomer/deleteSupplier/
+// deleteVehicle) rather than cascading through 20+ tables if ANY real
+// record still references this person — several of those references
+// (moldingEntries.workerId, stackingEntries.gangId, firingShifts.fitterId,
+// loadingEntries.palledarId) are NOT-NULL columns on real production
+// events, so there is no safe way to null them out even if we wanted to;
+// blocking is the only correct behavior once such a record exists.
+export async function deletePerson(kilnId: string, personId: string) {
+  const existing = (await db.select().from(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Person not found in this kiln");
+
+  const [
+    ledgerRows,
+    receiptRows,
+    attendanceRows,
+    familyRows,
+    suppliedRows,
+    salaryRows,
+    doctorVisitRows,
+    moldingRows,
+    stackingRows,
+    nikasiRows,
+    firingRows,
+    loadingRows,
+    productionLogRows,
+    stackingVehicleRows,
+    labourSessionRows,
+    soilContractRows,
+    sandContractRows,
+    landLeaseContractRows,
+    landRows,
+    soilTripRows,
+    soilArrivalRows,
+    jcbWorkLogRows,
+    sandDeliveryRows,
+    dieselRows,
+    brickLoadingRows,
+    dependentPeopleRows,
+    partnerAssetRows,
+    attributedInvoiceRows,
+  ] = await Promise.all([
+    db.select({ _id: ledgerEntries._id }).from(ledgerEntries).where(and(eq(ledgerEntries.kilnId, kilnId), eq(ledgerEntries.personId, personId))),
+    db.select({ _id: paymentReceipts._id }).from(paymentReceipts).where(and(eq(paymentReceipts.kilnId, kilnId), eq(paymentReceipts.personId, personId))),
+    db.select({ _id: attendances._id }).from(attendances).where(and(eq(attendances.kilnId, kilnId), eq(attendances.personId, personId))),
+    db.select({ _id: familyMembers._id }).from(familyMembers).where(and(eq(familyMembers.kilnId, kilnId), eq(familyMembers.headPersonId, personId))),
+    db.select({ _id: suppliedItems._id }).from(suppliedItems).where(and(eq(suppliedItems.kilnId, kilnId), eq(suppliedItems.personId, personId))),
+    db.select({ _id: salarySlips._id }).from(salarySlips).where(and(eq(salarySlips.kilnId, kilnId), eq(salarySlips.personId, personId))),
+    db.select({ _id: doctorVisits._id }).from(doctorVisits).where(and(eq(doctorVisits.kilnId, kilnId), eq(doctorVisits.personId, personId))),
+    db.select({ _id: moldingEntries._id }).from(moldingEntries).where(and(eq(moldingEntries.kilnId, kilnId), eq(moldingEntries.workerId, personId))),
+    db.select({ _id: stackingEntries._id }).from(stackingEntries).where(and(eq(stackingEntries.kilnId, kilnId), eq(stackingEntries.gangId, personId))),
+    db.select({ _id: nikasiEntries._id }).from(nikasiEntries).where(and(eq(nikasiEntries.kilnId, kilnId), eq(nikasiEntries.gangId, personId))),
+    db.select({ _id: firingShifts._id }).from(firingShifts).where(and(eq(firingShifts.kilnId, kilnId), eq(firingShifts.fitterId, personId))),
+    db.select({ _id: loadingEntries._id }).from(loadingEntries).where(and(eq(loadingEntries.kilnId, kilnId), eq(loadingEntries.palledarId, personId))),
+    db.select({ _id: productionLogs._id }).from(productionLogs).where(and(eq(productionLogs.kilnId, kilnId), eq(productionLogs.thekedarId, personId))),
+    db.select({ _id: stackingVehicles._id }).from(stackingVehicles).where(and(eq(stackingVehicles.kilnId, kilnId), eq(stackingVehicles.contractorId, personId))),
+    db.select({ contractorId: labourSessions.contractorId }).from(labourSessions).where(and(eq(labourSessions.kilnId, kilnId), eq(labourSessions.contractorId, personId))),
+    db.select({ _id: soilContracts._id }).from(soilContracts).where(and(eq(soilContracts.kilnId, kilnId), eq(soilContracts.landownerId, personId))),
+    db.select({ _id: sandContracts._id }).from(sandContracts).where(and(eq(sandContracts.kilnId, kilnId), eq(sandContracts.sandContractorId, personId))),
+    db.select({ _id: landLeaseContracts._id }).from(landLeaseContracts).where(and(eq(landLeaseContracts.kilnId, kilnId), eq(landLeaseContracts.landLeaseId, personId))),
+    db.select({ _id: lands._id }).from(lands).where(and(eq(lands.kilnId, kilnId), eq(lands.landownerId, personId))),
+    db.select({ _id: soilTrips._id }).from(soilTrips).where(and(eq(soilTrips.kilnId, kilnId), or(eq(soilTrips.landownerId, personId), eq(soilTrips.driverId, personId)))),
+    db.select({ _id: soilArrivals._id }).from(soilArrivals).where(and(eq(soilArrivals.kilnId, kilnId), or(eq(soilArrivals.landownerId, personId), eq(soilArrivals.jcbDriverId, personId), eq(soilArrivals.tractorDriverId, personId)))),
+    db.select({ _id: jcbWorkLogs._id }).from(jcbWorkLogs).where(and(eq(jcbWorkLogs.kilnId, kilnId), or(eq(jcbWorkLogs.landownerId, personId), eq(jcbWorkLogs.driverId, personId)))),
+    db.select({ _id: sandDeliveries._id }).from(sandDeliveries).where(and(eq(sandDeliveries.kilnId, kilnId), eq(sandDeliveries.sandContractorId, personId))),
+    db.select({ _id: vehicleDieselEntries._id }).from(vehicleDieselEntries).where(and(eq(vehicleDieselEntries.kilnId, kilnId), eq(vehicleDieselEntries.driverId, personId))),
+    db.select({ _id: brickLoadingEntries._id }).from(brickLoadingEntries).where(and(eq(brickLoadingEntries.kilnId, kilnId), eq(brickLoadingEntries.driverId, personId))),
+    db.select({ _id: people._id }).from(people).where(and(eq(people.kilnId, kilnId), or(eq(people.contractorId, personId), eq(people.bharaiContractorId, personId), eq(people.nikasiContractorId, personId), eq(people.pakayiContractorId, personId)))),
+    db.select({ _id: partnerAssets._id }).from(partnerAssets).where(and(eq(partnerAssets.kilnId, kilnId), eq(partnerAssets.partnerId, personId))),
+    db.select({ _id: invoices._id }).from(invoices).where(and(eq(invoices.kilnId, kilnId), or(eq(invoices.partnerId, personId), eq(invoices.agentId, personId)))),
+  ]);
+
+  const blockers: string[] = [];
+  if (ledgerRows.length) blockers.push(`${ledgerRows.length} ledger entr${ledgerRows.length === 1 ? "y" : "ies"}`);
+  if (receiptRows.length) blockers.push(`${receiptRows.length} payment receipt(s)`);
+  if (attendanceRows.length) blockers.push(`${attendanceRows.length} attendance record(s)`);
+  if (familyRows.length) blockers.push(`${familyRows.length} family member(s)`);
+  if (suppliedRows.length) blockers.push(`${suppliedRows.length} supplied item(s)`);
+  if (salaryRows.length) blockers.push(`${salaryRows.length} salary slip(s)`);
+  if (doctorVisitRows.length) blockers.push(`${doctorVisitRows.length} doctor visit(s)`);
+  if (moldingRows.length) blockers.push(`${moldingRows.length} molding entr${moldingRows.length === 1 ? "y" : "ies"}`);
+  if (stackingRows.length) blockers.push(`${stackingRows.length} stacking entr${stackingRows.length === 1 ? "y" : "ies"}`);
+  if (nikasiRows.length) blockers.push(`${nikasiRows.length} nikasi entr${nikasiRows.length === 1 ? "y" : "ies"}`);
+  if (firingRows.length) blockers.push(`${firingRows.length} firing shift(s)`);
+  if (loadingRows.length) blockers.push(`${loadingRows.length} loading entr${loadingRows.length === 1 ? "y" : "ies"}`);
+  if (productionLogRows.length) blockers.push(`${productionLogRows.length} production log(s)`);
+  if (stackingVehicleRows.length) blockers.push(`${stackingVehicleRows.length} stacking vehicle(s)`);
+  if (labourSessionRows.length) blockers.push(`${labourSessionRows.length} labour session(s)`);
+  if (soilContractRows.length) blockers.push(`${soilContractRows.length} soil contract(s)`);
+  if (sandContractRows.length) blockers.push(`${sandContractRows.length} sand contract(s)`);
+  if (landLeaseContractRows.length) blockers.push(`${landLeaseContractRows.length} land lease contract(s)`);
+  if (landRows.length) blockers.push(`${landRows.length} land record(s)`);
+  if (soilTripRows.length) blockers.push(`${soilTripRows.length} soil trip(s)`);
+  if (soilArrivalRows.length) blockers.push(`${soilArrivalRows.length} soil arrival(s)`);
+  if (jcbWorkLogRows.length) blockers.push(`${jcbWorkLogRows.length} JCB work log(s)`);
+  if (sandDeliveryRows.length) blockers.push(`${sandDeliveryRows.length} sand delivery/deliveries`);
+  if (dieselRows.length) blockers.push(`${dieselRows.length} diesel entr${dieselRows.length === 1 ? "y" : "ies"}`);
+  if (brickLoadingRows.length) blockers.push(`${brickLoadingRows.length} brick loading trip(s)`);
+  if (dependentPeopleRows.length) blockers.push(`${dependentPeopleRows.length} person/people listing them as their contractor`);
+  if (partnerAssetRows.length) blockers.push(`${partnerAssetRows.length} partner asset(s)`);
+  if (attributedInvoiceRows.length) blockers.push(`${attributedInvoiceRows.length} invoice(s) attributed to them as partner/agent`);
+
+  if (blockers.length > 0) {
+    throw new Error(
+      `Cannot delete ${existing.name} — they have real history: ${blockers.join(", ")}. Deleting them would erase that history, so this is refused.`
+    );
+  }
+
+  await db.delete(people).where(and(eq(people._id, personId), eq(people.kilnId, kilnId)));
+  emitToKiln(kilnId, "person:update", { _id: personId, deleted: true });
+  return existing;
 }
 
 // Fixes an accidental duplicate person record (e.g. the same contractor

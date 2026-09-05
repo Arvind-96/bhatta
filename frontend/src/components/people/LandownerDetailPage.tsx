@@ -225,16 +225,15 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
     }
   }
 
-  // Soft delete — active:false immediately drops them from every people
-  // list app-wide (see person.service.ts's listPeople), but their existing
-  // contracts, lands, arrivals, and ledger history stay intact, same as the
-  // Labour/Thekedar profile delete.
+  // Permanent delete — refused by the backend if this landowner has any
+  // real history (contracts, lands, arrivals, ledger entries). Use the
+  // Absconded toggle instead to just take them off the active list.
   async function deleteProfile() {
     if (!landowner) return;
     if (!confirm(t("people.confirmDeleteLandownerProfile", { name: landowner.name }))) return;
     setProfileError("");
     try {
-      await api.people.update(landownerId, { active: false });
+      await api.people.remove(landownerId);
       onBack();
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
