@@ -972,6 +972,21 @@ export async function listDispatchesForCustomer(kilnId: string, customerId: stri
   }));
 }
 
+// Bug fix (H7): saleOrders.saleOrderId is stamped onto every Dispatch
+// created by fulfilling that order (see fulfillSaleOrder), but nothing in
+// the frontend ever looked it up — no Dispatch row showed which Sale
+// Order it came from, and no Sale Order row showed which Dispatch(es)
+// fulfilled it. This is the reverse-lookup half of that fix; kept
+// deliberately minimal (no cancelled-row exclusion) since it's a
+// same-order provenance list, not a money total.
+export async function listDispatchesForSaleOrder(kilnId: string, saleOrderId: string) {
+  return db
+    .select({ _id: dispatches._id, slipNumber: dispatches.slipNumber, amount: dispatches.amount, bricksCount: dispatches.bricksCount, dispatchedOn: dispatches.dispatchedOn, cancelled: dispatches.cancelled })
+    .from(dispatches)
+    .where(and(eq(dispatches.kilnId, kilnId), eq(dispatches.saleOrderId, saleOrderId)))
+    .orderBy(desc(dispatches.dispatchedOn));
+}
+
 // seasonIds, not a single seasonId — callers doing a "state of the world
 // right now" reconciliation check (see reconciliation.service.ts) pass
 // every season up to and including the current one (seasonIdsThrough), so

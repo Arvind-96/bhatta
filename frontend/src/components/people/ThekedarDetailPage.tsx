@@ -63,6 +63,10 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
   const [showMerge, setShowMerge] = useState(false);
   const [otherContractors, setOtherContractors] = useState<Person[]>([]);
+  // Bug fix (C3): every mutation below used to have no visible error
+  // surface at all — a rejection was a silent unhandled promise rejection.
+  const [profileError, setProfileError] = useState("");
+  const [payError, setPayError] = useState("");
 
   async function refresh() {
     const [detail, ledger, allWorkers, allHelpers, allWorkEntries, allContractors] = await Promise.all([
@@ -108,6 +112,7 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
 
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
+    setProfileError("");
     setSavingProfile(true);
     try {
       await api.people.update(thekedarId, {
@@ -120,6 +125,8 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
         joiningDate: joiningDate || undefined,
       });
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingProfile(false);
     }
@@ -143,10 +150,13 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
 
   async function handlePhotoChange(file: File | Blob | null) {
     if (!file) return;
+    setProfileError("");
     setUploadingPhoto(true);
     try {
       await api.people.uploadPhoto(thekedarId, file);
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -154,10 +164,13 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
 
   async function handleIdentityProofChange(file: File | null) {
     if (!file) return;
+    setProfileError("");
     setUploadingPhoto(true);
     try {
       await api.people.uploadIdentityProof(thekedarId, file);
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -165,6 +178,7 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
 
   async function savePay(e: FormEvent) {
     e.preventDefault();
+    setPayError("");
     setSavingPay(true);
     try {
       await api.people.update(thekedarId, {
@@ -173,6 +187,8 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
         commissionPerThousand: commissionPerThousand ? Number(commissionPerThousand) : undefined,
       });
       await refresh();
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingPay(false);
     }
@@ -180,8 +196,13 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
 
   async function toggleAbsconded() {
     if (!thekedar) return;
-    await api.people.update(thekedarId, { status: thekedar.status === "ABSCONDED" ? "ACTIVE" : "ABSCONDED" });
-    await refresh();
+    setProfileError("");
+    try {
+      await api.people.update(thekedarId, { status: thekedar.status === "ABSCONDED" ? "ACTIVE" : "ABSCONDED" });
+      await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   // Soft delete — active:false drops them from every people list app-wide
@@ -199,8 +220,13 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
           })
         : "";
     if (!confirm(t("people.confirmDeleteThekedarProfile", { name: thekedar.name, warning }))) return;
-    await api.people.update(thekedarId, { active: false });
-    onBack();
+    setProfileError("");
+    try {
+      await api.people.update(thekedarId, { active: false });
+      onBack();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   const backButton = (
@@ -291,6 +317,7 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
             <LedgerQuickActions person={thekedar} onSaved={refresh} />
           </div>
         </div>
+        {profileError && <p className="mt-2 text-sm text-status-critical">{profileError}</p>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -327,6 +354,7 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
                   </option>
                 ))}
               </select>
+              {profileError && <p className="text-sm text-status-critical">{profileError}</p>}
               <Button type="submit" size="sm" disabled={savingProfile}>
                 {t("people.saveProfile")}
               </Button>
@@ -367,6 +395,7 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
                   className={inputClass}
                 />
               )}
+              {payError && <p className="text-sm text-status-critical">{payError}</p>}
               <Button type="submit" size="sm" disabled={savingPay}>
                 {t("people.savePayType")}
               </Button>
@@ -383,6 +412,7 @@ export function ThekedarDetailPage({ thekedarId, onBack, onOpenLabour }: Thekeda
                   {thekedar.identityProofPath ? t("people.replaceIdentityProof") : t("people.uploadIdentityProofHint")}
                 </label>
               </div>
+              {profileError && <p className="text-sm text-status-critical">{profileError}</p>}
             </form>
           ) : (
             <div className="grid grid-cols-2 gap-3">

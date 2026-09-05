@@ -7,6 +7,7 @@ import {
   createSupplierInvoice,
   getSupplierDetail,
   listAllSupplierInvoices,
+  listSupplierInvoicesForPurchaseOrder,
   updateSupplierInvoice,
   deleteSupplierInvoice,
 } from "../services/supplierInvoice.service";
@@ -48,6 +49,10 @@ export async function detailForSupplier(req: AuthedRequest, res: Response) {
 
 export async function listAll(req: AuthedRequest, res: Response) {
   res.json(await listAllSupplierInvoices(req.kiln!.id));
+}
+
+export async function byPurchaseOrder(req: AuthedRequest, res: Response) {
+  res.json(await listSupplierInvoicesForPurchaseOrder(req.kiln!.id, req.params.purchaseOrderId));
 }
 
 export async function update(req: AuthedRequest, res: Response) {

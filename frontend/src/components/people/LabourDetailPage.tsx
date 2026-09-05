@@ -70,6 +70,13 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPay, setSavingPay] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Bug fix (C3): every mutation below used to have no visible error
+  // surface at all — a rejection (duplicate, validation failure) was a
+  // silent unhandled promise rejection with no indication anything failed.
+  const [profileError, setProfileError] = useState("");
+  const [payError, setPayError] = useState("");
+  const [familyError, setFamilyError] = useState("");
+  const [supplyError, setSupplyError] = useState("");
   const [workEntries, setWorkEntries] = useState<WorkEntry[]>([]);
   const [showAddWork, setShowAddWork] = useState(false);
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null);
@@ -153,6 +160,7 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
   async function addFamilyMember(e: FormEvent) {
     e.preventDefault();
     if (!familyForm.name.trim()) return;
+    setFamilyError("");
     setSavingFamily(true);
     try {
       await api.familyMembers.create({
@@ -166,6 +174,8 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
       setFamilyForm({ name: "", relation: "SPOUSE", age: "", sex: "", isWorking: false });
       setShowAddFamily(false);
       await refresh();
+    } catch (err) {
+      setFamilyError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingFamily(false);
     }
@@ -174,6 +184,7 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
   async function addSuppliedItem(e: FormEvent) {
     e.preventDefault();
     if (!supplyForm.itemId || !supplyForm.quantity) return;
+    setSupplyError("");
     setSavingSupply(true);
     try {
       await api.suppliedItems.create({
@@ -184,25 +195,38 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
       setSupplyForm({ itemId: "", quantity: "" });
       setShowAddSupply(false);
       await refresh();
+    } catch (err) {
+      setSupplyError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingSupply(false);
     }
   }
 
   async function removeSuppliedItem(id: string) {
-    await api.suppliedItems.remove(id);
-    await refresh();
+    setSupplyError("");
+    try {
+      await api.suppliedItems.remove(id);
+      await refresh();
+    } catch (err) {
+      setSupplyError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function removeFamilyMember(member: FamilyForPerson["members"][number]) {
     if (!confirm(t("people.confirmRemoveFamilyMember", { name: member.name })))
       return;
-    await api.familyMembers.remove(member._id);
-    await refresh();
+    setFamilyError("");
+    try {
+      await api.familyMembers.remove(member._id);
+      await refresh();
+    } catch (err) {
+      setFamilyError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
+    setProfileError("");
     setSavingProfile(true);
     try {
       await api.people.update(labourId, {
@@ -218,6 +242,8 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
         joiningDate: joiningDate || undefined,
       });
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingProfile(false);
     }
@@ -244,10 +270,13 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
 
   async function handlePhotoChange(file: File | Blob | null) {
     if (!file) return;
+    setProfileError("");
     setUploadingPhoto(true);
     try {
       await api.people.uploadPhoto(labourId, file);
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -255,10 +284,13 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
 
   async function handleIdentityProofChange(file: File | null) {
     if (!file) return;
+    setProfileError("");
     setUploadingPhoto(true);
     try {
       await api.people.uploadIdentityProof(labourId, file);
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -266,6 +298,7 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
 
   async function savePay(e: FormEvent) {
     e.preventDefault();
+    setPayError("");
     setSavingPay(true);
     try {
       await api.people.update(labourId, {
@@ -274,6 +307,8 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
         ratePerThousand: ratePerThousand ? Number(ratePerThousand) : undefined,
       });
       await refresh();
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingPay(false);
     }
@@ -281,8 +316,13 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
 
   async function toggleAbsconded() {
     if (!labour) return;
-    await api.people.update(labourId, { status: labour.status === "ABSCONDED" ? "ACTIVE" : "ABSCONDED" });
-    await refresh();
+    setProfileError("");
+    try {
+      await api.people.update(labourId, { status: labour.status === "ABSCONDED" ? "ACTIVE" : "ABSCONDED" });
+      await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   // Soft delete — active:false immediately drops them from every people
@@ -293,8 +333,13 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
   async function deleteProfile() {
     if (!labour) return;
     if (!confirm(t("people.confirmDeleteLabourProfile", { name: labour.name }))) return;
-    await api.people.update(labourId, { active: false });
-    onBack();
+    setProfileError("");
+    try {
+      await api.people.update(labourId, { active: false });
+      onBack();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   const backButton = (
@@ -381,6 +426,7 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
             <LedgerQuickActions person={labour} onSaved={refresh} />
           </div>
         </div>
+        {profileError && <p className="mt-2 text-sm text-status-critical">{profileError}</p>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -434,6 +480,7 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
                   </option>
                 ))}
               </select>
+              {profileError && <p className="text-sm text-status-critical">{profileError}</p>}
               <Button type="submit" size="sm" disabled={savingProfile}>
                 {t("people.saveProfile")}
               </Button>
@@ -478,6 +525,7 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
                   className={inputClass}
                 />
               )}
+              {payError && <p className="text-sm text-status-critical">{payError}</p>}
               <Button type="submit" size="sm" disabled={savingPay}>
                 {t("people.savePayType")}
               </Button>
@@ -495,6 +543,7 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
                   {labour.identityProofPath ? t("people.replaceIdentityProof") : t("people.uploadIdentityProofHint")}
                 </label>
               </div>
+              {profileError && <p className="text-sm text-status-critical">{profileError}</p>}
             </form>
           ) : (
             <div className="flex flex-col gap-3">
@@ -682,11 +731,13 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
                 />
                 {t("people.alsoWorksAsLabour")}
               </label>
+              {familyError && <p className="col-span-2 text-sm text-status-critical">{familyError}</p>}
               <Button type="submit" disabled={savingFamily} className="col-span-2">
                 {t("people.saveFamilyMember")}
               </Button>
             </form>
           )}
+          {familyError && !showAddFamily && <p className="mb-2 text-sm text-status-critical">{familyError}</p>}
 
           {!family || family.members.length === 0 ? (
             <p className="py-6 text-center text-sm text-ink-muted">{t("people.noFamilyMembersYet")}</p>
@@ -776,11 +827,13 @@ export function LabourDetailPage({ labourId, onBack, onOpenThekedar, onOpenLabou
                 onChange={(e) => setSupplyForm((f) => ({ ...f, quantity: e.target.value }))}
                 className={inputClass}
               />
+              {supplyError && <p className="text-sm text-status-critical">{supplyError}</p>}
               <Button type="submit" disabled={savingSupply}>
                 {t("common.save")}
               </Button>
             </form>
           )}
+          {supplyError && !showAddSupply && <p className="mb-2 text-sm text-status-critical">{supplyError}</p>}
 
           {suppliedItems.length === 0 ? (
             <p className="py-6 text-center text-sm text-ink-muted">{t("people.noItemsSuppliedYet")}</p>

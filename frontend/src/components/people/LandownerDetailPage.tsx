@@ -74,6 +74,10 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   const [editingArrival, setEditingArrival] = useState<SoilArrival | null>(null);
   const [editingContract, setEditingContract] = useState<SoilContract | null>(null);
   const [editingLedgerEntry, setEditingLedgerEntry] = useState<LedgerEntry | null>(null);
+  // Bug fix (C3): every mutation below used to have no visible error
+  // surface at all — a rejection was a silent unhandled promise rejection.
+  const [profileError, setProfileError] = useState("");
+  const [contractError, setContractError] = useState("");
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
@@ -124,6 +128,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
 
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
+    setProfileError("");
     setSavingProfile(true);
     try {
       await api.people.update(landownerId, {
@@ -159,6 +164,8 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
       );
       await refresh();
       setIsEditing(false);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingProfile(false);
     }
@@ -192,10 +199,13 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
 
   async function handlePhotoChange(file: File | Blob | null) {
     if (!file) return;
+    setProfileError("");
     setUploadingPhoto(true);
     try {
       await api.people.uploadPhoto(landownerId, file);
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -203,10 +213,13 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
 
   async function handleIdentityProofChange(file: File | null) {
     if (!file) return;
+    setProfileError("");
     setUploadingPhoto(true);
     try {
       await api.people.uploadIdentityProof(landownerId, file);
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -219,14 +232,24 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
   async function deleteProfile() {
     if (!landowner) return;
     if (!confirm(t("people.confirmDeleteLandownerProfile", { name: landowner.name }))) return;
-    await api.people.update(landownerId, { active: false });
-    onBack();
+    setProfileError("");
+    try {
+      await api.people.update(landownerId, { active: false });
+      onBack();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function deleteContract(contract: SoilContract) {
     if (!confirm(t("people.confirmDeleteContract", { contractNumber: contract.contractNumber }))) return;
-    await api.soilContracts.remove(contract._id);
-    await refresh();
+    setContractError("");
+    try {
+      await api.soilContracts.remove(contract._id);
+      await refresh();
+    } catch (err) {
+      setContractError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   function printContract(contract: SoilContract) {
@@ -365,6 +388,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
             </Button>
           </div>
         </div>
+        {profileError && <p className="mt-2 text-sm text-status-critical">{profileError}</p>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -440,6 +464,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
                 <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
                 <DateInput value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
               </label>
+              {profileError && <p className="text-sm text-status-critical">{profileError}</p>}
               <Button type="submit" size="sm" disabled={savingProfile}>
                 {t("people.saveProfile")}
               </Button>
@@ -539,6 +564,7 @@ export function LandownerDetailPage({ landownerId, onBack }: LandownerDetailPage
               <p className="text-sm text-ink-muted">{contractBalance >= 0 ? t("people.remainingDue") : t("people.advanceOutstanding")}</p>
             </div>
           </div>
+          {contractError && <p className="mt-2 text-sm text-status-critical">{contractError}</p>}
           {contracts.length > 0 && (
             <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
               {contracts.map((c) => (

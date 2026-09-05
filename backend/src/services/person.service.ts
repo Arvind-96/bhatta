@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import { and, asc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, ne, or, sql } from "drizzle-orm";
 import { db, DATA_DIR } from "../db/client";
 import { people, ledgerEntries, customers, PERSON_TYPES, SEX_OPTIONS, WORK_TYPES, STACKING_STAGES } from "../db/schema";
 import { getCustomerDetail } from "./customer.service";
@@ -468,11 +468,18 @@ export async function getPersonFilePath(kilnId: string, personId: string, column
 // back in wages so far. Surfacing this list is the whole point: it's how an
 // owner notices an outstanding advance risk before someone disappears with
 // it, not after.
+//
+// Bug fix: this used to hard-scope to WORKER/HELPER/LABOUR_CONTRACTOR only
+// — a Landowner, Sand Contractor, Land Lease, Partner, or Staff member who
+// has been overpaid (negative balance, the exact same real-money risk this
+// list exists to surface) never appeared here at all. Same non-allow-list
+// fix personLedgerBalances/listPaymentsDue already apply for the identical
+// reason: a forgotten type here silently hides a real advance risk.
 export async function listOutstandingAdvances(kilnId: string) {
   const rows = await db
     .select()
     .from(people)
-    .where(and(eq(people.kilnId, kilnId), inArray(people.type, ["WORKER", "HELPER", "LABOUR_CONTRACTOR"])));
+    .where(and(eq(people.kilnId, kilnId), ne(people.type, "CUSTOMER")));
 
   const results = [];
   for (const person of rows) {

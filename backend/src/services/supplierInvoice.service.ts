@@ -70,6 +70,19 @@ export async function listSupplierInvoices(kilnId: string, supplierId: string) {
     .orderBy(desc(supplierInvoices.date), desc(supplierInvoices.createdAt));
 }
 
+// Bug fix (H7): purchaseOrders.purchaseOrderId is stamped onto every
+// Supplier Invoice created by fulfilling that order (see
+// fulfillPurchaseOrder), but nothing in the frontend ever looked it up —
+// no Purchase Order row showed which invoice(s) fulfilled it. Kept
+// deliberately minimal, same reasoning as listDispatchesForSaleOrder.
+export async function listSupplierInvoicesForPurchaseOrder(kilnId: string, purchaseOrderId: string) {
+  return db
+    .select({ _id: supplierInvoices._id, sequenceNumber: supplierInvoices.sequenceNumber, totalBillAmount: supplierInvoices.totalBillAmount, amountPaid: supplierInvoices.amountPaid, date: supplierInvoices.date })
+    .from(supplierInvoices)
+    .where(and(eq(supplierInvoices.kilnId, kilnId), eq(supplierInvoices.purchaseOrderId, purchaseOrderId)))
+    .orderBy(desc(supplierInvoices.date));
+}
+
 // Kiln-wide, every supplier — feeds the Supply Items catalog's "total
 // received" figure, which sums itemsReceived across every supplier's
 // invoices rather than just one.

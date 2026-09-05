@@ -1,8 +1,15 @@
 import { double, int, mysqlTable, varchar, text, uniqueIndex, index, boolean, datetime } from "drizzle-orm/mysql-core";
 import { idColumn, kilnIdColumn, createdAtColumn, dateColumn } from "./_helpers";
 
+// Bug fix (C2): THEKEDAR used to be a distinct type here, but every
+// contractor-link field validation only ever allow-listed LABOUR_CONTRACTOR
+// — a THEKEDAR-typed person could never actually be assigned as anyone's
+// contractor, and the "Add Thekedar" UI already created a LABOUR_CONTRACTOR
+// instead (see AddThekedarModal.tsx), so the type was structurally dead.
+// Merged into LABOUR_CONTRACTOR per the client's decision; any existing
+// THEKEDAR rows are converted by scripts/migrateThekedarToLabourContractor.ts.
 export const PERSON_TYPES = [
-  "DRIVER", "LABOUR_CONTRACTOR", "SUPPLIER", "THEKEDAR", "PARTNER", "WORKER",
+  "DRIVER", "LABOUR_CONTRACTOR", "SUPPLIER", "PARTNER", "WORKER",
   "HELPER", "LANDOWNER", "FITTER", "CUSTOMER", "MUNIM", "CHOWKIDAR", "SAND_CONTRACTOR",
   "SALES_AGENT", "LAND_LEASE",
 ] as const;

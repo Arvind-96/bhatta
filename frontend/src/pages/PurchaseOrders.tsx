@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { Fragment, FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ClipboardList, Plus, X } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -215,11 +215,31 @@ export function PurchaseOrders() {
   const [cancelling, setCancelling] = useState<PurchaseOrder | null>(null);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [cancelError, setCancelError] = useState("");
+  // Bug fix (H7): purchaseOrders.purchaseOrderId is stamped onto every
+  // Supplier Invoice created by fulfilling that order, but nothing
+  // surfaced which invoice(s) actually fulfilled a given order.
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [fulfillingInvoices, setFulfillingInvoices] = useState<Awaited<ReturnType<typeof api.supplierInvoices.byPurchaseOrder>>>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
 
   async function refresh() {
     setOrders(await api.purchaseOrders.list());
+  }
+
+  async function toggleExpand(orderId: string) {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+      return;
+    }
+    setExpandedOrderId(orderId);
+    setLoadingInvoices(true);
+    try {
+      setFulfillingInvoices(await api.supplierInvoices.byPurchaseOrder(orderId));
+    } finally {
+      setLoadingInvoices(false);
+    }
   }
 
   useEffect(() => {
@@ -274,8 +294,17 @@ export function PurchaseOrders() {
                 </thead>
                 <tbody>
                   {orders.map((o) => (
-                    <tr key={o._id} className="border-b border-border/60 last:border-0">
-                      <td className="py-3 text-ink-primary">{o.sequenceNumber != null ? `PO-${o.sequenceNumber}` : "—"}</td>
+                    <Fragment key={o._id}>
+                    <tr className="border-b border-border/60 last:border-0">
+                      <td className="py-3 text-ink-primary">
+                        {o.status !== "PENDING" ? (
+                          <button type="button" onClick={() => toggleExpand(o._id)} className="hover:underline">
+                            {o.sequenceNumber != null ? `PO-${o.sequenceNumber}` : "—"}
+                          </button>
+                        ) : (
+                          o.sequenceNumber != null ? `PO-${o.sequenceNumber}` : "—"
+                        )}
+                      </td>
                       <td className="py-3 text-ink-secondary">{supplierById.get(o.supplierId) ?? o.supplierId}</td>
                       <td className="py-3 text-right tabular-nums text-ink-secondary">{(o.items ?? []).length}</td>
                       <td className="py-3 text-right tabular-nums font-medium text-ink-primary">₹{formatINR(o.expectedAmount ?? 0)}</td>
@@ -297,6 +326,29 @@ export function PurchaseOrders() {
                         </div>
                       </td>
                     </tr>
+                    {expandedOrderId === o._id && (
+                      <tr className="border-b border-border/60 bg-ink-primary/[0.02] last:border-0">
+                        <td colSpan={6} className="py-2.5 pl-4">
+                          {loadingInvoices ? (
+                            <p className="text-xs text-ink-muted">{t("common.loading")}</p>
+                          ) : fulfillingInvoices.length === 0 ? (
+                            <p className="text-xs text-ink-muted">{t("purchaseOrder.noInvoicesYet")}</p>
+                          ) : (
+                            <ul className="space-y-1">
+                              {fulfillingInvoices.map((inv) => (
+                                <li key={inv._id} className="flex items-center gap-2 text-xs text-ink-secondary">
+                                  <span className="font-medium">{inv.sequenceNumber != null ? `PI-${inv.sequenceNumber}` : inv._id.slice(0, 8)}</span>
+                                  <span>{new Date(inv.date).toLocaleDateString("en-IN")}</span>
+                                  <span className="tabular-nums">₹{formatINR(inv.totalBillAmount)} {t("purchaseOrder.billedSuffix")}</span>
+                                  <span className="tabular-nums">₹{formatINR(inv.amountPaid)} {t("purchaseOrder.paidSuffix")}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

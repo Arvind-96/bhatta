@@ -54,6 +54,9 @@ export const overviewDict: Record<string, Record<Locale, string>> = {
   "overview.noPendingPayments": { en: "No pending payments.", hi: "कोई लंबित भुगतान नहीं।" },
   "overview.resolveDue": { en: "Open {name}'s ledger to resolve this due amount", hi: "यह बकाया राशि ठीक करने के लिए {name} का खाता खोलें" },
   "overview.moreCount": { en: "+{count} more", hi: "+{count} और" },
+  "overview.outstandingAdvances": { en: "Outstanding advances", hi: "बकाया एडवांस" },
+  "overview.noOutstandingAdvances": { en: "No outstanding advances.", hi: "कोई बकाया एडवांस नहीं।" },
+  "overview.daysPending": { en: "{count}d", hi: "{count} दिन" },
 
   "overview.sectionTodayProduction": { en: "Today's production", hi: "आज का उत्पादन" },
   "overview.sectionStockPayables": { en: "Stock & payables", hi: "स्टॉक व देनदारी" },

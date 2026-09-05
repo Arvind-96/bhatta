@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { create, list, roster } from "../controllers/firingShift.controller";
+import { create, list, remove, roster } from "../controllers/firingShift.controller";
 import { requireAuth, resolveKiln, resolveSeason, blockWritesOnArchivedSeason } from "../middleware/auth.middleware";
 import { asyncHandler } from "../middleware/asyncHandler";
 
@@ -9,3 +9,4 @@ firingShiftRouter.use(requireAuth, resolveKiln, resolveSeason, blockWritesOnArch
 firingShiftRouter.post("/", asyncHandler(create));
 firingShiftRouter.get("/", asyncHandler(list));
 firingShiftRouter.get("/roster", asyncHandler(roster));
+firingShiftRouter.delete("/:id", asyncHandler(remove));

@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Boxes,
   Fuel,
+  HandCoins,
   IndianRupee,
   LineChart,
   type LucideIcon,
@@ -36,6 +37,7 @@ import {
   type BrickCategory,
   type DashboardStockSummary,
   type DispatchTotals,
+  type OutstandingAdvance,
   type PaymentDue,
   type Person,
   type SeasonFinancialSummary,
@@ -55,7 +57,11 @@ function QuickEntry() {
 
   useEffect(() => {
     if (!activeKilnId) return;
-    api.people.list("THEKEDAR").then(setThekedars).catch(console.error);
+    // Bug fix (C2): THEKEDAR merged into LABOUR_CONTRACTOR — this picker
+    // used to fetch a type that could never again have any rows (every
+    // "Add Thekedar" flow already created LABOUR_CONTRACTOR), which would
+    // have silently emptied this dropdown forever.
+    api.people.list("LABOUR_CONTRACTOR").then(setThekedars).catch(console.error);
   }, [activeKilnId]);
 
   async function submitProduction(e: FormEvent) {
@@ -245,6 +251,13 @@ function DashboardStockPanel() {
   const [bricksSold, setBricksSold] = useState<{ categoryId: string; category: string; grade: string | null; bricksSold: number }[]>([]);
   const [fuelStock, setFuelStock] = useState<Record<string, number>>({});
   const [paymentsDue, setPaymentsDue] = useState<PaymentDue[]>([]);
+  // Bug fix: GET /people/advances had zero call sites anywhere in the
+  // frontend — the dedicated "outstanding advance" list the backend's own
+  // comment describes as "the whole point... so an owner notices before
+  // someone disappears with it" was never actually surfaced, only visible
+  // as one aggregate ₹ figure on Reports. Mirrors "Who's Payment Due"
+  // right next to it, just the opposite direction of money.
+  const [outstandingAdvances, setOutstandingAdvances] = useState<OutstandingAdvance[]>([]);
   const [ledgerFor, setLedgerFor] = useState<Person | null>(null);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
@@ -262,18 +275,20 @@ function DashboardStockPanel() {
   }
 
   async function refresh() {
-    const [summary, categories, sold, fuel, dues] = await Promise.all([
+    const [summary, categories, sold, fuel, dues, advances] = await Promise.all([
       api.reconciliation.dashboardStock(),
       api.brickCategories.list(),
       api.dispatch.soldByCategory(),
       api.fuelPurchases.stockBalance(),
       api.people.paymentsDue(),
+      api.people.advances(),
     ]);
     setStockSummary(summary);
     setBrickCategories(categories);
     setBricksSold(sold);
     setFuelStock(fuel);
     setPaymentsDue(dues);
+    setOutstandingAdvances(advances);
   }
 
   useEffect(() => {
@@ -296,6 +311,7 @@ function DashboardStockPanel() {
   const totalBricksSold = bricksSold.reduce((sum, c) => sum + c.bricksSold, 0);
   const totalFuelStock = Object.values(fuelStock).reduce((sum, v) => sum + v, 0);
   const totalDuesAmount = paymentsDue.reduce((sum, d) => sum + d.amountDue, 0);
+  const totalAdvancesAmount = outstandingAdvances.reduce((sum, a) => sum + a.outstandingAdvance, 0);
 
   return (
     <div className="space-y-4">
@@ -444,6 +460,68 @@ function DashboardStockPanel() {
           )}
           {paymentsDue.length > 8 && (
             <p className="mt-2 text-[11px] text-ink-muted">{t("overview.moreCount", { count: paymentsDue.length - 8 })}</p>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-status-warning/10">
+                <HandCoins className="h-4 w-4 text-status-warning" />
+              </div>
+              <CardTitle>{t("overview.outstandingAdvances")}</CardTitle>
+            </div>
+            <span className="font-mono text-sm font-semibold tabular-nums text-status-warning">
+              ₹{formatINR(totalAdvancesAmount)}
+            </span>
+          </CardHeader>
+          {outstandingAdvances.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
+              <HandCoins className="h-6 w-6 text-ink-muted/50" />
+              <p className="text-sm text-ink-muted">{t("overview.noOutstandingAdvances")}</p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {outstandingAdvances.slice(0, 8).map((a) => (
+                <li
+                  key={a.person._id}
+                  className="-mx-2 flex items-center justify-between rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-ink-primary/5"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                        avatarToneClass(a.person._id)
+                      )}
+                    >
+                      {initialOf(a.person.name)}
+                    </span>
+                    <span className="text-ink-secondary">{a.person.name}</span>
+                    <span className="text-[11px] text-ink-muted">{personTypeMeta[a.person.type].label}</span>
+                    {a.daysPending > 0 && (
+                      <span className="text-[11px] text-ink-muted">{t("overview.daysPending", { count: a.daysPending })}</span>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-mono font-semibold tabular-nums text-status-warning">
+                      ₹{formatINR(a.outstandingAdvance)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openLedgerFor(a.person._id)}
+                      className="text-ink-muted hover:text-status-warning"
+                      aria-label={t("overview.resolveDue", { name: a.person.name })}
+                      title={t("overview.resolveDue", { name: a.person.name })}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {outstandingAdvances.length > 8 && (
+            <p className="mt-2 text-[11px] text-ink-muted">{t("overview.moreCount", { count: outstandingAdvances.length - 8 })}</p>
           )}
         </Card>
       </div>

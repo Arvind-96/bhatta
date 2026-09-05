@@ -306,6 +306,8 @@ export const api = {
     }) => post<Dispatch>("/dispatch", input, true),
     totals: (days = 7) => get<DispatchTotals>(`/dispatch/totals?days=${days}`, true),
     soldByCategory: () => get<{ categoryId: string; category: string; grade: string | null; bricksSold: number }[]>("/dispatch/sold-by-category", true),
+    bySaleOrder: (saleOrderId: string) =>
+      get<{ _id: string; slipNumber?: number; amount: number; bricksCount: number; dispatchedOn: string; cancelled: boolean }[]>(`/dispatch/by-sale-order/${saleOrderId}`, true),
     adjustment: (id: string, input: { breakageCount?: number; returnedCount?: number; returnReason?: string }) =>
       patch<Dispatch>(`/dispatch/${id}/adjustment`, input, true),
     update: (
@@ -581,6 +583,8 @@ export const api = {
       }>
     ) => patch<SupplierInvoice>(`/supplier-invoices/${id}`, input, true),
     remove: (id: string) => del<void>(`/supplier-invoices/${id}`, true),
+    byPurchaseOrder: (purchaseOrderId: string) =>
+      get<{ _id: string; sequenceNumber?: number; totalBillAmount: number; amountPaid: number; date: string }[]>(`/supplier-invoices/by-purchase-order/${purchaseOrderId}`, true),
   },
 
   login: (email: string, password: string) => post<AuthResponse>("/auth/login", { email, password }),
@@ -1565,6 +1569,7 @@ export const api = {
       bonusAmount?: number;
     }) => post<FiringShift>("/firing-shifts", input, true),
     roster: (date?: string) => get<FitterRosterSummary>(`/firing-shifts/roster${date ? `?date=${date}` : ""}`, true),
+    remove: (id: string) => del<void>(`/firing-shifts/${id}`, true),
   },
 
   incidents: {

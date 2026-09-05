@@ -6,7 +6,7 @@ import { DateInput } from "@/components/ui/date-input";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { isPaymentSplitMismatched, PaymentSplitFields } from "@/components/shared/PaymentSplitFields";
-import type { DepthUnit, LandLeaseContract, LandLeaseRateType, LedgerPaymentMode } from "@/types";
+import type { DepthUnit, LandLeaseContract, LedgerPaymentMode } from "@/types";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const inputClass =
@@ -18,18 +18,24 @@ interface EditLandLeaseContractModalProps {
   onSaved: () => void;
 }
 
-// Exact clone of EditSoilContractModal.tsx — landId/landLeaseId aren't
-// editable here, same restriction the backend enforces.
+// Bug fix (C5b): this used to be a verbatim clone of EditSoilContractModal
+// — including its full 4-way rate-type switcher — even though Land Lease
+// is used exclusively for raw-brick molding with no excavation quantity or
+// depth to price against (the create form has never shown this picker;
+// see AddLandLeaseModal.tsx). Letting an admin retroactively flip a Land
+// Lease contract to PER_TROLLEY or depth-priced via Edit contradicted the
+// type's own design intent, so the picker is gone and rateType is always
+// PER_BIGHA — matching what create already enforces and what the backend
+// schema now enforces too (landLeaseContract.controller.ts).
+// landId/landLeaseId aren't editable here, same restriction the backend
+// enforces.
 export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditLandLeaseContractModalProps) {
   const { t } = useTranslation();
-  const [rateType, setRateType] = useState<LandLeaseRateType>(contract.rateType);
   const [contractedQuantity, setContractedQuantity] = useState(contract.contractedQuantity != null ? String(contract.contractedQuantity) : "");
-  const [ratePerTrolley, setRatePerTrolley] = useState(contract.ratePerTrolley != null ? String(contract.ratePerTrolley) : "");
   const [contractedAreaBigha, setContractedAreaBigha] = useState(contract.contractedAreaBigha != null ? String(contract.contractedAreaBigha) : "");
   const [ratePerBigha, setRatePerBigha] = useState(contract.ratePerBigha != null ? String(contract.ratePerBigha) : "");
   const [contractedDepth, setContractedDepth] = useState(contract.contractedDepth != null ? String(contract.contractedDepth) : "");
   const [depthUnit, setDepthUnit] = useState<DepthUnit>(contract.depthUnit ?? "feet");
-  const [ratePerDepthUnit, setRatePerDepthUnit] = useState(contract.ratePerDepthUnit != null ? String(contract.ratePerDepthUnit) : "");
   const [advanceAmount, setAdvanceAmount] = useState(String(contract.advanceAmount ?? 0));
   const [startDate, setStartDate] = useState(contract.startDate ? contract.startDate.slice(0, 10) : "");
   const [endDate, setEndDate] = useState(contract.endDate ? contract.endDate.slice(0, 10) : "");
@@ -48,10 +54,7 @@ export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditL
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (rateType === "PER_TROLLEY" && (!contractedQuantity || !ratePerTrolley)) return;
-    if (rateType === "PER_BIGHA" && (!contractedAreaBigha || !ratePerBigha)) return;
-    if (rateType === "PER_DEPTH" && (!contractedDepth || !ratePerDepthUnit)) return;
-    if (rateType === "BOTH" && (!contractedAreaBigha || !ratePerBigha || !contractedDepth || !ratePerDepthUnit)) return;
+    if (!contractedAreaBigha || !ratePerBigha) return;
     if (advanceDelta > 0 && isPaymentSplitMismatched(paymentMode, advanceDelta, cashAmount, onlineAmount)) {
       setFormError(t("payment.splitMismatch", { total: advanceDelta.toLocaleString("en-IN") }));
       return;
@@ -60,15 +63,15 @@ export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditL
     setSaving(true);
     try {
       await api.landLeaseContracts.update(contract._id, {
-        rateType,
+        rateType: "PER_BIGHA",
+        contractedAreaBigha: Number(contractedAreaBigha),
+        ratePerBigha: Number(ratePerBigha),
+        // Optional caps, same as the create form — a PER_BIGHA contract can
+        // still carry an informational trolley/depth cap without becoming
+        // a different rate type.
         contractedQuantity: contractedQuantity ? Number(contractedQuantity) : undefined,
-        ratePerTrolley: rateType === "PER_TROLLEY" ? Number(ratePerTrolley) : undefined,
-        contractedAreaBigha: rateType === "PER_BIGHA" || rateType === "BOTH" ? Number(contractedAreaBigha) : undefined,
-        ratePerBigha: rateType === "PER_BIGHA" || rateType === "BOTH" ? Number(ratePerBigha) : undefined,
-        contractedDepth:
-          (rateType === "PER_DEPTH" || rateType === "PER_BIGHA" || rateType === "BOTH") && contractedDepth ? Number(contractedDepth) : undefined,
-        depthUnit: (rateType === "PER_DEPTH" || rateType === "PER_BIGHA" || rateType === "BOTH") && contractedDepth ? depthUnit : undefined,
-        ratePerDepthUnit: rateType === "PER_DEPTH" || rateType === "BOTH" ? Number(ratePerDepthUnit) : undefined,
+        contractedDepth: contractedDepth ? Number(contractedDepth) : undefined,
+        depthUnit: contractedDepth ? depthUnit : undefined,
         advanceAmount: advanceAmount ? Number(advanceAmount) : undefined,
         paymentMode: advanceDelta > 0 ? paymentMode : undefined,
         cashAmount: advanceDelta > 0 && paymentMode === "CASH_AND_ONLINE" ? Number(cashAmount) : undefined,
@@ -98,63 +101,10 @@ export function EditLandLeaseContractModal({ contract, onClose, onSaved }: EditL
         </div>
 
         <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-2">
-          <div className="col-span-2 flex gap-1">
-            {(
-              [
-                { value: "PER_BIGHA", label: t("soil.fixedPerBigha") },
-                { value: "PER_DEPTH", label: t("soil.fixedPerDepth") },
-                { value: "BOTH", label: t("soil.bothBighaAndDepth") },
-                { value: "PER_TROLLEY", label: t("soil.perTrolley") },
-              ] as { value: LandLeaseRateType; label: string }[]
-            ).map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setRateType(opt.value)}
-                className={cn(
-                  "flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-colors",
-                  rateType === opt.value
-                    ? "border-series-1 bg-series-1/10 text-series-1"
-                    : "border-ink-primary/20 bg-surface text-ink-secondary hover:bg-ink-primary/10"
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          {rateType === "PER_TROLLEY" && (
-            <>
-              <input required type="number" placeholder={t("soil.contractedQuantityTrolleys")} value={contractedQuantity} onChange={(e) => setContractedQuantity(e.target.value)} className={inputClass} />
-              <input required type="number" placeholder={t("soil.ratePerTrolleyRupees")} value={ratePerTrolley} onChange={(e) => setRatePerTrolley(e.target.value)} className={inputClass} />
-            </>
-          )}
-
-          {rateType === "PER_BIGHA" && (
-            <>
-              <input required type="number" placeholder={t("people.numberOfBighas")} value={contractedAreaBigha} onChange={(e) => setContractedAreaBigha(e.target.value)} className={inputClass} />
-              <input required type="number" placeholder={t("soil.ratePerBighaRupees")} value={ratePerBigha} onChange={(e) => setRatePerBigha(e.target.value)} className={inputClass} />
-              <input type="number" placeholder={t("soil.trolleyCapOptional")} value={contractedQuantity} onChange={(e) => setContractedQuantity(e.target.value)} className={inputClass} />
-              <input type="number" placeholder={t("soil.depthCapOptional")} value={contractedDepth} onChange={(e) => setContractedDepth(e.target.value)} className={inputClass} />
-            </>
-          )}
-
-          {rateType === "PER_DEPTH" && (
-            <>
-              <input required type="number" placeholder={t("soil.depthFeetPlaceholder")} value={contractedDepth} onChange={(e) => setContractedDepth(e.target.value)} className={inputClass} />
-              <input required type="number" placeholder={t("soil.ratePerFeetRupees")} value={ratePerDepthUnit} onChange={(e) => setRatePerDepthUnit(e.target.value)} className={inputClass} />
-              <input type="number" placeholder={t("soil.trolleyCapOptional")} value={contractedQuantity} onChange={(e) => setContractedQuantity(e.target.value)} className={inputClass} />
-            </>
-          )}
-
-          {rateType === "BOTH" && (
-            <>
-              <input required type="number" placeholder={t("people.numberOfBighas")} value={contractedAreaBigha} onChange={(e) => setContractedAreaBigha(e.target.value)} className={inputClass} />
-              <input required type="number" placeholder={t("soil.ratePerBighaRupees")} value={ratePerBigha} onChange={(e) => setRatePerBigha(e.target.value)} className={inputClass} />
-              <input required type="number" placeholder={t("soil.depthFeetPlaceholder")} value={contractedDepth} onChange={(e) => setContractedDepth(e.target.value)} className={inputClass} />
-              <input required type="number" placeholder={t("soil.ratePerFeetRupees")} value={ratePerDepthUnit} onChange={(e) => setRatePerDepthUnit(e.target.value)} className={inputClass} />
-            </>
-          )}
+          <input required type="number" placeholder={t("people.numberOfBighas")} value={contractedAreaBigha} onChange={(e) => setContractedAreaBigha(e.target.value)} className={inputClass} />
+          <input required type="number" placeholder={t("soil.ratePerBighaRupees")} value={ratePerBigha} onChange={(e) => setRatePerBigha(e.target.value)} className={inputClass} />
+          <input type="number" placeholder={t("soil.trolleyCapOptional")} value={contractedQuantity} onChange={(e) => setContractedQuantity(e.target.value)} className={inputClass} />
+          <input type="number" placeholder={t("soil.depthCapOptional")} value={contractedDepth} onChange={(e) => setContractedDepth(e.target.value)} className={inputClass} />
 
           <input type="number" placeholder={t("soil.advanceAmountRupees")} value={advanceAmount} onChange={(e) => setAdvanceAmount(e.target.value)} className={cn(inputClass, "col-span-2")} />
 

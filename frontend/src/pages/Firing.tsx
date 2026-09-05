@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { ArrowRight, Flame, Layers, Plus, Warehouse } from "lucide-react";
+import { ArrowRight, Flame, Layers, Pencil, Plus, Trash2, Warehouse } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -174,7 +174,7 @@ function useGangOptions() {
 
 interface ChamberActivityItem {
   id: string;
-  type: "STACKING" | "FUEL" | "NIKASI" | "GRADING";
+  type: "STACKING" | "FUEL" | "NIKASI" | "GRADING" | "FIRING_SHIFT" | "INCIDENT";
   date: string;
   label: string;
   quantityLabel: string;
@@ -195,18 +195,25 @@ function useChamberActivity(gherId: string) {
       setItems([]);
       return;
     }
-    const [stackingEntries, nikasiEntries, fuelLogs, gradings] = await Promise.all([
+    const [stackingEntries, nikasiEntries, fuelLogs, gradings, shifts, incidents] = await Promise.all([
       api.stacking.list({ gherId }),
       api.nikasi.list({ gherId }),
       api.fuelLogs.list(),
       api.chamberGradings.list(),
+      api.firingShifts.list(),
+      api.incidents.list(),
     ]);
-    const gherIdOf = (ref: { _id: string } | string) => (typeof ref === "object" ? ref._id : ref);
+    const gherIdOf = (ref: { _id: string } | string | undefined) => (typeof ref === "object" ? ref?._id : ref);
     const merged: ChamberActivityItem[] = [
       ...stackingEntries.map((e) => ({ id: e._id, type: "STACKING" as const, date: e.date, label: "Bharai", quantityLabel: `${e.bricksCount.toLocaleString("en-IN")} bricks` })),
       ...nikasiEntries.map((e) => ({ id: e._id, type: "NIKASI" as const, date: e.date, label: "Nikasi", quantityLabel: `${e.bricksCount.toLocaleString("en-IN")} bricks` })),
       ...fuelLogs.filter((l) => gherIdOf(l.gherId) === gherId).map((l) => ({ id: l._id, type: "FUEL" as const, date: l.date, label: l.fuelType, quantityLabel: `${l.quantityKg.toLocaleString("en-IN")} kg` })),
       ...gradings.filter((g) => gherIdOf(g.gherId) === gherId).map((g) => ({ id: g._id, type: "GRADING" as const, date: g.date, label: "Grading", quantityLabel: `${g.totalOutput.toLocaleString("en-IN")} bricks` })),
+      // Bug fix: these two record types carry a chamber id and are
+      // logically "this chamber's activity" too, but were never wired
+      // into the feed despite both having the foreign key.
+      ...shifts.filter((s) => gherIdOf(s.gherId) === gherId).map((s) => ({ id: s._id, type: "FIRING_SHIFT" as const, date: s.date, label: s.shiftType, quantityLabel: s.overtimeHours > 0 ? `${s.overtimeHours}h OT` : "" })),
+      ...incidents.filter((i) => gherIdOf(i.gherId) === gherId).map((i) => ({ id: i._id, type: "INCIDENT" as const, date: i.date, label: i.type, quantityLabel: i.repairCost > 0 ? `₹${i.repairCost.toLocaleString("en-IN")}` : "" })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     setItems(merged.slice(0, 15));
   }
@@ -220,6 +227,8 @@ function useChamberActivity(gherId: string) {
   useKilnEvent("nikasi:update", () => refresh());
   useKilnEvent("fuelLog:update", () => refresh());
   useKilnEvent("grading:update", () => refresh());
+  useKilnEvent("firingShift:update", () => refresh());
+  useKilnEvent("incident:update", () => refresh());
 
   return items;
 }
@@ -229,6 +238,8 @@ const ACTIVITY_TYPE_LABEL_KEY: Record<ChamberActivityItem["type"], string> = {
   FUEL: "firing.activityFuel",
   NIKASI: "firing.activityNikasi",
   GRADING: "firing.activityGrading",
+  FIRING_SHIFT: "firing.activityFiringShift",
+  INCIDENT: "firing.activityIncident",
 };
 
 // One chamber's own detail — status + an explicit advance action, its
@@ -250,6 +261,7 @@ function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entr
   const [fuelForm, setFuelForm] = useState({ fuelType: "", quantityKg: "" });
   const [nikasiForm, setNikasiForm] = useState({ gangId: "", bricksCount: "" });
   const [saving, setSaving] = useState(false);
+  const [quickLogError, setQuickLogError] = useState("");
 
   function refreshCost() {
     api.financialReports.chamberCost(gher._id).then(setCost).catch(console.error);
@@ -269,14 +281,21 @@ function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entr
     setOpenForm("");
   }, [gher._id]);
 
+  // Bug fix (D2): these three quick-log handlers used to have no catch at
+  // all — a rejection (a validation failure, a chamber-status guard) was a
+  // fully silent unhandled promise rejection, the form staying open with
+  // no indication anything went wrong.
   async function submitStacking(e: FormEvent) {
     e.preventDefault();
     if (!stackingForm.gangId || !stackingForm.bricksCount) return;
+    setQuickLogError("");
     setSaving(true);
     try {
       await api.stacking.create({ gherId: gher._id, gangId: stackingForm.gangId, stage: "STOCK_TO_CHAMBER", bricksCount: Number(stackingForm.bricksCount) });
       setStackingForm({ gangId: "", bricksCount: "" });
       setOpenForm("");
+    } catch (err) {
+      setQuickLogError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -285,11 +304,14 @@ function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entr
   async function submitFuel(e: FormEvent) {
     e.preventDefault();
     if (!fuelForm.fuelType || !fuelForm.quantityKg) return;
+    setQuickLogError("");
     setSaving(true);
     try {
       await api.fuelLogs.create({ gherId: gher._id, fuelType: fuelForm.fuelType, quantityKg: Number(fuelForm.quantityKg) });
       setFuelForm({ fuelType: "", quantityKg: "" });
       setOpenForm("");
+    } catch (err) {
+      setQuickLogError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -298,11 +320,14 @@ function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entr
   async function submitNikasi(e: FormEvent) {
     e.preventDefault();
     if (!nikasiForm.gangId || !nikasiForm.bricksCount) return;
+    setQuickLogError("");
     setSaving(true);
     try {
       await api.nikasi.create({ gherId: gher._id, gangId: nikasiForm.gangId, bricksCount: Number(nikasiForm.bricksCount) });
       setNikasiForm({ gangId: "", bricksCount: "" });
       setOpenForm("");
+    } catch (err) {
+      setQuickLogError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -370,6 +395,8 @@ function ChamberDetailPanel({ entry, gangOptions, fuelTypes, onAdvance }: { entr
           <Plus className="h-3.5 w-3.5" /> {t("firing.logNikasiForChamber")}
         </Button>
       </div>
+
+      {quickLogError && <p className="mt-2 text-sm text-status-critical">{quickLogError}</p>}
 
       {openForm === "stacking" && (
         <form onSubmit={submitStacking} className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-border bg-ink-primary/[0.02] p-3">
@@ -649,6 +676,57 @@ function FuelUsageTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
   const [loading, setLoading] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { page, setPage, pageCount, pageItems: pagedLogs, total } = usePagination(logs, 10);
+  // Bug fix: Fuel Log entries are fully CRUD on the backend, but this
+  // history exposed no edit/delete button at all despite the API existing.
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ gherId: "", fuelType: "", quantityKg: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [logError, setLogError] = useState("");
+
+  function startEditLog(l: FuelLog) {
+    setLogError("");
+    setEditingLogId(l._id);
+    setEditForm({
+      gherId: typeof l.gherId === "object" ? l.gherId._id : l.gherId,
+      fuelType: l.fuelType,
+      quantityKg: String(l.quantityKg),
+    });
+  }
+
+  async function saveEditLog(e: FormEvent) {
+    e.preventDefault();
+    if (!editingLogId || !editForm.gherId || !editForm.fuelType || !editForm.quantityKg) return;
+    setLogError("");
+    setSavingEdit(true);
+    try {
+      await api.fuelLogs.update(editingLogId, {
+        gherId: editForm.gherId,
+        fuelType: editForm.fuelType,
+        quantityKg: Number(editForm.quantityKg),
+      });
+      setEditingLogId(null);
+      await refresh();
+    } catch (err) {
+      setLogError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function deleteLog(id: string) {
+    if (!confirm(t("firing.confirmDeleteFuelLog"))) return;
+    setLogError("");
+    setDeletingLogId(id);
+    try {
+      await api.fuelLogs.remove(id);
+      await refresh();
+    } catch (err) {
+      setLogError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    } finally {
+      setDeletingLogId(null);
+    }
+  }
 
   useEffect(() => {
     if (!form.fuelType && fuelTypes.length > 0) {
@@ -670,6 +748,7 @@ function FuelUsageTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.gherId || !form.fuelType || !form.quantityKg) return;
+    setLogError("");
     setLoading(true);
     try {
       await api.fuelLogs.create({
@@ -680,6 +759,8 @@ function FuelUsageTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
       setForm((f) => ({ ...f, quantityKg: "" }));
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setLogError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -743,27 +824,87 @@ function FuelUsageTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
         </Card>
       )}
 
+      {logError && <p className="text-sm text-status-critical">{logError}</p>}
       <Card>
         {logs.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-muted">{t("firing.noFuelUsageLoggedYet")}</p>
         ) : (
           <div className="space-y-1">
-            {pagedLogs.map((l) => (
-              <div key={l._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
-                <div>
-                  <p className="text-ink-primary">
-                    {t("firing.gherFuelLine", {
-                      number: typeof l.gherId === "object" ? l.gherId.number : "—",
-                      fuelType: l.fuelType,
-                    })}
-                  </p>
-                  <p className="text-sm text-ink-muted">{new Date(l.date).toLocaleDateString("en-IN")}</p>
+            {pagedLogs.map((l) =>
+              editingLogId === l._id ? (
+                <form key={l._id} onSubmit={saveEditLog} className="grid grid-cols-2 gap-2 rounded-lg border border-series-1/30 bg-series-1/5 p-2">
+                  <select
+                    required
+                    value={editForm.gherId}
+                    onChange={(e) => setEditForm((f) => ({ ...f, gherId: e.target.value }))}
+                    className={inputClass}
+                  >
+                    <option value="">{t("firing.chamberPlaceholder")}</option>
+                    {ghers.map((g) => (
+                      <option key={g._id} value={g._id}>
+                        {t("firing.gherNumber", { number: g.number })}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={editForm.fuelType}
+                    onChange={(e) => setEditForm((f) => ({ ...f, fuelType: e.target.value }))}
+                    className={inputClass}
+                  >
+                    {fuelTypes.map((ft) => (
+                      <option key={ft._id} value={ft.name}>
+                        {ft.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    required
+                    type="number"
+                    placeholder={t("firing.quantityFedKg")}
+                    value={editForm.quantityKg}
+                    onChange={(e) => setEditForm((f) => ({ ...f, quantityKg: e.target.value }))}
+                    className={cn(inputClass, "col-span-2")}
+                  />
+                  <div className="col-span-2 flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setEditingLogId(null)} className="flex-1">
+                      {t("common.cancel")}
+                    </Button>
+                    <Button type="submit" disabled={savingEdit} className="flex-1">
+                      {t("common.saveChanges")}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div key={l._id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
+                  <div>
+                    <p className="text-ink-primary">
+                      {t("firing.gherFuelLine", {
+                        number: typeof l.gherId === "object" ? l.gherId.number : "—",
+                        fuelType: l.fuelType,
+                      })}
+                    </p>
+                    <p className="text-sm text-ink-muted">{new Date(l.date).toLocaleDateString("en-IN")}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="tabular-nums font-medium text-ink-primary">
+                      {l.quantityKg.toLocaleString("en-IN")} {t("firing.kg")}
+                    </span>
+                    <button type="button" onClick={() => startEditLog(l)} className="text-ink-muted hover:text-series-1" aria-label={t("common.edit")}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteLog(l._id)}
+                      disabled={deletingLogId === l._id}
+                      className="text-ink-muted hover:text-status-critical disabled:opacity-50"
+                      aria-label={t("common.delete")}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <span className="tabular-nums font-medium text-ink-primary">
-                  {l.quantityKg.toLocaleString("en-IN")} {t("firing.kg")}
-                </span>
-              </div>
-            ))}
+              )
+            )}
             <Pagination page={page} pageCount={pageCount} onChange={setPage} total={total} pageSize={10} />
           </div>
         )}
@@ -869,6 +1010,8 @@ function ShiftsTab() {
     bonusAmount: "",
   });
   const [loading, setLoading] = useState(false);
+  const [deletingShiftId, setDeletingShiftId] = useState<string | null>(null);
+  const [shiftError, setShiftError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
 
   async function refresh() {
@@ -880,6 +1023,23 @@ function ShiftsTab() {
     setShifts(shiftData);
     setFitters(fitterData);
     setRoster(rosterData);
+  }
+
+  // Bug fix: Firing Shift entries had no delete path at all — no edit/
+  // delete affordance anywhere, unlike every other production-entry
+  // module (Molding/Stacking/Nikasi all support this).
+  async function handleDeleteShift(id: string) {
+    if (!confirm(t("firing.confirmDeleteShift"))) return;
+    setShiftError("");
+    setDeletingShiftId(id);
+    try {
+      await api.firingShifts.remove(id);
+      await refresh();
+    } catch (err) {
+      setShiftError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    } finally {
+      setDeletingShiftId(null);
+    }
   }
 
   useEffect(() => {
@@ -901,6 +1061,7 @@ function ShiftsTab() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.fitterId) return;
+    setShiftError("");
     setLoading(true);
     try {
       await api.firingShifts.create({
@@ -915,6 +1076,8 @@ function ShiftsTab() {
       setForm({ fitterId: "", gherId: "", shiftType: "DAY", handoverNotes: "", overtimeHours: "", overtimeRate: "", bonusAmount: "" });
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setShiftError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -999,6 +1162,7 @@ function ShiftsTab() {
         </Card>
       )}
 
+      {shiftError && <p className="text-sm text-status-critical">{shiftError}</p>}
       <Card>
         {shifts.length === 0 ? (
           <p className="py-8 text-center text-sm text-ink-muted">{t("firing.noShiftsLoggedYet")}</p>
@@ -1020,7 +1184,18 @@ function ShiftsTab() {
                     · <Badge variant="neutral">{s.shiftType}</Badge>
                     {typeof s.gherId === "object" && s.gherId ? ` · ${t("firing.gherNumber", { number: s.gherId.number })}` : ""}
                   </p>
-                  <span className="text-sm text-ink-muted">{new Date(s.date).toLocaleDateString("en-IN")}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-ink-muted">{new Date(s.date).toLocaleDateString("en-IN")}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteShift(s._id)}
+                      disabled={deletingShiftId === s._id}
+                      aria-label={t("common.delete")}
+                      className="text-ink-muted hover:text-status-critical disabled:opacity-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
                 {s.handoverNotes && <p className="mt-1 text-sm text-ink-muted">{s.handoverNotes}</p>}
                 {(s.overtimeHours > 0 || s.bonusAmount > 0) && (
@@ -1054,6 +1229,7 @@ function GradingTab() {
   const [gherId, setGherId] = useState("");
   const [items, setItems] = useState<LineItemRow[]>([emptyLineItemRow()]);
   const [loading, setLoading] = useState(false);
+  const [gradingError, setGradingError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { page, setPage, pageCount, pageItems: pagedGradings, total } = usePagination(gradings, 10);
 
@@ -1078,9 +1254,14 @@ function GradingTab() {
 
   const validItems = items.filter(isValidLineItemRow);
 
+  // Bug fix (D2): no catch at all — this is exactly where chamberGrading.
+  // service.ts's own D1 guard (rejecting a grading against a chamber that
+  // isn't UNLOADING, with a real, actionable message) used to get silently
+  // swallowed, since nothing here ever surfaced a rejection to the admin.
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!gherId || validItems.length === 0) return;
+    setGradingError("");
     setLoading(true);
     try {
       await api.chamberGradings.create({
@@ -1091,6 +1272,8 @@ function GradingTab() {
       setItems([emptyLineItemRow()]);
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setGradingError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -1133,6 +1316,7 @@ function GradingTab() {
               ))}
             </select>
             <BrickLineItemsEditor items={items} onChange={setItems} categories={categories} pricingEnabled={false} />
+            {gradingError && <p className="text-sm text-status-critical">{gradingError}</p>}
             <Button type="submit" disabled={loading || !gherId || validItems.length === 0}>
               {t("firing.saveGrading")}
             </Button>
@@ -1217,6 +1401,7 @@ function IncidentsTab() {
     bricksLost: "",
   });
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { page, setPage, pageCount, pageItems: pagedIncidents, total } = usePagination(incidents, 10);
 
@@ -1234,6 +1419,7 @@ function IncidentsTab() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.description) return;
+    setFormError("");
     setLoading(true);
     try {
       await api.incidents.create({
@@ -1246,6 +1432,8 @@ function IncidentsTab() {
       setForm({ type: "CRACK_LEAKAGE", gherId: "", description: "", repairCost: "", bricksLost: "" });
       setShowForm(false);
       await refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setLoading(false);
     }
@@ -1306,6 +1494,7 @@ function IncidentsTab() {
               onChange={(e) => setForm((f) => ({ ...f, bricksLost: e.target.value }))}
               className={inputClass}
             />
+            {formError && <p className="col-span-2 text-sm text-status-critical">{formError}</p>}
             <Button type="submit" disabled={loading} className="col-span-2">
               {t("firing.saveIncident")}
             </Button>

@@ -15,7 +15,7 @@ export interface MarkAttendanceInput {
 }
 
 // Eligible for attendance marking: WORKER/HELPER (piece-rate),
-// LABOUR_CONTRACTOR/THEKEDAR (thekedars — often paid PER_THOUSAND, so no
+// LABOUR_CONTRACTOR (thekedars — often paid PER_THOUSAND, so no
 // monthlySalary to fall back on), plus anyone with a monthlySalary set —
 // not a fixed type list, since which types actually carry a monthly
 // salary varies by kiln (this deployment's real data includes salaried
@@ -28,7 +28,6 @@ async function assertAttendanceEligible(kilnId: string, personId: string) {
     person.type === "WORKER" ||
     person.type === "HELPER" ||
     person.type === "LABOUR_CONTRACTOR" ||
-    person.type === "THEKEDAR" ||
     person.monthlySalary != null;
   if (!eligible) throw new Error("This person isn't eligible for attendance tracking (no monthly salary, not a worker/helper/thekedar)");
   return person;

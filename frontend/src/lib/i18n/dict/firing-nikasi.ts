@@ -54,6 +54,8 @@ export const firingNikasiDict: Record<string, Record<Locale, string>> = {
   "firing.performanceBonusPlaceholder": { en: "Performance bonus (₹, optional)", hi: "प्रदर्शन बोनस (₹, वैकल्पिक)" },
   "firing.saveShift": { en: "Save shift", hi: "पारी सहेजें" },
   "firing.noShiftsLoggedYet": { en: "No shifts logged yet.", hi: "अभी तक कोई पारी दर्ज नहीं हुई।" },
+  "firing.confirmDeleteShift": { en: "Delete this shift? Any OT/bonus already posted to the fitter's ledger will be reversed.", hi: "इस पारी को हटाएं? फिटर के खाते में जमा कोई भी ओवरटाइम/बोनस उलट दिया जाएगा।" },
+  "firing.confirmDeleteFuelLog": { en: "Delete this fuel log entry?", hi: "इस फ्यूल लॉग प्रविष्टि को हटाएं?" },
   "firing.hoursOT": { en: "{hours}h OT", hi: "{hours} घंटे ओवरटाइम" },
   "firing.bonusAmount": { en: "₹{amount} bonus", hi: "₹{amount} बोनस" },
 
@@ -112,6 +114,8 @@ export const firingNikasiDict: Record<string, Record<Locale, string>> = {
   "firing.activityFuel": { en: "Fuel", hi: "ईंधन" },
   "firing.activityNikasi": { en: "Nikasi", hi: "निकासी" },
   "firing.activityGrading": { en: "Grading", hi: "ग्रेडिंग" },
+  "firing.activityFiringShift": { en: "Shift", hi: "शिफ्ट" },
+  "firing.activityIncident": { en: "Incident", hi: "घटना" },
 
   // ---- Firing.tsx: incidents tab ----
   "firing.logIncidentEmergency": { en: "Log incident / emergency", hi: "घटना / आपातकाल दर्ज करें" },

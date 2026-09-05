@@ -34,6 +34,13 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  // Bug fix: this used to capture only name/phone/address + contract —
+  // missing idNumber (Aadhaar), nickname, joiningDate, and the identity-
+  // proof upload that the profile's own edit form all support.
+  const [idNumber, setIdNumber] = useState("");
+  const [nickname, setNickname] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
+  const [identityProof, setIdentityProof] = useState<File | null>(null);
   const [photo, setPhoto] = useState<File | Blob | null>(null);
   const [rateType, setRateType] = useState<SandContractRateType>("PER_TROLLEY");
   const [contractedTrolleys, setContractedTrolleys] = useState("");
@@ -87,6 +94,9 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
         name: name.trim(),
         phone: phone || undefined,
         address: address || undefined,
+        idNumber: idNumber || undefined,
+        nickname: nickname.trim() || undefined,
+        joiningDate: joiningDate || undefined,
       });
 
       if (photo) {
@@ -94,6 +104,13 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
           await api.people.uploadPhoto(person._id, photo);
         } catch {
           setUploadWarning(t("people.photoUploadFailedAfterCreate", { name: person.name }));
+        }
+      }
+      if (identityProof) {
+        try {
+          await api.people.uploadIdentityProof(person._id, identityProof);
+        } catch {
+          setUploadWarning(t("people.identityProofUploadFailedAfterCreate", { name: person.name }));
         }
       }
 
@@ -140,10 +157,22 @@ export function AddSandContractorModal({ onClose, onCreated }: AddSandContractor
               <input placeholder={t("people.mobileNumber")} value={phone} onChange={(e) => setPhone(e.target.value)} className={inputClass} />
             </div>
             <input placeholder={t("people.address")} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder={t("people.nickname")} value={nickname} onChange={(e) => setNickname(e.target.value)} className={inputClass} />
+              <input placeholder={t("people.aadharIdNumber")} value={idNumber} onChange={(e) => setIdNumber(e.target.value)} className={inputClass} />
+            </div>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
+              <DateInput value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
+            </label>
             <div>
               <p className="mb-1 text-xs text-ink-muted">{t("people.photoOptional")}</p>
               <PhotoCaptureInput value={photo} onChange={setPhoto} />
             </div>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-ink-muted">{t("people.uploadIdentityProofHint")}</span>
+              <input type="file" accept="image/*,.pdf" onChange={(e) => setIdentityProof(e.target.files?.[0] ?? null)} className={inputClass} />
+            </label>
           </div>
 
           {/* Contract */}

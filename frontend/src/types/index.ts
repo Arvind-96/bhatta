@@ -397,11 +397,12 @@ export interface DispatchTotals {
   dispatchCount: number;
 }
 
+// Bug fix (C2): THEKEDAR merged into LABOUR_CONTRACTOR — see
+// backend/src/db/schema/people.ts's own comment for why.
 export type PersonType =
   | "DRIVER"
   | "LABOUR_CONTRACTOR"
   | "SUPPLIER"
-  | "THEKEDAR"
   | "PARTNER"
   | "WORKER"
   | "HELPER"

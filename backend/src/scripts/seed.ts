@@ -135,7 +135,7 @@ async function main() {
     ["Ramesh Thekedar", "Naresh Contractor"].map((name) =>
       createPerson({
         kilnId,
-        type: "THEKEDAR",
+        type: "LABOUR_CONTRACTOR",
         name,
         phone: randPhone(),
         contractRate: randInt(6000, 8000),

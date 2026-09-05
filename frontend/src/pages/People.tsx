@@ -301,18 +301,18 @@ function ThekedarTab({ onOpenThekedar }: { onOpenThekedar: (id: string) => void 
   const workTypeLabels = useWorkTypeLabels();
 
   async function refresh() {
-    // "THEKEDAR" is a separate raw person-type from "LABOUR_CONTRACTOR" in
-    // the schema (a legacy naming split), but both mean the same thing to
-    // the admin — merged here so a THEKEDAR-typed record (previously only
-    // reachable via the now-removed "Other" tab) shows up under this tab
-    // like every other contractor.
-    const [contractorList, thekedarList, workers, helpers] = await Promise.all([
+    // Bug fix (C2): THEKEDAR used to be a separate raw person-type from
+    // LABOUR_CONTRACTOR in the schema (a legacy naming split, structurally
+    // dead — no contractor-link field ever allow-listed it), requiring
+    // this dual-fetch-and-merge workaround so a THEKEDAR-typed record
+    // showed up under this tab too. Merged into LABOUR_CONTRACTOR at the
+    // schema level, so a single fetch now covers every contractor.
+    const [contractorList, workers, helpers] = await Promise.all([
       api.people.list("LABOUR_CONTRACTOR"),
-      api.people.list("THEKEDAR"),
       api.people.list("WORKER"),
       api.people.list("HELPER"),
     ]);
-    setContractors([...contractorList, ...thekedarList]);
+    setContractors(contractorList);
     const counts = new Map<string, number>();
     const workTypes = new Map<string, Set<WorkType>>();
     for (const p of [...workers, ...helpers]) {

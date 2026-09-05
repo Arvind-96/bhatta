@@ -214,9 +214,11 @@ function AgentEditForm({ agentId, existing, onClose, onSaved }: { agentId: strin
   const [monthlySalesTarget, setMonthlySalesTarget] = useState(existing.monthlySalesTarget?.toString() ?? "");
   const [referralCode, setReferralCode] = useState(existing.referralCode ?? "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setFormError("");
     setSaving(true);
     try {
       await api.people.update(agentId, {
@@ -229,6 +231,8 @@ function AgentEditForm({ agentId, existing, onClose, onSaved }: { agentId: strin
         referralCode: referralCode.trim() || undefined,
       });
       onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -261,6 +265,7 @@ function AgentEditForm({ agentId, existing, onClose, onSaved }: { agentId: strin
       )}
       <input type="number" min={0} value={monthlySalesTarget} onChange={(e) => setMonthlySalesTarget(e.target.value)} className={inputClass} placeholder={t("salesAgent.monthlyTargetPlaceholder")} />
       <input value={referralCode} onChange={(e) => setReferralCode(e.target.value)} className={inputClass} placeholder={t("salesAgent.referralCodePlaceholder")} />
+      {formError && <p className="text-sm text-status-critical">{formError}</p>}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={saving}>
           {saving ? t("settings.savingEllipsis") : t("common.save")}

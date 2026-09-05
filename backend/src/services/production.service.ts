@@ -22,7 +22,7 @@ export interface CreateProductionInput {
 // push finds the existing row and bumps its version instead of duplicating it.
 export async function createProductionLog(input: CreateProductionInput) {
   const thekedar = input.thekedarId
-    ? await assertPersonOfType(input.kilnId, input.thekedarId, ["THEKEDAR"])
+    ? await assertPersonOfType(input.kilnId, input.thekedarId, ["LABOUR_CONTRACTOR"])
     : null;
 
   let log: typeof productionLogs.$inferSelect;

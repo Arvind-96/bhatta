@@ -38,7 +38,6 @@ function isWageEligible(person: Person) {
     person.type === "WORKER" ||
     person.type === "HELPER" ||
     person.type === "LABOUR_CONTRACTOR" ||
-    person.type === "THEKEDAR" ||
     person.monthlySalary != null
   );
 }

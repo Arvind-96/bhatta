@@ -212,7 +212,6 @@ const coreDict: Record<string, Record<Locale, string>> = {
   "common.personType.DRIVER": { en: "Driver", hi: "ड्राइवर" },
   "common.personType.LABOUR_CONTRACTOR": { en: "Labour Contractor (Thekedar)", hi: "ठेकेदार (लेबर)" },
   "common.personType.SUPPLIER": { en: "Supplier", hi: "आपूर्तिकर्ता" },
-  "common.personType.THEKEDAR": { en: "Thekedar", hi: "ठेकेदार" },
   "common.personType.PARTNER": { en: "Partner", hi: "साझेदार" },
   "common.personType.WORKER": { en: "Worker", hi: "मज़दूर" },
   "common.personType.HELPER": { en: "Helper", hi: "सहायक" },

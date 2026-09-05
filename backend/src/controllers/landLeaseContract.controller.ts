@@ -10,14 +10,24 @@ import {
   updateLandLeaseContract,
   updateLandLeaseContractStatus,
 } from "../services/landLeaseContract.service";
-import { LAND_LEASE_DEPTH_UNITS, LAND_LEASE_RATE_TYPES, LAND_LEASE_CONTRACT_STATUSES, LEDGER_PAYMENT_MODES } from "../db/schema";
+import { LAND_LEASE_DEPTH_UNITS, LAND_LEASE_CONTRACT_STATUSES, LEDGER_PAYMENT_MODES } from "../db/schema";
 import { validateCashOnlineSplit } from "../utils/paymentSplit";
+
+// Bug fix: rateType used to accept any of the full 4-way soil-contract
+// enum here, even though this land is used exclusively for raw-brick
+// molding — there's no excavation quantity or depth to price against, so
+// the create form has never shown a picker (always PER_BIGHA). The
+// backend not enforcing that let a direct API call, or the Edit modal
+// (see C5b — a verbatim clone of Soil's, exposing the full switcher),
+// retroactively turn a Land Lease contract into a PER_TROLLEY or
+// depth-priced one that contradicts the type's own design intent.
+const landLeaseRateTypeSchema = z.literal("PER_BIGHA");
 
 const createSchema = z
   .object({
     landId: z.string(),
     landLeaseId: z.string(),
-    rateType: z.enum(LAND_LEASE_RATE_TYPES).optional(),
+    rateType: landLeaseRateTypeSchema.optional(),
     contractedQuantity: z.number().positive().optional(),
     ratePerTrolley: z.number().positive().optional(),
     contractedAreaBigha: z.number().positive().optional(),
@@ -74,7 +84,7 @@ export async function getOne(req: AuthedRequest, res: Response) {
 // (updateLandLeaseContract) against that delta, same reasoning as
 // soilContract.controller.ts's updateSchema.
 const updateSchema = z.object({
-  rateType: z.enum(LAND_LEASE_RATE_TYPES).optional(),
+  rateType: landLeaseRateTypeSchema.optional(),
   contractedQuantity: z.number().positive().optional(),
   ratePerTrolley: z.number().positive().optional(),
   contractedAreaBigha: z.number().positive().optional(),

@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { z } from "zod";
 import { AuthedRequest } from "../middleware/auth.middleware";
-import { createFiringShift, fitterRosterSummary, listFiringShifts } from "../services/firingShift.service";
+import { createFiringShift, deleteFiringShift, fitterRosterSummary, listFiringShifts } from "../services/firingShift.service";
 import { SHIFT_TYPES } from "../db/schema";
 
 const createSchema = z.object({
@@ -32,6 +32,11 @@ export async function list(req: AuthedRequest, res: Response) {
     fitterId: req.query.fitterId as string | undefined,
   });
   res.json(shifts);
+}
+
+export async function remove(req: AuthedRequest, res: Response) {
+  await deleteFiringShift(req.kiln!.id, req.params.id);
+  res.status(204).end();
 }
 
 export async function roster(req: AuthedRequest, res: Response) {

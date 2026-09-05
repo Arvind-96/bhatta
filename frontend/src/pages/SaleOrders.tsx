@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { Fragment, FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ClipboardList, Plus, X } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -209,11 +209,32 @@ export function SaleOrders() {
   const [cancelling, setCancelling] = useState<SaleOrder | null>(null);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [cancelError, setCancelError] = useState("");
+  // Bug fix (H7): saleOrders.saleOrderId is stamped onto every Dispatch
+  // created by fulfilling that order, but nothing surfaced which
+  // dispatch(es) actually fulfilled a given order — the data resolved
+  // correctly, the UI just never showed it anywhere.
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [fulfillingDispatches, setFulfillingDispatches] = useState<Awaited<ReturnType<typeof api.dispatch.bySaleOrder>>>([]);
+  const [loadingDispatches, setLoadingDispatches] = useState(false);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
 
   async function refresh() {
     setOrders(await api.saleOrders.list());
+  }
+
+  async function toggleExpand(orderId: string) {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+      return;
+    }
+    setExpandedOrderId(orderId);
+    setLoadingDispatches(true);
+    try {
+      setFulfillingDispatches(await api.dispatch.bySaleOrder(orderId));
+    } finally {
+      setLoadingDispatches(false);
+    }
   }
 
   useEffect(() => {
@@ -268,8 +289,17 @@ export function SaleOrders() {
                 </thead>
                 <tbody>
                   {orders.map((o) => (
-                    <tr key={o._id} className="border-b border-border/60 last:border-0">
-                      <td className="py-3 text-ink-primary">{o.sequenceNumber != null ? `SO-${o.sequenceNumber}` : "—"}</td>
+                    <Fragment key={o._id}>
+                    <tr className="border-b border-border/60 last:border-0">
+                      <td className="py-3 text-ink-primary">
+                        {o.bricksFulfilled > 0 ? (
+                          <button type="button" onClick={() => toggleExpand(o._id)} className="hover:underline">
+                            {o.sequenceNumber != null ? `SO-${o.sequenceNumber}` : "—"}
+                          </button>
+                        ) : (
+                          o.sequenceNumber != null ? `SO-${o.sequenceNumber}` : "—"
+                        )}
+                      </td>
                       <td className="py-3 text-ink-secondary">{o.customerName}</td>
                       <td className="py-3 text-right tabular-nums text-ink-secondary">{o.bricksCount.toLocaleString("en-IN")}</td>
                       <td className="py-3 text-right tabular-nums font-medium text-ink-primary">{(o.bricksCount - o.bricksFulfilled).toLocaleString("en-IN")}</td>
@@ -291,6 +321,30 @@ export function SaleOrders() {
                         </div>
                       </td>
                     </tr>
+                    {expandedOrderId === o._id && (
+                      <tr className="border-b border-border/60 bg-ink-primary/[0.02] last:border-0">
+                        <td colSpan={6} className="py-2.5 pl-4">
+                          {loadingDispatches ? (
+                            <p className="text-xs text-ink-muted">{t("common.loading")}</p>
+                          ) : fulfillingDispatches.length === 0 ? (
+                            <p className="text-xs text-ink-muted">{t("saleOrder.noDispatchesYet")}</p>
+                          ) : (
+                            <ul className="space-y-1">
+                              {fulfillingDispatches.map((d) => (
+                                <li key={d._id} className="flex items-center gap-2 text-xs text-ink-secondary">
+                                  <span className="font-medium">{d.slipNumber != null ? `#${d.slipNumber}` : d._id.slice(0, 8)}</span>
+                                  <span>{new Date(d.dispatchedOn).toLocaleDateString("en-IN")}</span>
+                                  <span className="tabular-nums">₹{formatINR(d.amount)}</span>
+                                  <span className="tabular-nums">{d.bricksCount.toLocaleString("en-IN")} {t("saleOrder.bricksSuffix")}</span>
+                                  {d.cancelled && <span className="rounded-full bg-ink-primary/10 px-2 py-0.5 text-ink-muted">{t("common.cancelledBadge")}</span>}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

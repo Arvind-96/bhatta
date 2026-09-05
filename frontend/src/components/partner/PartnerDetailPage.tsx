@@ -35,10 +35,12 @@ function AddAssetForm({
   const [rentalRateUnit, setRentalRateUnit] = useState(existing?.rentalRateUnit ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!description.trim()) return;
+    setFormError("");
     setSaving(true);
     try {
       const input = {
@@ -52,6 +54,8 @@ function AddAssetForm({
       if (existing) await api.partnerAssets.update(existing._id, input);
       else await api.partnerAssets.create({ ...input, partnerId });
       onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -90,6 +94,7 @@ function AddAssetForm({
           <input placeholder={t("partner.rentalRateUnitPlaceholder")} value={rentalRateUnit} onChange={(e) => setRentalRateUnit(e.target.value)} className={inputClass + " flex-1"} />
         </div>
         <input placeholder={t("common.notes")} value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
+        {formError && <p className="text-sm text-status-critical">{formError}</p>}
         <div className="flex gap-2">
           <Button type="submit" size="sm" disabled={saving || !description.trim()}>
             {saving ? t("settings.savingEllipsis") : t("common.save")}
@@ -119,6 +124,7 @@ export function PartnerDetailPage({ partnerId, onBack, onDeleted }: PartnerDetai
   const [pendingDeleteAssetId, setPendingDeleteAssetId] = useState<string | null>(null);
   const [ledgerOpen, setLedgerOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteAssetError, setDeleteAssetError] = useState("");
 
   async function refresh() {
     setDetail(await api.partners.detail(partnerId, days));
@@ -359,12 +365,19 @@ export function PartnerDetailPage({ partnerId, onBack, onDeleted }: PartnerDetai
           detail={t("partner.confirmDeleteAsset")}
           confirmLabel={t("common.delete")}
           loading={deleting}
-          onCancel={() => setPendingDeleteAssetId(null)}
+          error={deleteAssetError}
+          onCancel={() => {
+            setPendingDeleteAssetId(null);
+            setDeleteAssetError("");
+          }}
           onConfirm={async () => {
+            setDeleteAssetError("");
             setDeleting(true);
             try {
               await api.partnerAssets.remove(pendingDeleteAsset._id);
               setPendingDeleteAssetId(null);
+            } catch (err) {
+              setDeleteAssetError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
             } finally {
               setDeleting(false);
             }
@@ -385,9 +398,11 @@ function PartnerEditForm({ partnerId, existing, onClose, onSaved }: { partnerId:
   const [partnershipDate, setPartnershipDate] = useState(existing.partnershipDate?.slice(0, 10) ?? "");
   const [profitSharePercent, setProfitSharePercent] = useState(existing.profitSharePercent?.toString() ?? "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setFormError("");
     setSaving(true);
     try {
       await api.people.update(partnerId, {
@@ -398,6 +413,8 @@ function PartnerEditForm({ partnerId, existing, onClose, onSaved }: { partnerId:
         profitSharePercent: profitSharePercent ? Number(profitSharePercent) : undefined,
       });
       onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -410,6 +427,7 @@ function PartnerEditForm({ partnerId, existing, onClose, onSaved }: { partnerId:
       <input value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} placeholder={t("partner.addressPlaceholder")} />
       <input type="date" value={partnershipDate} onChange={(e) => setPartnershipDate(e.target.value)} className={inputClass} />
       <input type="number" min={0} max={100} step="0.01" value={profitSharePercent} onChange={(e) => setProfitSharePercent(e.target.value)} className={inputClass} placeholder={t("partner.profitSharePlaceholder")} />
+      {formError && <p className="text-sm text-status-critical">{formError}</p>}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={saving}>
           {saving ? t("settings.savingEllipsis") : t("common.save")}

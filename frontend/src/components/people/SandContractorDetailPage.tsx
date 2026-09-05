@@ -77,6 +77,10 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
   const [editingDelivery, setEditingDelivery] = useState<SandDelivery | null>(null);
   const [editingContract, setEditingContract] = useState<SandContract | null>(null);
   const [editingLedgerEntry, setEditingLedgerEntry] = useState<LedgerEntry | null>(null);
+  // Bug fix (C3): every mutation below used to have no visible error
+  // surface at all — a rejection was a silent unhandled promise rejection.
+  const [profileError, setProfileError] = useState("");
+  const [contractError, setContractError] = useState("");
   const kilns = useAuthStore((s) => s.kilns);
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const activeKiln = kilns.find((k) => k.kilnId === activeKilnId);
@@ -117,6 +121,7 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
 
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
+    setProfileError("");
     setSavingProfile(true);
     try {
       await api.people.update(sandContractorId, {
@@ -129,6 +134,8 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
       });
       await refresh();
       setIsEditing(false);
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSavingProfile(false);
     }
@@ -148,10 +155,13 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
 
   async function handlePhotoChange(file: File | Blob | null) {
     if (!file) return;
+    setProfileError("");
     setUploadingPhoto(true);
     try {
       await api.people.uploadPhoto(sandContractorId, file);
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -159,10 +169,13 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
 
   async function handleIdentityProofChange(file: File | null) {
     if (!file) return;
+    setProfileError("");
     setUploadingPhoto(true);
     try {
       await api.people.uploadIdentityProof(sandContractorId, file);
       await refresh();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setUploadingPhoto(false);
     }
@@ -172,14 +185,24 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
   async function deleteProfile() {
     if (!contractor) return;
     if (!confirm(t("people.confirmDeleteSandContractorProfile", { name: contractor.name }))) return;
-    await api.people.update(sandContractorId, { active: false });
-    onBack();
+    setProfileError("");
+    try {
+      await api.people.update(sandContractorId, { active: false });
+      onBack();
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   async function deleteContract(contract: SandContract) {
     if (!confirm(t("sand.confirmDeleteContract", { contractNumber: contract.contractNumber }))) return;
-    await api.sandContracts.remove(contract._id);
-    await refresh();
+    setContractError("");
+    try {
+      await api.sandContracts.remove(contract._id);
+      await refresh();
+    } catch (err) {
+      setContractError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
+    }
   }
 
   function printContract(contract: SandContract) {
@@ -289,6 +312,7 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
             </Button>
           </div>
         </div>
+        {profileError && <p className="mt-2 text-sm text-status-critical">{profileError}</p>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -312,6 +336,7 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
                 <span className="text-xs text-ink-muted">{t("people.joiningDate")}</span>
                 <DateInput value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className={inputClass} />
               </label>
+              {profileError && <p className="text-sm text-status-critical">{profileError}</p>}
               <Button type="submit" size="sm" disabled={savingProfile}>
                 {t("people.saveProfile")}
               </Button>
@@ -402,6 +427,7 @@ export function SandContractorDetailPage({ sandContractorId, onBack }: SandContr
               <p className="text-sm text-ink-muted">{contractBalance >= 0 ? t("sand.remainingDue") : t("sand.advanceOutstanding")}</p>
             </div>
           </div>
+          {contractError && <p className="mt-2 text-sm text-status-critical">{contractError}</p>}
           {contracts.length > 0 && (
             <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
               {contracts.map((c) => (

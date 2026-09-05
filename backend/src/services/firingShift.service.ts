@@ -48,6 +48,35 @@ export async function createFiringShift(input: CreateShiftInput) {
   return shift;
 }
 
+// Bug fix: Firing Shift entries had no delete path at all — no service
+// function, no controller route, read-only rows with no edit/delete
+// affordance, unlike every other production-entry module (Molding/
+// Stacking/Nikasi all support this). Same reversal-entry pattern
+// deleteMoldingEntry uses: no stored link exists from a shift to the
+// ledger entry it posted, so the OT/bonus is reversed with an equal,
+// opposite PAID correction instead of trying to find and delete the
+// original DUE entry.
+export async function deleteFiringShift(kilnId: string, shiftId: string) {
+  const existing = (await db.select().from(firingShifts).where(and(eq(firingShifts._id, shiftId), eq(firingShifts.kilnId, kilnId))))[0];
+  if (!existing) throw new Error("Firing shift not found in this kiln");
+
+  const otAmount = (existing.overtimeHours ?? 0) * (existing.overtimeRate ?? 0);
+  const totalDue = otAmount + (existing.bonusAmount ?? 0);
+  if (totalDue > 0) {
+    await addLedgerEntry({
+      kilnId,
+      personId: existing.fitterId,
+      direction: "PAID",
+      amount: totalDue,
+      reason: `Shift deleted: reversing ₹${totalDue.toLocaleString("en-IN")} OT/bonus`,
+      category: "WAGE",
+    });
+  }
+
+  await db.delete(firingShifts).where(eq(firingShifts._id, shiftId));
+  emitToKiln(kilnId, "firingShift:update", { _id: shiftId, deleted: true });
+}
+
 export interface ListFiringShiftFilter {
   days?: number;
   fitterId?: string;

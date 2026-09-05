@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Banknote, Plus } from "lucide-react";
+import { Banknote, Pencil, Plus } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-input";
@@ -14,26 +14,40 @@ import type { BankAccount, BankTransaction, BankTransactionDirection, BankReconc
 const inputClass =
   "h-10 rounded-xl border border-border bg-ink-primary/5 px-3 text-sm text-ink-primary outline-none focus:ring-2 focus:ring-series-1";
 
-function AddAccountForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+// Bug fix (H9): Bank Account has a working backend update endpoint, wired
+// into the API client, but no edit UI anywhere called it — a typo'd bank
+// name/label/account number could never be corrected. `existing` set means
+// this same form edits in place instead of creating a new account.
+function AddAccountForm({ existing, onClose, onSaved }: { existing?: BankAccount; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
-  const [bankName, setBankName] = useState("");
-  const [accountLabel, setAccountLabel] = useState("");
-  const [accountNumberLast4, setAccountNumberLast4] = useState("");
-  const [openingBalance, setOpeningBalance] = useState("");
+  const [bankName, setBankName] = useState(existing?.bankName ?? "");
+  const [accountLabel, setAccountLabel] = useState(existing?.accountLabel ?? "");
+  const [accountNumberLast4, setAccountNumberLast4] = useState(existing?.accountNumberLast4 ?? "");
+  const [openingBalance, setOpeningBalance] = useState(existing?.openingBalance != null ? String(existing.openingBalance) : "");
+  // Bug fix: the backend has always accepted openingBalanceDate, but this
+  // form had no field for it at all.
+  const [openingBalanceDate, setOpeningBalanceDate] = useState(existing?.openingBalanceDate?.slice(0, 10) ?? "");
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!bankName.trim()) return;
+    setFormError("");
     setSaving(true);
     try {
-      await api.bankAccounts.create({
+      const input = {
         bankName: bankName.trim(),
         accountLabel: accountLabel.trim() || undefined,
         accountNumberLast4: accountNumberLast4.trim() || undefined,
         openingBalance: openingBalance ? Number(openingBalance) : undefined,
-      });
+        openingBalanceDate: openingBalanceDate || undefined,
+      };
+      if (existing) await api.bankAccounts.update(existing._id, input);
+      else await api.bankAccounts.create(input);
       onSaved();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : t("common.somethingWentWrong"));
     } finally {
       setSaving(false);
     }
@@ -42,13 +56,18 @@ function AddAccountForm({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   return (
     <Card className="max-w-md">
       <CardHeader>
-        <CardTitle>{t("bankRecon.newAccount")}</CardTitle>
+        <CardTitle>{existing ? t("bankRecon.editAccount") : t("bankRecon.newAccount")}</CardTitle>
       </CardHeader>
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input required placeholder={t("bankRecon.bankNamePlaceholder")} value={bankName} onChange={(e) => setBankName(e.target.value)} className={inputClass} />
         <input placeholder={t("bankRecon.accountLabelPlaceholder")} value={accountLabel} onChange={(e) => setAccountLabel(e.target.value)} className={inputClass} />
         <input placeholder={t("bankRecon.last4Placeholder")} value={accountNumberLast4} onChange={(e) => setAccountNumberLast4(e.target.value)} className={inputClass} />
         <input type="number" placeholder={t("bankRecon.openingBalancePlaceholder")} value={openingBalance} onChange={(e) => setOpeningBalance(e.target.value)} className={inputClass} />
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-ink-muted">{t("bankRecon.openingBalanceDateLabel")}</span>
+          <DateInput value={openingBalanceDate} onChange={(e) => setOpeningBalanceDate(e.target.value)} className={inputClass} />
+        </label>
+        {formError && <p className="text-sm text-status-critical">{formError}</p>}
         <div className="flex gap-2">
           <Button type="submit" disabled={saving || !bankName.trim()}>
             {saving ? t("settings.savingEllipsis") : t("common.save")}
@@ -110,6 +129,7 @@ function AddTransactionForm({ bankAccountId, onClose, onSaved }: { bankAccountId
 export function BankReconciliation() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [addingAccount, setAddingAccount] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
   const [bookEntries, setBookEntries] = useState<BookEntry[]>([]);
@@ -119,6 +139,7 @@ export function BankReconciliation() {
   const [matchError, setMatchError] = useState("");
   const activeKilnId = useAuthStore((s) => s.activeKilnId);
   const { t } = useTranslation();
+  const selectedAccount = accounts.find((a) => a._id === selectedAccountId) ?? null;
 
   async function refreshAccounts() {
     const rows = await api.bankAccounts.list();
@@ -187,9 +208,23 @@ export function BankReconciliation() {
             </button>
           ))}
         </div>
-        <Button size="sm" variant="outline" onClick={() => setAddingAccount((v) => !v)}>
-          <Plus className="h-4 w-4" /> {t("bankRecon.newAccount")}
-        </Button>
+        <div className="flex gap-2">
+          {selectedAccount && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setAddingAccount(false);
+                setEditingAccount(selectedAccount);
+              }}
+            >
+              <Pencil className="h-4 w-4" /> {t("common.edit")}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => { setEditingAccount(null); setAddingAccount((v) => !v); }}>
+            <Plus className="h-4 w-4" /> {t("bankRecon.newAccount")}
+          </Button>
+        </div>
       </div>
 
       {addingAccount && (
@@ -197,6 +232,17 @@ export function BankReconciliation() {
           onClose={() => setAddingAccount(false)}
           onSaved={() => {
             setAddingAccount(false);
+            refreshAccounts();
+          }}
+        />
+      )}
+
+      {editingAccount && (
+        <AddAccountForm
+          existing={editingAccount}
+          onClose={() => setEditingAccount(null)}
+          onSaved={() => {
+            setEditingAccount(null);
             refreshAccounts();
           }}
         />
