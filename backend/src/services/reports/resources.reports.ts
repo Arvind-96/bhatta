@@ -131,6 +131,7 @@ const fuel: ReportDefinition = {
         ],
         rows: grouped,
         totals: {
+          invoicedWeightKg: round2(grouped.reduce((s, r) => s + (r.invoicedWeightKg as number), 0)),
           actualWeightKg: round2(grouped.reduce((s, r) => s + (r.actualWeightKg as number), 0)),
           billAmount: round2(grouped.reduce((s, r) => s + (r.billAmount as number), 0)),
           amountPaid: round2(grouped.reduce((s, r) => s + (r.amountPaid as number), 0)),
