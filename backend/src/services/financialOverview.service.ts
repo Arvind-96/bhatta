@@ -77,19 +77,21 @@ function splitByPaymentMode<T extends { paymentMode?: string | null; cashAmount?
 // "Money spent" sums every distinct spend source exactly once:
 //   - Expense entries (JCB rental, royalty, petty cash, ...) — never touch
 //     the ledger, so no overlap risk.
-//   - FuelPurchase.amount (coal/wood/etc. bought) — the purchase's own
-//     recorded cost, used directly rather than via the supplier's ledger,
-//     since a fuel purchase only posts ledger entries when a supplier
-//     person is linked; using `amount` here works whether or not one is.
+//   - FuelPurchase.paidAmount (coal/wood/etc. bought) — what's actually
+//     been paid to the supplier so far, NOT the full bill (fuelPurchases.
+//     amount) — a fuel purchase can be partially paid on credit exactly
+//     like a Supplier Invoice, and the unpaid remainder already shows up
+//     separately as a supplier due (person.service.ts's listPaymentsDue).
+//     FuelPurchase never posts ledger entries (a supplier lives in the
+//     dedicated `suppliers` table, not `people`, so there's no valid
+//     ledger link even when one is attached), so this is the only place
+//     this cost is counted — no double-count risk either way.
 //   - VehicleDieselEntry.costAmount (diesel bought for kiln vehicles) —
 //     also never touches the ledger.
 //   - Every other PAID ledger entry (wages, salaries, soil arrivals,
-//     advances/kharchi/medical/festival, ...) EXCLUDING category "FUEL" —
-//     those are fuel-purchase-supplier settlements already counted via
-//     FuelPurchase.amount above, so including them again here would
-//     double-count the same rupees. Real customer payments never post to
-//     ledgerEntries at all (see above), so no customer-exclusion filter is
-//     needed here any more either.
+//     advances/kharchi/medical/festival, ...) — real customer payments
+//     never post to ledgerEntries at all (see above), so no customer-
+//     exclusion filter is needed here.
 // seasonId is nullable — pass null for an all-time, every-season view
 // (Compare needs to see across a season boundary to compare two
 // admin-picked date ranges at all, so it never passes a single season).

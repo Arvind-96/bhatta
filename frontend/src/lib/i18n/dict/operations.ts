@@ -86,6 +86,9 @@ export const operationsDict: Record<string, Record<Locale, string>> = {
   },
   "fuel.savePurchase": { en: "Save purchase", hi: "खरीद सहेजें" },
   "fuel.editPurchase": { en: "Edit purchase", hi: "खरीद संपादित करें" },
+  "fuel.billAmount": { en: "Bill Amount", hi: "बिल राशि" },
+  "fuel.paidAmount": { en: "Paid Amount", hi: "भुगतान राशि" },
+  "fuel.dueAmount": { en: "Due Amount", hi: "बकाया राशि" },
   "fuel.confirmDeletePurchase": {
     en: "Delete this fuel purchase? Any linked supplier ledger entries will be reversed and this cannot be undone.",
     hi: "यह ईंधन खरीद हटाएं? जुड़े आपूर्तिकर्ता खाता एंट्री उलट दी जाएंगी और इसे वापस नहीं लाया जा सकता।",

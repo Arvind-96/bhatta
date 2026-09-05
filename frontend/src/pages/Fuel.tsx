@@ -556,7 +556,9 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                   <th className="pb-2 font-medium">{t("common.vehicle")}</th>
                   <th className="pb-2 font-medium">{t("fuel.actual")}</th>
                   <th className="pb-2 font-medium">{t("fuel.variance")}</th>
-                  <th className="pb-2 font-medium text-right">{t("common.amount")}</th>
+                  <th className="pb-2 font-medium text-right">{t("fuel.billAmount")}</th>
+                  <th className="pb-2 font-medium text-right">{t("fuel.paidAmount")}</th>
+                  <th className="pb-2 font-medium text-right">{t("fuel.dueAmount")}</th>
                   <th className="pb-2 font-medium" />
                 </tr>
               </thead>
@@ -564,6 +566,15 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                 {pagedPurchases.map((p) => {
                   const gap = p.invoicedWeightKg - p.actualWeightKg;
                   const variance = p.invoicedWeightKg > 0 ? Math.round((gap / p.invoicedWeightKg) * 1000) / 10 : 0;
+                  // Bug fix: this row used to show only the full bill
+                  // amount, with no indication a purchase can be partially
+                  // paid on credit — the exact confusion behind "Where the
+                  // money went" showing the full bill as spent when only
+                  // part of it had actually been paid. Paid/Due are now
+                  // shown explicitly, same transparency the Purchase
+                  // Register report and Supplier profile already give.
+                  const paid = p.paidAmount ?? 0;
+                  const due = Math.max(0, Math.round((p.amount - paid) * 100) / 100);
                   return (
                     <tr key={p._id} className="border-b border-border/60 last:border-0">
                       <td className="py-3 text-ink-secondary">{new Date(p.date).toLocaleDateString("en-IN")}</td>
@@ -582,6 +593,12 @@ function PurchasesTab({ fuelTypes }: { fuelTypes: FuelType[] }) {
                       </td>
                       <td className="py-3 pr-2 text-right tabular-nums font-medium text-ink-primary">
                         ₹{formatINR(p.amount)}
+                      </td>
+                      <td className="py-3 pr-2 text-right tabular-nums text-status-good">
+                        ₹{formatINR(paid)}
+                      </td>
+                      <td className="py-3 pr-2 text-right tabular-nums font-medium text-status-critical">
+                        {due > 0 ? `₹${formatINR(due)}` : "—"}
                       </td>
                       <td className="py-3 pl-3 text-right">
                         <button
